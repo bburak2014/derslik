@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789343398567,
+      "tag": "0000_organic_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789343399608,
+      "tag": "0001_tenant_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789344872361,
+      "tag": "0002_learning_portals_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789363662708,
+      "tag": "0003_subscription_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789380000000,
+      "tag": "0004_single_backend_teaching",
+      "breakpoints": true
+    }
+  ]
+}

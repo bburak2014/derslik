@@ -1,0 +1,36 @@
+{
+  "name": "@derslik/mobile",
+  "version": "0.5.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "export": "expo export --platform ios --platform android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@derslik/api-client": "workspace:*",
+    "@derslik/contracts": "workspace:*",
+    "@expo/vector-icons": "^15.1.1",
+    "@supabase/supabase-js": "^2.57.0",
+    "expo": "~57.0.0",
+    "expo-crypto": "~57.0.2",
+    "expo-document-picker": "~57.0.1",
+    "expo-file-system": "~57.0.6",
+    "expo-linking": "~57.0.9",
+    "expo-secure-store": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "expo-video": "~57.0.3",
+    "expo-web-browser": "~57.0.2",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.14",
+    "typescript": "5.9.3"
+  }
+}

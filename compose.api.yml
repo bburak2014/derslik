@@ -1,0 +1,114 @@
+name: derslik
+
+x-api-image: &api-image
+  image: derslik-api:local
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+    target: runtime
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: derslik
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run node scripts/setup.mjs}
+      API_DATABASE_PASSWORD: ${API_DATABASE_PASSWORD:?API_DATABASE_PASSWORD is required}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./apps/api/docker/init-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d derslik"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    <<: *api-image
+    environment:
+      DATABASE_ADMIN_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/derslik
+      DATABASE_SSL: "false"
+    command: ["node", ".api-build/apps/api/src/db/migrate.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *api-image
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: "3001"
+      DATABASE_URL: postgresql://derslik_app:${API_DATABASE_PASSWORD}@postgres:5432/derslik
+      DATABASE_SSL: "false"
+      AUTH_ISSUER: ${AUTH_ISSUER:?Set the Supabase project auth issuer in .env.api}
+      WEB_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-derslik-materials}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_STREAM_TOKEN: ${CLOUDFLARE_STREAM_TOKEN:-}
+      CLOUDFLARE_STREAM_WEBHOOK_SECRET: ${CLOUDFLARE_STREAM_WEBHOOK_SECRET:-}
+      LEMONSQUEEZY_API_KEY: ${LEMONSQUEEZY_API_KEY:-}
+      LEMONSQUEEZY_STORE_ID: ${LEMONSQUEEZY_STORE_ID:-}
+      LEMONSQUEEZY_VARIANT_ID: ${LEMONSQUEEZY_VARIANT_ID:-}
+      LEMONSQUEEZY_WEBHOOK_SECRET: ${LEMONSQUEEZY_WEBHOOK_SECRET:-}
+      LEMONSQUEEZY_TEST_MODE: ${LEMONSQUEEZY_TEST_MODE:-true}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-authenticated}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_HTTP_PORT:-3001}:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  web:
+    image: derslik-web:local
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_BASE_URL: http://api:3001
+      SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL in .env.api}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Set the Supabase public key}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+    ports:
+      - "127.0.0.1:${WEB_HTTP_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  api-test:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: test
+    init: true
+    network_mode: none
+
+volumes:
+  postgres_data:

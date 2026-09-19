@@ -1,0 +1,14 @@
+{
+  "name": "@derslik/contracts",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./validation": "./src/validation.ts",
+    "./types": "./src/types.ts"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  }
+}

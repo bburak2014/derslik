@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Derslik",
+    "slug": "derslik",
+    "version": "0.3.0",
+    "orientation": "portrait",
+    "scheme": "derslik",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.derslik.app"
+    },
+    "android": {
+      "package": "com.derslik.app",
+      "permissions": [],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0f7a62"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-document-picker",
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "icon": "./assets/icon.png"
+  }
+}
