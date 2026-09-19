@@ -18,34 +18,78 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// Android'de basma geri bildirimi ripple ile verilir; iOS'ta opaklık değişimi
+// kullanılır. Tek yerde tanımlanır ki her dokunulabilir öğe aynı hissi versin.
+export const ripple = (light = false) =>
+  Platform.OS === "android"
+    ? { color: light ? "rgba(255,255,255,0.18)" : "rgba(13,29,41,0.10)", borderless: false }
+    : undefined;
+
+// Web ile birebir aynı değerler (apps/web/app/globals.css açık tema bloğu).
+// İki palet elle senkron tutuluyordu ve birbirinden kaymıştı; kaynak orası,
+// buradaki her değerin karşılığı orada bir belirteç.
 export const colors = {
-  // Brand
-  green: "#0f7a62",
-  greenDark: "#0a5f4c",
-  greenSoft: "#e6f4f0",
-  greenBorder: "#b7ded2",
-  navy: "#132c3d",
-  // Text
-  ink: "#0f2231",
-  body: "#33485c",
-  muted: "#64798c",
-  faint: "#8ea0b2",
-  // Surfaces
-  white: "#fff",
-  cream: "#f5f7fa",
-  subtle: "#eef2f7",
-  line: "#e3e9f0",
-  lineStrong: "#cbd6e2",
-  // Status
-  red: "#b23a2c",
-  redSoft: "#fdf1ef",
-  redBorder: "#f1cec7",
-  amber: "#8a5a10",
-  amberSoft: "#fdf5e6",
-  overlay: "rgba(15,34,49,0.45)",
+  // Marka
+  green: "#0f7a62", // --brand
+  greenDark: "#0a5f4c", // --brand-hover
+  greenSoft: "#e4f2ee", // --brand-soft
+  greenBorder: "#a7d4c6", // --brand-line
+  onBrand: "#ffffff", // --on-brand
+  navy: "#122c3e", // --navy
+  navySoft: "#1d3c51", // --navy-soft
+
+  // Metin — hepsi yüzey ve tuval üzerinde AA (4.5:1)
+  ink: "#0d1d29", // --ink
+  body: "#2c4153", // --text
+  muted: "#51657a", // --text-muted
+  faint: "#5c7084", // --text-subtle  (eski #8ea0b2 yalnızca 2.68:1 veriyordu)
+
+  // Yüzeyler
+  white: "#ffffff", // --surface
+  cream: "#f3f6f8", // --canvas
+  subtle: "#e8edf2", // --surface-sunken
+
+  // Çizgiler: dekoratif ayraç ile kontrol kenarlığı ayrı.
+  line: "#dae2e9", // --line         (kart kenarı, ayraç)
+  lineStrong: "#7e8f9e", // --line-control (girdi sınırı, 3:1)
+
+  // Durumlar
+  red: "#ae3226", // --danger
+  redSoft: "#fdf1ef", // --danger-soft
+  redBorder: "#efc7bf", // --danger-line
+  amber: "#7e5310", // --warn
+  amberSoft: "#fcf4e5", // --warn-soft
+  amberBorder: "#e8d3ab", // --warn-line
+  info: "#1a5578", // --info
+  infoSoft: "#ecf5fa", // --info-soft
+  infoBorder: "#c6deec", // --info-line
+
+  // Kimlik tonları — yalnızca ayırt etmek için; durum renklerinden ayrık.
+  tint1Bg: "#e2f1ec",
+  tint1Fg: "#0c6a55",
+  tint2Bg: "#e6edf4",
+  tint2Fg: "#2d5a80",
+  tint3Bg: "#ebe9f6",
+  tint3Fg: "#4c4494",
+  tint4Bg: "#f5e9e4",
+  tint4Fg: "#8a4a33",
+
+  overlay: "rgba(13,29,41,0.45)",
 };
 
-export const radius = { sm: 10, md: 12, lg: 16, xl: 22, pill: 999 };
+// surface: veri yüzeyi (kart, panel) — çizgili kâğıt hissi
+// action: eylem öğesi (düğme, girdi, segment)
+// pill: durum rozeti — veriden ayrışsın
+export const radius = {
+  surface: 6,
+  action: 8,
+  sm: 8,
+  md: 8,
+  lg: 6,
+  xl: 10,
+  pill: 999,
+};
+export const rail = 3;
 export const space = { xs: 6, sm: 10, md: 14, lg: 20, xl: 28 };
 
 const shadow = (level: 1 | 2 | 3) =>
@@ -60,11 +104,9 @@ const shadow = (level: 1 | 2 | 3) =>
     default: {},
   })!;
 
-export const elevation = {
-  card: shadow(1),
-  raised: shadow(2),
-  floating: shadow(3),
-};
+// Gölge yalnızca gerçekten yüzen yüzeyler için. Veri yüzeyleri (kart, metrik,
+// segment) çizgiyle ayrışır; bu, "defter" biçim dilinin temel kuralı.
+export const elevation = { floating: shadow(3) };
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
@@ -95,10 +137,17 @@ export const styles = StyleSheet.create({
   muted: { fontSize: 13.5, lineHeight: 21, color: colors.muted },
   caption: { fontSize: 12, lineHeight: 17, color: colors.faint },
   kicker: {
-    fontSize: 11,
-    letterSpacing: 1.1,
+    fontSize: 10.5,
+    letterSpacing: 0.75,
     fontWeight: "700",
     color: colors.green,
+    textTransform: "uppercase",
+  },
+  label2: {
+    fontSize: 10.5,
+    letterSpacing: 0.75,
+    fontWeight: "700",
+    color: colors.muted,
     textTransform: "uppercase",
   },
 
@@ -107,10 +156,9 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: radius.lg,
-    padding: 18,
+    borderRadius: radius.surface,
+    padding: 16,
     gap: 10,
-    ...shadow(1),
   },
   row: {
     flexDirection: "row",
@@ -134,7 +182,7 @@ export const styles = StyleSheet.create({
   // Buttons
   button: {
     minHeight: 50,
-    borderRadius: radius.md,
+    borderRadius: radius.action,
     paddingVertical: 13,
     paddingHorizontal: 18,
     flexDirection: "row",
@@ -160,9 +208,10 @@ export const styles = StyleSheet.create({
   danger: { backgroundColor: colors.redSoft, borderColor: colors.redBorder },
   dangerText: { color: colors.red },
   buttonSmall: {
-    minHeight: 40,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
+    // 48: Android'in 48dp'si iOS'un 44pt'sini de kapsıyor, tek değer yetiyor.
+    minHeight: 48,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     borderRadius: radius.sm,
   },
   buttonSmallText: { fontSize: 13.5 },
@@ -178,8 +227,8 @@ export const styles = StyleSheet.create({
   hint: { fontSize: 12.5, lineHeight: 18, color: colors.muted },
   input: {
     borderWidth: 1.5,
-    borderColor: colors.line,
-    borderRadius: radius.md,
+    borderColor: colors.lineStrong,
+    borderRadius: radius.action,
     paddingHorizontal: 14,
     paddingVertical: 13,
     minHeight: 52,
@@ -256,18 +305,21 @@ export const styles = StyleSheet.create({
     flex: 1,
     minWidth: 140,
     padding: 16,
+    paddingLeft: 16 - rail,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: radius.lg,
+    borderLeftWidth: rail,
+    borderLeftColor: colors.greenBorder,
+    borderRadius: radius.surface,
     gap: 4,
-    ...shadow(1),
   },
   metricValue: {
-    fontSize: 25,
+    fontSize: 26,
     fontWeight: "700",
     letterSpacing: -0.9,
     color: colors.ink,
+    fontVariant: ["tabular-nums"],
   },
 });
 
@@ -331,6 +383,7 @@ export function Button({
       disabled={inactive}
       accessibilityState={{ disabled: inactive, busy: loading }}
       onPress={onPress}
+      android_ripple={ripple(kind === "primary")}
       style={({ pressed }) => [
         styles.button,
         surface,
@@ -385,6 +438,7 @@ export function Card({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
+      android_ripple={ripple()}
       style={({ pressed }) => [
         styles.card,
         toned,
@@ -617,6 +671,7 @@ export function Segmented({
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
             onPress={() => onChange(o.value)}
+            android_ripple={ripple()}
             style={({ pressed }) => [
               section.segment,
               selected && section.segmentOn,
@@ -730,6 +785,8 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
           accessibilityLabel="Kapat"
           disabled={busy}
           onPress={onClose}
+          android_ripple={ripple()}
+          hitSlop={8}
           style={({ pressed }) => [
             section.close,
             pressed && { backgroundColor: colors.line },
@@ -880,7 +937,7 @@ const section = StyleSheet.create({
     flexWrap: "wrap",
     gap: 4,
     padding: 4,
-    borderRadius: radius.md,
+    borderRadius: radius.action,
     borderWidth: 1.5,
     borderColor: colors.line,
     backgroundColor: colors.subtle,
@@ -888,7 +945,7 @@ const section = StyleSheet.create({
   segment: {
     flexGrow: 1,
     flexBasis: 90,
-    minHeight: 42,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -896,13 +953,14 @@ const section = StyleSheet.create({
   },
   segmentOn: {
     backgroundColor: colors.white,
-    ...shadow(1),
+    borderWidth: 1,
+    borderColor: colors.greenBorder,
   },
   segmentText: { fontSize: 14, fontWeight: "600", color: colors.muted },
   segmentTextOn: { color: colors.green, fontWeight: "700" },
   close: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",

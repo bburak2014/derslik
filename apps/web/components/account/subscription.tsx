@@ -31,7 +31,17 @@ export function Subscription({
       setBusy(false);
     }
   }
-  if (!data) return error ? <p role="alert">{error}</p> : null;
+  // Rendering nothing while loading made the parent dialog jump a third time
+  // once the request landed; the placeholder keeps the card's slot reserved.
+  if (!data)
+    return error ? (
+      <p role="alert">{error}</p>
+    ) : (
+      <article className="usage-card is-loading" aria-hidden="true">
+        <span className="skeleton-line" />
+        <span className="skeleton-line short" />
+      </article>
+    );
   return (
     <article className="usage-card">
       <h3>Derslik aboneliği</h3>

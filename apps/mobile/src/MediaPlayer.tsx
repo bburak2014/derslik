@@ -87,7 +87,7 @@ export function MediaPlayer({
   }, [video.id, path, player]);
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView style={styles.screen} edges={["top", "bottom", "left", "right"]}>
         <ScrollView
           contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"

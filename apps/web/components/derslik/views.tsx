@@ -287,49 +287,46 @@ export function Overview({
     )
     .slice(0, 3);
   const shown = todayLessons.length ? todayLessons : next.slice(0, 4);
+  // Azalan paket ve açık bakiye tek listede, aciliyete göre: önce hakkı biten,
+  // sonra en büyük bakiye.
+  const attention = [
+    ...lowPackages.map((p) => {
+      const student = data.students.find((s) => s.id === p.student_id)!;
+      return {
+        key: "pkg-" + p.id,
+        kind: "package" as const,
+        student,
+        note: `${p.name} · ${p.remaining} / ${p.granted} hak kaldı`,
+        badge: p.remaining + " hak",
+        rank: p.remaining,
+        actionLabel: "Paket ekle",
+        action: () => actions.newPackage(student.id),
+      };
+    }),
+    ...active
+      .map((student) => ({ student, balance: balanceFor(data, student.id) }))
+      .filter((x) => x.balance > 0)
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 4)
+      .map(({ student, balance }) => ({
+        key: "bal-" + student.id,
+        kind: "balance" as const,
+        student,
+        note: "Paket ücretlerinden kalan",
+        badge: money(balance),
+        rank: 100,
+        actionLabel: "Tahsilat",
+        action: () => actions.newPayment(student.id),
+      })),
+  ]
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, 6);
   return (
     <>
-      <div className="stats-grid">
-        {[
-          {
-            label: "Aktif öğrenci",
-            value: active.length,
-            note: "Birlikte ilerlediğiniz öğrenciler",
-            icon: Users,
-          },
-          {
-            label: "Bugünkü ders",
-            value: todayLessons.filter((l) => l.status !== "CANCELLED").length,
-            note: `${todayLessons.filter((l) => l.status === "COMPLETED").length} ders tamamlandı`,
-            icon: CalendarDays,
-          },
-          {
-            label: "Bu ay tahsil edilen",
-            value: money(collected),
-            note: "Kaydettiğiniz manuel tahsilatlar",
-            icon: Wallet,
-          },
-          {
-            label: "Bekleyen tahsilat",
-            value: money(outstanding),
-            note: "Paket ücretlerinden kalan bakiye",
-            icon: Clock3,
-          },
-        ].map(({ label, value, note, icon: Icon }) => (
-          <div className="stat" key={label}>
-            <div className="stat-top">
-              <span>{label}</span>
-              <Icon size={18} />
-            </div>
-            <strong>{value}</strong>
-            <small>{note}</small>
-          </div>
-        ))}
-      </div>
       {data.students.length === 0 ? (
         <section className="onboarding">
           <div className="onboarding-copy">
-            <p className="eyebrow">DERSLİK'E HOŞ GELDİNİZ</p>
+            <p className="eyebrow">Derslik'e hoş geldiniz</p>
             <h2>
               İyi bir dersin başlangıcı,
               <br />
@@ -392,194 +389,177 @@ export function Overview({
           </div>
         </section>
       ) : (
-        <div className="dashboard-grid">
-          <div className="dashboard-main">
-            <section className="panel">
-              <div className="section-heading">
-                <div className="flex gap-3 items-center">
-                  <span className="date-tile">
-                    <small>
-                      {dayLabel(today + "T12:00:00+03:00", {
-                        month: "short",
-                        day: undefined,
-                      }).toLocaleUpperCase("tr")}
-                    </small>
-                    <strong>{Number(today.slice(-2))}</strong>
-                  </span>
-                  <div>
-                    <h2>
-                      {todayLessons.length
-                        ? "Bugünün dersleri"
-                        : "Sıradaki dersler"}
-                    </h2>
-                    <p>
-                      {dayLabel(today + "T12:00:00+03:00", {
-                        weekday: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
+        <>
+          {/* Gün şeridi: öğretmenin ilk sorusu "bugün ne var". Sayılar dört ayrı
+              karta değil, tarihin yanındaki tek bir deftere satırına toplandı. */}
+          <section className="day-panel">
+            <header className="day-panel-head">
+              <div className="day-panel-date">
+                <span className="date-tile">
+                  <small>
+                    {dayLabel(today + "T12:00:00+03:00", {
+                      month: "short",
+                      day: undefined,
+                    }).toLocaleUpperCase("tr")}
+                  </small>
+                  <strong>{Number(today.slice(-2))}</strong>
+                </span>
+                <div>
+                  <h2>Bugün</h2>
+                  <p>
+                    {dayLabel(today + "T12:00:00+03:00", {
+                      weekday: "long",
+                      year: "numeric",
+                    })}
+                  </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onNavigate("calendar")}
-                >
-                  Takvime git <ArrowUpRight size={14} />
+              </div>
+              <dl className="day-figures">
+                <div>
+                  <dt>Ders</dt>
+                  <dd>
+                    {todayLessons.filter((l) => l.status !== "CANCELLED").length}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Tamamlanan</dt>
+                  <dd>
+                    {todayLessons.filter((l) => l.status === "COMPLETED").length}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Aktif öğrenci</dt>
+                  <dd>{active.length}</dd>
+                </div>
+                <div>
+                  <dt>Bekleyen tahsilat</dt>
+                  <dd>{money(outstanding)}</dd>
+                </div>
+              </dl>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onNavigate("calendar")}
+              >
+                Takvime git <ArrowUpRight size={14} />
+              </Button>
+            </header>
+            {shown.length ? (
+              <LessonRows
+                lessons={shown}
+                data={data}
+                actions={actions}
+                busy={busy}
+                showDate={!todayLessons.length}
+              />
+            ) : (
+              /* Tam sayfa boş durum yerine tek satırlık istem: sayfanın
+                 yarısını kaplamasın. */
+              <div className="day-empty">
+                <span>
+                  <CalendarDays size={17} />
+                  Bugün planlanmış ders yok.
+                </span>
+                <Button size="sm" onClick={() => actions.newLesson()}>
+                  <Plus size={15} /> Ders planla
                 </Button>
               </div>
-              {shown.length ? (
-                <LessonRows
-                  lessons={shown}
-                  data={data}
-                  actions={actions}
-                  busy={busy}
-                  showDate={!todayLessons.length}
-                />
-              ) : (
-                <Empty
-                  title="Takviminizde biraz boşluk var."
-                  text="Yeni bir ders planlayarak öğrencinizle bir sonraki adımı belirleyin."
-                  action={
-                    <Button
-                      variant="outline"
-                      onClick={() => actions.newLesson()}
-                    >
-                      <Plus /> Ders planla
-                    </Button>
-                  }
-                />
-              )}
-              <div className="panel-foot">
-                <span>
-                  <CircleCheck size={14} /> Tamamlanan derslerde paket hakkı
-                  güncellenir.
-                </span>
+            )}
+          </section>
+
+          <div className="focus-grid">
+            {/* Dikkat gerektirenler: azalan paket ve açık bakiye eskiden iki
+                ayrı kartta duruyordu; ikisi de "kim ilgi bekliyor" sorusunun
+                cevabı olduğu için tek sıralı listede birleştirildi. */}
+            <section className="panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Dikkat gerektirenler</h2>
+                  <p>Azalan paketler ve açık bakiyeler</p>
+                </div>
+                <Package size={17} className="text-muted-foreground" />
               </div>
+              {attention.length ? (
+                <ul className="attention-list">
+                  {attention.map((item) => (
+                    <li className="attention-row" key={item.key}>
+                      <StudentAvatar student={item.student} />
+                      <div className="attention-body">
+                        <button
+                          className="student-name"
+                          onClick={() => actions.openStudent(item.student.id)}
+                        >
+                          {item.student.name}
+                        </button>
+                        <small>{item.note}</small>
+                      </div>
+                      <span
+                        className={
+                          "status " +
+                          (item.kind === "package"
+                            ? "status-warning"
+                            : "status-neutral")
+                        }
+                      >
+                        {item.badge}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={item.action}
+                      >
+                        {item.actionLabel}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="small-empty">
+                  <CircleCheck size={23} />
+                  <p>Bekleyen bir şey yok.</p>
+                  <span>
+                    Azalan paketler ve açık bakiyeler burada toplanır.
+                  </span>
+                </div>
+              )}
             </section>
-            <section className="quick-students">
-              <div className="section-heading border-0 px-0">
-                <h2>Öğrencilerinize bir bakış</h2>
+
+            <section className="panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Öğrencileriniz</h2>
+                  <p>{active.length} aktif</p>
+                </div>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => onNavigate("students")}
                 >
-                  Tüm öğrenciler <ArrowRight size={14} />
+                  Tümü <ArrowRight size={14} />
                 </Button>
               </div>
-              <div className="student-mini-grid">
-                {active.slice(0, 4).map((s) => (
-                  <button
-                    className="student-mini"
-                    onClick={() => actions.openStudent(s.id)}
-                    key={s.id}
-                  >
-                    <StudentAvatar student={s} />
-                    <strong>{s.name}</strong>
-                    <span>{s.subject}</span>
-                    <small>{creditsFor(data, s.id)} ders hakkı</small>
-                  </button>
+              <ul className="student-list">
+                {active.slice(0, 6).map((s) => (
+                  <li key={s.id}>
+                    <button
+                      className="student-row"
+                      onClick={() => actions.openStudent(s.id)}
+                    >
+                      <StudentAvatar student={s} />
+                      <span className="student-row-body">
+                        <strong>{s.name}</strong>
+                        <small>{s.subject}</small>
+                      </span>
+                      <span className="student-row-credit">
+                        {creditsFor(data, s.id)} ders
+                      </span>
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </section>
           </div>
-          <aside className="dashboard-side">
-            <section className="focus-card">
-              <div className="flex justify-between items-start">
-                <span className="focus-icon">
-                  <BookOpen size={21} />
-                </span>
-                <span className="focus-label">SIRADAKİ DERS</span>
-              </div>
-              {next[0] ? (
-                <>
-                  <span className="focus-time">
-                    {dayLabel(next[0].starts_at, { month: "short" })} ·{" "}
-                    {timeLabel(next[0].starts_at)}
-                  </span>
-                  <h2>
-                    {
-                      data.students.find((s) => s.id === next[0].student_id)
-                        ?.name
-                    }
-                  </h2>
-                  <p>{next[0].topic}</p>
-                  <Button
-                    className="w-full"
-                    variant="secondary"
-                    onClick={() => actions.openStudent(next[0].student_id)}
-                  >
-                    Derse hazırlan <ArrowUpRight />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <h2>Yeni bir başlangıca hazır.</h2>
-                  <p>Öğrenciniz için uygun zamanı seçin.</p>
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={() => actions.newLesson()}
-                  >
-                    Ders planla <Plus />
-                  </Button>
-                </>
-              )}
-            </section>
-            <section className="panel">
-              <div className="section-heading">
-                <h2>Paket takibi</h2>
-                <Package size={17} className="text-muted-foreground" />
-              </div>
-              {lowPackages.length ? (
-                <div className="renewal-list">
-                  {lowPackages.map((p) => {
-                    const s = data.students.find((s) => s.id === p.student_id)!;
-                    return (
-                      <div className="renewal" key={p.id}>
-                        <div className="flex items-center gap-3">
-                          <StudentAvatar student={s} />
-                          <div>
-                            <button
-                              className="student-name"
-                              onClick={() => actions.openStudent(s.id)}
-                            >
-                              {s.name}
-                            </button>
-                            <small>
-                              {p.remaining} / {p.granted} ders kaldı
-                            </small>
-                          </div>
-                        </div>
-                        <Progress
-                          value={(p.remaining / p.granted) * 100}
-                          className="h-1.5 mt-3"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => actions.newPackage(s.id)}
-                          className="renew-button"
-                        >
-                          Yeni paket ekle <Plus size={13} />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="small-empty">
-                  <CircleCheck size={23} />
-                  <p>Azalan bir paket yok.</p>
-                  <span>
-                    2 veya daha az hakkı kalan paketler burada görünür.
-                  </span>
-                </div>
-              )}
-            </section>
-          </aside>
-        </div>
+        </>
       )}
     </>
   );

@@ -154,7 +154,10 @@ function Application() {
     });
   if (!configured)
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView
+        style={styles.screen}
+        edges={["top", "bottom", "left", "right"]}
+      >
         <View style={[styles.body, { flex: 1, justifyContent: "center" }]}>
           <Text style={styles.brand}>
             derslik<Text style={{ color: colors.green }}>.</Text>
@@ -173,7 +176,10 @@ function Application() {
   if (reset) return <AuthScreen reset onDone={() => setReset(false)} />;
   if (!active || switching || invite)
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView
+        style={styles.screen}
+        edges={["top", "bottom", "left", "right"]}
+      >
         <ScrollView contentContainerStyle={styles.body}>
           <View style={{ gap: 4 }}>
             <Text style={styles.brand}>

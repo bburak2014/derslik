@@ -7,7 +7,10 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import type { Access } from "@derslik/api-client";
 import {
   emptyWorkspace,
@@ -67,6 +70,9 @@ export function TeacherScreen({
     [form, setForm] = useState<FormSpec | null>(null),
     [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  // Ekranın SafeAreaView'ı alt kenarı kapsamıyor (gövde tam yükseklikte kalsın
+  // diye); alt güvenli alanı sekme çubuğu kendi taşıyor.
+  const insets = useSafeAreaInsets();
   const load = useCallback(async () => {
     try {
       setData(await request(`/workspaces/${access.id}/snapshot`));
@@ -494,7 +500,7 @@ export function TeacherScreen({
             ? "Tahsilatlar"
             : "Bildirimler";
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         {student ? (
           <Button
@@ -888,7 +894,7 @@ export function TeacherScreen({
         )}
       </ScrollView>
       {!student && (
-        <View style={styles.tabs}>
+        <View style={[styles.tabs, { paddingBottom: insets.bottom + 6 }]}>
           {[
             { id: "overview", label: "Özet", icon: "grid-outline" as const },
             {

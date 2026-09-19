@@ -1,15 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { cn } from "cn"
 import * as RechartsPrimitive from "recharts"
 import type { TooltipValueType } from "recharts"
 
-import { cn } from "@/lib/utils"
-
-const THEMES = {
-  light: null,
-  dark: "(prefers-color-scheme: dark)",
-} as const
+// Format: { THEME_NAME: CSS_SELECTOR }
+const THEMES = { light: "", dark: ".dark" } as const
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const
 type TooltipNameType = number | string
@@ -96,9 +93,9 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     <style
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
-          .map(([theme, media]) => {
-            const rule = `
-[data-chart=${id}] {
+          .map(
+            ([theme, prefix]) => `
+${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
@@ -109,8 +106,7 @@ ${colorConfig
   .join("\n")}
 }
 `
-            return media ? `@media ${media} {\n${rule}}\n` : rule
-          })
+          )
           .join("\n"),
       }}
     />

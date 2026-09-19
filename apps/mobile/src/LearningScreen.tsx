@@ -9,7 +9,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
 import { File, FileMode } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
@@ -80,6 +83,9 @@ export function LearningScreen({
     files: boolean;
     videos: boolean;
   } | null>(null);
+  // Ekranın SafeAreaView'ı alt kenarı kapsamıyor; kaydırma içeriği alt güvenli
+  // alan kadar boşluk bırakıyor ki son kart home indicator altında kalmasın.
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<LearningData | PortalData>(empty),
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
@@ -327,7 +333,7 @@ export function LearningScreen({
   }
   if (loading) return <Loading />;
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         {owner ? (
           <Button secondary size="sm" icon="chevron-back" onPress={onBack}>
@@ -394,7 +400,10 @@ export function LearningScreen({
             }}
           />
         }
-        contentContainerStyle={styles.body}
+        contentContainerStyle={[
+          styles.body,
+          { paddingBottom: 44 + insets.bottom },
+        ]}
       >
         <View style={{ gap: 4 }}>
           <Text style={styles.kicker}>
@@ -1234,7 +1243,7 @@ export function Inbox({ workspaceId }: { workspaceId?: string }) {
 
 const pill = StyleSheet.create({
   chip: {
-    minHeight: 40,
+    minHeight: 48,
     paddingHorizontal: 16,
     justifyContent: "center",
     borderRadius: radius.pill,

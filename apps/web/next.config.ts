@@ -18,7 +18,12 @@ function connectSources() {
   sources.add("https://*.supabase.co");
   sources.add("https://videodelivery.net");
   sources.add("https://*.cloudflarestream.com");
-  if (development) sources.add("ws://localhost:*");
+  // Next.js dev HMR opens a WebSocket; connect-src 'self' does not cover the ws:
+  // scheme, so both spellings of the dev host are listed explicitly.
+  if (development) {
+    sources.add("ws://localhost:*");
+    sources.add("ws://127.0.0.1:*");
+  }
   return [...sources].join(" ");
 }
 

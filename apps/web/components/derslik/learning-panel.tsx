@@ -11,6 +11,15 @@ import {
 } from "@derslik/api-client";
 import { money, dayLabel, dateKey } from "@derslik/contracts";
 import { backend } from "@/lib/client";
+import { ThemeToggle } from "@/components/account/theme-toggle";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -77,18 +86,26 @@ function ActionForm({
             }}
           >
             {spec.fields.map((f) => (
-              <label key={f.name}>
-                {f.label}
+              <div className="form-field" key={f.name}>
+                <Label htmlFor={"field-" + f.name}>{f.label}</Label>
                 {f.options ? (
-                  <select name={f.name} defaultValue={f.value}>
-                    {f.options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  // Radix Root, name verildiğinde form gönderimi için gizli bir
+                  // yerel select basar; FormData okuması bozulmaz.
+                  <Select name={f.name} defaultValue={f.value}>
+                    <SelectTrigger id={"field-" + f.name}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {f.options.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : f.type === "textarea" ? (
                   <textarea
+                    id={"field-" + f.name}
                     name={f.name}
                     defaultValue={f.value}
                     required={f.required !== false}
@@ -97,6 +114,7 @@ function ActionForm({
                   />
                 ) : (
                   <input
+                    id={"field-" + f.name}
                     name={f.name}
                     type={f.type || "text"}
                     defaultValue={f.value}
@@ -105,7 +123,7 @@ function ActionForm({
                     min={f.type === "number" ? 0 : undefined}
                   />
                 )}
-              </label>
+              </div>
             ))}
             {error && (
               <p className="form-error" role="alert">
@@ -643,17 +661,22 @@ export function LearningPanel({
                   );
               }}
             >
-              <label>
-                Bağlı ödev
-                <select name="assignmentId">
-                  <option value="">Genel ders materyali</option>
-                  {data.assignments.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="form-field">
+                <Label htmlFor="material-assignment">Bağlı ödev</Label>
+                <Select name="assignmentId" defaultValue="">
+                  <SelectTrigger id="material-assignment">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Genel ders materyali</SelectItem>
+                    {data.assignments.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <label>
                 PDF veya görsel
                 <input
@@ -777,17 +800,22 @@ export function LearningPanel({
                 }
               }}
             >
-              <label>
-                Ders
-                <select name="lessonId">
-                  <option value="">Genel ders videosu</option>
-                  {data.lessons.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.topic} · {dayLabel(l.starts_at)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="form-field">
+                <Label htmlFor="video-lesson">Ders</Label>
+                <Select name="lessonId" defaultValue="">
+                  <SelectTrigger id="video-lesson">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Genel ders videosu</SelectItem>
+                    {data.lessons.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.topic} · {dayLabel(l.starts_at)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <label>
                 Video başlığı
                 <input name="title" required maxLength={150} />
@@ -1313,19 +1341,40 @@ export function LearningPanel({
     </section>
   );
 }
-export function Portal({ access }: { access: Access }) {
+export function Portal({
+  access,
+  switcher,
+  onSignout,
+}: {
+  access: Access;
+  switcher?: React.ReactNode;
+  onSignout?: () => void;
+}) {
   return (
     <main className="portal-page">
-      <header>
-        <p className="eyebrow">
-          {access.role === "STUDENT"
-            ? "ÖĞRENCİ ÇALIŞMA ALANI"
-            : "VELİ TAKİP ALANI"}
-        </p>
-        <h1>{access.studentName}</h1>
-        <p>Her ders, yeni bir adım.</p>
+      <header className="portal-header">
+        <div>
+          <p className="eyebrow">
+            {access.role === "STUDENT"
+              ? "ÖĞRENCİ ÇALIŞMA ALANI"
+              : "VELİ TAKİP ALANI"}
+          </p>
+          <h1>{access.studentName}</h1>
+          <p>Her ders, yeni bir adım.</p>
+        </div>
+        <div className="portal-account">
+          {switcher}
+          <div className="portal-account-actions">
+            <ThemeToggle />
+            <AccountExtras />
+            {onSignout && (
+              <button className="secondary-button" onClick={onSignout}>
+                Çıkış yap
+              </button>
+            )}
+          </div>
+        </div>
       </header>
-      <AccountExtras />
       <LearningPanel
         workspaceId={access.id}
         studentId={access.studentId!}
@@ -1338,18 +1387,28 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
   const [open, setOpen] = useState(false),
     [inbox, setInbox] = useState<any[]>([]),
     [limits, setLimits] = useState<any>(null),
+    [loading, setLoading] = useState(false),
     [error, setError] = useState("");
+  // The two requests used to run one after the other while the dialog was
+  // already on screen, so it opened empty and then grew twice. They now run in
+  // parallel behind a skeleton that occupies the final layout.
   async function show() {
     setOpen(true);
     setError("");
+    setLoading(true);
     try {
-      setInbox((await backend("/inbox")).data);
-      if (workspaceId)
-        setLimits(
-          (await backend(`/workspaces/${workspaceId}/settings/limits`)).data,
-        );
+      const [inboxResult, limitsResult] = await Promise.all([
+        backend("/inbox"),
+        workspaceId
+          ? backend(`/workspaces/${workspaceId}/settings/limits`)
+          : Promise.resolve(null),
+      ]);
+      setInbox(inboxResult.data);
+      if (limitsResult) setLimits(limitsResult.data);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setLoading(false);
     }
   }
   return (
@@ -1366,7 +1425,15 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
             </DialogDescription>
           </DialogHeader>
           {error && <p role="alert">{error}</p>}
-          {limits && (
+          {loading && (
+            <div className="dialog-skeleton" aria-hidden="true">
+              <span className="skeleton-card" />
+              <span className="skeleton-card" />
+              <span className="skeleton-line" />
+              <span className="skeleton-line short" />
+            </div>
+          )}
+          {!loading && limits && (
             <article className="usage-card">
               <h3>
                 {limits.limits.plan === "PRO" ? "Pro plan" : "Pilot plan"}
@@ -1386,13 +1453,13 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
               </p>
             </article>
           )}
-          {workspaceId && (
+          {!loading && workspaceId && (
             <Subscription
               workspaceId={workspaceId}
               onUpdate={() => void show()}
             />
           )}
-          <div className="learning-list">
+          <div className="learning-list" hidden={loading}>
             {!inbox.length && <p>Henüz bildirim yok.</p>}
             {inbox.map((n) => (
               <article key={n.id}>

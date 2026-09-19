@@ -157,7 +157,10 @@ export function AuthScreen({
   }
   const text = copy[mode];
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.navy }]}>
+    <SafeAreaView
+      style={[styles.screen, { backgroundColor: colors.navy }]}
+      edges={["top", "bottom", "left", "right"]}
+    >
       <StatusBar style="light" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -462,10 +465,10 @@ const auth = StyleSheet.create({
   separatorText: { fontSize: 12.5, color: colors.muted },
   reveal: {
     position: "absolute",
-    right: 4,
-    top: 4,
-    width: 46,
-    height: 46,
+    right: 2,
+    top: 2,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.sm,
@@ -473,16 +476,17 @@ const auth = StyleSheet.create({
   link: { color: colors.green, fontSize: 14, fontWeight: "700" },
   forgot: {
     alignSelf: "flex-end",
-    minHeight: 34,
+    minHeight: 48,
     justifyContent: "center",
-    marginTop: -4,
+    paddingHorizontal: 4,
+    marginTop: -8,
   },
   backRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    minHeight: 40,
+    minHeight: 48,
   },
   switch: {
     alignItems: "center",
@@ -492,7 +496,7 @@ const auth = StyleSheet.create({
     gap: 8,
     marginTop: 2,
   },
-  switchLink: { minHeight: 36, justifyContent: "center" },
+  switchLink: { minHeight: 48, justifyContent: "center", paddingHorizontal: 4 },
   footer: {
     flexDirection: "row",
     alignItems: "center",

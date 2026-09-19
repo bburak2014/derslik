@@ -130,56 +130,63 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
     );
   const active = session.active,
     key = (a: Access) => `${a.id}:${a.role}:${a.studentId || ""}`;
-  const accountBar = (
-    <div className="account-bar">
-      <label>
-        Çalışma alanı
-        <select
-          aria-label="Çalışma alanını değiştir"
-          value={key(active)}
-          disabled={busy}
-          onChange={async (e) => {
-            setBusy(true);
-            try {
-              await webRequest("/api/session", { key: e.target.value });
-              await reload();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {session.list.map((a) => (
-            <option key={key(a)} value={key(a)}>
-              {a.name}
-              {a.studentName ? ` · ${a.studentName}` : ""} ·{" "}
-              {a.role === "OWNER"
-                ? "Öğretmen"
-                : a.role === "STUDENT"
-                  ? "Öğrenci"
-                  : "Veli"}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button onClick={() => void signout()}>Çıkış yap</button>
-      {error && <span role="alert">{error}</span>}
-    </div>
-  );
-  return (
-    <>
-      {accountBar}
-      {active.role === "OWNER" ? (
-        <Workspace
-          key={key(active)}
-          displayName={session.user.email.split("@")[0]}
-          connected={active}
-          onSignout={() => void signout()}
-        />
-      ) : (
-        <Portal key={key(active)} access={active} />
-      )}
-    </>
+  const switcher =
+    session.list.length > 1 || error ? (
+      <div className="workspace-switcher">
+        {session.list.length > 1 && (
+          <label>
+            Çalışma alanı
+            <select
+              aria-label="Çalışma alanını değiştir"
+              value={key(active)}
+              disabled={busy}
+              onChange={async (e) => {
+                setBusy(true);
+                try {
+                  await webRequest("/api/session", { key: e.target.value });
+                  await reload();
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {session.list.map((a) => (
+                <option key={key(a)} value={key(a)}>
+                  {a.name}
+                  {a.studentName ? ` · ${a.studentName}` : ""} ·{" "}
+                  {a.role === "OWNER"
+                    ? "Öğretmen"
+                    : a.role === "STUDENT"
+                      ? "Öğrenci"
+                      : "Veli"}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {error && (
+          <span role="alert" className="switcher-error">
+            {error}
+          </span>
+        )}
+      </div>
+    ) : null;
+  return active.role === "OWNER" ? (
+    <Workspace
+      key={key(active)}
+      displayName={session.user.email.split("@")[0]}
+      connected={active}
+      onSignout={() => void signout()}
+      switcher={switcher}
+    />
+  ) : (
+    <Portal
+      key={key(active)}
+      access={active}
+      switcher={switcher}
+      onSignout={() => void signout()}
+    />
   );
 }

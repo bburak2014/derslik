@@ -2,6 +2,14 @@
 import { useState } from "react";
 import type { WorkspaceData } from "@derslik/contracts";
 import { LearningPanel } from "./learning-panel";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type TeachingView = "assignments" | "files" | "videos";
 export function isTeachingView(view: string): view is TeachingView {
@@ -31,24 +39,27 @@ export function TeachingHub({
     );
   return (
     <section>
-      <div className="learning-panel learning-heading">
-        <label>
-          Öğrenci
-          <select
-            className="rounded-lg border px-3 py-2 ml-3 max-w-full"
-            aria-label="İçerikleri gösterilecek öğrenci"
-            value={student.id}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-                {s.active ? "" : " · Arşivde"}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span>{student.subject}</span>
+      <div className="teaching-student-bar">
+        <div className="form-field">
+          <Label htmlFor="teaching-student">Öğrenci</Label>
+          <Select value={student.id} onValueChange={setSelected}>
+            <SelectTrigger
+              id="teaching-student"
+              aria-label="İçerikleri gösterilecek öğrenci"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {students.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                  {s.active ? "" : " · Arşivde"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <span className="teaching-student-subject">{student.subject}</span>
       </div>
       <LearningPanel
         key={`${workspaceId}:${student.id}`}

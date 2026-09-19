@@ -1,6 +1,7 @@
 "use client";
 import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras } from "./learning-panel";
+import { ThemeToggle } from "@/components/account/theme-toggle";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   BookOpen,
@@ -156,10 +157,15 @@ export default function Workspace({
   displayName,
   connected,
   onSignout,
+  switcher,
 }: {
   displayName: string;
   connected: import("@derslik/api-client").Access;
   onSignout: () => void;
+  /** Workspace picker. It lives inside the sidebar because the sidebar is
+   *  position:fixed from the top of the viewport — anything rendered above it
+   *  as a sibling is covered, taking keyboard focus out of sight with it. */
+  switcher?: React.ReactNode;
 }) {
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
@@ -343,7 +349,9 @@ export default function Workspace({
             </span>
           </div>
         </SidebarContent>
-        <SidebarFooter className="p-6 gap-5">
+        <SidebarFooter className="p-6 gap-4">
+          <ThemeToggle />
+          {switcher}
           <div className="profile">
             <span className="avatar">
               {displayName.charAt(0).toLocaleUpperCase("tr")}
