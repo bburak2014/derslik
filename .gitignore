@@ -141,3 +141,36 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# --- Derslik'e özel üretilen çıktılar ---
+# Bu bölüm projenin kendi .gitignore'undan geliyordu; genel Node şablonu bunları
+# bilmediği için `pnpm dev` sonrası derleme çıktıları çalışma ağacında görünüyordu.
+
+# API TypeScript derlemesi (pnpm dev / pnpm api:build üretir)
+/.api-build/
+
+# Framework ve dağıtım çıktıları
+/.vinext/
+/.wrangler/
+/.sites-runtime/
+next-env.d.ts
+.vercel
+
+# Expo yerel geliştirme durumu ve native proje klasörleri
+**/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+
+# Yerel araç durumu
+/.agents/
+/.codex/
+/outputs/
+/work/
+
+# Anahtar dosyaları asla girmesin
+*.pem
+
+# Ortam örnekleri izlenmeye devam etsin (.env.* kuralı bunları da yakalıyor)
+!apps/api/.env.example
+!apps/web/.env.example
+!apps/mobile/.env.example

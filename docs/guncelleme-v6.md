@@ -47,21 +47,29 @@ exp://**
 Son satır Expo Go içindir: Expo Go özel şemaları açamadığı için mobil dönüş adresi
 `exp://BILGISAYAR_ADI:8081/--/auth/callback` biçiminde olur.
 
-**Önemli:** Supabase, host'u çıplak IP olan hiçbir dönüş adresini kabul etmez —
-izin listesine tam adresi yazsan bile. `exp://192.168.1.102:8081/...` reddedilir ve
-akış projenin Site URL'ine düşer; telefonda bu `localhost` sayfası olduğu için
-"bağlanılamadı" hatası görürsün. Expo Go varsayılan olarak LAN IP'si kullandığından
-sosyal giriş için Metro'yu isim üzerinden yayınlaman gerekir:
+**Önemli:** Supabase, host'u **loopback olmayan çıplak IP** olan dönüş adreslerini
+kabul etmez — izin listesine tam adresi yazsan bile. Ölçülen davranış:
+
+| Dönüş adresi | Sonuç |
+| --- | --- |
+| `exp://192.168.1.102:8081/--/auth/callback` | reddedilir, Site URL'e düşer |
+| `exp://127.0.0.1:8081/--/auth/callback` | kabul (loopback muaf) |
+| `exp://localhost:8081/--/auth/callback` | kabul |
+| `exp://xxx.exp.direct/--/auth/callback` | kabul (`exp://**` ile) |
+| `derslik://auth/callback` | kabul |
+
+`pnpm mobile:start` LAN IP'si verdiği için sosyal giriş dönemez; tarayıcı Site URL'ine
+gider ve telefonda "localhost bağlanamadı" görürsün. Bunun yerine:
 
 ```sh
-pnpm mobile:tunnel
+pnpm mobile:localhost   # emülatör veya USB'li cihaz: exp://127.0.0.1:8081
+pnpm mobile:tunnel      # farklı ağdaki gerçek telefon: exp://...exp.direct
 ```
 
-Tünel adresi `exp://...exp.direct` biçimindedir; host bir isim olduğu için yukarıdaki
-`exp://**` satırı bunu karşılar, başka ayar gerekmez. `exp://**` yalnızca kendi
-geliştirme makinende kullanılmalı; canlı projeye bu joker satırı ekleme.
-Native geliştirme veya mağaza derlemesinde aynı kod `derslik://auth/callback`
-adresini üretir; bu adres zaten listede olduğundan tünele de gerek kalmaz.
+`mobile:localhost` Android için `adb reverse`'ü kendi kurar. Tünel yolu için izin
+listesinde `exp://**` bulunmalıdır; bu joker yalnızca kendi geliştirme makinende
+kullanılmalı, canlı projeye ekleme. Native geliştirme veya mağaza derlemesinde aynı kod
+`derslik://auth/callback` üretir; o adres zaten listede olduğundan hiçbirine gerek kalmaz.
 
 Canlı web kullanırken kendi HTTPS web callback adresini de ekle; `.env.api` içindeki APP_ORIGIN bunun kök adresi olmalı. Google test modundaysa kullanacağın hesapları test kullanıcılarına ekle. Microsoft girişinde uygulama `email` kapsamını ister. Apple web OAuth için Services ID ve imzalama anahtarı ayarlarını tamamlamalısın; sağlayıcı secret süresini takip et.
 

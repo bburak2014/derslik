@@ -31,9 +31,10 @@ exp://**
 ```
 
 `exp://**` satırı yalnızca Expo Go ile yerel denemeler içindir; canlı projede ekleme.
-Supabase çıplak IP host'lu dönüş adreslerini kabul etmediği için Expo Go'yu varsayılan
-LAN IP'siyle değil `pnpm mobile:tunnel` ile başlat; tünel adresinin host'u isimdir ve
-bu satırla eşleşir.
+Supabase loopback olmayan çıplak IP host'lu dönüş adreslerini kabul etmez, bu yüzden
+Expo Go'yu varsayılan LAN IP'siyle başlatırsan sosyal giriş dönemez. Emülatör veya USB'li
+cihazda `pnpm mobile:localhost` (`exp://127.0.0.1:8081`, loopback muaf), farklı ağdaki
+gerçek telefonda `pnpm mobile:tunnel` kullan.
 
 Üretimde web callback adreslerini kendi HTTPS alan adına çevir. PKCE bağlantıları akışın başlatıldığı tarayıcı/uygulamada açılır. E-posta iletimini gerçek kullanıcı denemesi için kendi SMTP ayarlarınla doğrula. [Supabase sunucu istemcisi](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [mobil deep link](https://supabase.com/docs/guides/auth/native-mobile-deep-linking).
 
@@ -102,9 +103,9 @@ Telefon tarayıcısından `http://BILGISAYAR_IP:3001/health/ready` açılarak AP
 
 `API_PUBLIC_URL=https://api.senin-alan-adin` ayarlanırsa web ve mobil bu tek uzak API adresini kullanır. Yerel API için boş bırak. İstemci ortam dosyalarını elle farklı adreslere çevirmek yerine `.env.api` üzerinden `pnpm env:sync` çalıştır. API portunu değiştirirsen `API_HTTP_PORT`, web portunu değiştirirsen `WEB_HTTP_PORT`, `APP_ORIGIN`, `WEB_ORIGIN`, `CORS_ORIGINS` alanlarını uyumlu tut.
 
-QR ile temel ekranları Expo Go’da deneyebilirsin. Sosyal girişi Expo Go’da denemek
-için `pnpm mobile:tunnel` kullan ve Supabase Redirect URLs listesinde `exp://**`
-bulunsun; normal `pnpm mobile:start` LAN IP'si verdiğinden sosyal giriş dönemez. Mağaza davranışının
+QR ile temel ekranları Expo Go’da deneyebilirsin. Sosyal giriş için `pnpm mobile:start`
+yerine `pnpm mobile:localhost` (emülatör/USB) veya `pnpm mobile:tunnel` (farklı ağ)
+kullan; normal başlatma LAN IP'si verdiğinden Supabase dönüşü reddeder. Mağaza davranışının
 birebir aynısı ve `derslik://` giriş dönüşleri için native development build kullan. Android SDK/JDK veya macOS/Xcode kurulu olduğunda:
 
 ```sh
