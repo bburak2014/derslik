@@ -1,29 +1,25 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  Apple,
   ArrowRight,
   BookOpen,
   CalendarDays,
   Eye,
   EyeOff,
-  Grid2X2,
   ShieldCheck,
   Users,
 } from "lucide-react";
+import {
+  AppleIcon,
+  GoogleIcon,
+  MicrosoftIcon,
+} from "./provider-icons";
+import { Spinner } from "@/components/derslik/loading";
 import { webRequest } from "@/lib/client";
 const social = [
-  {
-    id: "google",
-    name: "Google",
-    icon: (
-      <span className="google-mark" aria-hidden="true">
-        G
-      </span>
-    ),
-  },
-  { id: "apple", name: "Apple", icon: <Apple aria-hidden="true" /> },
-  { id: "azure", name: "Microsoft", icon: <Grid2X2 aria-hidden="true" /> },
+  { id: "google", name: "Google", icon: <GoogleIcon /> },
+  { id: "apple", name: "Apple", icon: <AppleIcon /> },
+  { id: "azure", name: "Microsoft", icon: <MicrosoftIcon /> },
 ];
 export function AuthForm({
   onSuccess,
@@ -169,6 +165,7 @@ export function AuthForm({
                 >
                   {p.icon}
                   <span>{busy === p.id ? "Açılıyor…" : p.name}</span>
+                  {busy === p.id && <Spinner />}
                 </button>
               ))}
             </div>
@@ -275,6 +272,7 @@ export function AuthForm({
             </p>
           )}
           <button className="primary-button auth-submit" disabled={!!busy}>
+            {busy === "email" && <Spinner />}
             {busy === "email"
               ? "İşleniyor…"
               : mode === "signin"

@@ -580,16 +580,6 @@ h2 {
 .sample-banner svg {
   flex-shrink: 0;
 }
-.loading-state {
-  height: 370px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 15px;
-  color: var(--muted-foreground);
-  font-size: 14px;
-}
 .sample-label {
   display: inline-block;
   color: var(--warn);
@@ -2611,12 +2601,7 @@ button:disabled {
   border-color: var(--brand);
   background: var(--brand-soft);
 }
-.google-mark {
-  font-family: Arial, sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: #4285f4;
-}
+
 .auth-card > .auth-provider-note {
   font-size: 0.8125rem;
   margin: 10px 0 0;
@@ -4322,4 +4307,474 @@ input[type="file"] {
   color: var(--text);
   border: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
+}
+
+/* ==================================================================
+   Bildirilen arayüz düzeltmeleri
+   ================================================================== */
+
+/* 1) Tıklanabilir her şeyde işaretçi. Bazı yerlerde vardı, bazılarında yoktu. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]),
+select,
+[data-slot="button"]:not(:disabled),
+[data-slot="select-trigger"]:not([data-disabled]),
+[data-slot="sidebar-menu-button"],
+[data-slot="tabs-trigger"] {
+  cursor: pointer;
+}
+button:disabled,
+[data-slot="button"]:disabled {
+  cursor: not-allowed;
+}
+
+/* 2) Tablolar: shadcn kabı overflow-x taşıyor ama .panel'in overflow:hidden'ı
+   kaydırma çubuğunu kırpıyordu ve grid/flex içinde min-width:auto daralmayı
+   engelliyordu. Üçü birden çözülür. */
+.panel {
+  overflow: visible;
+}
+[data-slot="table-container"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+[data-slot="table"] {
+  min-width: max-content;
+}
+.panel,
+.focus-grid > *,
+.dashboard-main,
+.dashboard-side {
+  min-width: 0;
+}
+/* Dar ekranda kaydırılabilir olduğu görünsün. */
+@media (max-width: 760px) {
+  [data-slot="table-container"] {
+    scrollbar-width: thin;
+  }
+  [data-slot="table-container"]::-webkit-scrollbar {
+    height: 6px;
+  }
+  [data-slot="table-container"]::-webkit-scrollbar-thumb {
+    background: var(--line-control);
+    border-radius: 999px;
+  }
+}
+
+/* 3) Sidebar altı: e-posta bloğu ile çıkış düğmesi bitişikti. */
+[data-slot="sidebar-footer"] {
+  gap: 14px;
+}
+[data-slot="sidebar-footer"] .profile {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+.signout {
+  margin-top: 2px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: var(--radius-action);
+  transition: background 0.15s ease;
+}
+.signout:hover {
+  background: var(--sidebar-accent);
+}
+
+/* 4) Yükleme formları sayfanın tamamına yayılıyordu. Form alanı okunabilir
+   genişlikte kalır; ilgili alanlar yan yana gelir. */
+.video-upload {
+  max-width: 620px;
+  padding: 22px;
+}
+@media (min-width: 720px) {
+  .video-upload {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* Tek başına satır isteyen alanlar */
+  .video-upload > .form-field:first-child,
+  .video-upload > label:has(input[type="file"]),
+  .video-upload > small,
+  .video-upload > button,
+  .video-upload > [data-slot="button"],
+  .video-upload > progress {
+    grid-column: 1 / -1;
+  }
+}
+.video-upload > small {
+  margin-top: -8px;
+}
+
+/* 5) Arama alanı artık shadcn InputGroup: kenarlık ve odak halkası grupta,
+   ikon kontrolün üstüne binmiyor. Eski elle kurulmuş kuralları devre dışı. */
+.search-field {
+  max-width: 420px;
+  width: 100%;
+}
+.search-field [data-slot="input-group-control"] {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  height: auto;
+  min-height: 0;
+}
+
+/* InputGroup içindeki kontrol: genel `input { width: 100% }` kuralı grubun
+   içinde taşmaya yol açıyordu (ikon genişliği hesaba katılmıyordu). Grup bir
+   flex kabı; kontrol kalan alanı alsın. */
+[data-slot="input-group-control"] {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0;
+}
+[data-slot="input-group"] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: var(--control-height);
+  padding: 0 13px;
+  border-radius: var(--radius-action);
+  border-width: 1.5px;
+  border-style: solid;
+  border-color: var(--line-control);
+  background: var(--surface);
+}
+[data-slot="input-group"]:has([data-slot="input-group-control"]:focus) {
+  border-color: var(--brand);
+  box-shadow: var(--focus-ring);
+}
+[data-slot="input-group-addon"] {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+/* ---- Üst şerit: dar ekranda tek satıra sığsın ---------------------------
+   Sağ grup (bildirimler + yenile) ile kırıntı yolu 375 px'te üst üste
+   biniyordu. Kırıntı yolu bulunulan sayfaya iner, bildirimler zil ikonuna
+   dönüşür; her ikisi de ≥48 px dokunma alanını korur. */
+.topbar-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 0 0 auto;
+}
+.crumb-current {
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crumb-root,
+.crumb-sep {
+  flex: 0 0 auto;
+}
+.topbar-action {
+  gap: 8px;
+}
+
+@media (max-width: 767px) {
+  .topbar-crumbs {
+    gap: 8px;
+  }
+  .topbar-actions {
+    gap: 4px;
+  }
+  .crumb-root,
+  .crumb-sep {
+    display: none;
+  }
+  .crumb-current {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  /* Etiket gizlenince buton kare bir ikon düğmesine iner. */
+  .topbar-action-label {
+    display: none;
+  }
+  /* Üst şeritte 62 px yer var; dokunma hedefleri 44 px eşiğinin altına
+     düşmesin. */
+  .topbar-action,
+  .topbar-actions [data-slot="button"],
+  .topbar-crumbs [data-slot="sidebar-trigger"] {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    gap: 0;
+  }
+}
+
+/* Buton içindeki simge metinle aynı hizada kalsın. */
+.primary-button,
+.secondary-button,
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---- Yükleme ekranı: form + rehber ---------------------------------------
+   Form okunabilir genişlikte kalınca sağda boş bir şerit oluşuyordu. Oraya
+   işin kendi bilgisi konuyor. Dar ekranda rehber formun altına iner. */
+.upload-layout {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 22px;
+}
+@media (min-width: 1040px) {
+  .upload-layout {
+    grid-template-columns: minmax(0, 620px) minmax(250px, 340px);
+  }
+}
+.upload-aside {
+  border: 1px solid var(--line);
+  border-left: var(--rail) solid var(--brand-line);
+  border-radius: var(--radius-surface);
+  background: var(--surface-sunken);
+  padding: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.upload-aside-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-action);
+  background: var(--brand-soft);
+  color: var(--brand);
+  margin-bottom: 12px;
+}
+.upload-aside h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 10px;
+}
+.upload-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+}
+.upload-steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 21px 1fr;
+  gap: 9px;
+  align-items: start;
+  line-height: 1.45;
+}
+.upload-steps li::before {
+  content: counter(step);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.upload-rules {
+  margin: 0 0 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.upload-rules dt {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 7px;
+}
+.upload-rules dd {
+  margin: 0 0 5px;
+  padding-left: 15px;
+  position: relative;
+  color: var(--foreground);
+}
+.upload-rules dd::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.upload-aside-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-subtle);
+}
+
+/* ---- Liste satırı eylemleri: ikon düğmeleri -----------------------------
+   Metin düğmeler satırı şişiriyordu. Ad artık tooltip ve aria-label'da;
+   görünür hedef 40 px (dar ekranda 44 px). */
+.icon-action {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.icon-action-danger {
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+.icon-action-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+/* Eylem yerine durum yazan satırlar (yükleme bitmemiş, silme bekliyor). */
+.learning-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+@media (max-width: 767px) {
+  .icon-action {
+    width: 44px;
+    height: 44px;
+  }
+  .learning-state {
+    min-height: 44px;
+  }
+}
+
+/* ---- Dosya önizleme penceresi ------------------------------------------
+   PDF ve görseller indirilmeden açılabilsin. */
+.preview-dialog {
+  max-width: 900px;
+  width: calc(100vw - 32px);
+}
+.preview-frame {
+  display: block;
+  width: 100%;
+  height: 65vh;
+  min-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background: var(--surface-sunken);
+  object-fit: contain;
+}
+@media (max-width: 767px) {
+  .preview-frame {
+    height: 55vh;
+    min-height: 240px;
+  }
+}
+
+/* ---- Liste satırı: başlık solda, eylemler sağda --------------------------
+   İkon düğmeleri içeriğin altında değil, başlıkla aynı hizada sağda durur.
+   Yer kalmadığında (dar ekran) alta sarar. */
+.learning-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.learning-row-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+/* Başlık, satırın en üstünden başlasın: video kartında h3 bir sarmalayıcının
+   içinde, o yüzden bir seviye daha derini de sıfırlanıyor. */
+.learning-row-main > :first-child,
+.learning-row-main > :first-child > :first-child {
+  margin-top: 0;
+}
+.learning-row-main > :last-child {
+  margin-bottom: 0;
+}
+.learning-actions-aligned {
+  margin: 0;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 767px) {
+  /* Dar ekranda ikonlar başlığın altına sarar; sola hizalı kalsın. */
+  .learning-actions-aligned {
+    flex: 1 1 100%;
+  }
+}
+
+/* Oynatıcı hazırlanırken: simge + kısa açıklama. */
+.player-loading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ---- Yüklenme göstergesi ------------------------------------------------
+   Sayfa ve bölüm yüklemelerinde tek gösterim: alanın ortasında dönen simge.
+   Metin yok; etiket ekran okuyucuda. */
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 300px;
+  color: var(--text-muted);
+}
+.loading-state.is-compact {
+  min-height: 180px;
+}
+.loading-spinner {
+  width: 30px;
+  height: 30px;
+}
+
+/* ---- Sağlayıcı (marka) düğmeleri ---------------------------------------
+   Google, Apple ve Microsoft marka kılavuzlarının üçü de işaretin beyaz
+   zeminde durmasını ister; o yüzden etkin düğme temadan bağımsız beyaz ve
+   metni sabit koyu. Koyu temada var(--ink) beyaz üstünde okunmuyordu.
+   Hover yeşile boyamıyor: marka zemini nötr kalmalı.
+   Devre dışı düğme sayfa zeminine döner; Apple işareti tek renkli olduğu
+   için currentColor ile o zeminde de görünür kalır (Apple'ın kendi kılavuzu
+   da açık zeminde siyah, koyu zeminde beyaz der). */
+.social-button:not(:disabled) {
+  background: #ffffff;
+  color: #1f1f1f;
+}
+.social-button:not(:disabled):hover {
+  background: #f1f4f7;
+  border-color: var(--line-control);
+  box-shadow: none;
+}
+.social-button:disabled {
+  color: var(--text-muted);
 }

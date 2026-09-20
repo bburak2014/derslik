@@ -12,6 +12,34 @@ import {
 import { money, dayLabel, dateKey } from "@derslik/contracts";
 import { backend } from "@/lib/client";
 import { ThemeToggle } from "@/components/account/theme-toggle";
+import { Button } from "@/components/ui/button";
+import {
+  Bell,
+  Download,
+  Eye,
+  FileText,
+  Play,
+  RefreshCw,
+  Trash2,
+  Video as VideoIcon,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { PageLoader, Skeleton, Spinner } from "@/components/derslik/loading";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -24,6 +52,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -131,6 +160,7 @@ function ActionForm({
               </p>
             )}
             <button className="primary-button" disabled={busy}>
+              {busy && <Spinner />}
               {busy ? "Kaydediliyor…" : "Kaydet"}
             </button>
           </form>
@@ -150,6 +180,43 @@ const empty: LearningData = {
   summaries: [],
   progress: [],
 };
+type Confirmation = {
+  title: string;
+  description: string;
+  action: string;
+  perform: () => void | Promise<void>;
+};
+
+function ConfirmDialog({
+  state,
+  onClose,
+}: {
+  state: Confirmation | null;
+  onClose: () => void;
+}) {
+  return (
+    <AlertDialog open={!!state} onOpenChange={(open) => !open && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{state?.title}</AlertDialogTitle>
+          <AlertDialogDescription>{state?.description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              void state?.perform();
+              onClose();
+            }}
+          >
+            {state?.action}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export function LearningPanel({
   workspaceId,
   studentId,
@@ -169,10 +236,15 @@ export function LearningPanel({
   } | null>(null);
   const [data, setData] = useState<LearningData | PortalData>(empty),
     [loading, setLoading] = useState(true),
+    [confirmation, setConfirmation] = useState<Confirmation | null>(null),
     [error, setError] = useState(""),
     [tab, setTab] = useState("assignments"),
     [form, setForm] = useState<FormSpec | null>(null),
     [activeVideo, setActiveVideo] = useState<Video | null>(null),
+    [filePreview, setFilePreview] = useState<{
+      file: Material;
+      url: string;
+    } | null>(null),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState<number | null>(null),
     [access, setAccess] = useState<any>(null),
@@ -277,6 +349,18 @@ export function LearningPanel({
       setBusy(false);
     }
   }
+  async function openPreview(file: Material) {
+    setBusy(true);
+    try {
+      // inline=1: imzalı bağlantı indirme yerine satır içi gösterim için gelsin.
+      const r = await backend(media + `/files/${file.id}/download?inline=1`);
+      setFilePreview({ file, url: r.data.url });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function download(file: Material) {
     try {
       const r = await backend(media + `/files/${file.id}/download`);
@@ -285,8 +369,15 @@ export function LearningPanel({
       setError((e as Error).message);
     }
   }
-  async function remove(file: Material) {
-    if (!confirm(`“${file.name}” silinsin mi?`)) return;
+  function remove(file: Material) {
+    setConfirmation({
+      title: "Dosya silinsin mi?",
+      description: `“${file.name}” kalıcı olarak kaldırılacak. Öğrenci artık indiremeyecek.`,
+      action: "Sil",
+      perform: () => removeNow(file),
+    });
+  }
+  async function removeNow(file: Material) {
     setBusy(true);
     try {
       await backend(media + `/files/${file.id}/delete`, {});
@@ -315,8 +406,8 @@ export function LearningPanel({
   }, [permissions.join(","), tab]);
   if (loading)
     return (
-      <div className="learning-panel" role="status">
-        Öğrenci içerikleri yükleniyor…
+      <div className="learning-panel">
+        <PageLoader compact />
       </div>
     );
   return (
@@ -340,15 +431,25 @@ export function LearningPanel({
               {t.title}
             </button>
           ))}
-          <button aria-label="İçerikleri yenile" onClick={() => void reload()}>
-            ↻
-          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="İçerikleri yenile"
+            onClick={() => void reload()}
+          >
+            <RefreshCw size={16} />
+          </Button>
         </div>
       )}
       {view && (
-        <button className="secondary-button mb-4" onClick={() => void reload()}>
-          İçerikleri yenile
-        </button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mb-4"
+          onClick={() => void reload()}
+        >
+          <RefreshCw size={15} /> İçerikleri yenile
+        </Button>
       )}
       {error && (
         <p role="alert" className="form-error">
@@ -613,6 +714,7 @@ export function LearningPanel({
                     )}
                     {(owner || (student && a.status === "OPEN")) && (
                       <label className="file-button">
+                        {busy && <Spinner />}
                         {busy ? "Yükleniyor…" : "Dosya ekle"}
                         <input
                           type="file"
@@ -647,6 +749,7 @@ export function LearningPanel({
             </div>
           </div>
           {owner && (
+            <div className="upload-layout">
             <form
               className="video-upload"
               onSubmit={async (e) => {
@@ -692,9 +795,12 @@ export function LearningPanel({
                 className="primary-button"
                 disabled={busy || !capabilities?.files}
               >
+                {busy && <Spinner />}
                 {busy ? "Yükleniyor…" : "Dosya yükle"}
               </button>
             </form>
+            <UploadAside kind="files" />
+            </div>
           )}
           <div className="learning-list">
             {!data.materials.length && (
@@ -704,35 +810,52 @@ export function LearningPanel({
             )}
             {data.materials.map((file) => (
               <article key={file.id}>
-                <h3>{file.name}</h3>
-                <p>
-                  {file.assignment_id
-                    ? data.assignments.find((a) => a.id === file.assignment_id)
-                        ?.title
-                    : "Genel ders materyali"}{" "}
-                  · {Math.ceil(Number(file.size_bytes) / 1024)} KB
-                </p>
-                <div className="learning-actions">
-                  <button
-                    className="secondary-button"
-                    disabled={file.status !== "READY" || file.delete_requested}
-                    onClick={() => void download(file)}
-                  >
-                    {file.delete_requested
-                      ? "Silme bekliyor"
-                      : file.status === "READY"
-                        ? "Dosyayı indir"
+                <div className="learning-row">
+                  <div className="learning-row-main">
+                    <h3>{file.name}</h3>
+                    <p>
+                      {file.assignment_id
+                        ? data.assignments.find(
+                            (a) => a.id === file.assignment_id,
+                          )?.title
+                        : "Genel ders materyali"}{" "}
+                      · {Math.ceil(Number(file.size_bytes) / 1024)} KB
+                    </p>
+                  </div>
+                <div className="learning-actions learning-actions-aligned">
+                  {file.status === "READY" && !file.delete_requested ? (
+                    <>
+                      <IconAction
+                        label="Önizle"
+                        icon={<Eye size={16} />}
+                        disabled={busy}
+                        onClick={() => void openPreview(file)}
+                      />
+                      <IconAction
+                        label="Dosyayı indir"
+                        icon={<Download size={16} />}
+                        onClick={() => void download(file)}
+                      />
+                    </>
+                  ) : (
+                    <span className="learning-state">
+                      {file.delete_requested
+                        ? "Silme bekliyor"
                         : "Yükleme tamamlanmadı"}
-                  </button>
+                    </span>
+                  )}
                   {owner && (
-                    <button
-                      className="text-danger"
+                    <IconAction
+                      danger
+                      label={
+                        file.delete_requested ? "Silmeyi yeniden dene" : "Sil"
+                      }
+                      icon={<Trash2 size={16} />}
                       disabled={busy}
                       onClick={() => void remove(file)}
-                    >
-                      {file.delete_requested ? "Silmeyi yeniden dene" : "Sil"}
-                    </button>
+                    />
                   )}
+                </div>
                 </div>
               </article>
             ))}
@@ -748,6 +871,7 @@ export function LearningPanel({
             </div>
           </div>
           {owner && (
+            <div className="upload-layout">
             <form
               className="video-upload"
               onSubmit={async (e) => {
@@ -855,11 +979,14 @@ export function LearningPanel({
                 className="primary-button"
                 disabled={busy || !capabilities?.videos}
               >
+                {busy && <Spinner />}
                 {busy
                   ? `Yükleniyor · %${Math.round((progress || 0) * 100)}`
                   : "Videoyu yükle"}
               </button>
             </form>
+            <UploadAside kind="videos" />
+            </div>
           )}
           <div className="learning-list">
             {!data.videos.length && (
@@ -869,31 +996,34 @@ export function LearningPanel({
             )}
             {data.videos.map((v) => (
               <article key={v.id}>
-                <div className="learning-card-heading">
-                  <h3>{v.title}</h3>
-                  <span className="eyebrow">
-                    {v.delete_requested
-                      ? "SİLME BEKLİYOR"
-                      : v.status === "READY"
-                        ? `${Math.ceil((v.duration_seconds || 0) / 60)} DK`
-                        : v.status === "FAILED"
-                          ? "YÜKLENEMEDİ"
-                          : "HAZIRLANIYOR"}
-                  </span>
-                </div>
-                <div className="learning-actions">
+                <div className="learning-row">
+                  <div className="learning-row-main">
+                    <div className="learning-card-heading">
+                      <h3>{v.title}</h3>
+                      <span className="eyebrow">
+                        {v.delete_requested
+                          ? "SİLME BEKLİYOR"
+                          : v.status === "READY"
+                            ? `${Math.ceil((v.duration_seconds || 0) / 60)} DK`
+                            : v.status === "FAILED"
+                              ? "YÜKLENEMEDİ"
+                              : "HAZIRLANIYOR"}
+                      </span>
+                    </div>
+                  </div>
+                <div className="learning-actions learning-actions-aligned">
                   {v.status === "READY" && !v.delete_requested && (
-                    <button
-                      className="primary-button"
+                    <IconAction
+                      label="Videoyu aç"
+                      icon={<Play size={16} />}
                       onClick={() => setActiveVideo(v)}
-                    >
-                      Videoyu aç
-                    </button>
+                    />
                   )}
                   {owner && (
                     <>
-                      <button
-                        className="secondary-button"
+                      <IconAction
+                        label="Durumu yenile"
+                        icon={<RefreshCw size={16} />}
                         disabled={busy}
                         onClick={async () => {
                           setBusy(true);
@@ -909,34 +1039,38 @@ export function LearningPanel({
                             setBusy(false);
                           }
                         }}
-                      >
-                        Durumu yenile
-                      </button>
-                      <button
-                        className="text-danger"
+                      />
+                      <IconAction
+                        danger
+                        label="Sil"
+                        icon={<Trash2 size={16} />}
                         disabled={busy}
-                        onClick={async () => {
-                          if (
-                            !confirm(
-                              "Bu video silinsin mi? Öğrenci artık izleyemeyecek.",
-                            )
-                          )
-                            return;
-                          setBusy(true);
-                          try {
-                            await backend(media + `/videos/${v.id}/delete`, {});
-                            await reload();
-                          } catch (e) {
-                            setError((e as Error).message);
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        Sil
-                      </button>
+                        onClick={() =>
+                          setConfirmation({
+                            title: "Video silinsin mi?",
+                            description:
+                              "Kayıt kalıcı olarak kaldırılacak. Öğrenci artık izleyemeyecek.",
+                            action: "Sil",
+                            perform: async () => {
+                              setBusy(true);
+                              try {
+                                await backend(
+                                  media + `/videos/${v.id}/delete`,
+                                  {},
+                                );
+                                await reload();
+                              } catch (e) {
+                                setError((e as Error).message);
+                              } finally {
+                                setBusy(false);
+                              }
+                            },
+                          })
+                        }
+                      />
                     </>
                   )}
+                </div>
                 </div>
                 {data.questions
                   .filter((q) => q.video_id === v.id)
@@ -1225,21 +1359,25 @@ export function LearningPanel({
                 {!a.revokedAt && (
                   <button
                     className="text-danger"
-                    onClick={async () => {
-                      if (
-                        !confirm("Bu hesabın öğrenciye erişimi kaldırılsın mı?")
-                      )
-                        return;
-                      try {
-                        await backend(
-                          `/workspaces/${workspaceId}/students/${studentId}/access/revoke`,
-                          { id: a.id, kind: "link" },
-                        );
-                        await accessReload();
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
+                    onClick={() =>
+                      setConfirmation({
+                        title: "Erişim kaldırılsın mı?",
+                        description:
+                          "Bu hesap öğrencinin ödev, dosya ve videolarını artık göremeyecek.",
+                        action: "Kaldır",
+                        perform: async () => {
+                          try {
+                            await backend(
+                              `/workspaces/${workspaceId}/students/${studentId}/access/revoke`,
+                              { id: a.id, kind: "link" },
+                            );
+                            await accessReload();
+                          } catch (e) {
+                            setError((e as Error).message);
+                          }
+                        },
+                      })
+                    }
                   >
                     Erişimi kaldır
                   </button>
@@ -1286,6 +1424,44 @@ export function LearningPanel({
         spec={form}
         onClose={() => setForm(null)}
       />
+      <Dialog
+        open={!!filePreview}
+        onOpenChange={(open) => {
+          if (!open) setFilePreview(null);
+        }}
+      >
+        <DialogContent className="preview-dialog">
+          <DialogHeader>
+            <DialogTitle>{filePreview?.file.name}</DialogTitle>
+            <DialogDescription>
+              Önizleme · dosyayı indirmeden içeriğine göz atın.
+            </DialogDescription>
+          </DialogHeader>
+          {filePreview &&
+            (isImageName(filePreview.file.name) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="preview-frame"
+                src={filePreview.url}
+                alt={filePreview.file.name}
+              />
+            ) : (
+              <iframe
+                className="preview-frame"
+                src={filePreview.url}
+                title={filePreview.file.name}
+              />
+            ))}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => void download(filePreview!.file)}
+            >
+              <Download size={16} /> Dosyayı indir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={!!activeVideo}
         onOpenChange={(open) => {
@@ -1338,6 +1514,10 @@ export function LearningPanel({
           )}
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        state={confirmation}
+        onClose={() => setConfirmation(null)}
+      />
     </section>
   );
 }
@@ -1383,6 +1563,85 @@ export function Portal({
     </main>
   );
 }
+// Yükleme formu okunabilir genişlikte kalınca sağda geniş bir boşluk kalıyordu.
+// Oraya dekor yerine işin kendisine ait bilgi konuyor: akışın adımları, kabul
+// edilen dosya kuralları ve öğrencinin sonunda ne göreceği.
+// Liste satırlarındaki eylemler metin yerine ikon düğmesi: satır daralıyor,
+// adlar tooltip ve aria-label olarak kalıyor (yalnızca ikon erişilebilirliği
+// kaybettirmesin diye).
+function IconAction({
+  label,
+  icon,
+  onClick,
+  disabled,
+  danger,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className={"icon-action" + (danger ? " icon-action-danger" : "")}
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+          >
+            {icon}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function isImageName(name: string) {
+  return /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
+}
+
+function UploadAside({ kind }: { kind: "files" | "videos" }) {
+  const video = kind === "videos";
+  const steps = video
+    ? ["Videonun ait olduğu dersi seçin.", "Dosyayı ekleyip süreyi doğrulayın.", "Yükleme bitince öğrenci izleyebilir."]
+    : ["Ödevi ya da genel materyali seçin.", "PDF veya görseli ekleyin.", "Dosya öğrencinin paneline düşer."];
+  const rules = video
+    ? ["MP4 veya MOV", "En fazla 2 GB", "En fazla 120 dakika"]
+    : ["PDF, JPG, PNG veya WebP", "En fazla 10 MB", "Ödeve ya da derse bağlanır"];
+  return (
+    <aside className="upload-aside">
+      <span className="upload-aside-icon" aria-hidden="true">
+        {video ? <VideoIcon size={20} /> : <FileText size={20} />}
+      </span>
+      <h3>{video ? "Video nasıl yayına girer" : "Dosya nasıl paylaşılır"}</h3>
+      <ol className="upload-steps">
+        {steps.map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ol>
+      <dl className="upload-rules">
+        <dt>Kabul edilen</dt>
+        {rules.map((r) => (
+          <dd key={r}>{r}</dd>
+        ))}
+      </dl>
+      <p className="upload-aside-note">
+        {video
+          ? "Yükleme sürerken sayfadan ayrılmayın; bağlantı koparsa aynı dosyayla kaldığı yerden denenir."
+          : "Öğrenciler yalnızca kendilerine bağlanmış dosyaları görür."}
+      </p>
+    </aside>
+  );
+}
+
 export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
   const [open, setOpen] = useState(false),
     [inbox, setInbox] = useState<any[]>([]),
@@ -1413,9 +1672,17 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
   }
   return (
     <>
-      <button className="secondary-button" onClick={() => void show()}>
-        Bildirimler{workspaceId ? " ve kullanım" : ""}
-      </button>
+      <Button
+        variant="outline"
+        className="topbar-action"
+        onClick={() => void show()}
+        aria-label={"Bildirimler" + (workspaceId ? " ve kullanım" : "")}
+      >
+        <Bell size={16} />
+        <span className="topbar-action-label">
+          Bildirimler{workspaceId ? " ve kullanım" : ""}
+        </span>
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="learning-dialog">
           <DialogHeader>
@@ -1427,10 +1694,10 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
           {error && <p role="alert">{error}</p>}
           {loading && (
             <div className="dialog-skeleton" aria-hidden="true">
-              <span className="skeleton-card" />
-              <span className="skeleton-card" />
-              <span className="skeleton-line" />
-              <span className="skeleton-line short" />
+              <Skeleton className="skeleton-card" />
+              <Skeleton className="skeleton-card" />
+              <Skeleton className="skeleton-line" />
+              <Skeleton className="skeleton-line short" />
             </div>
           )}
           {!loading && limits && (

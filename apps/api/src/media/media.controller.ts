@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
   type RawBodyRequest,
@@ -57,8 +58,15 @@ export class MediaController {
     @Param("ws") w: string,
     @Param("student") s: string,
     @Param("id") id: string,
+    @Query("inline") inline?: string,
   ) {
-    return this.media.downloadFile(req.actor, uuid.parse(w), uuid.parse(s), id);
+    return this.media.downloadFile(
+      req.actor,
+      uuid.parse(w),
+      uuid.parse(s),
+      id,
+      inline === "1",
+    );
   }
   @Post("files/:id/delete") deleteFile(
     @Req() req: ActorRequest,

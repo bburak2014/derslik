@@ -27,6 +27,21 @@ function connectSources() {
   return [...sources].join(" ");
 }
 
+// PDF önizlemesi imzalı Supabase Storage bağlantısını bir iframe'e koyar.
+// frame-src yazılmazsa default-src 'self' geçerli olur ve önizleme sessizce
+// engellenir. Kaynak dar tutuluyor: yalnızca Supabase, https: geneli değil.
+function frameSources() {
+  const sources = new Set(["'self'"]);
+  try {
+    if (process.env.SUPABASE_URL)
+      sources.add(new URL(process.env.SUPABASE_URL).origin);
+  } catch {
+    /* A malformed value simply contributes no source. */
+  }
+  sources.add("https://*.supabase.co");
+  return [...sources].join(" ");
+}
+
 const policy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -40,6 +55,7 @@ const policy = [
   "media-src 'self' blob: https://videodelivery.net https://*.cloudflarestream.com",
   "font-src 'self' data:",
   `connect-src ${connectSources()}`,
+  `frame-src ${frameSources()}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   ...(development ? [] : ["upgrade-insecure-requests"]),

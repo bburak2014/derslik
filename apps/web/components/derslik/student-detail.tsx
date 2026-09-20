@@ -13,7 +13,6 @@ import {
   BookOpen,
   ArrowDownLeft,
   ArrowUpRight,
-  LoaderCircle,
 } from "lucide-react";
 import {
   Sheet,
@@ -23,6 +22,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/derslik/loading";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -87,7 +87,7 @@ function NoteEditor({
           size="sm"
           disabled={busy || body === (note?.body || "")}
         >
-          {busy ? <LoaderCircle className="animate-spin" /> : null} Notu kaydet
+          {busy ? <Spinner /> : null} Notu kaydet
         </Button>
       </div>
     </form>

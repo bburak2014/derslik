@@ -231,13 +231,19 @@ export class MediaService {
       true,
     );
   }
-  async downloadFile(actor: Actor, ws: string, student: string, id: string) {
+  async downloadFile(
+    actor: Actor,
+    ws: string,
+    student: string,
+    id: string,
+    inline = false,
+  ) {
     const f = await this.file(actor, ws, student, id);
     if (f.status !== "READY")
       throw new ConflictException("Dosya henüz hazır değil.");
     return {
       data: {
-        url: await this.providers.downloadFileUrl(f.object_key),
+        url: await this.providers.downloadFileUrl(f.object_key, inline),
         expiresIn: 120,
         name: f.name,
       },

@@ -139,7 +139,9 @@ export class MediaProviders {
       throw new ServiceUnavailableException("Yükleme bağlantısı geçersiz.");
     return url.href;
   }
-  async downloadFileUrl(key: string) {
+  // `&download=` Supabase'e Content-Disposition: attachment verdirir. Tarayıcı
+  // içinde önizleme isteyen çağrılar bunu istemez, satır içi gösterim ister.
+  async downloadFileUrl(key: string, inline = false) {
     const data = (await (
       await this.storage("/object/sign/" + this.objectPath(key), {
         method: "POST",
@@ -147,7 +149,7 @@ export class MediaProviders {
         body: JSON.stringify({ expiresIn: 120 }),
       })
     ).json()) as { signedURL: string };
-    return this.storageRoot() + data.signedURL + "&download=";
+    return this.storageRoot() + data.signedURL + (inline ? "" : "&download=");
   }
   async fileInfo(key: string) {
     return (

@@ -1,6 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { LoaderCircle, Info, Plus } from "lucide-react";
+import { Info, Plus } from "lucide-react";
+import { Spinner } from "@/components/derslik/loading";
 import {
   Dialog,
   DialogContent,
@@ -614,7 +615,7 @@ export function RecordDialog({
             <Button type="submit" disabled={busy || noStudents || noPackage}>
               {busy ? (
                 <>
-                  <LoaderCircle className="animate-spin" /> Kaydediliyor
+                  <Spinner /> Kaydediliyor
                 </>
               ) : modal.type === "lesson" ? (
                 "Dersi planla"

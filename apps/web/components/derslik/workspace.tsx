@@ -12,9 +12,7 @@ import {
   Plus,
   Search,
   LogOut,
-  ArrowUpRight,
   RefreshCw,
-  LoaderCircle,
   FlaskConical,
   ChevronRight,
   FileText,
@@ -22,7 +20,12 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PageLoader, Spinner } from "@/components/derslik/loading";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Sidebar,
   SidebarProvider,
@@ -176,6 +179,7 @@ export default function Workspace({
     [selectedDay, setSelectedDay] = useState(dateKey()),
     [studentId, setStudentId] = useState<string | null>(null),
     [modal, setModal] = useState<ModalState | null>(null);
+  const [signoutOpen, setSignoutOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<{
     title: string;
     description: string;
@@ -361,7 +365,7 @@ export default function Workspace({
               <small>Öğretmen hesabı</small>
             </div>
           </div>
-          <button className="signout" onClick={onSignout}>
+          <button className="signout" onClick={() => setSignoutOpen(true)}>
             <LogOut size={14} /> Çıkış yap
           </button>
         </SidebarFooter>
@@ -371,15 +375,15 @@ export default function Workspace({
           İçeriğe geç
         </a>
         <header className="topbar">
-          <div className="flex items-center gap-3">
+          <div className="topbar-crumbs">
             <SidebarTrigger aria-label="Menüyü aç veya kapat" />
-            <span>Çalışma alanım</span>
-            <ChevronRight size={13} />
-            <span className="text-foreground">
+            <span className="crumb-root">Çalışma alanım</span>
+            <ChevronRight size={13} className="crumb-sep" />
+            <span className="crumb-current">
               {navigation.find((n) => n.id === view)?.label}
             </span>
           </div>
-          <div className="flex gap-5 items-center">
+          <div className="topbar-actions">
             {connected && <AccountExtras workspaceId={connected.id} />}
             <span className="workspace-tag">
               <span /> Yalnızca size özel
@@ -448,10 +452,7 @@ export default function Workspace({
             </div>
           )}
           {loading ? (
-            <div className="loading-state" role="status">
-              <LoaderCircle className="animate-spin" />
-              <span>Çalışma alanınız yükleniyor…</span>
-            </div>
+            <PageLoader />
           ) : (
             <>
               {view === "overview" && (
@@ -487,15 +488,17 @@ export default function Workspace({
               {view === "students" && (
                 <>
                   <div className="search-row">
-                    <div className="search-field">
-                      <Search size={17} />
-                      <Input
+                    <InputGroup className="search-field">
+                      <InputGroupAddon>
+                        <Search size={17} />
+                      </InputGroupAddon>
+                      <InputGroupInput
                         aria-label="Öğrenci ara"
                         placeholder="İsim, sınıf veya ders ara…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
-                    </div>
+                    </InputGroup>
                     <span>{data.students.length} öğrenci kaydı</span>
                   </div>
                   <StudentsView
@@ -547,6 +550,28 @@ export default function Workspace({
           busy={busy}
         />
       )}
+      <AlertDialog open={signoutOpen} onOpenChange={setSignoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hesabınızdan çıkılsın mı?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Oturumunuz kapanacak ve tekrar giriş yapmanız gerekecek.
+              Kaydedilmemiş bir değişikliğiniz varsa önce kaydedin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSignoutOpen(false);
+                onSignout();
+              }}
+            >
+              Çıkış yap
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog
         open={!!confirmation}
         onOpenChange={(open) => {
@@ -575,7 +600,7 @@ export default function Workspace({
             >
               {busy ? (
                 <>
-                  <LoaderCircle className="animate-spin" /> Kaydediliyor
+                  <Spinner /> Kaydediliyor
                 </>
               ) : (
                 "Onayla"

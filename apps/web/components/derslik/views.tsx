@@ -326,7 +326,7 @@ export function Overview({
       {data.students.length === 0 ? (
         <section className="onboarding">
           <div className="onboarding-copy">
-            <p className="eyebrow">Derslik'e hoş geldiniz</p>
+            <p className="eyebrow">Derslik&apos;e hoş geldiniz</p>
             <h2>
               İyi bir dersin başlangıcı,
               <br />

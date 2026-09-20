@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import type { Video } from "@derslik/api-client";
 import { backend } from "@/lib/client";
+import { Spinner } from "@/components/derslik/loading";
 export function VideoPlayer({
   video,
   mediaPath,
@@ -102,7 +103,11 @@ export function VideoPlayer({
           playing.current = false;
         }}
       />
-      {!ready && !error && <p role="status">Video açılıyor…</p>}
+      {!ready && !error && (
+        <p role="status" className="player-loading">
+          <Spinner /> Video açılıyor…
+        </p>
+      )}
       {error && (
         <p role="alert" className="form-error">
           {error}

@@ -6,6 +6,7 @@ import Workspace from "@/components/derslik/workspace";
 import { AuthForm } from "./auth-form";
 import { backend, webRequest } from "@/lib/client";
 import { Portal } from "@/components/derslik/learning-panel";
+import { PageLoader } from "@/components/derslik/loading";
 export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
   const [session, setSession] = useState<{
       user: { email: string };
@@ -35,8 +36,8 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
   }, [reload]);
   if (loading)
     return (
-      <main className="connection-state" role="status">
-        Çalışma alanınız açılıyor…
+      <main className="connection-state">
+        <PageLoader />
       </main>
     );
   if (unauthorized) return <AuthForm onSuccess={() => void reload()} />;
