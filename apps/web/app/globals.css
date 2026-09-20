@@ -4778,3 +4778,37 @@ button:disabled,
 .social-button:disabled {
   color: var(--text-muted);
 }
+
+/* ---- Davet bağlantısı: gönderme seçenekleri ----------------------------
+   Kopyala ile WhatsApp yan yana; dar ekranda alt alta geçer. */
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.invite-actions > .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  flex: 1 1 auto;
+}
+.invite-actions svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+/* Marka işareti kendi yeşilinde; düğme zemini nötr kalır. */
+.whatsapp-button:hover {
+  border-color: #25d366;
+}
+
+/* Davet kutusundaki gönderim durumu satırı. */
+.invite-state {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

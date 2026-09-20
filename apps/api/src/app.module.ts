@@ -14,6 +14,7 @@ import { HealthController } from "./health.controller.js";
 import { SnapshotService } from "./workspaces/snapshot.service.js";
 import { LearningService } from "./learning/learning.service.js";
 import { AccessService } from "./access/access.service.js";
+import { MailService } from "./access/mail.js";
 import { LearningController } from "./learning/learning.controller.js";
 import { MediaProviders } from "./media/providers.js";
 import { MediaService } from "./media/media.service.js";
@@ -58,6 +59,7 @@ export class AppModule {
         SnapshotService,
         LearningService,
         AccessService,
+        MailService,
         MediaProviders,
         MediaService,
         BillingProvider,

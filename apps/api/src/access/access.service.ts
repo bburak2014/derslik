@@ -12,6 +12,7 @@ import { CONFIG, type ApiConfig } from "../config.js";
 import { DatabaseService } from "../db/database.service.js";
 import { CommandService, toDto } from "../common/command.service.js";
 import { MediaProviders } from "../media/providers.js";
+import { MailService } from "./mail.js";
 import { lockStudent } from "../students/students.service.js";
 
 @Injectable()
@@ -20,6 +21,7 @@ export class AccessService {
     private readonly db: DatabaseService,
     private readonly commands: CommandService,
     private readonly providers: MediaProviders,
+    private readonly mail: MailService,
     @Inject(CONFIG) private readonly config: ApiConfig,
   ) {}
   list(actor: Actor) {
@@ -53,7 +55,7 @@ export class AccessService {
       return { data: toDto([...owners, ...portals]) };
     });
   }
-  invite(
+  async invite(
     actor: Actor,
     ws: string,
     student: string,
@@ -78,13 +80,14 @@ export class AccessService {
       })
       .strict()
       .parse(input);
-    return this.commands.run(
+    let studentName = "";
+    const result = await this.commands.run(
       actor,
       ws,
       key,
       { action: "invitation.create", studentId: student, ...c },
       async (tx) => {
-        await lockStudent(tx, ws, student, true);
+        studentName = (await lockStudent(tx, ws, student, true)).name;
         const token = randomBytes(32).toString("hex"),
           hash = createHash("sha256").update(token).digest("hex");
         const invite = (
@@ -102,6 +105,17 @@ export class AccessService {
         };
       },
     );
+    // Gönderim commit'ten sonra: sağlayıcı hata verirse davet yine de durur ve
+    // öğretmen bağlantıyı kopyalayarak iletebilir. Aynı anahtarla tekrar
+    // gelen istek (replayed) ikinci bir e-posta doğurmaz.
+    if (result.replayed) return result;
+    const emailed = await this.mail.sendInvite({
+      to: c.email,
+      url: result.data.url as string,
+      studentName,
+      role: c.role,
+    });
+    return { ...result, data: { ...result.data, emailed } };
   }
   async accept(actor: Actor, authorization: string, input: unknown) {
     const { token } = z

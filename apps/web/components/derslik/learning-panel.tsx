@@ -15,6 +15,7 @@ import { ThemeToggle } from "@/components/account/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Bell,
+  Copy,
   Download,
   Eye,
   FileText,
@@ -30,6 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { PageLoader, Skeleton, Spinner } from "@/components/derslik/loading";
+import { WhatsappIcon } from "@/components/account/provider-icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,13 +222,23 @@ function ConfirmDialog({
 export function LearningPanel({
   workspaceId,
   studentId,
+  studentName,
+  studentPhone,
   role = "OWNER",
   view,
+  initialTab,
+  autoInvite = false,
 }: {
   workspaceId: string;
   studentId: string;
+  studentName?: string;
+  studentPhone?: string;
   role?: "OWNER" | "STUDENT" | "GUARDIAN";
   view?: "assignments" | "files" | "videos";
+  /** Açılışta seçili gelecek sekme (öğrenci panelindeki kısayollar için). */
+  initialTab?: string;
+  /** Açılışta davet formu doğrudan açılsın mı. */
+  autoInvite?: boolean;
 }) {
   const owner = role === "OWNER",
     student = role === "STUDENT";
@@ -238,8 +250,12 @@ export function LearningPanel({
     [loading, setLoading] = useState(true),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null),
     [error, setError] = useState(""),
-    [tab, setTab] = useState("assignments"),
-    [form, setForm] = useState<FormSpec | null>(null),
+    [tab, setTab] = useState(initialTab ?? "assignments"),
+    // Davet kısayolu formu ilk render'da açar; effect ile açmak fazladan bir
+    // render turu ve yanıp sönme demek olurdu.
+    [form, setForm] = useState<FormSpec | null>(() =>
+      autoInvite ? inviteSpec() : null,
+    ),
     [activeVideo, setActiveVideo] = useState<Video | null>(null),
     [filePreview, setFilePreview] = useState<{
       file: Material;
@@ -248,7 +264,12 @@ export function LearningPanel({
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState<number | null>(null),
     [access, setAccess] = useState<any>(null),
-    [invite, setInvite] = useState("");
+    // Davet sonucu: bağlantı + e-postanın gerçekten gidip gitmediği.
+    [invite, setInvite] = useState<{
+      url: string;
+      email: string;
+      emailed: boolean;
+    } | null>(null);
   useEffect(() => {
     if (view) setTab(view);
   }, [view]);
@@ -348,6 +369,56 @@ export function LearningPanel({
     } finally {
       setBusy(false);
     }
+  }
+  /** Davet formunun tanımı; hem sekmedeki düğme hem de öğrenci panelindeki
+   *  kısayol aynı formu açsın diye tek yerde duruyor. */
+  function inviteSpec(): FormSpec {
+    return {
+      title: "Davet bağlantısı oluştur",
+      fields: [
+        { name: "email", label: "Davet edilecek e-posta", type: "email" },
+        {
+          name: "role",
+          label: "Hesap türü",
+          value: "STUDENT",
+          options: [
+            { value: "STUDENT", label: "Öğrenci" },
+            { value: "GUARDIAN", label: "Veli" },
+          ],
+        },
+        {
+          name: "payments",
+          label: "Paket ve ödeme bilgisi",
+          value: "no",
+          options: [
+            { value: "no", label: "Gizli kalsın" },
+            { value: "yes", label: "Görüntüleyebilsin" },
+          ],
+        },
+      ],
+      submit: async (v) => {
+        const r = await backend(
+          `/workspaces/${workspaceId}/students/${studentId}/invitations`,
+          {
+            email: v.email,
+            role: v.role,
+            permissions: [
+              "lessons",
+              "assignments",
+              "videos",
+              "notes",
+              ...(v.payments === "yes" ? ["payments"] : []),
+            ],
+          },
+        );
+        setInvite({
+          url: r.data.url,
+          email: v.email,
+          emailed: Boolean(r.data.emailed),
+        });
+        await accessReload();
+      },
+    };
   }
   async function openPreview(file: Material) {
     setBusy(true);
@@ -1274,79 +1345,53 @@ export function LearningPanel({
           </div>
           <button
             className="primary-button"
-            onClick={() =>
-              setForm({
-                title: "Davet bağlantısı oluştur",
-                fields: [
-                  {
-                    name: "email",
-                    label: "Davet edilecek e-posta",
-                    type: "email",
-                  },
-                  {
-                    name: "role",
-                    label: "Hesap türü",
-                    value: "STUDENT",
-                    options: [
-                      { value: "STUDENT", label: "Öğrenci" },
-                      { value: "GUARDIAN", label: "Veli" },
-                    ],
-                  },
-                  {
-                    name: "payments",
-                    label: "Paket ve ödeme bilgisi",
-                    value: "no",
-                    options: [
-                      { value: "no", label: "Gizli kalsın" },
-                      { value: "yes", label: "Görüntüleyebilsin" },
-                    ],
-                  },
-                ],
-                submit: async (v) => {
-                  const r = await backend(
-                    `/workspaces/${workspaceId}/students/${studentId}/invitations`,
-                    {
-                      email: v.email,
-                      role: v.role,
-                      permissions: [
-                        "lessons",
-                        "assignments",
-                        "videos",
-                        "notes",
-                        ...(v.payments === "yes" ? ["payments"] : []),
-                      ],
-                    },
-                  );
-                  setInvite(r.data.url);
-                  await accessReload();
-                },
-              })
-            }
+            onClick={() => setForm(inviteSpec())}
           >
             Davet oluştur
           </button>
           {invite && (
             <div className="invite-link">
+              <p className="invite-state">
+                {invite.emailed
+                  ? `Davet ${invite.email} adresine e-posta ile gönderildi. Ulaşmadıysa aşağıdaki bağlantıyı kendiniz iletebilirsiniz.`
+                  : "E-posta gönderimi kapalı; bağlantıyı aşağıdan kopyalayıp iletin."}
+              </p>
               <label>
                 Davet bağlantısı · 7 gün geçerli
                 <input
                   readOnly
-                  value={invite}
+                  value={invite.url}
                   onFocus={(e) => e.target.select()}
                 />
               </label>
-              <button
-                className="secondary-button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(invite);
-                  } catch {
-                    setError("Bağlantıyı seçip kopyalayın.");
-                  }
-                }}
-              >
-                Kopyala
-              </button>
+              <div className="invite-actions">
+                <button
+                  className="secondary-button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(invite.url);
+                    } catch {
+                      setError("Bağlantıyı seçip kopyalayın.");
+                    }
+                  }}
+                >
+                  <Copy size={15} /> Kopyala
+                </button>
+                {whatsappNumber(studentPhone || "") && (
+                  <a
+                    className="secondary-button whatsapp-button"
+                    href={whatsappInviteUrl(
+                      studentPhone || "",
+                      studentName || "",
+                      invite.url,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <WhatsappIcon /> WhatsApp ile gönder
+                  </a>
+                )}
+              </div>
             </div>
           )}
           <div className="learning-list">
@@ -1602,6 +1647,28 @@ function IconAction({
       </Tooltip>
     </TooltipProvider>
   );
+}
+
+/**
+ * Öğretmen telefonu serbest metin olarak giriyor ("0532 123 45 67",
+ * "+90 532...", "532..."). wa.me yalnızca ülke koduyla ve yalnızca rakam
+ * kabul eder. Türkiye cep numaraları 5 ile başladığı için baştaki "90" güvenle
+ * ülke kodu sayılabilir; başka bir ülke kodu yazılmışsa dokunulmaz.
+ */
+function whatsappNumber(raw: string) {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("90")) return digits;
+  if (digits.startsWith("0")) return "90" + digits.slice(1);
+  if (digits.length === 10) return "90" + digits;
+  return digits;
+}
+
+function whatsappInviteUrl(phone: string, name: string, invite: string) {
+  const text =
+    `Merhaba${name ? " " + name : ""}, Derslik'te size bir hesap tanımladım. ` +
+    `Aşağıdaki bağlantıdan 7 gün içinde giriş yapabilirsiniz:\n\n${invite}`;
+  return `https://wa.me/${whatsappNumber(phone)}?text=${encodeURIComponent(text)}`;
 }
 
 function isImageName(name: string) {

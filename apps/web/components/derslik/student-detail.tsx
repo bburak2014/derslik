@@ -13,6 +13,7 @@ import {
   BookOpen,
   ArrowDownLeft,
   ArrowUpRight,
+  Send,
 } from "lucide-react";
 import {
   Sheet,
@@ -111,6 +112,17 @@ export function StudentDetail({
   mutate: Mutate;
   busy: boolean;
 }) {
+  // invite bir sayaç: kısayola arka arkaya basıldığında da panel yeniden
+  // kurulsun ve davet formu tekrar açılsın.
+  const [tabState, setTabState] = useState({
+    id: "",
+    tab: "packages",
+    invite: 0,
+  });
+  const current =
+    tabState.id === student?.id
+      ? tabState
+      : { id: student?.id ?? "", tab: "packages", invite: 0 };
   const packages = data.packages.filter((p) => p.student_id === student?.id),
     lessons = data.lessons.filter((l) => l.student_id === student?.id),
     credits = data.credits.filter((c) => c.student_id === student?.id);
@@ -168,6 +180,22 @@ export function StudentDetail({
                 >
                   <Pencil /> Düzenle
                 </Button>
+                {workspaceId && !!student.active && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setTabState((prev) => ({
+                        id: student.id,
+                        tab: "learning",
+                        invite:
+                          (prev.id === student.id ? prev.invite : 0) + 1,
+                      }))
+                    }
+                  >
+                    <Send /> Davet gönder
+                  </Button>
+                )}
                 {!!student.active && (
                   <Button
                     variant="ghost"
@@ -201,7 +229,10 @@ export function StudentDetail({
               </div>
             </div>
             <Tabs
-              defaultValue="packages"
+              value={current.tab}
+              onValueChange={(v) =>
+                setTabState({ id: student.id, tab: v, invite: 0 })
+              }
               key={student.id}
               className="detail-tabs"
             >
@@ -385,8 +416,15 @@ export function StudentDetail({
               {workspaceId && (
                 <TabsContent value="learning">
                   <LearningPanel
+                    // Kısayoldan gelindiğinde panel yeniden kurulsun ki
+                    // "Davetler" sekmesi ve form açılış anında gelsin.
+                    key={current.invite ? "invite-" + current.invite : "normal"}
                     workspaceId={workspaceId}
                     studentId={student.id}
+                    studentName={student.name}
+                    studentPhone={student.phone}
+                    initialTab={current.invite ? "access" : undefined}
+                    autoInvite={current.invite > 0}
                   />
                 </TabsContent>
               )}

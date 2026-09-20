@@ -35,6 +35,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       LEMONSQUEEZY_WEBHOOK_SECRET: z.string().optional(),
       LEMONSQUEEZY_TEST_MODE: z.enum(["true", "false"]).default("true"),
       CLOUDFLARE_STREAM_WEBHOOK_SECRET: z.string().optional(),
+      // Davet e-postası. İkisi de tanımlı değilse gönderim atlanır.
+      RESEND_API_KEY: z.string().optional(),
+      MAIL_FROM: z.string().optional(),
     })
     .parse(
       Object.fromEntries(
