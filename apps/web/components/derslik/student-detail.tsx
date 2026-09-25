@@ -5,6 +5,7 @@ import {
   Plus,
   Pencil,
   Archive,
+  ArchiveRestore,
   LockKeyhole,
   Mail,
   Phone,
@@ -196,7 +197,7 @@ export function StudentDetail({
                     <Send /> Davet gönder
                   </Button>
                 )}
-                {!!student.active && (
+                {student.active ? (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -204,6 +205,15 @@ export function StudentDetail({
                     disabled={busy}
                   >
                     <Archive /> Arşivle
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => actions.restoreStudent(student)}
+                    disabled={busy}
+                  >
+                    <ArchiveRestore /> Aktife al
                   </Button>
                 )}
               </div>

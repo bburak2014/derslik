@@ -1,4 +1,11 @@
-import React, { useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,11 +17,19 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
+import {
+  deleteItemAsync,
+  getItemAsync,
+  setItemAsync,
+} from "expo-secure-store";
+
+const THEME_KEY = "derslik.theme";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -28,7 +43,7 @@ export const ripple = (light = false) =>
 // Web ile birebir aynı değerler (apps/web/app/globals.css açık tema bloğu).
 // İki palet elle senkron tutuluyordu ve birbirinden kaymıştı; kaynak orası,
 // buradaki her değerin karşılığı orada bir belirteç.
-export const colors = {
+export const lightColors = {
   // Marka
   green: "#0f7a62", // --brand
   greenDark: "#0a5f4c", // --brand-hover
@@ -37,6 +52,8 @@ export const colors = {
   onBrand: "#ffffff", // --on-brand
   navy: "#122c3e", // --navy
   navySoft: "#1d3c51", // --navy-soft
+  onNavy: "#a8bfcf", // navy üzerindeki ikincil metin
+  playerSurface: "#172e24", // oynatıcı boşluğu
 
   // Metin — hepsi yüzey ve tuval üzerinde AA (4.5:1)
   ink: "#0d1d29", // --ink
@@ -77,6 +94,56 @@ export const colors = {
   overlay: "rgba(13,29,41,0.45)",
 };
 
+export type Palette = typeof lightColors;
+
+// Koyu tema — web'deki light-dark() çiftlerinin ikinci değerleri
+// (apps/web/app/globals.css). Anahtarlar açık paletle birebir aynı, böylece
+// hiçbir kullanım satırı değişmiyor.
+export const darkColors: Palette = {
+  green: "#4ecba5", // --brand
+  greenDark: "#6fd9b8", // --brand-hover
+  greenSoft: "#13332c", // --brand-soft
+  greenBorder: "#2a5f51", // --brand-line
+  onBrand: "#08110c", // --on-brand
+  navy: "#0a1219", // --navy
+  navySoft: "#1c2a37", // --navy-soft
+  onNavy: "#a8bfcf",
+  playerSurface: "#172e24",
+
+  ink: "#eaf0f5", // --ink
+  body: "#c3d1dc", // --text
+  muted: "#94a7b8", // --text-muted
+  faint: "#8698a9", // --text-subtle
+
+  white: "#141f2a", // --surface
+  cream: "#0c151e", // --canvas
+  subtle: "#1c2a37", // --surface-sunken
+
+  line: "#2a3b4a", // --line
+  lineStrong: "#5a7086", // --line-control
+
+  red: "#f09a8c", // --danger
+  redSoft: "#2e1a16", // --danger-soft
+  redBorder: "#5c332c", // --danger-line
+  amber: "#e3b872", // --warn
+  amberSoft: "#2b2113", // --warn-soft
+  amberBorder: "#544022", // --warn-line
+  info: "#8dc5e6", // --info
+  infoSoft: "#122531", // --info-soft
+  infoBorder: "#27485c", // --info-line
+
+  tint1Bg: "#16332c",
+  tint1Fg: "#5ccfaa",
+  tint2Bg: "#17293a",
+  tint2Fg: "#87bce4",
+  tint3Bg: "#241f3d",
+  tint3Fg: "#a99ce8",
+  tint4Bg: "#33211b",
+  tint4Fg: "#e0a48c",
+
+  overlay: "rgba(0,0,0,0.6)",
+};
+
 // surface: veri yüzeyi (kart, panel) — çizgili kâğıt hissi
 // action: eylem öğesi (düğme, girdi, segment)
 // pill: durum rozeti — veriden ayrışsın
@@ -108,7 +175,8 @@ const shadow = (level: 1 | 2 | 3) =>
 // segment) çizgiyle ayrışır; bu, "defter" biçim dilinin temel kuralı.
 export const elevation = { floating: shadow(3) };
 
-export const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   body: { padding: 20, paddingBottom: 44, gap: 16 },
 
@@ -321,7 +389,229 @@ export const styles = StyleSheet.create({
     color: colors.ink,
     fontVariant: ["tabular-nums"],
   },
+  });
+
+const makeSection = (colors: Palette) =>
+  StyleSheet.create({
+    iconButton: {
+      width: 48,
+      height: 48,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radius.action,
+      borderWidth: 1.5,
+      borderColor: colors.lineStrong,
+      backgroundColor: colors.white,
+    },
+    pickerTrigger: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    pickerBackdrop: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: colors.overlay,
+    },
+    pickerSheet: {
+      backgroundColor: colors.white,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingHorizontal: 18,
+      paddingTop: 16,
+      gap: 12,
+    },
+    pickerHead: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    pickerClose: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pickerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      minHeight: 52,
+      paddingHorizontal: 12,
+      borderRadius: radius.action,
+    },
+  wrap: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 12,
+    marginTop: 4,
+  },
+  badge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+  },
+  badgeText: { fontSize: 11.5, fontWeight: "600", letterSpacing: 0.1 },
+  empty: {
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderStyle: "dashed",
+    backgroundColor: colors.white,
+  },
+  emptyIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.greenSoft,
+  },
+  alert: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 13,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.redBorder,
+    backgroundColor: colors.redSoft,
+  },
+  alertSuccess: {
+    borderColor: colors.greenBorder,
+    backgroundColor: colors.greenSoft,
+  },
+  alertText: { flex: 1, fontSize: 13.5, lineHeight: 20, color: colors.red },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  fieldError: { fontSize: 12.5, lineHeight: 18, color: colors.red },
+  segmented: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    padding: 4,
+    borderRadius: radius.action,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    backgroundColor: colors.subtle,
+  },
+  segment: {
+    flexGrow: 1,
+    flexBasis: 90,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+  },
+  segmentOn: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.greenBorder,
+  },
+  segmentText: { fontSize: 14, fontWeight: "600", color: colors.muted },
+  segmentTextOn: { color: colors.green, fontWeight: "700" },
+  close: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.subtle,
+  },
+  footer: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 16,
+    paddingBottom: 18,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    backgroundColor: colors.white,
+  },
+  });
+
+const themes = {
+  light: {
+    colors: lightColors,
+    styles: makeStyles(lightColors),
+    section: makeSection(lightColors),
+  },
+  dark: {
+    colors: darkColors,
+    styles: makeStyles(darkColors),
+    section: makeSection(darkColors),
+  },
+};
+
+export type ThemeMode = "light" | "dark" | "system";
+type ThemeValue = {
+  colors: Palette;
+  styles: ReturnType<typeof makeStyles>;
+  section: ReturnType<typeof makeSection>;
+  scheme: "light" | "dark";
+  mode: ThemeMode;
+  setMode: (mode: ThemeMode) => void;
+};
+
+const ThemeContext = createContext<ThemeValue>({
+  ...themes.light,
+  scheme: "light",
+  mode: "system",
+  setMode: () => {},
 });
+
+/**
+ * Tema sağlayıcı. `mode` üç değerli: cihazı izle (system) ya da sabitle.
+ * Seçim cihazda saklanır; web'deki tema düğmesiyle aynı davranış.
+ */
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const device = useColorScheme();
+  const [mode, setModeState] = useState<ThemeMode>("system");
+  useEffect(() => {
+    let alive = true;
+    void getItemAsync(THEME_KEY)
+      .then((stored) => {
+        if (alive && (stored === "light" || stored === "dark"))
+          setModeState(stored);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const setMode = useCallback((next: ThemeMode) => {
+    setModeState(next);
+    void (next === "system"
+      ? deleteItemAsync(THEME_KEY).catch(() => {})
+      : setItemAsync(THEME_KEY, next).catch(() => {}));
+  }, []);
+  const scheme: "light" | "dark" =
+    mode === "system" ? (device === "dark" ? "dark" : "light") : mode;
+  const value = useMemo(
+    () => ({ ...themes[scheme], scheme, mode, setMode }),
+    [scheme, mode, setMode],
+  );
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
+}
+
+/** Bileşenler bunu `const { colors, styles } = useTheme()` diye kullanır;
+ *  böylece mevcut `colors.x` / `styles.y` satırları aynen çalışır. */
+export function useTheme() {
+  return useContext(ThemeContext);
+}
+
 
 /* ------------------------------------------------------------------ */
 /* Buttons                                                             */
@@ -351,6 +641,7 @@ export function Button({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors, styles } = useTheme();
   const kind: ButtonVariant = variant || (secondary ? "secondary" : "primary");
   const inactive = disabled || loading;
   const surface =
@@ -426,6 +717,7 @@ export function Card({
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors, styles } = useTheme();
   const toned =
     tone === "brand"
       ? { backgroundColor: colors.greenSoft, borderColor: colors.greenBorder }
@@ -460,6 +752,7 @@ export function SectionHeading({
   description?: string;
   action?: React.ReactNode;
 }) {
+  const { styles, section } = useTheme();
   return (
     <View style={section.wrap}>
       <View style={{ flex: 1, gap: 2 }}>
@@ -478,6 +771,7 @@ export function Badge({
   children: React.ReactNode;
   tone?: "neutral" | "success" | "warning" | "danger";
 }) {
+  const { colors, section } = useTheme();
   const palette = {
     neutral: { bg: colors.subtle, fg: colors.muted, br: colors.line },
     success: { bg: colors.greenSoft, fg: colors.greenDark, br: colors.greenBorder },
@@ -507,6 +801,7 @@ export function EmptyState({
   description?: string;
   action?: React.ReactNode;
 }) {
+  const { colors, styles, section } = useTheme();
   return (
     <View style={section.empty}>
       <View style={section.emptyIcon}>
@@ -523,21 +818,26 @@ export function EmptyState({
   );
 }
 
-export function Loading({ label = "Çalışma alanınız açılıyor…" }) {
+/** Yükleme göstergesi: yalnızca dönen simge. Metin ekran okuyucuda kalır,
+ *  ekranda "yükleniyor" yazısı görünmez (web ile aynı davranış). */
+export function Loading({ label = "Yükleniyor" }) {
+  const { colors, styles } = useTheme();
   return (
     <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
       style={[
         styles.screen,
-        { alignItems: "center", justifyContent: "center", gap: 16 },
+        { alignItems: "center", justifyContent: "center" },
       ]}
     >
-      <ActivityIndicator color={colors.green} />
-      <Text style={styles.muted}>{label}</Text>
+      <ActivityIndicator size="large" color={colors.green} />
     </View>
   );
 }
 
 export function ErrorText({ message }: { message: string }) {
+  const { colors, section } = useTheme();
   return message ? (
     <View style={section.alert}>
       <Ionicons
@@ -554,6 +854,7 @@ export function ErrorText({ message }: { message: string }) {
 }
 
 export function SuccessText({ message }: { message: string }) {
+  const { colors, section } = useTheme();
   return message ? (
     <View style={[section.alert, section.alertSuccess]}>
       <Ionicons
@@ -585,6 +886,7 @@ export function Input({
   editable = true,
   ...rest
 }: TextInputProps & { invalid?: boolean }) {
+  const { colors, styles } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
@@ -630,6 +932,7 @@ export function Field({
   required?: boolean;
   children: React.ReactNode;
 }) {
+  const { styles, section } = useTheme();
   return (
     <View style={styles.field}>
       <View style={section.labelRow}>
@@ -657,6 +960,7 @@ export function Segmented({
   onChange: (value: string) => void;
   label?: string;
 }) {
+  const { colors, section } = useTheme();
   return (
     <View
       accessibilityRole="radiogroup"
@@ -715,6 +1019,201 @@ export type FormSpec = {
   submit: (values: Record<string, string>) => Promise<void>;
 };
 
+/**
+ * Yalnızca ikonlu eylem düğmesi. Liste satırlarında üç tam genişlik düğme
+ * kartı şişiriyordu; ad erişilebilirlik etiketinde kalır. Hedef 48 dp.
+ */
+export function IconButton({
+  icon,
+  label,
+  onPress,
+  disabled = false,
+  danger = false,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  const { colors, section } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      android_ripple={ripple()}
+      style={({ pressed }) => [
+        section.iconButton,
+        danger && { borderColor: colors.redBorder },
+        pressed &&
+          !disabled && {
+            backgroundColor: danger ? colors.redSoft : colors.subtle,
+          },
+        disabled && { opacity: 0.45 },
+      ]}
+    >
+      <Ionicons
+        name={icon}
+        size={19}
+        color={danger ? colors.red : colors.body}
+      />
+    </Pressable>
+  );
+}
+
+/**
+ * Uzun listeden tek seçim. Segmented yalnızca iki üç seçenek için uygun;
+ * öğrenci listesi gibi büyüyen listelerde arama yapılabilen bir katman gerekir
+ * (web tarafındaki Select'in mobil karşılığı).
+ */
+export function Picker({
+  value,
+  options,
+  onChange,
+  label,
+  placeholder = "Seçin",
+}: {
+  value: string;
+  options: { value: string; label: string; hint?: string }[];
+  onChange: (value: string) => void;
+  label?: string;
+  placeholder?: string;
+}) {
+  const { colors, styles, section } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = options.find((o) => o.value === value);
+  const needle = query.trim().toLocaleLowerCase("tr");
+  const shown = needle
+    ? options.filter((o) => o.label.toLocaleLowerCase("tr").includes(needle))
+    : options;
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: selected?.label ?? placeholder }}
+        onPress={() => {
+          setQuery("");
+          setOpen(true);
+        }}
+        android_ripple={ripple()}
+        style={({ pressed }) => [
+          styles.input,
+          section.pickerTrigger,
+          pressed && { borderColor: colors.green },
+        ]}
+      >
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.text,
+            { flex: 1 },
+            !selected && { color: colors.faint },
+          ]}
+        >
+          {selected?.label ?? placeholder}
+        </Text>
+        <Ionicons name="chevron-down" size={17} color={colors.muted} />
+      </Pressable>
+      <Modal
+        visible={open}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={section.pickerBackdrop}>
+          <SafeAreaView edges={["bottom"]} style={section.pickerSheet}>
+            <View style={section.pickerHead}>
+              <Text style={styles.h2}>{label ?? "Seçin"}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Kapat"
+                onPress={() => setOpen(false)}
+                hitSlop={10}
+                style={section.pickerClose}
+              >
+                <Ionicons name="close" size={20} color={colors.muted} />
+              </Pressable>
+            </View>
+            {options.length > 7 && (
+              <Input
+                placeholder="Ara…"
+                value={query}
+                onChangeText={setQuery}
+                autoCorrect={false}
+              />
+            )}
+            <ScrollView
+              style={{ maxHeight: 360 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {!shown.length && (
+                <Text style={[styles.muted, { padding: 14 }]}>
+                  Eşleşen kayıt yok.
+                </Text>
+              )}
+              {shown.map((o) => {
+                const on = o.value === value;
+                return (
+                  <Pressable
+                    key={o.value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => {
+                      onChange(o.value);
+                      setOpen(false);
+                    }}
+                    android_ripple={ripple()}
+                    style={({ pressed }) => [
+                      section.pickerRow,
+                      (pressed || on) && { backgroundColor: colors.greenSoft },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.text, on && { color: colors.green }]}>
+                        {o.label}
+                      </Text>
+                      {!!o.hint && <Text style={styles.caption}>{o.hint}</Text>}
+                    </View>
+                    {on && (
+                      <Ionicons
+                        name="checkmark"
+                        size={18}
+                        color={colors.green}
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+/** Görünüm seçimi — web'deki tema düğmesiyle aynı üç seçenek. */
+export function ThemeToggle() {
+  const { mode, setMode } = useTheme();
+  return (
+    <Segmented
+      label="Görünüm"
+      value={mode}
+      onChange={(value) => setMode(value as ThemeMode)}
+      options={[
+        { value: "light", label: "Açık" },
+        { value: "dark", label: "Koyu" },
+        { value: "system", label: "Sistem" },
+      ]}
+    />
+  );
+}
+
 export function FormSheet({
   form,
   onClose,
@@ -735,6 +1234,7 @@ export function FormSheet({
 }
 
 function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
+  const { colors, styles, section } = useTheme();
   const [values, setValues] = useState(
       Object.fromEntries(
         form.fields.map((f) => [f.key, f.value || f.options?.[0]?.value || ""]),
@@ -876,103 +1376,3 @@ export function confirmAction(
   ]);
 }
 
-const section = StyleSheet.create({
-  wrap: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 12,
-    marginTop: 4,
-  },
-  badge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    alignSelf: "flex-start",
-  },
-  badgeText: { fontSize: 11.5, fontWeight: "600", letterSpacing: 0.1 },
-  empty: {
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderStyle: "dashed",
-    backgroundColor: colors.white,
-  },
-  emptyIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.greenSoft,
-  },
-  alert: {
-    flexDirection: "row",
-    gap: 10,
-    padding: 13,
-    paddingHorizontal: 14,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.redBorder,
-    backgroundColor: colors.redSoft,
-  },
-  alertSuccess: {
-    borderColor: colors.greenBorder,
-    backgroundColor: colors.greenSoft,
-  },
-  alertText: { flex: 1, fontSize: 13.5, lineHeight: 20, color: colors.red },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  fieldError: { fontSize: 12.5, lineHeight: 18, color: colors.red },
-  segmented: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    padding: 4,
-    borderRadius: radius.action,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.subtle,
-  },
-  segment: {
-    flexGrow: 1,
-    flexBasis: 90,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderRadius: radius.sm,
-  },
-  segmentOn: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.greenBorder,
-  },
-  segmentText: { fontSize: 14, fontWeight: "600", color: colors.muted },
-  segmentTextOn: { color: colors.green, fontWeight: "700" },
-  close: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.subtle,
-  },
-  footer: {
-    flexDirection: "row",
-    gap: 10,
-    padding: 16,
-    paddingBottom: 18,
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.white,
-  },
-});

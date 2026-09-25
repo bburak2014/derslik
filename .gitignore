@@ -153,6 +153,7 @@ vite.config.ts.timestamp-*
 /.vinext/
 /.wrangler/
 /.sites-runtime/
+.sites-runtime/
 next-env.d.ts
 .vercel
 

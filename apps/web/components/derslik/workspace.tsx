@@ -120,6 +120,7 @@ export type Actions = {
   voidPayment: (payment: Payment) => void;
   editStudent: (student: Student) => void;
   archiveStudent: (student: Student) => void;
+  restoreStudent: (student: Student) => void;
 };
 export type Mutate = (command: Command, message: string) => Promise<boolean>;
 
@@ -318,6 +319,14 @@ export default function Workspace({
           "Öğrenci aktif listeden çıkarılacak. Paketleri, tahsilatları ve geçmiş dersleri saklanacak. Planlanan dersi olan öğrenciler arşivlenemez.",
         command: { action: "student.archive", id: s.id, version: s.version },
         message: "Öğrenci arşivlendi.",
+      }),
+    restoreStudent: (s) =>
+      setConfirmation({
+        title: "Öğrenciyi aktife al",
+        description:
+          "Öğrenci yeniden aktif listeye dönecek; ders planlayabilir, içerik paylaşabilir ve davet gönderebilirsiniz. Aktif öğrenci sınırınız doluysa bu işlem yapılamaz.",
+        command: { action: "student.restore", id: s.id, version: s.version },
+        message: "Öğrenci yeniden aktif.",
       }),
   };
   const active = data.students.filter((s) => s.active).length;
