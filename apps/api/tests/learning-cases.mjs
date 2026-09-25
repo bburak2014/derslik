@@ -856,6 +856,11 @@ export async function learningCases({
         return remote();
       };
       const path = `/v1/workspaces/${ws}/subscription`;
+      // The generic GET workspaces/:ws/:resource route must not swallow this
+      // one; the notifications panel reads the plan state from here.
+      const current = (await ok(path)).data;
+      assert.equal(current.status, "none");
+      assert.equal(current.available, true);
       assert.equal(
         (
           await request(path + "/checkout", {
