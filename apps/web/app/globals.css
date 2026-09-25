@@ -482,6 +482,17 @@
     margin-top: 13px;
     color: var(--sidebar-foreground);
   }
+  /* Öğrenci/veli menüsü: not, menünün altına tam sığmıyorsa hiç görünmez;
+     kısa ekranda yarısı kesik kalmasın. Altı menü satırı ve not birlikte
+     yaklaşık 680px tutar. */
+  .portal-nav {
+    container-type: size;
+  }
+  @container (max-height: 700px) {
+    .portal-nav .sidebar-note {
+      display: none;
+    }
+  }
   .signout {
     font-size: 12px;
     display: flex;
@@ -1477,22 +1488,6 @@
     justify-content: center;
     padding: 32px 16px;
   }
-  .portal-page {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 50px 30px;
-  }
-  .portal-page > header {
-    margin-bottom: 26px;
-  }
-  .portal-page h1 {
-    font-size: 2.8rem;
-    letter-spacing: -0.04em;
-    margin: 14px 0;
-  }
-  .portal-page > header > p:last-child {
-    color: var(--text-subtle);
-  }
   .learning-panel {
     display: grid;
     /* minmax(0, 1fr): kaydırılan sekme şeridi gibi geniş içerik sütunu
@@ -1525,12 +1520,6 @@
     }
     .auth-card {
       padding: 32px 28px;
-    }
-    .portal-page {
-      padding: 32px 12px;
-    }
-    .portal-page > header {
-      padding: 0 12px;
     }
   }
 
@@ -1847,7 +1836,7 @@
      Faz 1 — çalışma alanı seçici ve yükleme iskeletleri
      ================================================================== */
 
-  /* Sidebar içinde (öğretmen) ve portal başlığında (öğrenci/veli) aynı bileşen. */
+  /* Öğretmen ve öğrenci/veli kabuğunda sidebar altındaki aynı bileşen. */
   .workspace-switcher {
     display: grid;
     gap: 8px;
@@ -1856,30 +1845,6 @@
     font-size: 12.5px;
     line-height: 1.5;
     color: var(--sidebar-danger);
-  }
-
-  /* Portal (öğrenci/veli) başlığı — burada sabit sidebar yok, üst şerit güvenli. */
-  .portal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    flex-wrap: wrap;
-  }
-  .portal-account {
-    display: grid;
-    gap: 10px;
-    justify-items: end;
-    min-width: 220px;
-  }
-  .portal-account .workspace-switcher {
-    width: 100%;
-  }
-  .portal-account-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
   }
 
   /* Yükleme iskeletleri: modal son yerleşimini baştan kaplasın, veri gelince
@@ -1893,21 +1858,7 @@
     }
   }
 
-  @media (max-width: 760px) {
-    .portal-header {
-      flex-direction: column;
-    }
-    .portal-account {
-      min-width: 0;
-      width: 100%;
-      justify-items: stretch;
-    }
-    .portal-account-actions {
-      justify-content: flex-start;
-    }
-  }
-
-  /* Tema anahtarı — sidebar (koyu zemin) ve portal (açık zemin) için aynı
+  /* Tema anahtarı — öğretmen ve öğrenci/veli sidebar'ında (koyu zemin) aynı
    bileşen. Biçimi shadcn TabsList/TabsTrigger ile birebir: 36px yükseklik,
    rounded-lg kap, rounded-md düğme, text-sm font-medium. */
   .theme-toggle {
