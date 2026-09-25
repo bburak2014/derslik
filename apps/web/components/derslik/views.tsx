@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   Users,
@@ -72,6 +72,26 @@ export function creditsFor(data: WorkspaceData, id: string) {
         p.student_id === id && (!p.expires_on || p.expires_on >= dateKey()),
     )
     .reduce((a, p) => a + p.remaining, 0);
+}
+/** Paketteki haklar defter kareleri gibi: dolu kare kalan hak. Kareler yalnızca
+ *  süsleme; sayı yanında metin olarak zaten okunuyor. */
+export function CreditPips({ data, id }: { data: WorkspaceData; id: string }) {
+  const packs = data.packages.filter(
+    (p) => p.student_id === id && (!p.expires_on || p.expires_on >= dateKey()),
+  );
+  const granted = packs.reduce((a, p) => a + p.granted, 0),
+    remaining = packs.reduce((a, p) => a + p.remaining, 0);
+  if (!granted || granted > 16) return null;
+  return (
+    <span
+      className={`credit-pips ${remaining <= 2 ? "low" : ""}`}
+      aria-hidden="true"
+    >
+      {Array.from({ length: granted }, (_, i) => (
+        <i key={i} className={i < remaining ? "on" : undefined} />
+      ))}
+    </span>
+  );
 }
 export function StudentAvatar({
   student,
@@ -146,15 +166,25 @@ export function LessonRows({
   busy?: boolean;
   showDate?: boolean;
 }) {
+  // Süren dersi işaretlemek için saat; dakikada bir ilerler.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   return (
     <div className="lesson-list">
       {lessons.map((l) => {
         const student = data.students.find((s) => s.id === l.student_id);
         if (!student) return null;
         const pack = data.packages.find((p) => p.id === l.package_id);
+        const now =
+          l.status === "SCHEDULED" &&
+          Date.parse(l.starts_at) <= clock &&
+          clock < Date.parse(l.ends_at);
         return (
           <div
-            className={`lesson-row ${l.status === "CANCELLED" ? "lesson-cancelled" : ""}`}
+            className={`lesson-row ${l.status === "CANCELLED" ? "lesson-cancelled" : ""} ${now ? "lesson-now" : ""}`}
             key={l.id}
           >
             <div className="lesson-time">
@@ -186,6 +216,7 @@ export function LessonRows({
               </div>
             </div>
             <div className="lesson-actions">
+              {now && <span className="now-chip">Şimdi</span>}
               <Status status={l.status} />
               {l.status === "SCHEDULED" && (
                 <Button
@@ -549,6 +580,7 @@ export function Overview({
                       <span className="student-row-body">
                         <strong>{s.name}</strong>
                         <small>{s.subject}</small>
+                        <CreditPips data={data} id={s.id} />
                       </span>
                       <span className="student-row-credit">
                         {creditsFor(data, s.id)} ders

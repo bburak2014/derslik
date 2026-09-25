@@ -79,7 +79,7 @@ export function AuthForm({
           <h1>
             Her öğrenciye
             <br />
-            daha çok zaman.
+            <span className="ink-mark">daha çok zaman.</span>
           </h1>
           <p>
             Planlamadan gelişim takibine, dersinizle ilgili her şey bir arada.

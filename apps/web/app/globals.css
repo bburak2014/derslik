@@ -31,49 +31,54 @@
   color-scheme: light dark;
 
   /* Yüzeyler */
-  --canvas: light-dark(#f3f6f8, #0c151e);
-  --surface: light-dark(#ffffff, #141f2a);
-  --surface-sunken: light-dark(#e8edf2, #1c2a37);
-  --surface-raised: light-dark(#ffffff, #1a2733);
+  --canvas: light-dark(#f5f6fa, #0d1230);
+  --surface: light-dark(#ffffff, #151b3f);
+  --surface-sunken: light-dark(#eceef6, #1c2350);
+  --surface-raised: light-dark(#ffffff, #1a2150);
 
   /* Çizgiler: dekoratif ayraç ile kontrol kenarlığı ayrı. Kontrol kenarlığı
      bir girdinin sınırını gösteren tek işaret olduğu için 3:1 şartına tabi. */
-  --line: light-dark(#dae2e9, #2a3b4a);
-  --line-control: light-dark(#7e8f9e, #5a7086);
+  --line: light-dark(#dde1ee, #283062);
+  --line-control: light-dark(#7d86aa, #6d76a6);
 
   /* Metin */
-  --ink: light-dark(#0d1d29, #eaf0f5);
-  --text: light-dark(#2c4153, #c3d1dc);
-  --text-muted: light-dark(#51657a, #94a7b8);
-  --text-subtle: light-dark(#5c7084, #8698a9);
+  --ink: light-dark(#121a44, #eef0fb);
+  --text: light-dark(#2f3760, #c9cdea);
+  --text-muted: light-dark(#535a80, #9ea5cb);
+  --text-subtle: light-dark(#5d6488, #9198c0);
 
   /* Marka */
-  --brand: light-dark(#0f7a62, #4ecba5);
-  --brand-hover: light-dark(#0a5f4c, #6fd9b8);
-  --brand-soft: light-dark(#e4f2ee, #13332c);
-  --brand-line: light-dark(#a7d4c6, #2a5f51);
-  --on-brand: light-dark(#ffffff, #08110c);
+  --brand: light-dark(#2338a8, #8ea0ff);
+  --brand-hover: light-dark(#1a2b86, #a9b7ff);
+  --brand-soft: light-dark(#e7eafb, #202a66);
+  --brand-line: light-dark(#b9c2f2, #3a4690);
+  --on-brand: light-dark(#ffffff, #0d1230);
+
+  /* Fosforlu kalem: yalnızca "şimdi" ve "dikkat" için tek vurgu. */
+  --marker: light-dark(#ffd84a, #f2d44e);
+  --marker-ink: light-dark(#2a2100, #221b00);
+  --marker-soft: light-dark(#fff4c2, #3a3212);
 
   /* Gezinme yüzeyi */
-  --navy: light-dark(#122c3e, #0a1219);
-  --navy-soft: light-dark(#1d3c51, #1c2a37);
+  --navy: light-dark(#141c4d, #090d24);
+  --navy-soft: light-dark(#232d68, #161c40);
 
   /* Durumlar */
-  --danger: light-dark(#ae3226, #f09a8c);
-  --danger-soft: light-dark(#fdf1ef, #2e1a16);
-  --danger-line: light-dark(#efc7bf, #5c332c);
-  --warn: light-dark(#7e5310, #e3b872);
-  --warn-soft: light-dark(#fcf4e5, #2b2113);
-  --warn-line: light-dark(#e8d3ab, #544022);
-  --info: light-dark(#1a5578, #8dc5e6);
-  --info-soft: light-dark(#ecf5fa, #122531);
-  --info-line: light-dark(#c6deec, #27485c);
+  --danger: light-dark(#b33a26, #f39a86);
+  --danger-soft: light-dark(#fbeeeb, #3a1b16);
+  --danger-line: light-dark(#efc4ba, #6a332a);
+  --warn: light-dark(#7f5300, #f0c46a);
+  --warn-soft: light-dark(#fdf3d8, #352a10);
+  --warn-line: light-dark(#ecd49a, #5e4a1c);
+  --info: light-dark(#2338a8, #aeb9ff);
+  --info-soft: light-dark(#eef0fc, #1a2150);
+  --info-line: light-dark(#c9d0f4, #34408a);
 
   /* Biçim */
   --control-height: 44px;
-  --control-radius: 10px;
-  --panel-radius: 16px;
-  --focus-ring: 0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent);
+  --control-radius: 12px;
+  --panel-radius: 18px;
+  --focus-ring: 0 0 0 3px var(--marker), 0 0 0 5px var(--ink);
   --shadow-card: light-dark(
     0 1px 2px rgb(13 29 41 / 0.06),
     0 1px 2px rgb(0 0 0 / 0.4)
@@ -108,39 +113,39 @@
   --ring: var(--brand);
   --radius: 0.625rem;
   --sidebar: var(--navy);
-  --sidebar-foreground: light-dark(#c6d5e0, #a8bccb);
-  --sidebar-primary: light-dark(#7de0bd, #4ecba5);
-  --sidebar-primary-foreground: #08110c;
+  --sidebar-foreground: light-dark(#c3c9ec, #aab1dc);
+  --sidebar-primary: light-dark(#ffd84a, #f2d44e);
+  --sidebar-primary-foreground: #2a2100;
   --sidebar-accent: var(--navy-soft);
-  --sidebar-accent-foreground: light-dark(#eef5f9, #eaf0f5);
-  --sidebar-border: light-dark(#2a4358, #243545);
-  --sidebar-ring: light-dark(#7de0bd, #4ecba5);
-  --sidebar-danger: light-dark(#ffb4a6, #f09a8c);
+  --sidebar-accent-foreground: light-dark(#ffffff, #eef0fb);
+  --sidebar-border: light-dark(#2a3470, #1c2350);
+  --sidebar-ring: light-dark(#ffd84a, #f2d44e);
+  --sidebar-danger: light-dark(#ffb4a6, #f39a86);
 
   /* Öne çıkan istatistik kartı: açık temada lacivert zemin ayırt edici,
      koyu temada lacivert tuvalle aynı tona düşerdi; orada ayrımı yükseltilmiş
      yüzey ve marka kenarlığı taşır. */
-  --stat-feature-bg: light-dark(#122c3e, #1a2733);
-  --stat-feature-fg: light-dark(#ffffff, #eaf0f5);
-  --stat-feature-meta: light-dark(#b7ccd9, #94a7b8);
-  --stat-feature-line: light-dark(#122c3e, #2a5f51);
+  --stat-feature-bg: light-dark(#141c4d, #1a2150);
+  --stat-feature-fg: light-dark(#ffffff, #eef0fb);
+  --stat-feature-meta: light-dark(#c3c9ec, #9ea5cb);
+  --stat-feature-line: light-dark(#141c4d, #3a4690);
 
   /* Kimlik tonları — avatar ve satır şeridi gibi yalnızca ayırt etmeye yarayan
      yüzeyler. Durum renklerinden (uyarı/hata/bilgi) kasıtlı olarak ayrıktır;
      yoksa sağlıklı bir kayıt uyarı gibi okunur. Baş harfler metin olduğu için
      her çift AA (4.5:1) sağlar. */
-  --tint-1-bg: light-dark(#e2f1ec, #16332c);
-  --tint-1-fg: light-dark(#0c6a55, #5ccfaa);
-  --tint-2-bg: light-dark(#e6edf4, #17293a);
-  --tint-2-fg: light-dark(#2d5a80, #87bce4);
-  --tint-3-bg: light-dark(#ebe9f6, #241f3d);
-  --tint-3-fg: light-dark(#4c4494, #a99ce8);
-  --tint-4-bg: light-dark(#f5e9e4, #33211b);
-  --tint-4-fg: light-dark(#8a4a33, #e0a48c);
-  --chart-1: light-dark(#0f7a62, #4ecba5);
-  --chart-2: light-dark(#2f7fa8, #6fb3d8);
-  --chart-3: light-dark(#a8741f, #d9a74f);
-  --chart-4: light-dark(#6a5f9e, #9c8fd4);
+  --tint-1-bg: light-dark(#e7eafb, #202a66);
+  --tint-1-fg: light-dark(#2338a8, #aeb9ff);
+  --tint-2-bg: light-dark(#e3f4ec, #12342a);
+  --tint-2-fg: light-dark(#1a6e4a, #7fdcb2);
+  --tint-3-bg: light-dark(#f1e6fb, #2c1d48);
+  --tint-3-fg: light-dark(#6b3aa0, #cfaef5);
+  --tint-4-bg: light-dark(#fbe9e5, #3a1b16);
+  --tint-4-fg: light-dark(#9c3420, #f5ab98);
+  --chart-1: light-dark(#2338a8, #8ea0ff);
+  --chart-2: light-dark(#1d7f55, #5fd19f);
+  --chart-3: light-dark(#b58a00, #f2d44e);
+  --chart-4: light-dark(#6b3aa0, #cfaef5);
   --chart-5: light-dark(#7e8f9e, #7e8f9e);
 }
 
@@ -4040,7 +4045,9 @@ input[type="file"]:hover:not(:disabled) {
    min-height + dolgu matematiği sayfa formlarında 46px, diyalogda 44px
    veriyordu (shadcn Input'un satır yüksekliği farklı). Sabit yükseklik bu
    2px'lik kaymayı kapatır; çok satırlı alanlar hariç tutulur. */
-input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not(
+    [type="range"]
+  ),
 select,
 [data-slot="input"],
 [data-slot="select-trigger"],
@@ -4811,4 +4818,205 @@ button:disabled,
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-muted);
+}
+
+/* ==================================================================
+   Mürekkep ve fosforlu kalem — Derslik görsel kimliği.
+
+   Önceki katmanların üstüne son söz olarak yazıldı; yerleşim kuralları
+   aynı kalır, yalnızca kimlik değişir:
+     - Mürekkep mavisi (--navy) düzeni taşır: kenar çubuğu, günün başlığı.
+     - Fosforlu sarı (--marker) tek vurgudur ve yalnızca "şimdi" ile
+       "dikkat" anlamına gelir: süren ders, bugünün tarihi, odak halkası.
+     - Başlıklar Bricolage Grotesque, gövde Onest.
+   ================================================================== */
+:root {
+  --font-display:
+    var(--font-derslik-display), var(--font-derslik), "Segoe UI", system-ui,
+    sans-serif;
+  /* Kareli defter dokusu: yalnızca mürekkep yüzeylerde, çok hafif. */
+  --grid-texture:
+    linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+}
+
+h1,
+h2,
+h3,
+.brand,
+.page-heading h1,
+.day-figures dd,
+.date-tile strong,
+.lesson-time strong,
+.metric-value,
+.finance-stats strong,
+.auth-story h1,
+.auth-card h1,
+.connection-state h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+.page-heading h1 {
+  font-weight: 800;
+  text-wrap: balance;
+}
+.eyebrow {
+  color: var(--brand);
+  letter-spacing: 0.12em;
+}
+
+/* Fosforlu kalem çizgisi: metnin alt yarısında, satır kırılsa da sürer. */
+.ink-mark {
+  background: linear-gradient(
+    transparent 55%,
+    var(--marker) 55% 92%,
+    transparent 92%
+  );
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding-inline: 0.06em;
+}
+
+/* ---- Kenar çubuğu: mürekkep + kareli defter -------------------------- */
+[data-slot="sidebar-inner"] {
+  background-color: var(--navy);
+  background-image: var(--grid-texture);
+  background-size: 18px 18px;
+}
+[data-slot="sidebar-container"] {
+  border-right-color: var(--navy) !important;
+}
+.brand {
+  font-weight: 800;
+}
+.brand-dot {
+  color: var(--marker);
+}
+/* Etkin sayfa, defter ayracı gibi kağıda bağlanır: sağ kenara kadar uzanır
+   ve zemin rengini alır. */
+[data-slot="sidebar-content"]
+  [data-slot="sidebar-menu-button"][data-active="true"] {
+  margin-right: -1rem;
+  width: calc(100% + 1rem);
+  border-radius: 12px 0 0 12px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-slot="sidebar-menu-button"][data-active="true"] .nav-count {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.note-flower {
+  color: var(--marker);
+}
+
+/* ---- Bugün kartı: başlık şeridi mürekkep --------------------------------- */
+.day-panel {
+  border-radius: 18px;
+}
+.day-panel-head {
+  background-color: var(--stat-feature-bg);
+  background-image: var(--grid-texture);
+  background-size: 20px 20px;
+  color: var(--stat-feature-fg);
+  border-bottom-color: var(--stat-feature-line);
+}
+.day-panel-head h2,
+.day-panel-head dd {
+  color: var(--stat-feature-fg);
+}
+.day-panel-head p,
+.day-panel-head dt {
+  color: var(--stat-feature-meta);
+}
+.day-panel-head .day-figures > div {
+  border-color: rgb(255 255 255 / 0.14);
+}
+.day-panel-head [data-slot="button"] {
+  color: var(--stat-feature-fg);
+}
+.day-panel-head [data-slot="button"]:hover {
+  background: rgb(255 255 255 / 0.1);
+  color: var(--stat-feature-fg);
+}
+.day-panel-head .date-tile {
+  background: var(--marker);
+  border-color: var(--marker);
+  color: var(--marker-ink);
+}
+.day-panel-head .date-tile small,
+.day-panel-head .date-tile strong {
+  color: var(--marker-ink);
+}
+
+/* Süren ders: fosforlu satır. */
+.lesson-row.lesson-now {
+  background: var(--marker-soft);
+}
+.lesson-row.lesson-now .lesson-accent {
+  background: var(--marker);
+  width: 4px;
+}
+.now-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--marker-ink);
+  color: var(--marker);
+  white-space: nowrap;
+}
+
+/* ---- Ders hakkı kareleri ------------------------------------------------- */
+.credit-pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+.credit-pips i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+}
+.credit-pips i.on {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.credit-pips.low i.on {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+/* ---- Düğmeler: daha dolgun, mürekkep mavisi ---------------------------- */
+[data-slot="button"],
+.primary-button,
+.secondary-button {
+  border-radius: var(--control-radius);
+  font-weight: 600;
+}
+
+/* ---- Giriş ekranı --------------------------------------------------------- */
+.auth-story {
+  background-color: var(--navy);
+  background-image: var(--grid-texture);
+  background-size: 22px 22px;
+}
+.auth-story h1 {
+  font-weight: 800;
+  line-height: 1.12;
+}
+.auth-story .ink-mark {
+  background: var(--marker);
+  color: var(--marker-ink);
+  border-radius: 6px;
+  padding-inline: 0.12em;
+}
+.auth-story-label {
+  color: var(--marker);
 }
