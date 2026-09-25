@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "../vendor/shadcn-tailwind-4.13.0.css";
+@import "../vendor/shadcn-tailwind-4.21.0.css";
 
 /* Üç tema durumunu da kapsar: açık seçimi (.light), koyu seçimi (.dark) ve
    seçim yokken işletim sistemi tercihi. Yalnızca .dark'a bakan varyant,
