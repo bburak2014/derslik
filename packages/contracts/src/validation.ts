@@ -26,6 +26,7 @@ export const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("student.create"), ...fields }),
   z.object({ action: z.literal("student.update"), id, version, ...fields }),
   z.object({ action: z.literal("student.archive"), id, version }),
+  z.object({ action: z.literal("student.restore"), id, version }),
   z.object({
     action: z.literal("package.create"),
     studentId: id,

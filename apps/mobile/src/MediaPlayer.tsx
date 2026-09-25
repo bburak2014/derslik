@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView } from "expo-video";
 import type { Video } from "@derslik/api-client";
 import { request } from "./core";
-import { Button, ErrorText, styles } from "./ui";
+import { Button, ErrorText, useTheme } from "./ui";
 export function MediaPlayer({
   video,
   path,
@@ -20,6 +20,7 @@ export function MediaPlayer({
   onClose: () => void;
   action: (body: unknown) => Promise<void>;
 }) {
+  const { colors, styles } = useTheme();
   const player = useVideoPlayer(null, (p) => {
       p.timeUpdateEventInterval = 1;
     }),
@@ -104,7 +105,7 @@ export function MediaPlayer({
               width: "100%",
               aspectRatio: 16 / 9,
               borderRadius: 12,
-              backgroundColor: "#172e24",
+              backgroundColor: colors.playerSurface,
             }}
             nativeControls
             fullscreenOptions={{ enable: true }}

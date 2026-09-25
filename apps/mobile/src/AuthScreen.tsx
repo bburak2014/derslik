@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { AppleMark, GoogleMark, MicrosoftMark } from "./brand-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "./core";
@@ -21,13 +22,13 @@ import {
 } from "./oauth";
 import {
   Button,
-  colors,
   ErrorText,
   Field,
   Input,
+  type Palette,
   radius,
-  styles,
   SuccessText,
+  useTheme,
 } from "./ui";
 
 const copy = {
@@ -61,6 +62,8 @@ export function AuthScreen({
   reset?: boolean;
   onDone?: () => void;
 }) {
+  const { colors, styles } = useTheme();
+  const auth = useMemo(() => makeAuth(colors), [colors]);
   const [mode, setMode] = useState<Mode>(reset ? "password" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -219,17 +222,13 @@ export function AuthScreen({
                           { opacity: off || busy ? 0.45 : 1 },
                         ]}
                       >
-                        <Ionicons
-                          name={
-                            p.id === "google"
-                              ? "logo-google"
-                              : p.id === "apple"
-                                ? "logo-apple"
-                                : "logo-microsoft"
-                          }
-                          size={21}
-                          color={colors.ink}
-                        />
+                        {p.id === "google" ? (
+                          <GoogleMark size={21} />
+                        ) : p.id === "apple" ? (
+                          <AppleMark size={21} color={colors.ink} />
+                        ) : (
+                          <MicrosoftMark size={21} />
+                        )}
                         <Text style={auth.socialLabel} numberOfLines={1}>
                           {busy === p.id ? "Açılıyor…" : p.name}
                         </Text>
@@ -390,7 +389,8 @@ export function AuthScreen({
   );
 }
 
-const auth = StyleSheet.create({
+const makeAuth = (colors: Palette) =>
+  StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: "center",
@@ -423,7 +423,7 @@ const auth = StyleSheet.create({
     letterSpacing: -1,
     color: colors.white,
   },
-  heroLead: { color: "#a8bfcf", fontSize: 14.5, lineHeight: 21 },
+  heroLead: { color: colors.onNavy, fontSize: 14.5, lineHeight: 21 },
   card: {
     backgroundColor: colors.white,
     borderRadius: radius.xl,
@@ -504,5 +504,5 @@ const auth = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 12,
   },
-  footerText: { textAlign: "center", color: "#a8bfcf", fontSize: 12.5 },
-});
+  footerText: { textAlign: "center", color: colors.onNavy, fontSize: 12.5 },
+  });

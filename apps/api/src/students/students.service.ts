@@ -61,7 +61,11 @@ export class StudentsService {
       ).rows[0];
       return { data: student };
     }
-    if (c.action === "student.update" || c.action === "student.archive") {
+    if (
+      c.action === "student.update" ||
+      c.action === "student.archive" ||
+      c.action === "student.restore"
+    ) {
       const student = await lockStudent(tx, ws, c.id);
       if (student.version !== c.version)
         throw new ConflictException(
@@ -80,6 +84,36 @@ export class StudentsService {
           data: (
             await tx.query(
               "UPDATE derslik.students SET active=false,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
+              [ws, c.id],
+            )
+          ).rows[0],
+        };
+      }
+      if (c.action === "student.restore") {
+        if (student.active)
+          throw new ConflictException("Öğrenci zaten aktif.");
+        // Arşivden dönen öğrenci yeniden sınıra dahil olur; yoksa arşivleyip
+        // geri alarak plan sınırı aşılabilirdi.
+        const limit = (
+          await tx.query(
+            "SELECT student_limit FROM derslik.workspace_limits WHERE workspace_id=$1 FOR UPDATE",
+            [ws],
+          )
+        ).rows[0].student_limit;
+        const count = Number(
+          (
+            await tx.query(
+              "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1 AND active",
+              [ws],
+            )
+          ).rows[0].n,
+        );
+        if (count >= limit)
+          throw new ConflictException("Aktif öğrenci sınırına ulaşıldı.");
+        return {
+          data: (
+            await tx.query(
+              "UPDATE derslik.students SET active=true,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
               [ws, c.id],
             )
           ).rows[0],

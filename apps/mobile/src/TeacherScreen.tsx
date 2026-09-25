@@ -27,7 +27,6 @@ import { request } from "./core";
 import {
   Badge,
   Button,
-  colors,
   Card,
   confirmAction,
   EmptyState,
@@ -36,11 +35,18 @@ import {
   type FormSpec,
   Input,
   Loading,
+  Picker,
   radius,
+  ripple,
   SectionHeading,
-  styles,
+  Segmented,
+  useTheme,
 } from "./ui";
-import { LearningScreen, Inbox } from "./LearningScreen";
+import {
+  LearningScreen,
+  Inbox,
+  type TeachingView,
+} from "./LearningScreen";
 const dateTime = (day: string, time: string) => {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
@@ -58,11 +64,16 @@ export function TeacherScreen({
   access: Access;
   onAccount: () => void;
 }) {
+  const { colors, styles } = useTheme();
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
     [tab, setTab] = useState("overview"),
+    // Öğretim sekmesi: web'deki Ödevler / PDF / Videolar görünümlerinin
+    // karşılığı. Hangi öğrencinin içeriği gösteriliyor, hangi bölüm açık.
+    [teachingView, setTeachingView] = useState<TeachingView>("assignments"),
+    [teachingStudent, setTeachingStudent] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
     [learning, setLearning] = useState(false),
     [search, setSearch] = useState(""),
@@ -498,7 +509,142 @@ export function TeacherScreen({
           ? "Ders takvimi"
           : tab === "payments"
             ? "Tahsilatlar"
-            : "Bildirimler";
+            : tab === "teaching"
+              ? "Öğretim"
+              : "Bildirimler";
+  // Alt sekme çubuğu iki yerden çiziliyor (normal görünüm ve Öğretim
+  // ekranı), o yüzden tek yerde duruyor.
+  const tabBar = !student && (
+      <View style={[styles.tabs, { paddingBottom: insets.bottom + 6 }]}>
+        {[
+          { id: "overview", label: "Özet", icon: "grid-outline" as const },
+          {
+            id: "calendar",
+            label: "Takvim",
+            icon: "calendar-outline" as const,
+          },
+          {
+            id: "students",
+            label: "Öğrenciler",
+            icon: "people-outline" as const,
+          },
+          {
+            id: "payments",
+            label: "Tahsilatlar",
+            icon: "wallet-outline" as const,
+          },
+          {
+            id: "teaching",
+            label: "Öğretim",
+            icon: "school-outline" as const,
+          },
+        ].map((t) => (
+          <Pressable
+            key={t.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === t.id }}
+            onPress={() => setTab(t.id)}
+            style={({ pressed }) => [
+              styles.tab,
+              tab === t.id && {
+                backgroundColor: colors.greenSoft,
+                borderRadius: radius.md,
+              },
+              pressed && tab !== t.id && { backgroundColor: colors.subtle },
+            ]}
+          >
+            <Ionicons
+              name={t.icon}
+              size={22}
+              color={tab === t.id ? colors.green : colors.muted}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                tab === t.id && { color: colors.green },
+              ]}
+            >
+              {t.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+  );
+  // Öğretim ekranı: webde sol menüdeki Ödevler / PDF ve dosyalar / Ders
+  // videoları başlıklarının karşılığı. Mobilde alt çubukta tek sekme, içinde
+  // öğrenci seçici ve bölüm segmenti var.
+  if (tab === "teaching") {
+    const roster = [...data.students].sort(
+      (a, b) =>
+        Number(b.active) - Number(a.active) ||
+        a.name.localeCompare(b.name, "tr"),
+    );
+    const chosen = roster.find((x) => x.id === teachingStudent) || roster[0];
+    return (
+      <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
+        <View style={styles.header}>
+          <Text style={styles.brand}>
+            derslik<Text style={{ color: colors.green }}>.</Text>
+          </Text>
+          <Button
+            secondary
+            size="sm"
+            icon="person-circle-outline"
+            onPress={onAccount}
+          >
+            Hesabım
+          </Button>
+        </View>
+        {!chosen ? (
+          <View style={styles.body}>
+            <EmptyState
+              icon="people-outline"
+              title="Önce bir öğrenci ekleyin"
+              description="Ödevleri, PDF dosyalarını ve ders videolarını burada paylaşabilirsiniz."
+            />
+          </View>
+        ) : (
+          <>
+            <View
+              style={{ paddingHorizontal: 20, paddingTop: 14, gap: 10 }}
+            >
+              <Picker
+                label="Öğrenci"
+                value={chosen.id}
+                onChange={setTeachingStudent}
+                options={roster.map((x) => ({
+                  value: x.id,
+                  label: x.name + (x.active ? "" : " · Arşivde"),
+                  hint: x.subject,
+                }))}
+              />
+              <Segmented
+                label="Bölüm"
+                value={teachingView}
+                onChange={(value) => setTeachingView(value as TeachingView)}
+                options={[
+                  { value: "assignments", label: "Ödevler" },
+                  { value: "files", label: "PDF" },
+                  { value: "videos", label: "Videolar" },
+                ]}
+              />
+            </View>
+            <LearningScreen
+              key={chosen.id + ":" + teachingView}
+              access={access}
+              studentId={chosen.id}
+              studentName={chosen.name}
+              onBack={onAccount}
+              view={teachingView}
+            />
+          </>
+        )}
+        {tabBar}
+        <FormSheet form={form} onClose={() => setForm(null)} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -516,14 +662,41 @@ export function TeacherScreen({
             derslik<Text style={{ color: colors.green }}>.</Text>
           </Text>
         )}
-        <Button
-          secondary
-          size="sm"
-          icon="person-circle-outline"
-          onPress={onAccount}
-        >
-          Hesabım
-        </Button>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Bildirimler"
+            accessibilityState={{ selected: tab === "inbox" }}
+            onPress={() => setTab("inbox")}
+            android_ripple={ripple()}
+            hitSlop={6}
+            style={({ pressed }) => [
+              {
+                width: 44,
+                height: 44,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: radius.action,
+              },
+              tab === "inbox" && { backgroundColor: colors.greenSoft },
+              pressed && tab !== "inbox" && { backgroundColor: colors.subtle },
+            ]}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color={tab === "inbox" ? colors.green : colors.muted}
+            />
+          </Pressable>
+          <Button
+            secondary
+            size="sm"
+            icon="person-circle-outline"
+            onPress={onAccount}
+          >
+            Hesabım
+          </Button>
+        </View>
       </View>
       <ScrollView
         refreshControl={
@@ -667,7 +840,7 @@ export function TeacherScreen({
             {data.lessons
               .filter((l) => l.student_id === student.id)
               .map(lessonCard)}
-            {!!student.active && (
+            {student.active ? (
               <Button
                 variant="danger"
                 icon="archive-outline"
@@ -688,6 +861,27 @@ export function TeacherScreen({
                 }
               >
                 Öğrenciyi arşivle
+              </Button>
+            ) : (
+              <Button
+                secondary
+                icon="arrow-undo-outline"
+                onPress={() =>
+                  confirmAction(
+                    "Öğrenciyi aktife al",
+                    "Öğrenci yeniden aktif listeye dönecek. Aktif öğrenci sınırınız doluysa bu işlem yapılamaz.",
+                    async () => {
+                      await mutate({
+                        action: "student.restore",
+                        id: student.id,
+                        version: student.version,
+                      });
+                    },
+                    setError,
+                  )
+                }
+              >
+                Öğrenciyi aktife al
               </Button>
             )}
           </>
@@ -893,62 +1087,7 @@ export function TeacherScreen({
           <Inbox workspaceId={access.id} />
         )}
       </ScrollView>
-      {!student && (
-        <View style={[styles.tabs, { paddingBottom: insets.bottom + 6 }]}>
-          {[
-            { id: "overview", label: "Özet", icon: "grid-outline" as const },
-            {
-              id: "calendar",
-              label: "Takvim",
-              icon: "calendar-outline" as const,
-            },
-            {
-              id: "students",
-              label: "Öğrenciler",
-              icon: "people-outline" as const,
-            },
-            {
-              id: "payments",
-              label: "Tahsilatlar",
-              icon: "wallet-outline" as const,
-            },
-            {
-              id: "inbox",
-              label: "Bildirimler",
-              icon: "notifications-outline" as const,
-            },
-          ].map((t) => (
-            <Pressable
-              key={t.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === t.id }}
-              onPress={() => setTab(t.id)}
-              style={({ pressed }) => [
-                styles.tab,
-                tab === t.id && {
-                  backgroundColor: colors.greenSoft,
-                  borderRadius: radius.md,
-                },
-                pressed && tab !== t.id && { backgroundColor: colors.subtle },
-              ]}
-            >
-              <Ionicons
-                name={t.icon}
-                size={22}
-                color={tab === t.id ? colors.green : colors.muted}
-              />
-              <Text
-                style={[
-                  styles.tabText,
-                  tab === t.id && { color: colors.green },
-                ]}
-              >
-                {t.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
+      {tabBar}
       <FormSheet form={form} onClose={() => setForm(null)} />
     </SafeAreaView>
   );

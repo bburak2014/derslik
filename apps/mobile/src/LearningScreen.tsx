@@ -1,6 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  Image,
   Linking,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,12 +22,12 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
-import { File, FileMode } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import {
   uploadTus,
   type Access,
   type LearningData,
+  type Material,
   type PortalData,
   type Video,
 } from "@derslik/api-client";
@@ -29,15 +37,19 @@ import {
   Badge,
   Button,
   Card,
-  colors,
   confirmAction,
   ErrorText,
   FormSheet,
   type FormSpec,
+  type Palette,
+  IconButton,
   Loading,
   radius,
-  styles,
+  useTheme,
 } from "./ui";
+import { setStringAsync } from "expo-clipboard";
+import { Ionicons } from "@expo/vector-icons";
+import { PdfViewer } from "./PdfViewer";
 import { MediaPlayer } from "./MediaPlayer";
 const empty: LearningData = {
   lessons: [],
@@ -66,17 +78,54 @@ export function PortalScreen({
     />
   );
 }
+export type TeachingView = "assignments" | "files" | "videos";
+
+/**
+ * Seçilen dosyayı bayt olarak okur.
+ *
+ * expo-file-system'in iki API'si de işe yaramıyor: Expo Go, FileSystem'i
+ * kendi deneyim klasörüne kapsıyor, DocumentPicker ise kopyayı Expo Go'nun
+ * uygulama önbelleğine (cache/DocumentPicker/...) bırakıyor. Yeni API
+ * "Missing READ permission", eskisi "isn't readable" diyor.
+ *
+ * Ağ katmanının blob okuyucusu bu kapsam kontrolünden geçmiyor, o yüzden
+ * içeriği oradan alıp FileReader ile bayta çeviriyoruz.
+ */
+async function readFileBytes(uri: string) {
+  const blob = await (await fetch(uri)).blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Dosya okunamadı."));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(blob);
+  });
+  const binary = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function isImageName(name: string) {
+  return /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
+}
+
 export function LearningScreen({
   access,
   studentId,
   studentName,
   onBack,
+  view,
 }: {
   access: Access;
   studentId: string;
   studentName: string;
   onBack: () => void;
+  /** Tek bir bölümü gömülü göstermek için (Öğretim sekmesi). Verilince
+   *  ekranın kendi başlığı ve sekme şeridi çizilmez. */
+  view?: TeachingView;
 }) {
+  const { colors, styles } = useTheme();
+  const pill = useMemo(() => makePill(colors), [colors]);
   const owner = access.role === "OWNER",
     student = access.role === "STUDENT";
   const [capabilities, setCapabilities] = useState<{
@@ -90,7 +139,20 @@ export function LearningScreen({
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
-    [tab, setTab] = useState(owner ? "assignments" : "lessons"),
+    [tab, setTab] = useState(view ?? (owner ? "assignments" : "lessons")),
+    [invite, setInvite] = useState<{
+      url: string;
+      email: string;
+      emailed: boolean;
+    } | null>(null),
+    [copied, setCopied] = useState(false),
+    // Görsel önizlemesi uygulama içinde açılır; PDF'i Android tarayıcısı
+    // çizemediği için o sistem görüntüleyicisine gider.
+    [preview, setPreview] = useState<{
+      name: string;
+      url: string;
+      kind: "image" | "pdf";
+    } | null>(null),
     [form, setForm] = useState<FormSpec | null>(null),
     [busy, setBusy] = useState(false),
     [video, setVideo] = useState<Video | null>(null),
@@ -166,8 +228,9 @@ export function LearningScreen({
     { id: "inbox", label: "Bildirimler", permission: "lessons" },
   ].filter((t) => permissions.includes(t.permission));
   useEffect(() => {
+    if (view) return;
     if (tabs.length && !tabs.some((t) => t.id === tab)) setTab(tabs[0].id);
-  }, [permissions.join(","), tab]);
+  }, [permissions.join(","), tab, view]);
   async function loadLinks() {
     try {
       setLinks(
@@ -188,14 +251,21 @@ export function LearningScreen({
       multiple: false,
     });
     if (picked.canceled) return;
-    const asset = picked.assets[0],
-      file = new File(asset.uri);
+    const asset = picked.assets[0];
     setBusy(true);
     setError("");
     try {
-      if (file.size > 10 * 1024 ** 2)
+      // DocumentPicker dosyayı Expo Go'nun kendi önbelleğine kopyalıyor
+      // (cache/DocumentPicker/...). expo-file-system'in yeni kapsamlı API'si
+      // orayı proje kapsamı dışında saydığı için `exists` false dönüyor ve
+      // okuma "Missing READ permission" ile reddediliyor. Eski API kapsam
+      // kontrolü yapmıyor; hem bu yolu hem content:// adreslerini okuyabiliyor.
+      if ((asset.size ?? 0) > 10 * 1024 ** 2)
         throw new Error("Dosya en fazla 10 MB olabilir.");
-      const fingerprint = [assignmentId, asset.name, file.size].join(":"),
+      const bytes = await readFileBytes(asset.uri);
+      if (bytes.byteLength > 10 * 1024 ** 2)
+        throw new Error("Dosya en fazla 10 MB olabilir.");
+      const fingerprint = [assignmentId, asset.name, bytes.byteLength].join(":"),
         reserved = fileReservations.current.get(fingerprint);
       let id = reserved;
       if (!id) {
@@ -207,8 +277,8 @@ export function LearningScreen({
               : "RESOURCE"
             : "SUBMISSION",
           name: asset.name,
-          mimeType: asset.mimeType || file.type,
-          sizeBytes: file.size,
+          mimeType: asset.mimeType || "application/octet-stream",
+          sizeBytes: bytes.byteLength,
         });
         id = r.data.id;
         fileReservations.current.set(fingerprint, id!);
@@ -216,10 +286,10 @@ export function LearningScreen({
           const sent = await expoFetch(r.data.uploadUrl, {
             method: "PUT",
             headers: {
-              "Content-Type": asset.mimeType || file.type,
+              "Content-Type": asset.mimeType || "application/octet-stream",
               "x-upsert": "false",
             },
-            body: file,
+            body: bytes,
           });
           if (!sent.ok && sent.status !== 409) {
             fileReservations.current.delete(fingerprint);
@@ -227,7 +297,12 @@ export function LearningScreen({
           }
         }
       }
-      await request(media + `/files/${id}/finish`, {});
+      try {
+        await request(media + `/files/${id}/finish`, {});
+      } catch (e) {
+        fileReservations.current.delete(fingerprint);
+        throw e;
+      }
       fileReservations.current.delete(fingerprint);
       await reload();
     } catch (e) {
@@ -241,20 +316,20 @@ export function LearningScreen({
     id: string;
     url: string;
   }) {
-    const file = new File(session.asset.uri),
-      handle = file.open(FileMode.ReadOnly);
     setBusy(true);
     setError("");
     setProgress(0);
     try {
+      // Dosya okuması, PDF/görsel yüklemesiyle aynı sebepten FileSystem API'si
+      // üzerinden yapılamıyor: Expo Go, DocumentPicker'ın bıraktığı yolu
+      // kapsam dışı sayıyor. Blob parçalara ayrılırken kopyalanmıyor, bu yüzden
+      // büyük videolar da bellek şişirmeden gönderilebiliyor.
+      const blob = await (await fetch(session.asset.uri)).blob();
       await uploadTus(
         session.url,
         {
-          size: file.size,
-          slice: (start, end) => {
-            handle.offset = start;
-            return handle.readBytes(end - start) as unknown as BodyInit;
-          },
+          size: blob.size,
+          slice: (start, end) => blob.slice(start, end) as unknown as BodyInit,
         },
         {
           fetch: expoFetch as unknown as typeof fetch,
@@ -267,7 +342,6 @@ export function LearningScreen({
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      handle.close();
       setBusy(false);
     }
   }
@@ -283,9 +357,8 @@ export function LearningScreen({
         multiple: false,
       });
       if (picked.canceled) return;
-      const asset = picked.assets[0],
-        file = new File(asset.uri);
-      if (file.size > 2 * 1024 ** 3)
+      const asset = picked.assets[0];
+      if ((asset.size ?? 0) > 2 * 1024 ** 3)
         throw new Error("Video en fazla 2 GB olabilir.");
       setForm({
         title: "Ders videosu yükle",
@@ -319,7 +392,7 @@ export function LearningScreen({
           const r = await request(media + "/videos", {
             title: v.title,
             lessonId: v.lessonId || null,
-            sizeBytes: file.size,
+            sizeBytes: asset.size ?? 0,
             maxDurationSeconds: Number(v.duration) * 60,
           });
           const session = { asset, id: r.data.id, url: r.data.uploadUrl };
@@ -331,9 +404,33 @@ export function LearningScreen({
       setError((e as Error).message);
     }
   }
+  // Silme iki yerden çağrılıyor (hazır dosya satırı ve bekleyen satır).
+  function removeFile(file: Material) {
+    confirmAction(
+      "Dosyayı sil",
+      "Bu dosya öğrenci için de kaldırılacak.",
+      async () => {
+        setBusy(true);
+        try {
+          await request(media + `/files/${file.id}/delete`, {});
+          await reload();
+        } catch (e) {
+          await reload();
+          setError((e as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      },
+      setError,
+    );
+  }
   if (loading) return <Loading />;
   return (
-    <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
+    <SafeAreaView
+      style={styles.screen}
+      edges={view ? ["left", "right"] : ["top", "left", "right"]}
+    >
+      {!view && (
       <View style={styles.header}>
         {owner ? (
           <Button secondary size="sm" icon="chevron-back" onPress={onBack}>
@@ -355,6 +452,8 @@ export function LearningScreen({
           </Button>
         )}
       </View>
+      )}
+      {!view && (
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -389,6 +488,7 @@ export function LearningScreen({
           );
         })}
       </ScrollView>
+      )}
       <ScrollView
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -405,6 +505,7 @@ export function LearningScreen({
           { paddingBottom: 44 + insets.bottom },
         ]}
       >
+        {!view && (
         <View style={{ gap: 4 }}>
           <Text style={styles.kicker}>
             {owner
@@ -415,6 +516,7 @@ export function LearningScreen({
           </Text>
           <Text style={styles.title}>{studentName}</Text>
         </View>
+        )}
         <ErrorText message={error} />
         {error && (
           <Button secondary onPress={() => void reload()}>
@@ -706,57 +808,75 @@ export function LearningScreen({
                         ?.title
                     : "Genel ders materyali"}
                 </Text>
-                <Button
-                  secondary
-                  disabled={file.status !== "READY" || file.delete_requested}
-                  onPress={async () => {
-                    try {
-                      const r = await request(
-                        media + `/files/${file.id}/download`,
-                      );
-                      await Linking.openURL(r.data.url);
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  {file.delete_requested
-                    ? "Silme bekliyor"
-                    : file.status === "READY"
-                      ? "Dosyayı aç"
-                      : "Yükleme tamamlanmadı"}
-                </Button>
-                {owner && (
-                  <Button
-                    secondary
-                    disabled={busy}
-                    onPress={() =>
-                      confirmAction(
-                        "Dosyayı sil",
-                        "Bu dosya öğrenci için de kaldırılacak.",
-                        async () => {
-                          setBusy(true);
-                          try {
-                            await request(
-                              media + `/files/${file.id}/delete`,
-                              {},
-                            );
-                            await reload();
-                          } catch (e) {
-                            await reload();
-                            setError((e as Error).message);
-                          } finally {
-                            setBusy(false);
-                          }
-                        },
-                        setError,
-                      )
-                    }
-                  >
-                    {file.delete_requested
-                      ? "Silmeyi yeniden dene"
-                      : "Dosyayı sil"}
-                  </Button>
+                {file.status === "READY" && !file.delete_requested ? (
+                  <View style={styles.row}>
+                    <IconButton
+                      icon="eye-outline"
+                      label="Önizle"
+                      onPress={async () => {
+                        try {
+                          // inline=1: bağlantı indirme yerine görüntülenmek
+                          // üzere imzalanır.
+                          const r = await request(
+                            media + `/files/${file.id}/download?inline=1`,
+                          );
+                          // Görsel yerel olarak, PDF pdf.js ile çizilir;
+                          // ikisi de uygulamadan çıkmadan açılır.
+                          setPreview({
+                            name: file.name,
+                            url: r.data.url,
+                            kind: isImageName(file.name) ? "image" : "pdf",
+                          });
+                        } catch (e) {
+                          setError((e as Error).message);
+                        }
+                      }}
+                    />
+                    <IconButton
+                      icon="download-outline"
+                      label="Dosyayı indir"
+                      onPress={async () => {
+                        try {
+                          const r = await request(
+                            media + `/files/${file.id}/download`,
+                          );
+                          await Linking.openURL(r.data.url);
+                        } catch (e) {
+                          setError((e as Error).message);
+                        }
+                      }}
+                    />
+                    {owner && (
+                      <IconButton
+                        danger
+                        icon="trash-outline"
+                        label="Dosyayı sil"
+                        disabled={busy}
+                        onPress={() => removeFile(file)}
+                      />
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.row}>
+                    <Text style={[styles.caption, { flex: 1 }]}>
+                      {file.delete_requested
+                        ? "Silme bekliyor"
+                        : "Yükleme tamamlanmadı"}
+                    </Text>
+                    {owner && (
+                      <IconButton
+                        danger
+                        icon="trash-outline"
+                        label={
+                          file.delete_requested
+                            ? "Silmeyi yeniden dene"
+                            : "Dosyayı sil"
+                        }
+                        disabled={busy}
+                        onPress={() => removeFile(file)}
+                      />
+                    )}
+                  </View>
                 )}
               </Card>
             ))}
@@ -805,44 +925,52 @@ export function LearningScreen({
                         ? "Yüklenemedi"
                         : "Hazırlanıyor"}
                 </Badge>
-                {v.status === "READY" && !v.delete_requested && (
-                  <Button onPress={() => setVideo(v)}>Videoyu izle</Button>
-                )}
-                {owner && (
-                  <>
-                    <Button
-                      secondary
-                      disabled={busy}
-                      onPress={async () => {
-                        try {
-                          await request(media + `/videos/${v.id}/refresh`, {});
-                          await reload();
-                        } catch (e) {
-                          setError((e as Error).message);
-                        }
-                      }}
-                    >
-                      Durumu yenile
-                    </Button>
-                    <Button
-                      secondary
-                      disabled={busy}
-                      onPress={() =>
-                        confirmAction(
-                          "Videoyu sil",
-                          "Öğrenci bu videoyu artık izleyemeyecek.",
-                          async () => {
-                            await request(media + `/videos/${v.id}/delete`, {});
+                <View style={styles.row}>
+                  {v.status === "READY" && !v.delete_requested && (
+                    <IconButton
+                      icon="play-outline"
+                      label="Videoyu izle"
+                      onPress={() => setVideo(v)}
+                    />
+                  )}
+                  {owner && (
+                    <>
+                      <IconButton
+                        icon="refresh-outline"
+                        label="Durumu yenile"
+                        disabled={busy}
+                        onPress={async () => {
+                          try {
+                            await request(media + `/videos/${v.id}/refresh`, {});
                             await reload();
-                          },
-                          setError,
-                        )
-                      }
-                    >
-                      Videoyu sil
-                    </Button>
-                  </>
-                )}
+                          } catch (e) {
+                            setError((e as Error).message);
+                          }
+                        }}
+                      />
+                      <IconButton
+                        danger
+                        icon="trash-outline"
+                        label="Videoyu sil"
+                        disabled={busy}
+                        onPress={() =>
+                          confirmAction(
+                            "Videoyu sil",
+                            "Öğrenci bu videoyu artık izleyemeyecek.",
+                            async () => {
+                              await request(
+                                media + `/videos/${v.id}/delete`,
+                                {},
+                              );
+                              await reload();
+                            },
+                            setError,
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                </View>
                 {data.questions
                   .filter((q) => q.video_id === v.id)
                   .map((q) => (
@@ -1075,6 +1203,11 @@ export function LearningScreen({
                       },
                     );
                     await loadLinks();
+                    setInvite({
+                      url: r.data.url,
+                      email: v.email,
+                      emailed: Boolean(r.data.emailed),
+                    });
                     await Share.share({
                       message: `Derslik davetiniz (7 gün geçerli): ${r.data.url}`,
                     });
@@ -1084,6 +1217,42 @@ export function LearningScreen({
             >
               Davet bağlantısı oluştur
             </Button>
+            {invite && (
+              <Card>
+                <Text style={styles.muted}>
+                  {invite.emailed
+                    ? `Davet ${invite.email} adresine e-posta ile gönderildi. Ulaşmadıysa bağlantıyı kendiniz iletebilirsiniz.`
+                    : "E-posta gönderimi kapalı; bağlantıyı kopyalayıp iletin."}
+                </Text>
+                <Text style={styles.caption} numberOfLines={2}>
+                  {invite.url}
+                </Text>
+                <View style={styles.row}>
+                  <Button
+                    secondary
+                    size="sm"
+                    icon="copy-outline"
+                    onPress={async () => {
+                      await setStringAsync(invite.url);
+                      setCopied(true);
+                    }}
+                  >
+                    {copied ? "Kopyalandı" : "Kopyala"}
+                  </Button>
+                  <Button
+                    secondary
+                    size="sm"
+                    onPress={() =>
+                      void Share.share({
+                        message: `Derslik davetiniz (7 gün geçerli): ${invite.url}`,
+                      })
+                    }
+                  >
+                    Gönder
+                  </Button>
+                </View>
+              </Card>
+            )}
             {links?.data?.map((l: any) => (
               <Card key={l.id}>
                 <Text style={styles.h2}>
@@ -1153,6 +1322,62 @@ export function LearningScreen({
           <Inbox workspaceId={owner ? access.id : undefined} />
         )}
       </ScrollView>
+      {preview?.kind === "pdf" && (
+        <PdfViewer
+          name={preview.name}
+          url={preview.url}
+          onClose={() => setPreview(null)}
+        />
+      )}
+      <Modal
+        visible={preview?.kind === "image"}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setPreview(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)" }}>
+          <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{ flex: 1, color: "#ffffff", fontSize: 14 }}
+              >
+                {preview?.name}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Kapat"
+                onPress={() => setPreview(null)}
+                hitSlop={10}
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </Pressable>
+            </View>
+            {preview && (
+              <Image
+                source={{ uri: preview.url }}
+                resizeMode="contain"
+                accessibilityLabel={preview.name}
+                style={{ flex: 1, width: "100%" }}
+              />
+            )}
+          </SafeAreaView>
+        </View>
+      </Modal>
       <FormSheet form={form} onClose={() => setForm(null)} />
       {video && (
         <MediaPlayer
@@ -1171,6 +1396,7 @@ export function LearningScreen({
   );
 }
 export function Inbox({ workspaceId }: { workspaceId?: string }) {
+  const { styles } = useTheme();
   const [rows, setRows] = useState<any[]>([]),
     [limits, setLimits] = useState<any>(null),
     [error, setError] = useState("");
@@ -1241,7 +1467,8 @@ export function Inbox({ workspaceId }: { workspaceId?: string }) {
   );
 }
 
-const pill = StyleSheet.create({
+const makePill = (colors: Palette) =>
+  StyleSheet.create({
   chip: {
     minHeight: 48,
     paddingHorizontal: 16,
@@ -1257,4 +1484,4 @@ const pill = StyleSheet.create({
   },
   chipText: { fontSize: 14, fontWeight: "600", color: colors.body },
   chipTextOn: { color: colors.white, fontWeight: "700" },
-});
+  });

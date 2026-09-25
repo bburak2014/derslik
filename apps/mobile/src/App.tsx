@@ -15,16 +15,19 @@ import {
   Badge,
   Button,
   Card,
-  colors,
   EmptyState,
   ErrorText,
   FormSheet,
   type FormSpec,
+  confirmAction,
   Loading,
-  styles,
+  ThemeProvider,
+  ThemeToggle,
+  useTheme,
 } from "./ui";
 
 function Application() {
+  const { colors, styles } = useTheme();
   const [session, setSession] = useState<Session | null>(null),
     [boot, setBoot] = useState(true),
     [access, setAccess] = useState<Access[]>([]),
@@ -260,10 +263,21 @@ function Application() {
           <Button secondary icon="mail-open-outline" onPress={accountForm}>
             Davet kabul et
           </Button>
+          <View style={{ gap: 8, marginTop: 4 }}>
+            <Text style={styles.label2}>Görünüm</Text>
+            <ThemeToggle />
+          </View>
           <Button
             variant="ghost"
             icon="log-out-outline"
-            onPress={() => void signout()}
+            onPress={() =>
+              confirmAction(
+                "Hesabınızdan çıkılsın mı?",
+                "Oturumunuz kapanacak ve tekrar giriş yapmanız gerekecek.",
+                signout,
+                setError,
+              )
+            }
           >
             Çıkış yap
           </Button>
@@ -279,11 +293,26 @@ function Application() {
     <PortalScreen key={key} access={active} onAccount={select} />
   );
 }
+// StatusBar temayla ters çalışır: koyu zeminde açık simgeler gerekir. Sabit
+// "dark" olduğu için koyu temada üst çubuk okunmuyordu.
+function Shell() {
+  const { scheme, colors } = useTheme();
+  return (
+    <>
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <View style={{ flex: 1, backgroundColor: colors.cream }}>
+        <Application />
+      </View>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Application />
+      <ThemeProvider>
+        <Shell />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
