@@ -64,8 +64,7 @@ export class DatabaseService implements OnModuleDestroy {
            WHERE w.id = $1 AND w.owner_id = $2 AND m.role = 'OWNER' AND m.active = true`,
           [workspaceId, actor.id],
         );
-        if (!rowCount)
-          throw new ForbiddenException("Bu çalışma alanına erişiminiz yok.");
+        if (!rowCount) throw new ForbiddenException("api.noWorkspaceAccess");
       }
       if (workspaceId)
         await tx.query("SELECT derslik.expire_subscription($1)", [workspaceId]);
@@ -102,8 +101,7 @@ export class DatabaseService implements OnModuleDestroy {
           write,
         ])
       ).rows[0]?.allowed;
-      if (!allowed)
-        throw new ForbiddenException("Bu öğrenci için erişiminiz yok.");
+      if (!allowed) throw new ForbiddenException("api.noStudentAccess");
       return fn(tx);
     });
   }

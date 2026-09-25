@@ -71,7 +71,7 @@ export class QueriesService {
           [ws, id],
         )
       ).rows[0];
-      if (!student) throw new NotFoundException("Öğrenci bulunamadı.");
+      if (!student) throw new NotFoundException("api.studentNotFound");
       if (noteOnly) {
         const note = (
           await tx.query(

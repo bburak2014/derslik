@@ -47,6 +47,7 @@ import {
 } from "./views";
 import { ToneBadge } from "./feedback";
 import type { Actions, Mutate } from "./workspace";
+import { t } from "@derslik/contracts";
 
 function NoteEditor({
   studentId,
@@ -67,20 +68,20 @@ function NoteEditor({
         e.preventDefault();
         await mutate(
           { action: "note.save", studentId, body, version: note?.version || 0 },
-          "Özel notunuz kaydedildi.",
+          t("detail.noteSaved"),
         );
       }}
     >
       <div className="private-note-label">
         <LockKeyhole size={16} />
-        <Label htmlFor="private-note">Yalnızca benim notum</Label>
+        <Label htmlFor="private-note">{t("detail.privateNote")}</Label>
       </div>
-      <p>Bu not öğretmen çalışma alanınıza özeldir.</p>
+      <p>{t("detail.privateNoteHint")}</p>
       <Textarea
         id="private-note"
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Bir sonraki derste hatırlamak istedikleriniz…"
+        placeholder={t("detail.notePlaceholder")}
         maxLength={5000}
         rows={7}
       />
@@ -91,7 +92,7 @@ function NoteEditor({
           size="sm"
           disabled={busy || body === (note?.body || "")}
         >
-          {busy ? <Spinner /> : null} Notu kaydet
+          {busy ? <Spinner /> : null} {t("detail.saveNote")}
         </Button>
       </div>
     </form>
@@ -126,12 +127,13 @@ export function StudentDetail({
     invite: 0,
     notice: 0,
   });
-  if (
-    focus &&
-    focus.studentId === student?.id &&
-    focus.at !== tabState.notice
-  )
-    setTabState({ id: focus.studentId, tab: "learning", invite: 0, notice: focus.at });
+  if (focus && focus.studentId === student?.id && focus.at !== tabState.notice)
+    setTabState({
+      id: focus.studentId,
+      tab: "learning",
+      invite: 0,
+      notice: focus.at,
+    });
   const current =
     tabState.id === student?.id
       ? tabState
@@ -162,10 +164,12 @@ export function StudentDetail({
                   </SheetDescription>
                   <div className="flex gap-2 mt-2">
                     {!!student.is_sample && (
-                      <ToneBadge tone="warn">Örnek öğrenci</ToneBadge>
+                      <ToneBadge tone="warn">
+                        {t("detail.sampleStudent")}
+                      </ToneBadge>
                     )}
                     {!student.active && (
-                      <ToneBadge tone="muted">Arşivlendi</ToneBadge>
+                      <ToneBadge tone="muted">{t("detail.archived")}</ToneBadge>
                     )}
                   </div>
                 </div>
@@ -191,7 +195,7 @@ export function StudentDetail({
                   onClick={() => actions.editStudent(student)}
                   disabled={busy}
                 >
-                  <Pencil /> Düzenle
+                  <Pencil /> {t("common.edit")}
                 </Button>
                 {workspaceId && !!student.active && (
                   <Button
@@ -201,13 +205,12 @@ export function StudentDetail({
                       setTabState((prev) => ({
                         id: student.id,
                         tab: "learning",
-                        invite:
-                          (prev.id === student.id ? prev.invite : 0) + 1,
+                        invite: (prev.id === student.id ? prev.invite : 0) + 1,
                         notice: prev.notice,
                       }))
                     }
                   >
-                    <Send /> Davet gönder
+                    <Send /> {t("detail.sendInvite")}
                   </Button>
                 )}
                 {student.active ? (
@@ -217,7 +220,7 @@ export function StudentDetail({
                     onClick={() => actions.archiveStudent(student)}
                     disabled={busy}
                   >
-                    <Archive /> Arşivle
+                    <Archive /> {t("detail.archive")}
                   </Button>
                 ) : (
                   <Button
@@ -226,28 +229,37 @@ export function StudentDetail({
                     onClick={() => actions.restoreStudent(student)}
                     disabled={busy}
                   >
-                    <ArchiveRestore /> Aktife al
+                    <ArchiveRestore /> {t("detail.restore")}
                   </Button>
                 )}
               </div>
             </SheetHeader>
             <div className="detail-stats">
               <div>
-                <span>Kalan ders hakkı</span>
+                <span>{t("detail.creditsLeft")}</span>
                 <strong>
                   {creditsFor(data, student.id)}
-                  <small>ders</small>
+                  <small>
+                    {t("common.lessonUnit", {
+                      count: creditsFor(data, student.id),
+                    })}
+                  </small>
                 </strong>
               </div>
               <div>
-                <span>Açık bakiye</span>
+                <span>{t("students.openBalance")}</span>
                 <strong>{money(balanceFor(data, student.id))}</strong>
               </div>
               <div>
-                <span>Tamamlanan</span>
+                <span>{t("overview.figureCompleted")}</span>
                 <strong>
                   {lessons.filter((l) => l.status === "COMPLETED").length}
-                  <small>ders</small>
+                  <small>
+                    {t("common.lessonUnit", {
+                      count: lessons.filter((l) => l.status === "COMPLETED")
+                        .length,
+                    })}
+                  </small>
                 </strong>
               </div>
             </div>
@@ -268,26 +280,26 @@ export function StudentDetail({
                   paneldeki diğer sekme şeritleriyle aynı davranış. */}
               <TabsList className="mx-6 mt-5 max-w-[calc(100%-3rem)] shrink-0 justify-start overflow-x-auto">
                 <TabsTrigger value="packages" className="flex-none">
-                  Paketler
+                  {t("detail.tabPackages")}
                 </TabsTrigger>
                 <TabsTrigger value="lessons" className="flex-none">
-                  Dersler
+                  {t("nav.lessons")}
                 </TabsTrigger>
                 <TabsTrigger value="notes" className="flex-none">
-                  Özel not
+                  {t("detail.tabNote")}
                 </TabsTrigger>
                 <TabsTrigger value="history" className="flex-none">
-                  Hareketler
+                  {t("detail.tabHistory")}
                 </TabsTrigger>
                 {workspaceId && (
                   <TabsTrigger value="learning" className="flex-none">
-                    Ödev, PDF, video ve erişim
+                    {t("detail.tabLearning")}
                   </TabsTrigger>
                 )}
               </TabsList>
               <TabsContent value="packages" className="detail-tab-content">
                 <div className="flex flex-wrap justify-between gap-3 mb-5">
-                  <h2>Ders paketleri</h2>
+                  <h2>{t("detail.packagesTitle")}</h2>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -295,7 +307,7 @@ export function StudentDetail({
                       onClick={() => actions.newPayment(student.id)}
                       disabled={busy}
                     >
-                      <Wallet /> Tahsilat
+                      <Wallet /> {t("overview.collect")}
                     </Button>
                     {!!student.active && (
                       <Button
@@ -303,7 +315,7 @@ export function StudentDetail({
                         onClick={() => actions.newPackage(student.id)}
                         disabled={busy}
                       >
-                        <Plus /> Paket ekle
+                        <Plus /> {t("overview.addPackage")}
                       </Button>
                     )}
                   </div>
@@ -315,10 +327,11 @@ export function StudentDetail({
                         <div>
                           <h3>{p.name}</h3>
                           <p>
-                            {money(p.price_minor)} · {p.granted} ders
+                            {money(p.price_minor)} ·{" "}
+                            {t("common.lessonCount", { count: p.granted })}
                           </p>
                         </div>
-                        <CreditBadge count={p.remaining} unit="hak" />
+                        <CreditBadge count={p.remaining} unit="credits" />
                       </div>
                       <Progress
                         value={(p.remaining / p.granted) * 100}
@@ -326,19 +339,25 @@ export function StudentDetail({
                       />
                       <div className="package-meta">
                         <span>
-                          {p.granted - p.remaining} / {p.granted} ders
-                          kullanıldı
+                          {t("detail.used", {
+                            used: p.granted - p.remaining,
+                            count: p.granted,
+                          })}
                         </span>
                         <span>
                           {p.expires_on
-                            ? (p.expires_on < dateKey()
-                                ? "Süresi doldu · "
-                                : "Son gün: ") +
-                              dayLabel(p.expires_on + "T12:00:00+03:00", {
-                                year: "numeric",
-                                month: "short",
-                              })
-                            : "Süre sınırı yok"}
+                            ? t(
+                                p.expires_on < dateKey()
+                                  ? "detail.expiredOn"
+                                  : "detail.lastDay",
+                                {
+                                  date: dayLabel(
+                                    p.expires_on + "T12:00:00+03:00",
+                                    { year: "numeric", month: "short" },
+                                  ),
+                                },
+                              )
+                            : t("detail.noExpiry")}
                         </span>
                       </div>
                     </div>
@@ -346,12 +365,12 @@ export function StudentDetail({
                 ) : (
                   <Empty
                     icon={BookOpen}
-                    title="Henüz ders paketi yok."
-                    text="Bir paket tanımlayarak öğrencinin ders haklarını ve ücretini kaydedin."
+                    title={t("detail.noPackages")}
+                    text={t("detail.noPackagesHint")}
                     action={
                       student.active ? (
                         <Button onClick={() => actions.newPackage(student.id)}>
-                          <Plus /> Paket ekle
+                          <Plus /> {t("overview.addPackage")}
                         </Button>
                       ) : undefined
                     }
@@ -360,14 +379,14 @@ export function StudentDetail({
               </TabsContent>
               <TabsContent value="lessons">
                 <div className="flex justify-between items-center gap-3 px-6 py-5">
-                  <h2>Ders geçmişi</h2>
+                  <h2>{t("detail.lessonHistory")}</h2>
                   {!!student.active && (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => actions.newLesson(student.id)}
                     >
-                      <Plus /> Ders planla
+                      <Plus /> {t("ws.planLesson")}
                     </Button>
                   )}
                 </div>
@@ -382,8 +401,8 @@ export function StudentDetail({
                 ) : (
                   <Empty
                     icon={CalendarDays}
-                    title="Henüz planlanmış ders yok."
-                    text="Öğrencinin paketiyle ilk dersi planlayarak başlayın."
+                    title={t("detail.noLessons")}
+                    text={t("detail.noLessonsHint")}
                   />
                 )}
               </TabsContent>
@@ -402,7 +421,7 @@ export function StudentDetail({
                 />
               </TabsContent>
               <TabsContent value="history" className="detail-tab-content">
-                <h2 className="mb-5">Ders hakkı hareketleri</h2>
+                <h2 className="mb-5">{t("detail.creditHistory")}</h2>
                 {credits.length ? (
                   <div className="credit-history">
                     {credits.map((c) => (
@@ -419,8 +438,8 @@ export function StudentDetail({
                         <div>
                           <strong>
                             {c.delta > 0
-                              ? "Ders hakkı iade edildi"
-                              : "Ders tamamlandı"}
+                              ? t("detail.creditReturned")
+                              : t("detail.lessonCompleted")}
                           </strong>
                           <p>
                             {
@@ -442,8 +461,8 @@ export function StudentDetail({
                   </div>
                 ) : (
                   <Empty
-                    title="Henüz ders hakkı hareketi yok."
-                    text="Ders tamamladığınızda kullanım ve iade kayıtları burada görünür."
+                    title={t("detail.noHistory")}
+                    text={t("detail.noHistoryHint")}
                   />
                 )}
               </TabsContent>

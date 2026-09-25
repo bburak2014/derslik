@@ -10,7 +10,8 @@ import { AuthScreen } from "./AuthScreen";
 import { authRoute, completeAuthLink } from "./oauth";
 import { TeacherScreen } from "./TeacherScreen";
 import { PortalScreen, type NoticeFocus } from "./LearningScreen";
-import type { NoticeTarget } from "@derslik/contracts";
+import { t, type NoticeTarget } from "@derslik/contracts";
+import { LanguagePicker, LocaleProvider } from "./i18n";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Avatar,
@@ -57,7 +58,7 @@ function Application() {
       access.find((a) => fits(a) && a.role === "OWNER") ||
       access.find(fits);
     if (!next) {
-      setError("Bu bildirimin ait olduğu alana artık erişiminiz yok.");
+      setError(t("conn.noticeNoAccess"));
       return;
     }
     setActive(next);
@@ -137,10 +138,7 @@ function Application() {
         if (route && (await completeAuthLink(url)) && route === "recovery")
           setReset(true);
       } catch {
-        Alert.alert(
-          "Bağlantı açılamadı",
-          "Bağlantının süresi dolmuş olabilir. Yeniden giriş yapın veya yeni bağlantı isteyin.",
-        );
+        Alert.alert(t("mobile.linkFailedTitle"), t("mobile.linkFailedBody"));
       }
     };
     void Linking.getInitialURL().then((u) => {
@@ -167,13 +165,14 @@ function Application() {
   }
   const accountForm = () =>
     setForm({
-      title: "Davet kabul et",
-      description:
-        "Öğretmeninizin gönderdiği davet bağlantısını buraya yapıştırın.",
-      fields: [{ key: "link", label: "Davet bağlantısı", value: invite || "" }],
+      title: t("mobile.acceptInvite"),
+      description: t("mobile.pasteInvite"),
+      fields: [
+        { key: "link", label: t("mobile.inviteLink"), value: invite || "" },
+      ],
       submit: async (v) => {
         const token = v.link.match(/([a-f0-9]{64})\/?$/)?.[1];
-        if (!token) throw new Error("Geçerli davet bağlantısı girin.");
+        if (!token) throw new Error(t("mobile.inviteInvalid"));
         const r = await request<{
           data: {
             workspaceId: string;
@@ -200,12 +199,8 @@ function Application() {
       >
         <View style={[styles.body, { flex: 1, justifyContent: "center" }]}>
           <Brand />
-          <Text style={styles.title}>Uygulamayı bağlayın.</Text>
-          <Text style={styles.text}>
-            Mobil uygulamanın bağlantı ayarları henüz tamamlanmamış. Kurulum
-            kılavuzundaki mobil ortam değişkenlerini ekleyip uygulamayı yeniden
-            başlatın.
-          </Text>
+          <Text style={styles.title}>{t("mobile.setupTitle")}</Text>
+          <Text style={styles.text}>{t("mobile.setupBody")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -221,28 +216,28 @@ function Application() {
         <ScrollView contentContainerStyle={styles.body}>
           <Brand />
           <View style={{ gap: 6, marginTop: 8 }}>
-            <Kicker>Hesabınız</Kicker>
-            <Text style={styles.title}>Çalışma alanınız</Text>
+            <Kicker>{t("mobile.yourAccount")}</Kicker>
+            <Text style={styles.title}>{t("mobile.yourWorkspace")}</Text>
             <View style={[styles.row, { gap: 6 }]}>
-              <Ionicons
-                name="mail-outline"
-                size={14}
-                color={colors.muted}
-              />
+              <Ionicons name="mail-outline" size={14} color={colors.muted} />
               <Text style={styles.muted}>{session.user.email}</Text>
             </View>
           </View>
           <ErrorText message={error} />
           {error && (
-            <Button secondary icon="refresh-outline" onPress={() => void load()}>
-              Yeniden dene
+            <Button
+              secondary
+              icon="refresh-outline"
+              onPress={() => void load()}
+            >
+              {t("common.retry")}
             </Button>
           )}
           {!access.length && !error && (
             <EmptyState
               icon="briefcase-outline"
-              title="Henüz bir çalışma alanınız yok"
-              description="Öğretmenseniz kendi alanınızı oluşturun, öğrenci veya veliyseniz aldığınız daveti kabul edin."
+              title={t("mobile.noWorkspace")}
+              description={t("mobile.noWorkspaceHint")}
             />
           )}
           {access.map((a) => (
@@ -262,15 +257,11 @@ function Application() {
                     {a.name}
                   </Text>
                   <Text style={styles.muted} numberOfLines={1}>
-                    {a.studentName || "Öğretmen hesabı"}
+                    {a.studentName || t("ws.teacherAccount")}
                   </Text>
                   <View style={{ marginTop: 3 }}>
                     <Badge tone={a.role === "OWNER" ? "info" : "neutral"}>
-                      {a.role === "GUARDIAN"
-                        ? "Veli"
-                        : a.role === "STUDENT"
-                          ? "Öğrenci"
-                          : "Öğretmen"}
+                      {t(`roles.${a.role}`)}
                     </Badge>
                   </View>
                 </View>
@@ -287,8 +278,8 @@ function Application() {
               icon="add"
               onPress={() =>
                 setForm({
-                  title: "Öğretmen çalışma alanı",
-                  fields: [{ key: "name", label: "Çalışma alanı adı" }],
+                  title: t("mobile.teacherWorkspace"),
+                  fields: [{ key: "name", label: t("conn.workspaceName") }],
                   submit: async (v) => {
                     await request("/workspaces", { name: v.name });
                     await load();
@@ -297,29 +288,33 @@ function Application() {
                 })
               }
             >
-              Öğretmen çalışma alanı oluştur
+              {t("conn.createWorkspace")}
             </Button>
           )}
           <Button secondary icon="mail-open-outline" onPress={accountForm}>
-            Davet kabul et
+            {t("mobile.acceptInvite")}
           </Button>
           <View style={{ gap: 8, marginTop: 8 }}>
-            <Kicker muted>Görünüm</Kicker>
+            <Kicker muted>{t("common.appearance")}</Kicker>
             <ThemeToggle />
+          </View>
+          <View style={{ gap: 8 }}>
+            <Kicker muted>{t("common.language")}</Kicker>
+            <LanguagePicker />
           </View>
           <Button
             variant="ghost"
             icon="log-out-outline"
             onPress={() =>
               confirmAction(
-                "Hesabınızdan çıkılsın mı?",
-                "Oturumunuz kapanacak ve tekrar giriş yapmanız gerekecek.",
+                t("ws.signOutTitle"),
+                t("portal.signOutBody"),
                 signout,
                 setError,
               )
             }
           >
-            Çıkış yap
+            {t("common.signOut")}
           </Button>
         </ScrollView>
         <FormSheet form={form} onClose={() => setForm(null)} />
@@ -363,7 +358,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <Shell />
+        <LocaleProvider>
+          <Shell />
+        </LocaleProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

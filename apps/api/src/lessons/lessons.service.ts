@@ -26,9 +26,7 @@ async function calendarLock(tx: PoolClient, ws: string) {
 
 function checkExpiry(expiresOn: string | null, start: Date) {
   if (expiresOn && expiresOn < istanbulDay(start))
-    throw new ConflictException(
-      "Ders tarihi paketin geçerlilik süresini aşıyor.",
-    );
+    throw new ConflictException("api.lessonAfterPackageExpiry");
 }
 
 @Injectable()
@@ -47,22 +45,18 @@ export class LessonsService {
           [ws, c.packageId, c.studentId],
         )
       ).rows[0];
-      if (!pack) throw new NotFoundException("Öğrenciye ait paket bulunamadı.");
+      if (!pack) throw new NotFoundException("api.packageNotFound");
       if (pack.remaining < 1)
-        throw new ConflictException("Pakette kullanılabilir ders hakkı yok.");
+        throw new ConflictException("api.packageNoCredits");
       if (c.makeupForId) {
-        if (c.weeks !== 1)
-          throw new ConflictException("Telafi dersi tek seferlik olmalı.");
+        if (c.weeks !== 1) throw new ConflictException("api.makeupSingle");
         const original = (
           await tx.query(
             "SELECT id FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='CANCELLED'",
             [ws, c.studentId, c.makeupForId],
           )
         ).rows[0];
-        if (!original)
-          throw new ConflictException(
-            "Telafi için aynı öğrenciye ait iptal edilmiş bir ders seçin.",
-          );
+        if (!original) throw new ConflictException("api.makeupPickCancelled");
       }
       const series = c.weeks > 1 ? randomUUID() : null;
       const lessons = [];
@@ -111,7 +105,7 @@ export class LessonsService {
         [ws, c.id],
       )
     ).rows[0];
-    if (!lookup) throw new NotFoundException("Ders bulunamadı.");
+    if (!lookup) throw new NotFoundException("api.lessonNotFound");
     // All student mutations take this lock first, including archive and payments.
     await lockStudent(
       tx,
@@ -126,12 +120,10 @@ export class LessonsService {
       )
     ).rows[0];
     if (lesson.version !== c.version)
-      throw new ConflictException("Ders değişmiş. Güncel sürümü yükleyin.");
+      throw new ConflictException("api.lessonChanged");
     const expected = c.action === "lesson.reverse" ? "COMPLETED" : "SCHEDULED";
     if (lesson.status !== expected)
-      throw new ConflictException(
-        "Bu işlem dersin mevcut durumunda yapılamaz.",
-      );
+      throw new ConflictException("api.lessonStateInvalid");
     if (c.action === "lesson.cancel") {
       const data = (
         await tx.query(
@@ -166,9 +158,7 @@ export class LessonsService {
     let reversesId: string | null = null;
     if (delta === -1) {
       if (pack.remaining < 1)
-        throw new ConflictException(
-          "Pakette kullanılabilir ders hakkı kalmadı.",
-        );
+        throw new ConflictException("api.packageCreditsUsedUp");
       checkExpiry(pack.expires_on, lesson.starts_at);
     } else {
       const debit = (
@@ -177,10 +167,7 @@ export class LessonsService {
           [ws, c.id, lesson.version - 1],
         )
       ).rows[0];
-      if (!debit)
-        throw new ConflictException(
-          "İade edilecek ders hakkı hareketi bulunamadı.",
-        );
+      if (!debit) throw new ConflictException("api.creditToReturnNotFound");
       reversesId = debit.id;
     }
     const entry = (

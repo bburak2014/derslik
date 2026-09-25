@@ -46,7 +46,13 @@ import {
   type LearningTabInfo,
   type NoticeFocus,
 } from "./learning-panel";
-import type { NoticeTarget } from "@derslik/contracts";
+import {
+  t,
+  upper,
+  type MessageKey,
+  type NoticeTarget,
+} from "@derslik/contracts";
+import { LanguageSelect } from "@/components/i18n/language-select";
 
 type PortalRole = "STUDENT" | "GUARDIAN";
 
@@ -56,59 +62,58 @@ const pages: Partial<
   Record<
     LearningTab,
     {
-      label: string;
+      label: MessageKey;
       icon: LucideIcon;
-      subtitle: Record<PortalRole, string>;
+      subtitle: Record<PortalRole, MessageKey>;
     }
   >
 > = {
   lessons: {
-    label: "Dersler",
+    label: "nav.lessons",
     icon: CalendarDays,
     subtitle: {
-      STUDENT: "Planlanan ve tamamlanan derslerinizi buradan takip edin.",
-      GUARDIAN: "Planlanan ve tamamlanan dersleri buradan takip edin.",
+      STUDENT: "portal.lessonsStudent",
+      GUARDIAN: "portal.lessonsGuardian",
     },
   },
   assignments: {
-    label: "Ödevler",
+    label: "nav.assignments",
     icon: ClipboardList,
     subtitle: {
-      STUDENT:
-        "Ödevlerinizi teslim edin, öğretmeninizin geri bildirimlerini okuyun.",
-      GUARDIAN: "Verilen ödevleri, teslimleri ve geri bildirimleri görün.",
+      STUDENT: "portal.assignmentsStudent",
+      GUARDIAN: "portal.assignmentsGuardian",
     },
   },
   files: {
-    label: "PDF ve dosyalar",
+    label: "nav.files",
     icon: FileText,
     subtitle: {
-      STUDENT: "Öğretmeninizin paylaştığı çalışma kağıtları ve materyaller.",
-      GUARDIAN: "Öğretmenin paylaştığı çalışma kağıtları ve materyaller.",
+      STUDENT: "portal.filesStudent",
+      GUARDIAN: "portal.filesGuardian",
     },
   },
   videos: {
-    label: "Ders videoları",
+    label: "nav.videos",
     icon: Video,
     subtitle: {
-      STUDENT: "Ders kayıtlarını dilediğiniz zaman yeniden izleyin.",
-      GUARDIAN: "Ders kayıtlarını dilediğiniz zaman izleyin.",
+      STUDENT: "portal.videosStudent",
+      GUARDIAN: "portal.videosGuardian",
     },
   },
   notes: {
-    label: "Paylaşımlar",
+    label: "nav.notes",
     icon: NotebookPen,
     subtitle: {
-      STUDENT: "Öğretmeninizin notları ve haftalık gelişim özetleri.",
-      GUARDIAN: "Öğretmenin notları ve haftalık gelişim özetleri.",
+      STUDENT: "portal.notesStudent",
+      GUARDIAN: "portal.notesGuardian",
     },
   },
   payments: {
-    label: "Paket ve bakiye",
+    label: "nav.balance",
     icon: Wallet,
     subtitle: {
-      STUDENT: "Ders haklarınız, açık bakiye ve kayıtlı ödemeler.",
-      GUARDIAN: "Ders hakları, açık bakiye ve kayıtlı ödemeler.",
+      STUDENT: "portal.balanceStudent",
+      GUARDIAN: "portal.balanceGuardian",
     },
   },
 };
@@ -160,7 +165,7 @@ function PortalNavigation({
               }}
             >
               <Icon />
-              <span>{page.label}</span>
+              <span>{t(page.label)}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         );
@@ -177,7 +182,7 @@ function PortalBrand({ onHome }: { onHome: () => void }) {
     <Link
       href="/"
       className="brand"
-      aria-label="Derslik ana sayfa"
+      aria-label={t("ws.homeLink")}
       onClick={(e) => {
         e.preventDefault();
         onHome();
@@ -221,7 +226,7 @@ export function Portal({
   }, []);
   // Adresteki sayfaya izin yoksa (ör. ödeme bilgisi gizli) ilk izinli sayfa açılır.
   const current =
-    tabs.length && !tabs.some((t) => t.id === tab) ? tabs[0].id : tab;
+    tabs.length && !tabs.some((x) => x.id === tab) ? tabs[0].id : tab;
   const page = pages[current] ?? pages.lessons!;
   function navigate(next: LearningTab) {
     setTab(next);
@@ -254,12 +259,16 @@ export function Portal({
         <SidebarHeader className="p-7">
           <PortalBrand onHome={() => navigate(tabs[0]?.id ?? "lessons")} />
           <p className="sidebar-kicker">
-            {role === "STUDENT" ? "ÖĞRENCİ ALANI" : "VELİ TAKİP ALANI"}
+            {upper(
+              role === "STUDENT"
+                ? t("portal.studentArea")
+                : t("portal.guardianArea"),
+            )}
           </p>
         </SidebarHeader>
         <SidebarContent className="portal-nav px-4 pt-6">
           <p className="nav-label" title={access.name}>
-            {access.name.toLocaleUpperCase("tr")}
+            {upper(access.name)}
           </p>
           <PortalNavigation
             tabs={tabs}
@@ -271,43 +280,36 @@ export function Portal({
             {role === "STUDENT" ? (
               <>
                 <p>
-                  Her ders,
+                  {t("portal.studentNote1")}
                   <br />
-                  <strong>yeni bir adım.</strong>
+                  <strong>{t("portal.studentNote2")}</strong>
                 </p>
-                <span>
-                  Ödevleriniz, notlarınız ve
-                  <br />
-                  ders kayıtlarınız burada.
-                </span>
+                <span>{t("portal.studentNote3")}</span>
               </>
             ) : (
               <>
                 <p>
-                  Gelişimi
+                  {t("portal.guardianNote1")}
                   <br />
-                  <strong>birlikte izleyin.</strong>
+                  <strong>{t("portal.guardianNote2")}</strong>
                 </p>
-                <span>
-                  Dersler, ödevler ve öğretmen
-                  <br />
-                  notları tek yerde.
-                </span>
+                <span>{t("portal.guardianNote3")}</span>
               </>
             )}
           </div>
         </SidebarContent>
         <SidebarFooter className="p-6 gap-4">
           <ThemeToggle />
+          <LanguageSelect />
           {switcher}
           <div className="profile">
-            <span className="avatar">
-              {displayName.charAt(0).toLocaleUpperCase("tr")}
-            </span>
+            <span className="avatar">{upper(displayName.charAt(0))}</span>
             <div>
               <strong title={displayName}>{displayName}</strong>
               <small>
-                {role === "STUDENT" ? "Öğrenci hesabı" : "Veli hesabı"}
+                {role === "STUDENT"
+                  ? t("portal.studentAccount")
+                  : t("portal.guardianAccount")}
               </small>
             </div>
           </div>
@@ -319,21 +321,21 @@ export function Portal({
               className="signout justify-start"
               onClick={() => setSignoutOpen(true)}
             >
-              <LogOut /> Çıkış yap
+              <LogOut /> {t("common.signOut")}
             </Button>
           )}
         </SidebarFooter>
       </Sidebar>
       <main className="workspace">
         <a href="#main-content" className="skip-link">
-          İçeriğe geç
+          {t("common.skipToContent")}
         </a>
         <header className="topbar">
           <div className="topbar-crumbs">
-            <SidebarTrigger aria-label="Menüyü aç veya kapat" />
+            <SidebarTrigger aria-label={t("common.toggleMenu")} />
             <span className="crumb-root">{access.studentName}</span>
             <ChevronRight size={13} className="crumb-sep" />
-            <span className="crumb-current">{page.label}</span>
+            <span className="crumb-current">{t(page.label)}</span>
           </div>
           <div className="topbar-actions">
             <AccountExtras onOpen={onNotice} />
@@ -343,10 +345,10 @@ export function Portal({
           <div className="page-heading">
             <div>
               <p className="eyebrow">
-                {"DERSLİK / " + page.label.toLocaleUpperCase("tr")}
+                {upper("Derslik") + " / " + upper(t(page.label))}
               </p>
-              <h1>{page.label}</h1>
-              <p>{page.subtitle[role]}</p>
+              <h1>{t(page.label)}</h1>
+              <p>{t(page.subtitle[role])}</p>
             </div>
           </div>
           <LearningPanel
@@ -362,20 +364,20 @@ export function Portal({
       <AlertDialog open={signoutOpen} onOpenChange={setSignoutOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hesabınızdan çıkılsın mı?</AlertDialogTitle>
+            <AlertDialogTitle>{t("ws.signOutTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Oturumunuz kapanacak ve tekrar giriş yapmanız gerekecek.
+              {t("portal.signOutBody")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setSignoutOpen(false);
                 onSignout?.();
               }}
             >
-              Çıkış yap
+              {t("common.signOut")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

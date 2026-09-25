@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { CONFIG, type ApiConfig } from "../config.js";
+import { apiText } from "../common/i18n.js";
 
 function escapeHtml(value: string) {
   return value.replace(
@@ -35,19 +36,22 @@ export class MailService {
     role: "STUDENT" | "GUARDIAN";
   }): Promise<boolean> {
     if (!this.configured) return false;
-    const who = input.role === "GUARDIAN" ? "veli" : "öğrenci";
-    const name = escapeHtml(input.studentName);
+    // E-posta daveti gönderen öğretmenin dilinde yazılır.
+    const intro =
+      input.role === "GUARDIAN"
+        ? "mail.inviteIntroGuardian"
+        : "mail.inviteIntroStudent";
     const url = encodeURI(input.url);
-    const subject = `Derslik daveti · ${input.studentName}`;
+    const subject = apiText("mail.inviteSubject", { name: input.studentName });
     const text =
-      `${input.studentName} için Derslik'te ${who} erişiminiz tanımlandı.\n\n` +
-      `Aşağıdaki bağlantıdan 7 gün içinde giriş yapın. Daveti yalnızca bu ` +
-      `e-posta adresiyle açtığınız hesapla kabul edebilirsiniz.\n\n${input.url}\n`;
+      apiText(intro, { name: input.studentName }) +
+      "\n\n" +
+      apiText("mail.inviteSignIn") +
+      `\n\n${input.url}\n`;
     const html =
-      `<p>${name} için Derslik'te <strong>${who}</strong> erişiminiz tanımlandı.</p>` +
-      `<p><a href="${url}">Daveti aç</a></p>` +
-      `<p>Bağlantı 7 gün geçerlidir. Daveti yalnızca bu e-posta adresiyle ` +
-      `açtığınız hesapla kabul edebilirsiniz.</p>`;
+      `<p>${escapeHtml(apiText(intro, { name: input.studentName }))}</p>` +
+      `<p><a href="${url}">${escapeHtml(apiText("mail.inviteOpen"))}</a></p>` +
+      `<p>${escapeHtml(apiText("mail.inviteValidity"))}</p>`;
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",

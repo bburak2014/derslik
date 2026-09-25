@@ -16,7 +16,7 @@ export class HealthController {
       );
       return { status: "ok" };
     } catch {
-      throw new ServiceUnavailableException("Veritabanı hazır değil.");
+      throw new ServiceUnavailableException("api.databaseNotReady");
     }
   }
 }

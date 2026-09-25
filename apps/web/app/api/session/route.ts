@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       { client } = await serverSession(),
       list = (await client.access()).data;
     const active = list.find((a) => accessKey(a) === body.key);
-    if (!active) throw new HttpError(403, "Çalışma alanına erişiminiz yok.");
+    if (!active) throw new HttpError(403, "web.noWorkspaceAccess");
     (await cookies()).set("derslik-context", accessKey(active), {
       httpOnly: true,
       secure: process.env.APP_ORIGIN!.startsWith("https:"),

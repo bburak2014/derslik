@@ -14,7 +14,7 @@ async function owner() {
   const { client } = await serverSession();
   const { active } = await selectedAccess(client);
   if (!active || active.role !== "OWNER")
-    throw new HttpError(403, "Öğretmen çalışma alanı gerekli.");
+    throw new HttpError(403, "web.teacherWorkspaceRequired");
   return { client, workspaceId: active.id };
 }
 export async function GET() {
@@ -30,12 +30,11 @@ export async function POST(request: Request) {
     csrf(request);
     const { client, workspaceId } = await owner();
     const command = commandSchema.safeParse(await readBody(request));
-    if (!command.success)
-      throw new HttpError(400, "Geçersiz alanları kontrol edin.");
+    if (!command.success) throw new HttpError(400, "web.invalidFields");
     const key = requestIdSchema.safeParse(
       request.headers.get("Idempotency-Key"),
     );
-    if (!key.success) throw new HttpError(400, "İşlem anahtarı gerekli.");
+    if (!key.success) throw new HttpError(400, "web.keyRequired");
     return json(await client.command(workspaceId, command.data, key.data));
   } catch (e) {
     return errorResponse(e);

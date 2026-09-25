@@ -155,6 +155,14 @@ export async function learningCases({
       // Someone signed in with another account must learn to switch to the
       // invited address, not see the generic constraint message.
       assert.match(wrongAccount.body.error.message, /gönderildiği e-posta/);
+      // The same error follows the caller's language.
+      const wrongAccountEn = await request("/v1/invitations/accept", {
+        method: "POST",
+        body: acceptBody,
+        auth: tokenB,
+        headers: { "Accept-Language": "en-US,en;q=0.9" },
+      });
+      assert.match(wrongAccountEn.body.error.message, /email address it was/);
       await ok("/v1/invitations/accept", acceptBody, { auth: tokenStudent });
       assert.equal(
         (
@@ -324,7 +332,7 @@ export async function learningCases({
       });
       const inbox = (await ok("/v1/inbox", undefined, { auth: tokenStudent }))
         .data;
-      const reviewed = inbox.find((n) => n.title === "Ödev değerlendirildi");
+      const reviewed = inbox.find((n) => n.title === "notice.reviewed");
       // The notification names the assignment so clients can open it.
       assert.equal(reviewed.kind, "REVIEW");
       assert.equal(reviewed.targetId, assignment.id);

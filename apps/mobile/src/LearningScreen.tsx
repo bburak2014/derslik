@@ -30,6 +30,8 @@ import {
   dayLabel,
   money,
   noticeTarget,
+  noticeText,
+  t,
   timeLabel,
   type Notice,
   type NoticeTarget,
@@ -120,7 +122,7 @@ async function readFileBytes(uri: string) {
   const blob = await (await fetch(uri)).blob();
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Dosya okunamadı."));
+    reader.onerror = () => reject(new Error(t("ml.readFailed")));
     reader.onload = () => resolve(String(reader.result));
     reader.readAsDataURL(blob);
   });
@@ -272,7 +274,7 @@ export function LearningScreen({
     void reload();
   }, [reload]);
   async function action(command: unknown) {
-    if (inFlight.current) throw new Error("Önceki işlem tamamlanıyor.");
+    if (inFlight.current) throw new Error(t("mt.busy"));
     inFlight.current = true;
     try {
       await request(owner ? base : base + "/actions", command);
@@ -297,19 +299,23 @@ export function LearningScreen({
     ? ["assignments", "lessons", "videos", "notes", "payments"]
     : (data as PortalData).permissions || [];
   const tabs = [
-    { id: "lessons", label: "Dersler", permission: "lessons" },
-    { id: "assignments", label: "Ödevler", permission: "assignments" },
-    { id: "files", label: "PDF ve dosyalar", permission: "assignments" },
-    { id: "videos", label: "Videolar", permission: "videos" },
-    { id: "notes", label: "Paylaşımlar", permission: "notes" },
+    { id: "lessons", label: t("nav.lessons"), permission: "lessons" },
+    {
+      id: "assignments",
+      label: t("nav.assignments"),
+      permission: "assignments",
+    },
+    { id: "files", label: t("nav.files"), permission: "assignments" },
+    { id: "videos", label: t("mt.videos"), permission: "videos" },
+    { id: "notes", label: t("nav.notes"), permission: "notes" },
     ...(owner
-      ? [{ id: "access", label: "Davetler", permission: "lessons" }]
-      : [{ id: "payments", label: "Bakiye", permission: "payments" }]),
-    { id: "inbox", label: "Bildirimler", permission: "lessons" },
-  ].filter((t) => permissions.includes(t.permission));
+      ? [{ id: "access", label: t("learn.tabAccess"), permission: "lessons" }]
+      : [{ id: "payments", label: t("ml.balance"), permission: "payments" }]),
+    { id: "inbox", label: t("inbox.title"), permission: "lessons" },
+  ].filter((x) => permissions.includes(x.permission));
   useEffect(() => {
     if (view) return;
-    if (tabs.length && !tabs.some((t) => t.id === tab)) setTab(tabs[0].id);
+    if (tabs.length && !tabs.some((x) => x.id === tab)) setTab(tabs[0].id);
   }, [permissions.join(","), tab, view]);
   async function loadLinks() {
     try {
@@ -322,7 +328,7 @@ export function LearningScreen({
   }
   async function attach(assignmentId: string | null) {
     if (!capabilities?.files) {
-      setError("Dosya yükleme şu anda kullanılamıyor.");
+      setError(t("learn.uploadUnavailable"));
       return;
     }
     const picked = await DocumentPicker.getDocumentAsync({
@@ -341,10 +347,10 @@ export function LearningScreen({
       // okuma "Missing READ permission" ile reddediliyor. Eski API kapsam
       // kontrolü yapmıyor; hem bu yolu hem content:// adreslerini okuyabiliyor.
       if ((asset.size ?? 0) > 10 * 1024 ** 2)
-        throw new Error("Dosya en fazla 10 MB olabilir.");
+        throw new Error(t("ml.fileTooLarge"));
       const bytes = await readFileBytes(asset.uri);
       if (bytes.byteLength > 10 * 1024 ** 2)
-        throw new Error("Dosya en fazla 10 MB olabilir.");
+        throw new Error(t("ml.fileTooLarge"));
       const fingerprint = [assignmentId, asset.name, bytes.byteLength].join(
           ":",
         ),
@@ -375,7 +381,7 @@ export function LearningScreen({
           });
           if (!sent.ok && sent.status !== 409) {
             fileReservations.current.delete(fingerprint);
-            throw new Error("Dosya yüklenemedi. Yeniden deneyin.");
+            throw new Error(t("learn.uploadFailed"));
           }
         }
       }
@@ -429,7 +435,7 @@ export function LearningScreen({
   }
   async function chooseVideo() {
     if (!capabilities?.videos) {
-      setError("Video yükleme şu anda kullanılamıyor.");
+      setError(t("ml.videoUnavailable"));
       return;
     }
     try {
@@ -441,21 +447,21 @@ export function LearningScreen({
       if (picked.canceled) return;
       const asset = picked.assets[0];
       if ((asset.size ?? 0) > 2 * 1024 ** 3)
-        throw new Error("Video en fazla 2 GB olabilir.");
+        throw new Error(t("ml.videoTooLarge"));
       setForm({
-        title: "Ders videosu yükle",
-        description: `${asset.name} · En fazla 2 saat.`,
+        title: t("ml.uploadVideo"),
+        description: `${asset.name} · ${t("ml.videoMaxHours")}`,
         fields: [
           {
             key: "title",
-            label: "Video başlığı",
+            label: t("learn.videoTitle"),
             value: asset.name.replace(/\.[^.]+$/, ""),
           },
           {
             key: "lessonId",
-            label: "Ders",
+            label: t("learn.lesson"),
             options: [
-              { value: "", label: "Genel ders videosu" },
+              { value: "", label: t("learn.generalVideo") },
               ...data.lessons.map((l) => ({
                 value: l.id,
                 label: `${l.topic} · ${dateKey(l.starts_at)}`,
@@ -465,7 +471,7 @@ export function LearningScreen({
           },
           {
             key: "duration",
-            label: "En fazla süre (dakika)",
+            label: t("ml.maxDuration"),
             value: "60",
             keyboard: "decimal-pad",
           },
@@ -489,8 +495,8 @@ export function LearningScreen({
   // Silme iki yerden çağrılıyor (hazır dosya satırı ve bekleyen satır).
   function removeFile(file: Material) {
     confirmAction(
-      "Dosyayı sil",
-      "Bu dosya öğrenci için de kaldırılacak.",
+      t("ml.deleteFile"),
+      t("ml.deleteFileBody"),
       async () => {
         setBusy(true);
         try {
@@ -512,16 +518,16 @@ export function LearningScreen({
     sub?: LearningData["submissions"][number],
   ): [BadgeTone, string] =>
     a.status === "CANCELLED"
-      ? ["neutral", "İptal edildi"]
+      ? ["neutral", t("lesson.cancelled")]
       : a.status === "COMPLETED"
-        ? ["success", "Tamamlandı"]
+        ? ["success", t("lesson.completed")]
         : sub
           ? sub.status === "REVIEWED"
-            ? ["success", "Değerlendirildi"]
-            : ["info", "Teslim edildi"]
+            ? ["success", t("learn.reviewed")]
+            : ["info", t("learn.submitted")]
           : a.due_on && a.due_on < dateKey()
-            ? ["danger", "Gecikti"]
-            : ["warning", "Teslim bekleniyor"];
+            ? ["danger", t("learn.late")]
+            : ["warning", t("learn.awaiting")];
   return (
     <SafeAreaView
       style={styles.screen}
@@ -537,7 +543,7 @@ export function LearningScreen({
               onPress={onBack}
               style={{ marginLeft: -10 }}
             >
-              Öğrenci dosyası
+              {t("mt.studentFile")}
             </Button>
           ) : (
             <Brand />
@@ -549,7 +555,7 @@ export function LearningScreen({
               icon="person-circle-outline"
               onPress={onBack}
             >
-              Hesabım
+              {t("mt.myAccount")}
             </Button>
           )}
         </View>
@@ -589,10 +595,10 @@ export function LearningScreen({
             <View style={{ flex: 1, gap: 4 }}>
               <Kicker>
                 {owner
-                  ? "Öğrenme alanı"
+                  ? t("ml.learningArea")
                   : student
-                    ? "Öğrenci çalışma alanı"
-                    : "Veli takip alanı"}
+                    ? t("ml.studentArea")
+                    : t("ml.guardianArea")}
               </Kicker>
               <Text style={styles.title} numberOfLines={2}>
                 {studentName}
@@ -608,7 +614,7 @@ export function LearningScreen({
             style={{ alignSelf: "flex-start" }}
             onPress={() => void reload()}
           >
-            Yenile
+            {t("ml.reload")}
           </Button>
         )}
         {(owner || student) &&
@@ -624,14 +630,11 @@ export function LearningScreen({
                 />
                 <Text style={styles.h2}>
                   {tab === "videos"
-                    ? "Video yükleme hazır değil"
-                    : "Dosya yükleme hazır değil"}
+                    ? t("ml.videoNotReady")
+                    : t("ml.fileNotReady")}
                 </Text>
               </View>
-              <Text style={styles.muted}>
-                Yükleme hizmetine şu anda erişilemiyor. Hizmet
-                etkinleştirildiğinde tekrar kontrol edin.
-              </Text>
+              <Text style={styles.muted}>{t("learn.uploadServiceDown")}</Text>
               <Button
                 secondary
                 size="sm"
@@ -639,7 +642,7 @@ export function LearningScreen({
                 style={{ alignSelf: "flex-start" }}
                 onPress={() => void reload()}
               >
-                Tekrar kontrol et
+                {t("learn.checkAgain")}
               </Button>
             </Card>
           )}
@@ -648,8 +651,8 @@ export function LearningScreen({
             {!data.lessons.length && (
               <EmptyState
                 icon="calendar-outline"
-                title="Henüz ders yok"
-                description="Planlanan dersleriniz burada görünecek."
+                title={t("learn.noLessons")}
+                description={t("learn.noLessonsHint")}
               />
             )}
             {data.lessons.map((l) => (
@@ -687,7 +690,7 @@ export function LearningScreen({
                         color={colors.faint}
                       />
                       <Text style={styles.caption}>
-                        {l.location || "Konum belirtilmedi"}
+                        {l.location || t("lesson.noLocation")}
                       </Text>
                     </View>
                   </View>
@@ -703,18 +706,18 @@ export function LearningScreen({
                 icon="add"
                 onPress={() =>
                   formAction(
-                    "Yeni ödev",
+                    t("notice.assignmentNew"),
                     [
-                      { key: "title", label: "Başlık" },
+                      { key: "title", label: t("learn.title") },
                       {
                         key: "instructions",
-                        label: "Yönerge",
+                        label: t("learn.instructions"),
                         multiline: true,
                         required: false,
                       },
                       {
                         key: "dueOn",
-                        label: "Son teslim (YYYY-AA-GG)",
+                        label: t("ml.dueField"),
                         required: false,
                         value: dateKey(),
                       },
@@ -723,14 +726,14 @@ export function LearningScreen({
                   )
                 }
               >
-                Ödev ver
+                {t("learn.assign")}
               </Button>
             )}
             {!data.assignments.length && (
               <EmptyState
                 icon="clipboard-outline"
-                title="Henüz ödev yok"
-                description="Verilen ödevler, teslimler ve geri bildirimler burada görünecek."
+                title={t("learn.noAssignments")}
+                description={t("learn.noAssignmentsHint")}
               />
             )}
             {data.assignments.map((a) => {
@@ -761,17 +764,19 @@ export function LearningScreen({
                     />
                     <Text style={styles.caption}>
                       {a.due_on
-                        ? "Son teslim " + dayLabel(a.due_on + "T12:00:00+03:00")
-                        : "Son teslim tarihi yok"}
+                        ? t("learn.dueDate", {
+                            date: dayLabel(a.due_on + "T12:00:00+03:00"),
+                          })
+                        : t("learn.noDueDate")}
                     </Text>
                   </View>
                   {student && sub && a.status === "OPEN" && (
                     <Text style={[styles.caption, { marginTop: -4 }]}>
                       {editable
                         ? a.due_on
-                          ? "Teslimi bu günün sonuna kadar düzenleyebilirsiniz."
-                          : "Teslimi istediğiniz zaman düzenleyebilirsiniz."
-                        : "Son teslim tarihi geçti, teslim kilitlendi."}
+                          ? t("ml.editableToday")
+                          : t("ml.editableAnytime")
+                        : t("ml.locked")}
                     </Text>
                   )}
                   {!!a.instructions && (
@@ -779,12 +784,14 @@ export function LearningScreen({
                   )}
                   {sub && (
                     <View style={section.quote}>
-                      <Text style={styles.label}>Öğrenci teslimi</Text>
+                      <Text style={styles.label}>
+                        {t("learn.studentSubmission")}
+                      </Text>
                       <Text style={styles.text}>{sub.body}</Text>
                       {!!sub.feedback && (
                         <>
                           <Text style={[styles.label, { marginTop: 6 }]}>
-                            Öğretmen geri bildirimi
+                            {t("learn.teacherFeedback")}
                           </Text>
                           <Text style={styles.text}>{sub.feedback}</Text>
                         </>
@@ -814,7 +821,9 @@ export function LearningScreen({
                         }}
                       >
                         {m.name}
-                        {m.status !== "READY" ? " (yükleniyor)" : ""}
+                        {m.status !== "READY"
+                          ? ` (${t("ml.uploadingShort")})`
+                          : ""}
                       </Button>
                     ))}
                   <View style={styles.row}>
@@ -826,30 +835,43 @@ export function LearningScreen({
                         style={{ flexGrow: 1 }}
                         onPress={() =>
                           formAction(
-                            "Ödevi düzenle",
+                            t("learn.editAssignment"),
                             [
-                              { key: "title", label: "Başlık", value: a.title },
+                              {
+                                key: "title",
+                                label: t("learn.title"),
+                                value: a.title,
+                              },
                               {
                                 key: "instructions",
-                                label: "Yönerge",
+                                label: t("learn.instructions"),
                                 value: a.instructions,
                                 multiline: true,
                                 required: false,
                               },
                               {
                                 key: "dueOn",
-                                label: "Son teslim (YYYY-AA-GG)",
+                                label: t("ml.dueField"),
                                 value: a.due_on || "",
                                 required: false,
                               },
                               {
                                 key: "status",
-                                label: "Durum",
+                                label: t("common.status"),
                                 value: a.status,
                                 options: [
-                                  { value: "OPEN", label: "Devam ediyor" },
-                                  { value: "COMPLETED", label: "Tamamlandı" },
-                                  { value: "CANCELLED", label: "İptal edildi" },
+                                  {
+                                    value: "OPEN",
+                                    label: t("learn.inProgress"),
+                                  },
+                                  {
+                                    value: "COMPLETED",
+                                    label: t("lesson.completed"),
+                                  },
+                                  {
+                                    value: "CANCELLED",
+                                    label: t("lesson.cancelled"),
+                                  },
                                 ],
                               },
                             ],
@@ -862,7 +884,7 @@ export function LearningScreen({
                           )
                         }
                       >
-                        Düzenle
+                        {t("common.edit")}
                       </Button>
                     )}
                     {student && editable && (
@@ -872,11 +894,13 @@ export function LearningScreen({
                         style={{ flexGrow: 1 }}
                         onPress={() =>
                           formAction(
-                            sub ? "Teslimi düzenle" : "Ödevi teslim et",
+                            sub
+                              ? t("learn.editSubmission")
+                              : t("learn.submitTitle"),
                             [
                               {
                                 key: "body",
-                                label: "Çözümünüz / açıklamanız",
+                                label: t("learn.yourAnswer"),
                                 multiline: true,
                                 value: sub?.body,
                               },
@@ -890,7 +914,7 @@ export function LearningScreen({
                           )
                         }
                       >
-                        {sub ? "Teslimi düzenle" : "Teslim et"}
+                        {sub ? t("learn.editSubmission") : t("learn.submit")}
                       </Button>
                     )}
                     {owner && sub && (
@@ -900,11 +924,11 @@ export function LearningScreen({
                         style={{ flexGrow: 1 }}
                         onPress={() =>
                           formAction(
-                            "Ödevi değerlendir",
+                            t("learn.reviewTitle"),
                             [
                               {
                                 key: "feedback",
-                                label: "Geri bildirim",
+                                label: t("learn.feedback"),
                                 multiline: true,
                                 value: sub.feedback,
                               },
@@ -918,7 +942,7 @@ export function LearningScreen({
                           )
                         }
                       >
-                        Geri bildirim yaz
+                        {t("learn.writeFeedback")}
                       </Button>
                     )}
                     {(owner || (student && editable)) && (
@@ -930,7 +954,7 @@ export function LearningScreen({
                         disabled={busy || !capabilities?.files}
                         onPress={() => void attach(a.id)}
                       >
-                        {busy ? "Yükleniyor…" : "Dosya ekle"}
+                        {busy ? t("learn.uploading") : t("learn.addFile")}
                       </Button>
                     )}
                   </View>
@@ -947,18 +971,15 @@ export function LearningScreen({
                 disabled={busy || !capabilities?.files}
                 onPress={() => void attach(null)}
               >
-                {busy ? "Yükleniyor…" : "PDF / materyal yükle"}
+                {busy ? t("learn.uploading") : t("ml.uploadMaterial")}
               </Button>
             )}
-            <Text style={styles.caption}>
-              PDF, JPG, PNG veya WebP · en fazla 10 MB. Ödev ekleri de burada
-              görünür.
-            </Text>
+            <Text style={styles.caption}>{t("ml.fileNote")}</Text>
             {!data.materials.length && (
               <EmptyState
                 icon="document-text-outline"
-                title="Henüz dosya yok"
-                description="Eklenen PDF ve materyaller burada görünecek."
+                title={t("learn.noFiles")}
+                description={t("learn.noFilesHint")}
               />
             )}
             {!!data.materials.length && (
@@ -982,20 +1003,20 @@ export function LearningScreen({
                         <Text style={styles.caption} numberOfLines={1}>
                           {!ready
                             ? file.delete_requested
-                              ? "Silme bekliyor"
-                              : "Yükleme tamamlanmadı"
+                              ? t("learn.deletePending")
+                              : t("learn.uploadIncomplete")
                             : file.assignment_id
                               ? data.assignments.find(
                                   (a) => a.id === file.assignment_id,
                                 )?.title
-                              : "Genel ders materyali"}
+                              : t("learn.generalMaterial")}
                         </Text>
                       </View>
                       <View style={{ flexDirection: "row", gap: 6 }}>
                         {ready && (
                           <IconButton
                             icon="eye-outline"
-                            label="Önizle"
+                            label={t("learn.preview")}
                             onPress={async () => {
                               try {
                                 // inline=1: bağlantı indirme yerine
@@ -1021,7 +1042,7 @@ export function LearningScreen({
                         {ready && (
                           <IconButton
                             icon="download-outline"
-                            label="Dosyayı indir"
+                            label={t("learn.download")}
                             onPress={async () => {
                               try {
                                 const r = await request(
@@ -1040,8 +1061,8 @@ export function LearningScreen({
                             icon="trash-outline"
                             label={
                               file.delete_requested
-                                ? "Silmeyi yeniden dene"
-                                : "Dosyayı sil"
+                                ? t("learn.retryDelete")
+                                : t("ml.deleteFile")
                             }
                             disabled={busy}
                             onPress={() => removeFile(file)}
@@ -1063,13 +1084,13 @@ export function LearningScreen({
                 disabled={busy || !capabilities?.videos}
                 onPress={() => void chooseVideo()}
               >
-                Ders videosu yükle
+                {t("ml.uploadVideo")}
               </Button>
             )}
             {progress !== null && (
               <Card>
                 <Meter
-                  label="Video yükleniyor"
+                  label={t("ml.videoUploading")}
                   used={Math.round(progress * 100)}
                   limit={100}
                   unit="%"
@@ -1082,14 +1103,14 @@ export function LearningScreen({
                 icon="play-forward-outline"
                 onPress={() => void sendVideo(upload)}
               >
-                Yüklemeye devam et
+                {t("ml.resumeUpload")}
               </Button>
             )}
             {!data.videos.length && (
               <EmptyState
                 icon="videocam-outline"
-                title="Henüz video yok"
-                description="Hazır olduğunda ders videoları burada görünecek."
+                title={t("learn.noVideos")}
+                description={t("learn.noVideosHint")}
               />
             )}
             {data.videos.map((v) => {
@@ -1099,7 +1120,9 @@ export function LearningScreen({
                   <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`${v.title} videosunu izle`}
+                      accessibilityLabel={t("ml.watchVideoLabel", {
+                        title: v.title,
+                      })}
                       disabled={!ready}
                       onPress={() => setVideo(v)}
                       style={({ pressed }) => [
@@ -1133,12 +1156,16 @@ export function LearningScreen({
                         dot={!(v.status === "READY" && !v.delete_requested)}
                       >
                         {v.delete_requested
-                          ? "Silme bekliyor"
+                          ? t("learn.deletePending")
                           : v.status === "READY"
-                            ? `${Math.ceil((v.duration_seconds || 0) / 60)} dakika`
+                            ? t("learn.minutes", {
+                                count: Math.ceil(
+                                  (v.duration_seconds || 0) / 60,
+                                ),
+                              })
                             : v.status === "FAILED"
-                              ? "Yüklenemedi"
-                              : "Hazırlanıyor"}
+                              ? t("learn.videoFailed")
+                              : t("learn.videoPreparing")}
                       </Badge>
                     </View>
                   </View>
@@ -1150,14 +1177,14 @@ export function LearningScreen({
                         style={{ flexGrow: 1 }}
                         onPress={() => setVideo(v)}
                       >
-                        Videoyu izle
+                        {t("ml.watchVideo")}
                       </Button>
                     )}
                     {owner && (
                       <>
                         <IconButton
                           icon="refresh-outline"
-                          label="Durumu yenile"
+                          label={t("ml.refreshStatus")}
                           disabled={busy}
                           onPress={async () => {
                             try {
@@ -1174,12 +1201,12 @@ export function LearningScreen({
                         <IconButton
                           danger
                           icon="trash-outline"
-                          label="Videoyu sil"
+                          label={t("ml.deleteVideo")}
                           disabled={busy}
                           onPress={() =>
                             confirmAction(
-                              "Videoyu sil",
-                              "Öğrenci bu videoyu artık izleyemeyecek.",
+                              t("ml.deleteVideo"),
+                              t("ml.deleteVideoBody"),
                               async () => {
                                 await request(
                                   media + `/videos/${v.id}/delete`,
@@ -1206,17 +1233,20 @@ export function LearningScreen({
                           />
                           <Text style={styles.label}>
                             {Math.floor(q.at_seconds / 60)}:
-                            {String(q.at_seconds % 60).padStart(2, "0")} · Soru
+                            {String(q.at_seconds % 60).padStart(2, "0")} ·{" "}
+                            {t("ml.question")}
                           </Text>
                           {q.resolved && (
                             <Badge tone="success" icon="checkmark">
-                              Yanıtlandı
+                              {t("learn.answered")}
                             </Badge>
                           )}
                         </View>
                         <Text style={styles.text}>{q.body}</Text>
                         {!!q.answer && (
-                          <Text style={styles.muted}>Yanıt: {q.answer}</Text>
+                          <Text style={styles.muted}>
+                            {t("ml.answerLine", { answer: q.answer })}
+                          </Text>
                         )}
                         {owner && (
                           <View style={{ alignSelf: "flex-start" }}>
@@ -1224,11 +1254,11 @@ export function LearningScreen({
                               icon="arrow-undo-outline"
                               onPress={() =>
                                 formAction(
-                                  "Soruyu yanıtla",
+                                  t("ml.answerTitle"),
                                   [
                                     {
                                       key: "answer",
-                                      label: "Yanıt",
+                                      label: t("ml.answer"),
                                       value: q.answer,
                                       multiline: true,
                                     },
@@ -1243,7 +1273,7 @@ export function LearningScreen({
                                 )
                               }
                             >
-                              Yanıtla
+                              {t("learn.reply")}
                             </TextLink>
                           </View>
                         )}
@@ -1263,16 +1293,19 @@ export function LearningScreen({
                   style={{ flexGrow: 1 }}
                   onPress={() =>
                     formAction(
-                      "Not paylaş",
+                      t("learn.shareNote"),
                       [
-                        { key: "body", label: "Not", multiline: true },
+                        { key: "body", label: t("mt.note"), multiline: true },
                         {
                           key: "audience",
-                          label: "Kim görebilsin?",
+                          label: t("learn.audience"),
                           value: "BOTH",
                           options: [
-                            { value: "BOTH", label: "Öğrenci ve veli" },
-                            { value: "STUDENT", label: "Yalnız öğrenci" },
+                            { value: "BOTH", label: t("learn.audienceBoth") },
+                            {
+                              value: "STUDENT",
+                              label: t("learn.audienceStudent"),
+                            },
                           ],
                         },
                       ],
@@ -1280,7 +1313,7 @@ export function LearningScreen({
                     )
                   }
                 >
-                  Not paylaş
+                  {t("learn.shareNote")}
                 </Button>
                 <Button
                   secondary
@@ -1288,11 +1321,11 @@ export function LearningScreen({
                   style={{ flexGrow: 1 }}
                   onPress={() =>
                     formAction(
-                      "Haftalık özet hazırla",
+                      t("learn.summaryTitle"),
                       [
                         {
                           key: "weekOn",
-                          label: "Hafta başlangıcı (YYYY-AA-GG)",
+                          label: t("ml.weekStartField"),
                           value: dateKey(),
                         },
                       ],
@@ -1300,22 +1333,26 @@ export function LearningScreen({
                     )
                   }
                 >
-                  Özet taslağı
+                  {t("ml.summaryDraft")}
                 </Button>
               </View>
             )}
             {data.summaries.map((s) => (
               <Card key={s.id} {...spot(s.id)}>
                 <View style={[styles.row, { justifyContent: "space-between" }]}>
-                  <Kicker>Haftalık özet</Kicker>
+                  <Kicker>{t("learn.weeklySummary")}</Kicker>
                   <Badge
                     tone={s.status === "DRAFT" ? "warning" : "success"}
                     dot
                   >
-                    {s.status === "DRAFT" ? "Taslak" : "Paylaşıldı"}
+                    {s.status === "DRAFT"
+                      ? t("learn.draft")
+                      : t("learn.shared")}
                   </Badge>
                 </View>
-                <Text style={styles.h2}>{s.week_on} haftası</Text>
+                <Text style={styles.h2}>
+                  {t("learn.weekOf", { date: s.week_on })}
+                </Text>
                 <Text style={styles.text}>{s.body}</Text>
                 {owner && (
                   <Button
@@ -1327,11 +1364,11 @@ export function LearningScreen({
                     style={{ alignSelf: "flex-start" }}
                     onPress={() =>
                       formAction(
-                        "Özeti incele ve paylaş",
+                        t("learn.reviewSummary"),
                         [
                           {
                             key: "body",
-                            label: "Özet",
+                            label: t("learn.summary"),
                             value: s.body,
                             multiline: true,
                           },
@@ -1346,8 +1383,8 @@ export function LearningScreen({
                     }
                   >
                     {s.status === "DRAFT"
-                      ? "Düzenle ve onayla"
-                      : "Özeti güncelle"}
+                      ? t("learn.editApprove")
+                      : t("learn.updateSummary")}
                   </Button>
                 )}
               </Card>
@@ -1356,7 +1393,9 @@ export function LearningScreen({
               <Card key={n.id}>
                 <View style={[styles.row, { justifyContent: "space-between" }]}>
                   <Kicker>
-                    {n.audience === "BOTH" ? "Öğrenci ve veli" : "Öğrenci"}
+                    {n.audience === "BOTH"
+                      ? t("learn.audienceBoth")
+                      : t("common.student")}
                   </Kicker>
                   <Text style={styles.caption}>{dayLabel(n.created_at)}</Text>
                 </View>
@@ -1366,8 +1405,8 @@ export function LearningScreen({
             {!data.notes.length && !data.summaries.length && (
               <EmptyState
                 icon="reader-outline"
-                title="Henüz paylaşım yok"
-                description="Paylaşılan notlar ve haftalık özetler burada görünecek."
+                title={t("learn.noNotes")}
+                description={t("learn.noNotesHint")}
               />
             )}
           </>
@@ -1378,7 +1417,7 @@ export function LearningScreen({
               <InkFigures
                 items={[
                   {
-                    label: "Açık bakiye",
+                    label: t("students.openBalance"),
                     value: money(
                       data.packages.reduce(
                         (n, p) => n + Number(p.price_minor),
@@ -1390,7 +1429,7 @@ export function LearningScreen({
                     ),
                   },
                   {
-                    label: "Kalan ders",
+                    label: t("mt.remainingLessons"),
                     value: data.packages.reduce((n, p) => n + p.remaining, 0),
                   },
                 ]}
@@ -1401,11 +1440,11 @@ export function LearningScreen({
                   { color: colors.onFeatureMuted, marginTop: -4 },
                 ]}
               >
-                Öğretmenin kaydettiği paketler ve tahsilatlar.
+                {t("ml.balanceBasis")}
               </Text>
             </InkPanel>
             {!!data.packages.length && (
-              <SectionHeading title="Ders paketleri" />
+              <SectionHeading title={t("mt.packages")} />
             )}
             {data.packages.map((p) => (
               <Card key={p.id}>
@@ -1421,15 +1460,21 @@ export function LearningScreen({
                     tone={p.remaining <= 2 ? "warning" : "info"}
                     icon={p.remaining <= 2 ? "alert-circle-outline" : undefined}
                   >
-                    {p.remaining} hak
+                    {t("common.creditCount", { count: p.remaining })}
                   </Badge>
                 </View>
                 <Text style={styles.muted}>
-                  {p.remaining} / {p.granted} hak · {money(p.price_minor)}
+                  {t("mt.creditsOf", {
+                    remaining: p.remaining,
+                    granted: p.granted,
+                  })}{" "}
+                  · {money(p.price_minor)}
                 </Text>
               </Card>
             ))}
-            {!!data.payments.length && <SectionHeading title="Tahsilatlar" />}
+            {!!data.payments.length && (
+              <SectionHeading title={t("nav.payments")} />
+            )}
             {!!data.payments.length && (
               <List>
                 {data.payments.map((p, i) => (
@@ -1455,7 +1500,7 @@ export function LearningScreen({
                       tone={p.voided_at ? "neutral" : "success"}
                       icon={p.voided_at ? undefined : "checkmark"}
                     >
-                      {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
+                      {p.voided_at ? t("mt.voided") : t("learn.paid")}
                     </Badge>
                   </ListRow>
                 ))}
@@ -1465,37 +1510,34 @@ export function LearningScreen({
         )}
         {tab === "access" && owner && (
           <>
-            <Text style={styles.muted}>
-              Davet bağlantısını yalnızca belirtilen, doğrulanmış e-posta hesabı
-              kabul edebilir.
-            </Text>
+            <Text style={styles.muted}>{t("learn.accessText")}</Text>
             <Button
               icon="person-add-outline"
               onPress={() =>
                 setForm({
-                  title: "Davet oluştur",
+                  title: t("learn.createInvite"),
                   fields: [
                     {
                       key: "email",
-                      label: "E-posta",
+                      label: t("mt.email"),
                       keyboard: "email-address",
                     },
                     {
                       key: "role",
-                      label: "Hesap türü",
+                      label: t("learn.accountType"),
                       value: "STUDENT",
                       options: [
-                        { value: "STUDENT", label: "Öğrenci" },
-                        { value: "GUARDIAN", label: "Veli" },
+                        { value: "STUDENT", label: t("roles.STUDENT") },
+                        { value: "GUARDIAN", label: t("roles.GUARDIAN") },
                       ],
                     },
                     {
                       key: "payments",
-                      label: "Paket / ödeme bilgisi",
+                      label: t("learn.paymentInfo"),
                       value: "no",
                       options: [
-                        { value: "no", label: "Gizli kalsın" },
-                        { value: "yes", label: "Görüntüleyebilsin" },
+                        { value: "no", label: t("learn.paymentHidden") },
+                        { value: "yes", label: t("learn.paymentVisible") },
                       ],
                     },
                   ],
@@ -1521,13 +1563,13 @@ export function LearningScreen({
                       emailed: Boolean(r.data.emailed),
                     });
                     await Share.share({
-                      message: `Derslik davetiniz (7 gün geçerli): ${r.data.url}`,
+                      message: t("ml.shareInvite", { url: r.data.url }),
                     });
                   },
                 })
               }
             >
-              Davet bağlantısı oluştur
+              {t("learn.inviteTitle")}
             </Button>
             {invite && (
               <Card tone="brand">
@@ -1538,15 +1580,13 @@ export function LearningScreen({
                     color={colors.brand}
                   />
                   <Text style={styles.label}>
-                    {invite.emailed
-                      ? "Davet gönderildi"
-                      : "Davet bağlantısı hazır"}
+                    {invite.emailed ? t("ml.inviteSent") : t("ml.inviteReady")}
                   </Text>
                 </View>
                 <Text style={styles.muted}>
                   {invite.emailed
-                    ? `Davet ${invite.email} adresine e-posta ile gönderildi. Ulaşmadıysa bağlantıyı kendiniz iletebilirsiniz.`
-                    : "E-posta gönderimi kapalı; bağlantıyı kopyalayıp iletin."}
+                    ? t("ml.inviteEmailed", { email: invite.email })
+                    : t("ml.inviteNoEmail")}
                 </Text>
                 <Text style={styles.caption} numberOfLines={2}>
                   {invite.url}
@@ -1561,7 +1601,7 @@ export function LearningScreen({
                       setCopied(true);
                     }}
                   >
-                    {copied ? "Kopyalandı" : "Kopyala"}
+                    {copied ? t("ml.copied") : t("learn.copy")}
                   </Button>
                   <Button
                     secondary
@@ -1569,11 +1609,11 @@ export function LearningScreen({
                     icon="share-outline"
                     onPress={() =>
                       void Share.share({
-                        message: `Derslik davetiniz (7 gün geçerli): ${invite.url}`,
+                        message: t("ml.shareInvite", { url: invite.url }),
                       })
                     }
                   >
-                    Gönder
+                    {t("ml.send")}
                   </Button>
                 </View>
               </Card>
@@ -1581,8 +1621,8 @@ export function LearningScreen({
             {!!links && !links.data?.length && !links.invitations?.length && (
               <EmptyState
                 icon="person-add-outline"
-                title="Henüz davet yok"
-                description="Öğrenci veya veliyi davet ettiğinizde burada görünür."
+                title={t("learn.noInvites")}
+                description={t("learn.noInvitesHint")}
               />
             )}
             {!!(links?.data?.length || links?.invitations?.length) && (
@@ -1599,11 +1639,11 @@ export function LearningScreen({
                     <View style={{ flex: 1, gap: 4 }}>
                       <Text style={styles.label}>
                         {l.role === "STUDENT"
-                          ? "Öğrenci erişimi"
-                          : "Veli erişimi"}
+                          ? t("learn.studentAccess")
+                          : t("learn.guardianAccess")}
                       </Text>
                       <Badge tone={l.revokedAt ? "neutral" : "success"} dot>
-                        {l.revokedAt ? "Kaldırıldı" : "Etkin"}
+                        {l.revokedAt ? t("learn.removed") : t("ml.active")}
                       </Badge>
                     </View>
                     {!l.revokedAt && (
@@ -1612,8 +1652,8 @@ export function LearningScreen({
                         size="sm"
                         onPress={() =>
                           confirmAction(
-                            "Erişimi kaldır",
-                            "Bu hesap öğrenci bilgilerini artık göremeyecek.",
+                            t("learn.revokeAccess"),
+                            t("ml.revokeBody"),
                             async () => {
                               await request(
                                 `/workspaces/${access.id}/students/${studentId}/access/revoke`,
@@ -1625,7 +1665,7 @@ export function LearningScreen({
                           )
                         }
                       >
-                        Kaldır
+                        {t("learn.remove")}
                       </Button>
                     )}
                   </ListRow>
@@ -1633,12 +1673,12 @@ export function LearningScreen({
                 {links?.invitations?.map((inv: any, i: number) => {
                   const expired = new Date(inv.expiresAt) < new Date();
                   const [tone, state]: [BadgeTone, string] = inv.acceptedAt
-                    ? ["success", "Kabul edildi"]
+                    ? ["success", t("learn.accepted")]
                     : inv.revokedAt
-                      ? ["neutral", "İptal edildi"]
+                      ? ["neutral", t("lesson.cancelled")]
                       : expired
-                        ? ["neutral", "Süresi doldu"]
-                        : ["warning", "Davet bekliyor"];
+                        ? ["neutral", t("learn.expired")]
+                        : ["warning", t("learn.invitePending")];
                   return (
                     <ListRow
                       key={inv.id}
@@ -1669,7 +1709,7 @@ export function LearningScreen({
                             }
                           }}
                         >
-                          İptal et
+                          {t("mt.cancelLesson")}
                         </Button>
                       )}
                     </ListRow>
@@ -1718,7 +1758,7 @@ export function LearningScreen({
               </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Kapat"
+                accessibilityLabel={t("common.close")}
                 onPress={() => setPreview(null)}
                 hitSlop={10}
                 style={({ pressed }) => ({
@@ -1774,26 +1814,30 @@ function FileIcon({ icon }: { icon: IconName }) {
   );
 }
 
-/** Bildirim başlıkları sunucuda sabit metinler; simge başlıktan seçiliyor
- *  (web ile aynı eşleme). */
-function noticeIcon(title: string): IconName {
-  const t = title.toLocaleLowerCase("tr");
-  if (t.includes("soru")) return "chatbubble-outline";
-  if (t.includes("video")) return "videocam-outline";
-  if (t.includes("özet")) return "sparkles-outline";
-  if (t.includes("ödev")) return "clipboard-outline";
+/** Bildirim simgesi türden seçilir (web ile aynı eşleme); türü olmayan eski
+ *  kayıtlarda sunucunun Türkçe başlığına bakılır. */
+function noticeIcon(n: Notice): IconName {
+  if (n.kind === "QUESTION" || n.kind === "ANSWER") return "chatbubble-outline";
+  if (n.kind === "VIDEO") return "videocam-outline";
+  if (n.kind === "SUMMARY") return "sparkles-outline";
+  if (n.kind) return "clipboard-outline";
+  const title = n.title.toLocaleLowerCase("tr");
+  if (title.includes("soru")) return "chatbubble-outline";
+  if (title.includes("video")) return "videocam-outline";
+  if (title.includes("özet")) return "sparkles-outline";
+  if (title.includes("ödev")) return "clipboard-outline";
   return "notifications-outline";
 }
 
 function ago(iso: string, now: number) {
   const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
-  if (minutes < 1) return "Az önce";
-  if (minutes < 60) return `${minutes} dk önce`;
+  if (minutes < 1) return t("time.justNow");
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} sa önce`;
+  if (hours < 24) return t("time.hoursAgo", { count: hours });
   const days = Math.round(hours / 24);
-  if (days === 1) return "Dün";
-  if (days < 7) return `${days} gün önce`;
+  if (days === 1) return t("time.yesterday");
+  if (days < 7) return t("time.daysAgo", { count: days });
   return dayLabel(iso);
 }
 
@@ -1853,9 +1897,11 @@ export function Inbox({
       <ErrorText message={error} />
       {rows && (
         <SectionHeading
-          title="Son bildirimler"
+          title={t("ml.recentNotices")}
           description={
-            unread.length ? `${unread.length} okunmamış` : "Hepsi okundu"
+            unread.length
+              ? t("ml.unreadCount", { count: unread.length })
+              : t("ml.allRead")
           }
           action={
             unread.length ? (
@@ -1865,7 +1911,7 @@ export function Inbox({
                 icon="checkmark-done"
                 onPress={() => void markRead(unread.map((n) => n.id))}
               >
-                Tümü okundu
+                {t("inbox.markAll")}
               </Button>
             ) : undefined
           }
@@ -1874,8 +1920,8 @@ export function Inbox({
       {rows && !rows.length && (
         <EmptyState
           icon="notifications-off-outline"
-          title="Yeni bildirim yok"
-          description="Teslimler, yeni videolar ve geri bildirimler burada görünecek."
+          title={t("inbox.empty")}
+          description={t("inbox.emptyHint")}
         />
       )}
       {!!rows?.length && (
@@ -1887,7 +1933,7 @@ export function Inbox({
                 key={n.id}
                 disabled={!target}
                 accessibilityRole={target ? "button" : undefined}
-                accessibilityHint={target ? "İlgili sayfayı açar" : undefined}
+                accessibilityHint={target ? t("ml.openRelated") : undefined}
                 onPress={() => {
                   if (!target) return;
                   if (!n.readAt) void markRead([n.id]);
@@ -1909,34 +1955,39 @@ export function Inbox({
                   ]}
                 >
                   <Ionicons
-                    name={noticeIcon(n.title)}
+                    name={noticeIcon(n)}
                     size={16}
                     color={n.readAt ? colors.muted : colors.brand}
                   />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <View style={[styles.row, { flexWrap: "nowrap", alignItems: "flex-start" }]}>
+                  <View
+                    style={[
+                      styles.row,
+                      { flexWrap: "nowrap", alignItems: "flex-start" },
+                    ]}
+                  >
                     <Text
                       style={[
                         n.readAt ? styles.text : styles.label,
                         { flex: 1, fontSize: 14.5 },
                       ]}
                     >
-                      {n.title}
+                      {noticeText(n.title)}
                     </Text>
                     {!n.readAt && (
                       <View
-                        accessibilityLabel="Okunmadı"
+                        accessibilityLabel={t("inbox.unread")}
                         style={section.unreadDot}
                       />
                     )}
                   </View>
-                  <Text style={styles.muted}>{n.body}</Text>
+                  <Text style={styles.muted}>{noticeText(n.body)}</Text>
                   <View style={[styles.row, { gap: 14, marginTop: 4 }]}>
                     <Text style={styles.caption}>{ago(n.createdAt, now)}</Text>
                     {!n.readAt && (
                       <TextLink onPress={() => void markRead([n.id])}>
-                        Okundu say
+                        {t("inbox.markRead")}
                       </TextLink>
                     )}
                   </View>
@@ -1957,28 +2008,30 @@ export function Inbox({
       {limits && (
         <>
           <SectionHeading
-            title="Kullanım ve plan"
-            description="Plan sınırlarına göre kullanımınız."
+            title={t("inbox.tabUsage")}
+            description={t("inbox.usageText")}
             action={
               <Badge tone="info">
-                {limits.limits.plan === "PRO" ? "Pro plan" : "Pilot plan"}
+                {limits.limits.plan === "PRO"
+                  ? t("inbox.planPro")
+                  : t("inbox.planPilot")}
               </Badge>
             }
           />
           <Card style={{ gap: 18 }}>
             <Meter
-              label="Aktif öğrenci"
+              label={t("overview.figureActive")}
               used={Number(limits.used.students)}
               limit={Number(limits.limits.studentLimit)}
             />
             <Meter
-              label="Video"
+              label={t("inbox.video")}
               used={Math.ceil(Number(limits.used.videoSeconds) / 60)}
               limit={Math.floor(Number(limits.limits.videoSeconds) / 60)}
-              unit="dk"
+              unit={t("inbox.minutesUnit")}
             />
             <Meter
-              label="Dosya alanı"
+              label={t("inbox.storage")}
               used={Math.round(Number(limits.used.materialBytes) / 1024 ** 2)}
               limit={Math.floor(
                 Number(limits.limits.materialBytes) / 1024 ** 2,

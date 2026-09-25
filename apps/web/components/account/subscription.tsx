@@ -14,15 +14,16 @@ import {
 } from "@/components/ui/card";
 import { Skeleton, Spinner } from "@/components/derslik/loading";
 import { FormError, ToneBadge, type Tone } from "@/components/derslik/feedback";
+import { intlLocale, t, type MessageKey } from "@derslik/contracts";
 
-const statuses: Record<string, [Tone, string]> = {
-  active: ["ok", "Etkin"],
-  on_trial: ["info", "Deneme"],
-  cancelled: ["muted", "İptal edildi"],
-  expired: ["muted", "Sona erdi"],
-  past_due: ["warn", "Ödeme bekliyor"],
-  unpaid: ["danger", "Ödenmedi"],
-  paused: ["muted", "Duraklatıldı"],
+const statuses: Record<string, [Tone, MessageKey]> = {
+  active: ["ok", "sub.status.active"],
+  on_trial: ["info", "sub.status.on_trial"],
+  cancelled: ["muted", "sub.status.cancelled"],
+  expired: ["muted", "sub.status.expired"],
+  past_due: ["warn", "sub.status.past_due"],
+  unpaid: ["danger", "sub.status.unpaid"],
+  paused: ["muted", "sub.status.paused"],
 };
 
 export function Subscription({
@@ -85,17 +86,18 @@ export function Subscription({
         </CardContent>
       </Card>
     );
-  const status = data.providerId
-    ? statuses[data.status] || (["muted", data.status] as [Tone, string])
+  const known = statuses[data.status];
+  const status: [Tone, string] | null = data.providerId
+    ? known
+      ? [known[0], t(known[1])]
+      : ["muted", data.status]
     : null;
   return (
     <Card className="gap-5 py-5">
       <CardHeader className="px-5">
         <CardTitle>Derslik Pro</CardTitle>
         <CardDescription>
-          {data.providerId
-            ? "Aboneliğiniz ödeme sağlayıcısı üzerinden yönetilir."
-            : "Şu anda Pilot planını kullanıyorsunuz."}
+          {data.providerId ? t("sub.managedByProvider") : t("sub.onPilot")}
         </CardDescription>
         {status && (
           <CardAction>
@@ -108,9 +110,9 @@ export function Subscription({
           <>
             <ul className="grid gap-2">
               {[
-                `${data.pro.students} aktif öğrenci`,
-                `${data.pro.videoHours} saat ders videosu`,
-                `${data.pro.materialGb} GB dosya alanı`,
+                t("sub.proStudents", { count: data.pro.students }),
+                t("sub.proVideo", { count: data.pro.videoHours }),
+                t("sub.proStorage", { count: data.pro.materialGb }),
               ].map((line) => (
                 <li className="flex items-center gap-2" key={line}>
                   <Check className="size-4 shrink-0 text-(--ok)" />
@@ -119,19 +121,17 @@ export function Subscription({
               ))}
             </ul>
             <p className="text-muted-foreground text-xs">
-              {data.testMode
-                ? "Test ödeme ortamı açık. Gerçek ücret alınmaz."
-                : "Ücret ve yenileme koşulları ödeme sayfasında gösterilir."}
+              {data.testMode ? t("sub.testMode") : t("sub.termsOnCheckout")}
             </p>
           </>
         ) : (
-          <p className="text-muted-foreground">
-            Ücretli abonelikler henüz açılmamış.
-          </p>
+          <p className="text-muted-foreground">{t("sub.notAvailable")}</p>
         )}
         {data.endsAt && (
           <p className="text-muted-foreground text-xs">
-            Bitiş: {new Date(data.endsAt).toLocaleDateString("tr-TR")}
+            {t("sub.endsAt", {
+              date: new Date(data.endsAt).toLocaleDateString(intlLocale()),
+            })}
           </p>
         )}
         {error && <FormError>{error}</FormError>}
@@ -144,7 +144,7 @@ export function Subscription({
             onClick={() => void open(data.providerId ? "portal" : "checkout")}
           >
             {busy ? <Spinner /> : <ExternalLink />}
-            {data.providerId ? "Aboneliği yönet" : "Pro'ya geç"}
+            {data.providerId ? t("sub.manage") : t("sub.upgrade")}
           </Button>
           <Button
             type="button"
@@ -152,7 +152,7 @@ export function Subscription({
             disabled={busy}
             onClick={() => void sync()}
           >
-            <RefreshCw /> Durumu yenile
+            <RefreshCw /> {t("sub.refresh")}
           </Button>
         </CardFooter>
       )}

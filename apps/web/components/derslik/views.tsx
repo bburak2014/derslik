@@ -57,6 +57,7 @@ import {
   type View,
 } from "@/lib/domain/types";
 import type { Actions } from "./workspace";
+import { intlLocale, lower, t } from "@derslik/contracts";
 
 export function balanceFor(data: WorkspaceData, id: string) {
   return (
@@ -113,7 +114,7 @@ export function StudentAvatar({
         .slice(0, 2)
         .map((x) => x[0])
         .join("")
-        .toLocaleUpperCase("tr")}
+        .toLocaleUpperCase(intlLocale())}
     </span>
   );
 }
@@ -121,24 +122,32 @@ export function Status({ status }: { status: Lesson["status"] }) {
   if (status === "COMPLETED")
     return (
       <ToneBadge tone="ok">
-        <Check /> Tamamlandı
+        <Check /> {t("lesson.completed")}
       </ToneBadge>
     );
   return (
     <ToneBadge tone={status === "CANCELLED" ? "muted" : "info"}>
       <span className="size-1 rounded-full bg-current" aria-hidden="true" />
-      {status === "CANCELLED" ? "İptal edildi" : "Planlandı"}
+      {status === "CANCELLED" ? t("lesson.cancelled") : t("lesson.scheduled")}
     </ToneBadge>
   );
 }
 /** Kalan ders hakkı. Azalan paket yalnızca renkle değil ünlem simgesiyle de
  *  işaretlenir; renk körlüğünde veya gri baskıda ayrım kaybolmasın. */
-export function CreditBadge({ count, unit }: { count: number; unit: string }) {
+export function CreditBadge({
+  count,
+  unit,
+}: {
+  count: number;
+  unit: "lessons" | "credits";
+}) {
   const low = count <= 2;
   return (
     <ToneBadge tone={low ? "warn" : "info"} className="tabular-nums">
       {low && <CircleAlert />}
-      {count} {unit}
+      {t(unit === "lessons" ? "common.lessonCount" : "common.creditCount", {
+        count,
+      })}
     </ToneBadge>
   );
 }
@@ -220,15 +229,15 @@ export function LessonRows({
               <div className="lesson-meta">
                 <span>
                   <MapPin size={12} />
-                  {l.location || "Konum belirtilmedi"}
+                  {l.location || t("lesson.noLocation")}
                 </span>
                 <span className="meta-credit">
-                  {pack?.remaining ?? 0} hak kaldı
+                  {t("lesson.creditsLeft", { count: pack?.remaining ?? 0 })}
                 </span>
               </div>
             </div>
             <div className="lesson-actions">
-              {now && <span className="now-chip">Şimdi</span>}
+              {now && <span className="now-chip">{t("lesson.now")}</span>}
               <Status status={l.status} />
               {l.status === "SCHEDULED" && (
                 <Button
@@ -239,7 +248,7 @@ export function LessonRows({
                   disabled={busy}
                 >
                   <Check size={14} />
-                  <span>Tamamla</span>
+                  <span>{t("lesson.complete")}</span>
                 </Button>
               )}
               <DropdownMenu>
@@ -247,7 +256,7 @@ export function LessonRows({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    aria-label={`${student.name} ders işlemleri`}
+                    aria-label={t("lesson.actionsFor", { name: student.name })}
                     disabled={busy}
                   >
                     <MoreHorizontal />
@@ -257,30 +266,30 @@ export function LessonRows({
                   <DropdownMenuItem
                     onClick={() => actions.openStudent(student.id)}
                   >
-                    <Users /> Öğrenciye git
+                    <Users /> {t("lesson.goToStudent")}
                   </DropdownMenuItem>
                   {l.status === "SCHEDULED" && (
                     <>
                       <DropdownMenuItem onClick={() => actions.reschedule(l)}>
-                        <CalendarClock /> Tarihi değiştir
+                        <CalendarClock /> {t("lesson.reschedule")}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => actions.cancel(l)}
                         className="text-destructive"
                       >
-                        <X /> Dersi iptal et
+                        <X /> {t("confirm.cancelTitle")}
                       </DropdownMenuItem>
                     </>
                   )}
                   {l.status === "CANCELLED" && actions.makeup && (
                     <DropdownMenuItem onClick={() => actions.makeup?.(l)}>
-                      <CalendarClock /> Telafi dersi planla
+                      <CalendarClock /> {t("lesson.planMakeup")}
                     </DropdownMenuItem>
                   )}
                   {l.status === "COMPLETED" && (
                     <DropdownMenuItem onClick={() => actions.reverse(l)}>
-                      <Undo2 /> Tamamlamayı geri al
+                      <Undo2 /> {t("confirm.reverseTitle")}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -339,10 +348,14 @@ export function Overview({
         key: "pkg-" + p.id,
         kind: "package" as const,
         student,
-        note: `${p.name} · ${p.remaining} / ${p.granted} hak kaldı`,
-        badge: p.remaining + " hak",
+        note: t("overview.packageNote", {
+          name: p.name,
+          remaining: p.remaining,
+          granted: p.granted,
+        }),
+        badge: t("common.creditCount", { count: p.remaining }),
         rank: p.remaining,
-        actionLabel: "Paket ekle",
+        actionLabel: t("overview.addPackage"),
         action: () => actions.newPackage(student.id),
       };
     }),
@@ -355,10 +368,10 @@ export function Overview({
         key: "bal-" + student.id,
         kind: "balance" as const,
         student,
-        note: "Paket ücretlerinden kalan",
+        note: t("overview.balanceNote"),
         badge: money(balance),
         rank: 100,
-        actionLabel: "Tahsilat",
+        actionLabel: t("overview.collect"),
         action: () => actions.newPayment(student.id),
       })),
   ]
@@ -369,19 +382,16 @@ export function Overview({
       {data.students.length === 0 ? (
         <section className="onboarding">
           <div className="onboarding-copy">
-            <p className="eyebrow">Derslik&apos;e hoş geldiniz</p>
+            <p className="eyebrow">{t("overview.welcome")}</p>
             <h2>
-              İyi bir dersin başlangıcı,
+              {t("overview.heroLine1")}
               <br />
-              düzenli bir çalışma alanı.
+              {t("overview.heroLine2")}
             </h2>
-            <p>
-              Öğrencinizi ekleyin, ders paketini tanımlayın ve ilk dersinizi
-              planlayın. Gerisini takvimden takip edin.
-            </p>
+            <p>{t("overview.heroBody")}</p>
             <div className="flex flex-wrap gap-3">
               <Button size="lg" onClick={onAddStudent}>
-                <Plus /> İlk öğrencimi ekle
+                <Plus /> {t("overview.addFirstStudent")}
               </Button>
               <Button
                 size="lg"
@@ -390,11 +400,11 @@ export function Overview({
                 onClick={onSeed}
                 disabled={busy}
               >
-                <FlaskConical /> Örneklerle keşfet
+                <FlaskConical /> {t("overview.explore")}
               </Button>
             </div>
             <span hidden={!onSeed} className="onboarding-note">
-              Örneklerle keşfet seçeneği kurgusal kayıtlar ekler.
+              {t("overview.exploreNote")}
             </span>
           </div>
           <div className="setup-steps">
@@ -402,20 +412,20 @@ export function Overview({
               {
                 icon: Users,
                 num: "01",
-                title: "Öğrencinizi ekleyin",
-                text: "Hesap açmasını beklemeden başlayın.",
+                title: t("overview.step1Title"),
+                text: t("overview.step1Text"),
               },
               {
                 icon: Package,
                 num: "02",
-                title: "Paketini tanımlayın",
-                text: "Ders hakları ve ücret bir arada.",
+                title: t("overview.step2Title"),
+                text: t("overview.step2Text"),
               },
               {
                 icon: CalendarDays,
                 num: "03",
-                title: "İlk dersi planlayın",
-                text: "Tamamlandığında hak otomatik düşer.",
+                title: t("overview.step3Title"),
+                text: t("overview.step3Text"),
               },
             ].map(({ icon: Icon, num, title, text }) => (
               <div className="setup-step" key={num}>
@@ -443,12 +453,12 @@ export function Overview({
                     {dayLabel(today + "T12:00:00+03:00", {
                       month: "short",
                       day: undefined,
-                    }).toLocaleUpperCase("tr")}
+                    }).toLocaleUpperCase(intlLocale())}
                   </small>
                   <strong>{Number(today.slice(-2))}</strong>
                 </span>
                 <div>
-                  <h2>Bugün</h2>
+                  <h2>{t("common.today")}</h2>
                   <p>
                     {dayLabel(today + "T12:00:00+03:00", {
                       weekday: "long",
@@ -459,23 +469,29 @@ export function Overview({
               </div>
               <dl className="day-figures">
                 <div>
-                  <dt>Ders</dt>
+                  <dt>{t("overview.figureLessons")}</dt>
                   <dd>
-                    {todayLessons.filter((l) => l.status !== "CANCELLED").length}
+                    {
+                      todayLessons.filter((l) => l.status !== "CANCELLED")
+                        .length
+                    }
                   </dd>
                 </div>
                 <div>
-                  <dt>Tamamlanan</dt>
+                  <dt>{t("overview.figureCompleted")}</dt>
                   <dd>
-                    {todayLessons.filter((l) => l.status === "COMPLETED").length}
+                    {
+                      todayLessons.filter((l) => l.status === "COMPLETED")
+                        .length
+                    }
                   </dd>
                 </div>
                 <div>
-                  <dt>Aktif öğrenci</dt>
+                  <dt>{t("overview.figureActive")}</dt>
                   <dd>{active.length}</dd>
                 </div>
                 <div>
-                  <dt>Bekleyen tahsilat</dt>
+                  <dt>{t("payments.pending")}</dt>
                   <dd>{money(outstanding)}</dd>
                 </div>
               </dl>
@@ -484,7 +500,7 @@ export function Overview({
                 size="sm"
                 onClick={() => onNavigate("calendar")}
               >
-                Takvime git <ArrowUpRight size={14} />
+                {t("overview.goToCalendar")} <ArrowUpRight size={14} />
               </Button>
             </header>
             {shown.length ? (
@@ -501,10 +517,10 @@ export function Overview({
               <div className="day-empty">
                 <span>
                   <CalendarDays size={17} />
-                  Bugün planlanmış ders yok.
+                  {t("overview.noLessonsToday")}
                 </span>
                 <Button size="sm" onClick={() => actions.newLesson()}>
-                  <Plus size={15} /> Ders planla
+                  <Plus size={15} /> {t("ws.planLesson")}
                 </Button>
               </div>
             )}
@@ -517,8 +533,8 @@ export function Overview({
             <section className="panel">
               <div className="section-heading">
                 <div>
-                  <h2>Dikkat gerektirenler</h2>
-                  <p>Azalan paketler ve açık bakiyeler</p>
+                  <h2>{t("overview.attentionTitle")}</h2>
+                  <p>{t("overview.attentionSubtitle")}</p>
                 </div>
                 <Package size={17} className="text-muted-foreground" />
               </div>
@@ -542,11 +558,7 @@ export function Overview({
                       >
                         {item.badge}
                       </ToneBadge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={item.action}
-                      >
+                      <Button variant="ghost" size="sm" onClick={item.action}>
                         {item.actionLabel}
                       </Button>
                     </li>
@@ -555,10 +567,8 @@ export function Overview({
               ) : (
                 <div className="small-empty">
                   <CircleCheck size={23} />
-                  <p>Bekleyen bir şey yok.</p>
-                  <span>
-                    Azalan paketler ve açık bakiyeler burada toplanır.
-                  </span>
+                  <p>{t("overview.attentionEmpty")}</p>
+                  <span>{t("overview.attentionEmptyHint")}</span>
                 </div>
               )}
             </section>
@@ -566,15 +576,15 @@ export function Overview({
             <section className="panel">
               <div className="section-heading">
                 <div>
-                  <h2>Öğrencileriniz</h2>
-                  <p>{active.length} aktif</p>
+                  <h2>{t("ws.studentsTitle")}</h2>
+                  <p>{t("overview.activeCount", { count: active.length })}</p>
                 </div>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => onNavigate("students")}
                 >
-                  Tümü <ArrowRight size={14} />
+                  {t("common.all")} <ArrowRight size={14} />
                 </Button>
               </div>
               <ul className="student-list">
@@ -591,7 +601,9 @@ export function Overview({
                         <CreditPips data={data} id={s.id} />
                       </span>
                       <span className="student-row-credit">
-                        {creditsFor(data, s.id)} ders
+                        {t("common.lessonCount", {
+                          count: creditsFor(data, s.id),
+                        })}
                       </span>
                     </button>
                   </li>
@@ -635,7 +647,7 @@ export function CalendarView({
           <Button
             variant="outline"
             size="icon-sm"
-            aria-label="Önceki hafta"
+            aria-label={t("calendar.previousWeek")}
             onClick={() => onSelectDay(addDays(selectedDay, -7))}
           >
             <ChevronLeft />
@@ -650,19 +662,19 @@ export function CalendarView({
           <Button
             variant="outline"
             size="icon-sm"
-            aria-label="Sonraki hafta"
+            aria-label={t("calendar.nextWeek")}
             onClick={() => onSelectDay(addDays(selectedDay, 7))}
           >
             <ChevronRight />
           </Button>
           <Button size="sm" variant="ghost" onClick={() => onSelectDay(today)}>
-            Bugün
+            {t("common.today")}
           </Button>
         </div>
         <Tabs value={mode} onValueChange={setMode}>
           <TabsList>
-            <TabsTrigger value="day">Gün</TabsTrigger>
-            <TabsTrigger value="week">Hafta</TabsTrigger>
+            <TabsTrigger value="day">{t("calendar.day")}</TabsTrigger>
+            <TabsTrigger value="week">{t("calendar.week")}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -689,7 +701,7 @@ export function CalendarView({
                 })}
               </span>
               <strong>{Number(d.slice(-2))}</strong>
-              <small>{count ? `${count} ders` : "—"}</small>
+              <small>{count ? t("common.lessonCount", { count }) : "—"}</small>
             </button>
           );
         })}
@@ -698,13 +710,13 @@ export function CalendarView({
         <div>
           <h2>
             {mode === "week"
-              ? "Bu haftanın dersleri"
+              ? t("calendar.thisWeek")
               : dayLabel(selectedDay + "T12:00:00+03:00", { weekday: "long" })}
           </h2>
-          <p>{visible.length} ders kaydı · Türkiye saati</p>
+          <p>{t("calendar.recordCount", { count: visible.length })}</p>
         </div>
         <Button size="sm" variant="outline" onClick={() => actions.newLesson()}>
-          <Plus /> Ders ekle
+          <Plus /> {t("calendar.addLesson")}
         </Button>
       </div>
       {visible.length ? (
@@ -717,11 +729,11 @@ export function CalendarView({
         />
       ) : (
         <Empty
-          title="Bu aralıkta dersiniz yok."
-          text="Ders ekleyebilir veya takvimden başka bir gün seçebilirsiniz."
+          title={t("calendar.emptyTitle")}
+          text={t("calendar.emptyText")}
           action={
             <Button variant="outline" onClick={() => actions.newLesson()}>
-              <Plus /> Ders planla
+              <Plus /> {t("ws.planLesson")}
             </Button>
           }
         />
@@ -745,34 +757,32 @@ export function StudentsView({
   const shown = data.students.filter(
     (s) =>
       (filter === "active" ? s.active : !s.active) &&
-      `${s.name} ${s.grade} ${s.subject}`
-        .toLocaleLowerCase("tr")
-        .includes(search.toLocaleLowerCase("tr")),
+      lower(`${s.name} ${s.grade} ${s.subject}`).includes(lower(search)),
   );
   return (
     <section className="panel">
       <div className="section-heading">
         <Tabs value={filter} onValueChange={setFilter}>
           <TabsList>
-            <TabsTrigger value="active">Aktif öğrenciler</TabsTrigger>
-            <TabsTrigger value="archive">Arşiv</TabsTrigger>
+            <TabsTrigger value="active">{t("students.active")}</TabsTrigger>
+            <TabsTrigger value="archive">{t("students.archive")}</TabsTrigger>
           </TabsList>
         </Tabs>
         <span className="text-sm text-muted-foreground">
-          {shown.length} öğrenci
+          {t("common.studentCount", { count: shown.length })}
         </span>
       </div>
       {shown.length ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="pl-6">Öğrenci</TableHead>
-              <TableHead>Ders / sınıf</TableHead>
-              <TableHead>Kalan hak</TableHead>
-              <TableHead>Açık bakiye</TableHead>
-              <TableHead>Sıradaki ders</TableHead>
+              <TableHead className="pl-6">{t("common.student")}</TableHead>
+              <TableHead>{t("students.subjectGrade")}</TableHead>
+              <TableHead>{t("students.creditsLeft")}</TableHead>
+              <TableHead>{t("students.openBalance")}</TableHead>
+              <TableHead>{t("students.nextLesson")}</TableHead>
               <TableHead>
-                <span className="sr-only">İşlemler</span>
+                <span className="sr-only">{t("common.actions")}</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -796,7 +806,7 @@ export function StudentsView({
                         <strong>{s.name}</strong>
                         {s.is_sample === 1 && (
                           <ToneBadge tone="warn" className="mt-1">
-                            Örnek
+                            {t("common.sample")}
                           </ToneBadge>
                         )}
                       </span>
@@ -805,11 +815,14 @@ export function StudentsView({
                   <TableCell>
                     <span className="table-primary">{s.subject}</span>
                     <small className="table-secondary">
-                      {s.grade || "Sınıf belirtilmedi"}
+                      {s.grade || t("students.noGrade")}
                     </small>
                   </TableCell>
                   <TableCell>
-                    <CreditBadge count={creditsFor(data, s.id)} unit="ders" />
+                    <CreditBadge
+                      count={creditsFor(data, s.id)}
+                      unit="lessons"
+                    />
                   </TableCell>
                   <TableCell className="font-medium">
                     {money(balanceFor(data, s.id))}
@@ -825,14 +838,16 @@ export function StudentsView({
                         </small>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">Planlanmadı</span>
+                      <span className="text-muted-foreground">
+                        {t("students.notPlanned")}
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      aria-label={`${s.name} detaylarını aç`}
+                      aria-label={t("students.openDetails", { name: s.name })}
                       onClick={() => actions.openStudent(s.id)}
                     >
                       <ArrowUpRight />
@@ -848,22 +863,22 @@ export function StudentsView({
           icon={search ? Search : Users}
           title={
             search
-              ? "Aramanızla eşleşen öğrenci yok."
+              ? t("students.noMatch")
               : filter === "archive"
-                ? "Arşiviniz henüz boş."
-                : "İlk öğrencinizle başlayın."
+                ? t("students.archiveEmpty")
+                : t("students.startTitle")
           }
           text={
             search
-              ? "İsmin bir bölümünü, dersini veya sınıfını aramayı deneyin."
+              ? t("students.noMatchHint")
               : filter === "archive"
-                ? "Arşivlediğiniz öğrencilerin geçmiş kayıtları burada saklanır."
-                : "Öğrencinin hesap açmasına gerek yok. Bilgilerini eklemeniz yeterli."
+                ? t("students.archiveEmptyHint")
+                : t("students.startHint")
           }
           action={
             !search && filter === "active" ? (
               <Button onClick={onAdd}>
-                <Plus /> Öğrenci ekle
+                <Plus /> {t("ws.addStudent")}
               </Button>
             ) : undefined
           }
@@ -893,17 +908,17 @@ export function PaymentsView({
     <>
       <div className="finance-stats">
         <div>
-          <span>Toplam paket tutarı</span>
+          <span>{t("payments.totalPackages")}</span>
           <strong>{money(all)}</strong>
         </div>
         <div>
           <span>
-            <ArrowDownLeft size={14} /> Tahsil edilen
+            <ArrowDownLeft size={14} /> {t("payments.collected")}
           </span>
           <strong className="text-primary">{money(total)}</strong>
         </div>
         <div>
-          <span>Bekleyen tahsilat</span>
+          <span>{t("payments.pending")}</span>
           <strong>{money(all - total)}</strong>
         </div>
       </div>
@@ -911,23 +926,27 @@ export function PaymentsView({
         <section className="panel self-start">
           <div className="section-heading">
             <div>
-              <h2>Tahsilat geçmişi</h2>
-              <p>Aldığınız ödemelerin manuel kayıtları</p>
+              <h2>{t("payments.history")}</h2>
+              <p>{t("payments.historySubtitle")}</p>
             </div>
             <Badge variant="outline" className="text-muted-foreground">
-              <Banknote /> Manuel
+              <Banknote /> {t("payments.manual")}
             </Badge>
           </div>
           {data.payments.length ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="pl-6">Öğrenci / tarih</TableHead>
-                  <TableHead>Yöntem</TableHead>
-                  <TableHead className="text-right">Tutar</TableHead>
-                  <TableHead>Durum</TableHead>
+                  <TableHead className="pl-6">
+                    {t("payments.studentDate")}
+                  </TableHead>
+                  <TableHead>{t("payments.method")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("payments.amount")}
+                  </TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
                   <TableHead>
-                    <span className="sr-only">İşlem</span>
+                    <span className="sr-only">{t("common.actions")}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -960,19 +979,15 @@ export function PaymentsView({
                           </small>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {p.method === "TRANSFER"
-                          ? "Havale / EFT"
-                          : p.method === "CASH"
-                            ? "Nakit"
-                            : "Diğer"}
-                      </TableCell>
+                      <TableCell>{t(`payments.methods.${p.method}`)}</TableCell>
                       <TableCell className="text-right font-semibold whitespace-nowrap">
                         {money(p.amount_minor)}
                       </TableCell>
                       <TableCell>
                         <ToneBadge tone={p.voided_at ? "muted" : "ok"}>
-                          {p.voided_at ? "İptal" : "Kaydedildi"}
+                          {p.voided_at
+                            ? t("payments.voided")
+                            : t("payments.recorded")}
                         </ToneBadge>
                       </TableCell>
                       <TableCell>
@@ -983,7 +998,9 @@ export function PaymentsView({
                                 variant="ghost"
                                 size="icon-sm"
                                 disabled={busy}
-                                aria-label={`${s.name} tahsilat işlemleri`}
+                                aria-label={t("payments.actionsFor", {
+                                  name: s.name,
+                                })}
                               >
                                 <MoreHorizontal />
                               </Button>
@@ -992,7 +1009,7 @@ export function PaymentsView({
                               <DropdownMenuItem
                                 onClick={() => actions.voidPayment(p)}
                               >
-                                <Undo2 /> Kaydı iptal et
+                                <Undo2 /> {t("payments.void")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1006,11 +1023,11 @@ export function PaymentsView({
           ) : (
             <Empty
               icon={Wallet}
-              title="Henüz tahsilat kaydı yok."
-              text="Öğrencinizden aldığınız ödemeyi ekleyin; açık bakiye otomatik güncellensin."
+              title={t("payments.emptyTitle")}
+              text={t("payments.emptyText")}
               action={
                 <Button variant="outline" onClick={() => actions.newPayment()}>
-                  <Plus /> Tahsilat ekle
+                  <Plus /> {t("ws.addPayment")}
                 </Button>
               }
             />
@@ -1018,9 +1035,9 @@ export function PaymentsView({
         </section>
         <aside className="panel self-start">
           <div className="section-heading">
-            <h2>Açık bakiyeler</h2>
+            <h2>{t("payments.openBalances")}</h2>
             <Badge variant="outline" className="text-muted-foreground">
-              {due.length} öğrenci
+              {t("common.studentCount", { count: due.length })}
             </Badge>
           </div>
           {due.length ? (
@@ -1042,7 +1059,7 @@ export function PaymentsView({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`${s.name} tahsilat ekle`}
+                    aria-label={t("payments.addFor", { name: s.name })}
                     onClick={() => actions.newPayment(s.id)}
                     disabled={busy}
                   >
@@ -1054,16 +1071,13 @@ export function PaymentsView({
           ) : (
             <div className="small-empty">
               <CircleCheck size={25} />
-              <p>Bekleyen tahsilat yok.</p>
-              <span>Paketlerden kalan ödemeler burada görünür.</span>
+              <p>{t("payments.noneDue")}</p>
+              <span>{t("payments.noneDueHint")}</span>
             </div>
           )}
         </aside>
       </div>
-      <p className="finance-note">
-        Bu ekran ödeme kaydı tutar; banka işlemi, karttan tahsilat veya fatura
-        düzenleme yapmaz.
-      </p>
+      <p className="finance-note">{t("payments.disclaimer")}</p>
     </>
   );
 }
