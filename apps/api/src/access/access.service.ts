@@ -143,14 +143,30 @@ export class AccessService {
         "Daveti kabul etmek için e-posta adresinizi doğrulayın.",
       );
     const hash = createHash("sha256").update(token).digest("hex");
-    return this.db.transaction(actor, null, async (tx) => ({
-      data: (
-        await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
-          hash,
-          user.email!.toLowerCase(),
-        ])
-      ).rows[0].data,
-    }));
+    try {
+      return await this.db.transaction(actor, null, async (tx) => ({
+        data: (
+          await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
+            hash,
+            user.email!.toLowerCase(),
+          ])
+        ).rows[0].data,
+      }));
+    } catch (error) {
+      // accept_invitation raises one error for every refusal. The usual cause
+      // is being signed in with another account than the invited address, and
+      // the generic constraint message gave the invitee no hint of that.
+      if (
+        (error as { code?: string })?.code === "23514" &&
+        (error as Error).message?.includes("Invitation unavailable")
+      )
+        throw new ConflictException(
+          "Bu davet bu hesapla kabul edilemedi. Davet yalnızca gönderildiği " +
+            "e-posta adresiyle kabul edilir; süresi dolmuş, iptal edilmiş ya da " +
+            "daha önce kullanılmış da olabilir.",
+        );
+      throw error;
+    }
   }
   links(actor: Actor, ws: string, student: string) {
     return this.db.transaction(actor, ws, async (tx) => ({

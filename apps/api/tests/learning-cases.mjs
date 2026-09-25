@@ -140,16 +140,15 @@ export async function learningCases({
       ).data;
       const acceptBody = { token: studentInvite.url.split("/").at(-1) };
       assert.equal((await request(portal, { auth: tokenStudent })).status, 403);
-      assert.equal(
-        (
-          await request("/v1/invitations/accept", {
-            method: "POST",
-            body: acceptBody,
-            auth: tokenB,
-          })
-        ).status,
-        409,
-      );
+      const wrongAccount = await request("/v1/invitations/accept", {
+        method: "POST",
+        body: acceptBody,
+        auth: tokenB,
+      });
+      assert.equal(wrongAccount.status, 409);
+      // Someone signed in with another account must learn to switch to the
+      // invited address, not see the generic constraint message.
+      assert.match(wrongAccount.body.error.message, /gönderildiği e-posta/);
       await ok("/v1/invitations/accept", acceptBody, { auth: tokenStudent });
       assert.equal(
         (
