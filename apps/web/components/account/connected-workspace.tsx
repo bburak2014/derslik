@@ -96,7 +96,9 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
           <CardHeader>
             <CardTitle className="text-xl">Derslik davetiniz</CardTitle>
             <CardDescription>
-              {session.user.email} hesabınızla daveti kabul edebilirsiniz.
+              {session.user.email} ile giriş yaptınız. Davet yalnızca
+              gönderildiği e-posta adresiyle kabul edilir; başka bir adrese
+              geldiyse aşağıdan o hesapla giriş yapın.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -107,7 +109,19 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
               onClick={async () => {
                 setBusy(true);
                 try {
-                  await backend("/invitations/accept", { token: inviteToken });
+                  const r = await backend<{
+                    data: {
+                      workspaceId: string;
+                      role: string;
+                      studentId: string;
+                    };
+                  }>("/invitations/accept", { token: inviteToken });
+                  // Open the view that was just joined. Accounts that also
+                  // teach list their own workspace first, so without this they
+                  // landed back in the teacher view. Same key as the switcher.
+                  await webRequest("/api/session", {
+                    key: `${r.data.workspaceId}:${r.data.role}:${r.data.studentId}`,
+                  }).catch(() => undefined);
                   location.assign("/");
                 } catch (e) {
                   setError((e as Error).message);

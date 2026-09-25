@@ -29,6 +29,10 @@ import {
   useTheme,
 } from "./ui";
 
+type AccessRef = Pick<Access, "id" | "role" | "studentId">;
+const sameAccess = (a: Access, b?: AccessRef | null) =>
+  !!b && a.id === b.id && a.studentId === b.studentId && a.role === b.role;
+
 function Application() {
   const { colors, styles } = useTheme();
   const [session, setSession] = useState<Session | null>(null),
@@ -40,18 +44,16 @@ function Application() {
     [invite, setInvite] = useState<string | null>(null),
     [form, setForm] = useState<FormSpec | null>(null),
     [switching, setSwitching] = useState(false);
-  const load = useCallback(async () => {
+  // `prefer` opens a given view, such as an invitation just accepted;
+  // otherwise the current view stays selected.
+  const load = useCallback(async (prefer?: AccessRef) => {
     try {
       const r = await request<{ data: Access[] }>("/access");
       setAccess(r.data);
       setActive(
         (old) =>
-          r.data.find(
-            (a) =>
-              a.id === old?.id &&
-              a.studentId === old?.studentId &&
-              a.role === old?.role,
-          ) ||
+          r.data.find((a) => sameAccess(a, prefer)) ||
+          r.data.find((a) => sameAccess(a, old)) ||
           r.data[0] ||
           null,
       );
@@ -153,9 +155,22 @@ function Application() {
       submit: async (v) => {
         const token = v.link.match(/([a-f0-9]{64})\/?$/)?.[1];
         if (!token) throw new Error("Geçerli davet bağlantısı girin.");
-        await request("/invitations/accept", { token });
+        const r = await request<{
+          data: {
+            workspaceId: string;
+            role: Access["role"];
+            studentId: string;
+          };
+        }>("/invitations/accept", { token });
         setInvite(null);
-        await load();
+        // Go straight to the view just joined; an account that also teaches
+        // would otherwise stay in its own workspace.
+        await load({
+          id: r.data.workspaceId,
+          role: r.data.role,
+          studentId: r.data.studentId,
+        });
+        setSwitching(false);
       },
     });
   if (!configured)
