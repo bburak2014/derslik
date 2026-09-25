@@ -166,7 +166,7 @@ export class LearningService {
     };
     for (const [key, sql] of Object.entries(queries))
       result[key] = (await tx.query(sql, [ws, student])).rows;
-    return rawDto(result);
+    return rawDto(result) as Record<string, unknown>;
   }
   get(actor: Actor, ws: string, student: string) {
     return this.db.transaction(actor, ws, async (tx) => {

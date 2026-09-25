@@ -151,6 +151,7 @@ export function TeacherScreen({
     }
   }, [access.id]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void load();
   }, [load]);
   async function mutate(command: Command) {

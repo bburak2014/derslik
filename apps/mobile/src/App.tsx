@@ -38,7 +38,8 @@ const sameAccess = (a: Access, b?: AccessRef | null) =>
 function Application() {
   const { colors, styles } = useTheme();
   const [session, setSession] = useState<Session | null>(null),
-    [boot, setBoot] = useState(true),
+    // Without a Supabase client there is no session to restore.
+    [boot, setBoot] = useState(supabase !== null),
     [access, setAccess] = useState<Access[]>([]),
     [active, setActive] = useState<Access | null>(null),
     [error, setError] = useState(""),
@@ -85,10 +86,7 @@ function Application() {
     }
   }, []);
   useEffect(() => {
-    if (!supabase) {
-      setBoot(false);
-      return;
-    }
+    if (!supabase) return;
     let alive = true;
     void supabase.auth
       .getSession()
@@ -153,6 +151,7 @@ function Application() {
     };
   }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     if (session) void load();
   }, [session?.user.id, load]);
   async function signout() {

@@ -23,6 +23,11 @@ import {
   type Material,
   type PortalData,
   type Video,
+  type FileReservation,
+  type InvitationResult,
+  type MediaCapabilities,
+  type SignedUrl,
+  type VideoReservation,
 } from "@derslik/api-client";
 import {
   canEditSubmission,
@@ -35,6 +40,8 @@ import {
   timeLabel,
   type Notice,
   type NoticeTarget,
+  type StudentAccessList,
+  type WorkspaceLimits,
 } from "@derslik/contracts";
 import { request } from "./core";
 import {
@@ -172,7 +179,9 @@ export function LearningScreen({
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
-    [tab, setTab] = useState(view ?? (owner ? "assignments" : "lessons")),
+    [selectedTab, setTab] = useState(
+      view ?? (owner ? "assignments" : "lessons"),
+    ),
     [invite, setInvite] = useState<{
       url: string;
       email: string;
@@ -195,7 +204,7 @@ export function LearningScreen({
       url: string;
     } | null>(null),
     [progress, setProgress] = useState<number | null>(null),
-    [links, setLinks] = useState<any>(null);
+    [links, setLinks] = useState<StudentAccessList | null>(null);
   const inFlight = useRef(false),
     fileReservations = useRef(new Map<string, string>());
   // Bildirim hedefi: kartların kaydırma içindeki yeri onLayout ile tutulur;
@@ -254,8 +263,8 @@ export function LearningScreen({
   const reload = useCallback(async () => {
     try {
       const [result, status] = await Promise.all([
-        request(base),
-        request("/media/capabilities").catch(() => ({
+        request<LearningData | PortalData>(base),
+        request<MediaCapabilities>("/media/capabilities").catch(() => ({
           files: false,
           videos: false,
         })),
@@ -271,6 +280,7 @@ export function LearningScreen({
     }
   }, [base]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
   }, [reload]);
   async function action(command: unknown) {
@@ -313,14 +323,18 @@ export function LearningScreen({
       : [{ id: "payments", label: t("ml.balance"), permission: "payments" }]),
     { id: "inbox", label: t("inbox.title"), permission: "lessons" },
   ].filter((x) => permissions.includes(x.permission));
-  useEffect(() => {
-    if (view) return;
-    if (tabs.length && !tabs.some((x) => x.id === tab)) setTab(tabs[0].id);
-  }, [permissions.join(","), tab, view]);
+  // Fall back to the first permitted tab when the selected one is not allowed
+  // (a tab opened through `view` is kept as is).
+  const tab =
+    view || tabs.some((x) => x.id === selectedTab)
+      ? selectedTab
+      : (tabs[0]?.id ?? selectedTab);
   async function loadLinks() {
     try {
       setLinks(
-        await request(`/workspaces/${access.id}/students/${studentId}/access`),
+        await request<StudentAccessList>(
+          `/workspaces/${access.id}/students/${studentId}/access`,
+        ),
       );
     } catch (e) {
       setError((e as Error).message);
@@ -357,7 +371,7 @@ export function LearningScreen({
         reserved = fileReservations.current.get(fingerprint);
       let id = reserved;
       if (!id) {
-        const r = await request(media + "/files", {
+        const r = await request<{ data: FileReservation }>(media + "/files", {
           assignmentId,
           purpose: owner
             ? assignmentId
@@ -477,12 +491,15 @@ export function LearningScreen({
           },
         ],
         submit: async (v) => {
-          const r = await request(media + "/videos", {
-            title: v.title,
-            lessonId: v.lessonId || null,
-            sizeBytes: asset.size ?? 0,
-            maxDurationSeconds: Number(v.duration) * 60,
-          });
+          const r = await request<{ data: VideoReservation }>(
+            media + "/videos",
+            {
+              title: v.title,
+              lessonId: v.lessonId || null,
+              sizeBytes: asset.size ?? 0,
+              maxDurationSeconds: Number(v.duration) * 60,
+            },
+          );
           const session = { asset, id: r.data.id, url: r.data.uploadUrl };
           setUpload(session);
           void sendVideo(session);
@@ -811,7 +828,7 @@ export function LearningScreen({
                         disabled={m.status !== "READY" || m.delete_requested}
                         onPress={async () => {
                           try {
-                            const r = await request(
+                            const r = await request<{ data: SignedUrl }>(
                               media + `/files/${m.id}/download`,
                             );
                             await Linking.openURL(r.data.url);
@@ -1021,7 +1038,7 @@ export function LearningScreen({
                               try {
                                 // inline=1: bağlantı indirme yerine
                                 // görüntülenmek üzere imzalanır.
-                                const r = await request(
+                                const r = await request<{ data: SignedUrl }>(
                                   media + `/files/${file.id}/download?inline=1`,
                                 );
                                 // Görsel yerel olarak, PDF pdf.js ile çizilir;
@@ -1045,7 +1062,7 @@ export function LearningScreen({
                             label={t("learn.download")}
                             onPress={async () => {
                               try {
-                                const r = await request(
+                                const r = await request<{ data: SignedUrl }>(
                                   media + `/files/${file.id}/download`,
                                 );
                                 await Linking.openURL(r.data.url);
@@ -1542,7 +1559,7 @@ export function LearningScreen({
                     },
                   ],
                   submit: async (v) => {
-                    const r = await request(
+                    const r = await request<{ data: InvitationResult }>(
                       `/workspaces/${access.id}/students/${studentId}/invitations`,
                       {
                         email: v.email,
@@ -1627,7 +1644,7 @@ export function LearningScreen({
             )}
             {!!(links?.data?.length || links?.invitations?.length) && (
               <List>
-                {links?.data?.map((l: any, i: number) => (
+                {links?.data?.map((l, i) => (
                   <ListRow key={l.id} divider={i > 0}>
                     <FileIcon
                       icon={
@@ -1670,7 +1687,7 @@ export function LearningScreen({
                     )}
                   </ListRow>
                 ))}
-                {links?.invitations?.map((inv: any, i: number) => {
+                {links?.invitations?.map((inv, i) => {
                   const expired = new Date(inv.expiresAt) < new Date();
                   const [tone, state]: [BadgeTone, string] = inv.acceptedAt
                     ? ["success", t("learn.accepted")]
@@ -1855,7 +1872,7 @@ export function Inbox({
 }) {
   const { colors, styles, section } = useTheme();
   const [rows, setRows] = useState<Notice[] | null>(null),
-    [limits, setLimits] = useState<any>(null),
+    [limits, setLimits] = useState<WorkspaceLimits | null>(null),
     [error, setError] = useState(""),
     [now, setNow] = useState(0);
   useEffect(() => {
@@ -1864,7 +1881,9 @@ export function Inbox({
         const [inbox, usage] = await Promise.all([
           request<{ data: Notice[] }>("/inbox"),
           workspaceId
-            ? request(`/workspaces/${workspaceId}/settings/limits`)
+            ? request<{ data: WorkspaceLimits }>(
+                `/workspaces/${workspaceId}/settings/limits`,
+              )
             : Promise.resolve(null),
         ]);
         setRows(inbox.data);

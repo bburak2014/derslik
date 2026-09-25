@@ -47,7 +47,7 @@ export function AuthForm({
   const [providersLoaded, setProvidersLoaded] = useState(false);
   useEffect(() => {
     let alive = true;
-    webRequest("/api/auth/providers")
+    webRequest<{ providers: string[] }>("/api/auth/providers")
       .then((r) => {
         if (alive) {
           setEnabled(r.providers);
@@ -61,6 +61,7 @@ export function AuthForm({
         }
       });
     if (new URLSearchParams(location.search).has("auth_error"))
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable in the browser, after hydration.
       setError(t("auth.callbackFailed"));
     return () => {
       alive = false;
@@ -165,10 +166,13 @@ export function AuthForm({
                         setError("");
                         setBusy(p.id);
                         try {
-                          const r = await webRequest("/api/auth/oauth", {
-                            provider: p.id,
-                            next: location.pathname,
-                          });
+                          const r = await webRequest<{ url: string }>(
+                            "/api/auth/oauth",
+                            {
+                              provider: p.id,
+                              next: location.pathname,
+                            },
+                          );
                           location.assign(r.url);
                         } catch (e) {
                           setError((e as Error).message);
@@ -206,14 +210,17 @@ export function AuthForm({
               setMessage("");
               const f = new FormData(e.currentTarget);
               try {
-                const r = await webRequest(`/api/auth/${mode}`, {
-                  ...(mode !== "password"
-                    ? { email: String(f.get("email")).trim() }
-                    : {}),
-                  ...(mode !== "recover"
-                    ? { password: f.get("password") }
-                    : {}),
-                });
+                const r = await webRequest<{ confirmationRequired?: boolean }>(
+                  `/api/auth/${mode}`,
+                  {
+                    ...(mode !== "password"
+                      ? { email: String(f.get("email")).trim() }
+                      : {}),
+                    ...(mode !== "recover"
+                      ? { password: f.get("password") }
+                      : {}),
+                  },
+                );
                 if (mode === "recover" || r.confirmationRequired)
                   setMessage(t("auth.checkInbox"));
                 else onSuccess();
