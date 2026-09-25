@@ -14,6 +14,7 @@ import {
   dateKey,
   addDays,
   timeLabel,
+  canEditSubmission,
 } from "@derslik/contracts";
 import { backend } from "@/lib/client";
 import { Button } from "@/components/ui/button";
@@ -717,6 +718,7 @@ export function LearningPanel({
               const files = data.materials.filter(
                 (m) => m.assignment_id === a.id,
               );
+              const editable = canEditSubmission(a, !!sub, today);
               return (
                 <Item
                   variant="outline"
@@ -847,35 +849,33 @@ export function LearningPanel({
                         <Pencil /> Düzenle
                       </Button>
                     )}
-                    {student &&
-                      a.status === "OPEN" &&
-                      sub?.status !== "REVIEWED" && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() =>
-                            simple(
-                              "Ödevi teslim et",
-                              [
-                                {
-                                  name: "body",
-                                  label: "Çözümünüz / açıklamanız",
-                                  type: "textarea",
-                                  value: sub?.body || "",
-                                },
-                              ],
-                              (v) => ({
-                                action: "assignment.submit",
-                                assignmentId: a.id,
-                                body: v.body,
-                                version: sub?.version || 0,
-                              }),
-                            )
-                          }
-                        >
-                          <Send /> {sub ? "Teslimi düzenle" : "Teslim et"}
-                        </Button>
-                      )}
+                    {student && editable && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() =>
+                          simple(
+                            sub ? "Teslimi düzenle" : "Ödevi teslim et",
+                            [
+                              {
+                                name: "body",
+                                label: "Çözümünüz / açıklamanız",
+                                type: "textarea",
+                                value: sub?.body || "",
+                              },
+                            ],
+                            (v) => ({
+                              action: "assignment.submit",
+                              assignmentId: a.id,
+                              body: v.body,
+                              version: sub?.version || 0,
+                            }),
+                          )
+                        }
+                      >
+                        <Send /> {sub ? "Teslimi düzenle" : "Teslim et"}
+                      </Button>
+                    )}
                     {owner && sub && (
                       <Button
                         type="button"
@@ -904,7 +904,22 @@ export function LearningPanel({
                         <MessageSquare /> Geri bildirim yaz
                       </Button>
                     )}
-                    {(owner || (student && a.status === "OPEN")) && (
+                    {student &&
+                      sub &&
+                      a.status === "OPEN" &&
+                      (editable ? (
+                        a.due_on && (
+                          <span className="text-muted-foreground text-xs">
+                            {dayLabel(a.due_on + "T12:00:00+03:00")} gününün
+                            sonuna kadar düzenleyebilirsiniz
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          Son teslim tarihi geçti, teslim kilitlendi
+                        </span>
+                      ))}
+                    {(owner || (student && editable)) && (
                       <FilePicker
                         busy={busy}
                         disabled={busy || !capabilities?.files}

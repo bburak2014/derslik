@@ -12,6 +12,9 @@ import { CommandService } from "../common/command.service.js";
 import { rawDto } from "../workspaces/snapshot.service.js";
 import { lockStudent } from "../students/students.service.js";
 
+// Due dates are calendar days in the workspace timezone (fixed to Istanbul).
+export const ISTANBUL_TODAY = "(now() AT TIME ZONE 'Europe/Istanbul')::date";
+
 const id = z.string().uuid(),
   short = z.string().trim().min(1).max(150),
   body = z.string().trim().min(1).max(5000);
@@ -262,7 +265,8 @@ export class LearningService {
           );
           const assignment = (
             await tx.query(
-              "SELECT id,status FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3",
+              `SELECT id,status,due_on IS NOT NULL AND due_on<${ISTANBUL_TODAY} AS past_due
+               FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3`,
               [ws, student, c.assignmentId],
             )
           ).rows[0];
@@ -275,17 +279,18 @@ export class LearningService {
               [ws, c.assignmentId],
             )
           ).rows[0];
-          if (
-            (previous?.version ?? 0) !== c.version ||
-            previous?.status === "REVIEWED"
-          )
+          // A late first hand-in is still accepted; changing it is not.
+          if (previous && assignment.past_due)
             throw new ConflictException(
-              "Teslim değişmiş veya değerlendirilmiş.",
+              "Son teslim tarihi geçti; teslim artık değiştirilemez.",
             );
+          if ((previous?.version ?? 0) !== c.version)
+            throw new ConflictException("Teslim değişmiş. Yenileyin.");
+          // Editing a reviewed hand-in sends it back to the teacher's queue.
           const data = (
             await tx.query(
               `INSERT INTO derslik.submissions(workspace_id,student_id,assignment_id,user_id,body) VALUES($1,$2,$3,$4,$5)
-     ON CONFLICT(workspace_id,assignment_id) DO UPDATE SET body=EXCLUDED.body,version=submissions.version+1 RETURNING *`,
+     ON CONFLICT(workspace_id,assignment_id) DO UPDATE SET body=EXCLUDED.body,status='SUBMITTED',version=submissions.version+1 RETURNING *`,
               [ws, student, c.assignmentId, actor.id, c.body],
             )
           ).rows[0];
@@ -293,8 +298,10 @@ export class LearningService {
             tx,
             ws,
             student,
-            "Ödev teslim edildi",
-            "Yeni teslimi inceleyebilirsiniz.",
+            previous ? "Ödev teslimi güncellendi" : "Ödev teslim edildi",
+            previous
+              ? "Öğrenci teslimini güncelledi; yeni hâlini inceleyebilirsiniz."
+              : "Yeni teslimi inceleyebilirsiniz.",
             true,
           );
           return { data };

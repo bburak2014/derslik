@@ -21,7 +21,7 @@ import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
 import { CommandService } from "../common/command.service.js";
 import { lockStudent } from "../students/students.service.js";
-import { notify } from "../learning/learning.service.js";
+import { ISTANBUL_TODAY, notify } from "../learning/learning.service.js";
 import { MediaProviders } from "./providers.js";
 
 const uuid = z.string().uuid();
@@ -115,7 +115,10 @@ export class MediaService {
           c.assignmentId &&
           (
             await tx.query(
-              "SELECT id,status FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3",
+              `SELECT a.id,a.status,a.due_on IS NOT NULL AND a.due_on<${ISTANBUL_TODAY} AND EXISTS(
+                 SELECT 1 FROM derslik.submissions s WHERE s.workspace_id=a.workspace_id AND s.assignment_id=a.id
+               ) AS locked
+               FROM derslik.assignments a WHERE a.workspace_id=$1 AND a.student_id=$2 AND a.id=$3`,
               [ws, student, c.assignmentId],
             )
           ).rows[0];
@@ -123,6 +126,10 @@ export class MediaService {
           throw new NotFoundException("Ödev bulunamadı.");
         if (!owner && assignment?.status !== "OPEN")
           throw new ConflictException("Bu ödev teslimlere kapalı.");
+        if (!owner && assignment?.locked)
+          throw new ConflictException(
+            "Son teslim tarihi geçti; teslime dosya eklenemez.",
+          );
         await tx.query("SELECT derslik.expire_subscription($1)", [ws]);
         await tx.query("SELECT derslik.reserve_material_quota($1,$2,$3)", [
           ws,

@@ -24,7 +24,13 @@ import {
   type PortalData,
   type Video,
 } from "@derslik/api-client";
-import { dateKey, dayLabel, money, timeLabel } from "@derslik/contracts";
+import {
+  canEditSubmission,
+  dateKey,
+  dayLabel,
+  money,
+  timeLabel,
+} from "@derslik/contracts";
 import { request } from "./core";
 import {
   Avatar,
@@ -271,7 +277,9 @@ export function LearningScreen({
       const bytes = await readFileBytes(asset.uri);
       if (bytes.byteLength > 10 * 1024 ** 2)
         throw new Error("Dosya en fazla 10 MB olabilir.");
-      const fingerprint = [assignmentId, asset.name, bytes.byteLength].join(":"),
+      const fingerprint = [assignmentId, asset.name, bytes.byteLength].join(
+          ":",
+        ),
         reserved = fileReservations.current.get(fingerprint);
       let id = reserved;
       if (!id) {
@@ -661,6 +669,7 @@ export function LearningScreen({
                 (s) => s.assignment_id === a.id,
               );
               const [tone, state] = assignmentState(a, sub);
+              const editable = canEditSubmission(a, !!sub);
               return (
                 <Card key={a.id}>
                   <View
@@ -687,6 +696,15 @@ export function LearningScreen({
                         : "Son teslim tarihi yok"}
                     </Text>
                   </View>
+                  {student && sub && a.status === "OPEN" && (
+                    <Text style={[styles.caption, { marginTop: -4 }]}>
+                      {editable
+                        ? a.due_on
+                          ? "Teslimi bu günün sonuna kadar düzenleyebilirsiniz."
+                          : "Teslimi istediğiniz zaman düzenleyebilirsiniz."
+                        : "Son teslim tarihi geçti, teslim kilitlendi."}
+                    </Text>
+                  )}
                   {!!a.instructions && (
                     <Text style={styles.text}>{a.instructions}</Text>
                   )}
@@ -778,36 +796,34 @@ export function LearningScreen({
                         Düzenle
                       </Button>
                     )}
-                    {student &&
-                      a.status === "OPEN" &&
-                      sub?.status !== "REVIEWED" && (
-                        <Button
-                          size="sm"
-                          icon="paper-plane-outline"
-                          style={{ flexGrow: 1 }}
-                          onPress={() =>
-                            formAction(
-                              "Ödevi teslim et",
-                              [
-                                {
-                                  key: "body",
-                                  label: "Çözümünüz / açıklamanız",
-                                  multiline: true,
-                                  value: sub?.body,
-                                },
-                              ],
-                              (v) => ({
-                                action: "assignment.submit",
-                                assignmentId: a.id,
-                                body: v.body,
-                                version: sub?.version || 0,
-                              }),
-                            )
-                          }
-                        >
-                          {sub ? "Teslimi düzenle" : "Teslim et"}
-                        </Button>
-                      )}
+                    {student && editable && (
+                      <Button
+                        size="sm"
+                        icon="paper-plane-outline"
+                        style={{ flexGrow: 1 }}
+                        onPress={() =>
+                          formAction(
+                            sub ? "Teslimi düzenle" : "Ödevi teslim et",
+                            [
+                              {
+                                key: "body",
+                                label: "Çözümünüz / açıklamanız",
+                                multiline: true,
+                                value: sub?.body,
+                              },
+                            ],
+                            (v) => ({
+                              action: "assignment.submit",
+                              assignmentId: a.id,
+                              body: v.body,
+                              version: sub?.version || 0,
+                            }),
+                          )
+                        }
+                      >
+                        {sub ? "Teslimi düzenle" : "Teslim et"}
+                      </Button>
+                    )}
                     {owner && sub && (
                       <Button
                         size="sm"
@@ -836,7 +852,7 @@ export function LearningScreen({
                         Geri bildirim yaz
                       </Button>
                     )}
-                    {(owner || (student && a.status === "OPEN")) && (
+                    {(owner || (student && editable)) && (
                       <Button
                         secondary
                         size="sm"
@@ -879,7 +895,8 @@ export function LearningScreen({
             {!!data.materials.length && (
               <List>
                 {data.materials.map((file, i) => {
-                  const ready = file.status === "READY" && !file.delete_requested;
+                  const ready =
+                    file.status === "READY" && !file.delete_requested;
                   return (
                     <ListRow key={file.id} divider={i > 0}>
                       <FileIcon
@@ -922,7 +939,9 @@ export function LearningScreen({
                                 setPreview({
                                   name: file.name,
                                   url: r.data.url,
-                                  kind: isImageName(file.name) ? "image" : "pdf",
+                                  kind: isImageName(file.name)
+                                    ? "image"
+                                    : "pdf",
                                 });
                               } catch (e) {
                                 setError((e as Error).message);
@@ -1220,7 +1239,10 @@ export function LearningScreen({
               <Card key={s.id}>
                 <View style={[styles.row, { justifyContent: "space-between" }]}>
                   <Kicker>Haftalık özet</Kicker>
-                  <Badge tone={s.status === "DRAFT" ? "warning" : "success"} dot>
+                  <Badge
+                    tone={s.status === "DRAFT" ? "warning" : "success"}
+                    dot
+                  >
                     {s.status === "DRAFT" ? "Taslak" : "Paylaşıldı"}
                   </Badge>
                 </View>
@@ -1230,7 +1252,9 @@ export function LearningScreen({
                   <Button
                     secondary
                     size="sm"
-                    icon={s.status === "DRAFT" ? "checkmark-done" : "create-outline"}
+                    icon={
+                      s.status === "DRAFT" ? "checkmark-done" : "create-outline"
+                    }
                     style={{ alignSelf: "flex-start" }}
                     onPress={() =>
                       formAction(
@@ -1317,7 +1341,11 @@ export function LearningScreen({
             {data.packages.map((p) => (
               <Card key={p.id}>
                 <View
-                  style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                  }}
                 >
                   <Text style={[styles.h2, { flex: 1 }]}>{p.name}</Text>
                   <Badge
@@ -1441,7 +1469,9 @@ export function LearningScreen({
                     color={colors.brand}
                   />
                   <Text style={styles.label}>
-                    {invite.emailed ? "Davet gönderildi" : "Davet bağlantısı hazır"}
+                    {invite.emailed
+                      ? "Davet gönderildi"
+                      : "Davet bağlantısı hazır"}
                   </Text>
                 </View>
                 <Text style={styles.muted}>
@@ -1491,11 +1521,17 @@ export function LearningScreen({
                 {links?.data?.map((l: any, i: number) => (
                   <ListRow key={l.id} divider={i > 0}>
                     <FileIcon
-                      icon={l.role === "STUDENT" ? "school-outline" : "people-outline"}
+                      icon={
+                        l.role === "STUDENT"
+                          ? "school-outline"
+                          : "people-outline"
+                      }
                     />
                     <View style={{ flex: 1, gap: 4 }}>
                       <Text style={styles.label}>
-                        {l.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
+                        {l.role === "STUDENT"
+                          ? "Öğrenci erişimi"
+                          : "Veli erişimi"}
                       </Text>
                       <Badge tone={l.revokedAt ? "neutral" : "success"} dot>
                         {l.revokedAt ? "Kaldırıldı" : "Etkin"}
@@ -1604,10 +1640,7 @@ export function LearningScreen({
             >
               <Text
                 numberOfLines={1}
-                style={[
-                  styles.label,
-                  { flex: 1, color: colors.onNavyStrong },
-                ]}
+                style={[styles.label, { flex: 1, color: colors.onNavyStrong }]}
               >
                 {preview?.name}
               </Text>
@@ -1804,7 +1837,12 @@ export function Inbox({
                 />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <View style={[styles.row, { flexWrap: "nowrap", alignItems: "flex-start" }]}>
+                <View
+                  style={[
+                    styles.row,
+                    { flexWrap: "nowrap", alignItems: "flex-start" },
+                  ]}
+                >
                   <Text
                     style={[
                       n.readAt ? styles.text : styles.label,
@@ -1860,7 +1898,9 @@ export function Inbox({
             <Meter
               label="Dosya alanı"
               used={Math.round(Number(limits.used.materialBytes) / 1024 ** 2)}
-              limit={Math.floor(Number(limits.limits.materialBytes) / 1024 ** 2)}
+              limit={Math.floor(
+                Number(limits.limits.materialBytes) / 1024 ** 2,
+              )}
               unit="MB"
             />
           </Card>

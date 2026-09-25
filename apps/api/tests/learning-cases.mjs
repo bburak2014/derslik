@@ -2,6 +2,12 @@ import { BillingProvider } from "../../../.api-build/apps/api/src/subscriptions/
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import { MediaProviders } from "../../../.api-build/apps/api/src/media/providers.js";
+// Due dates are Istanbul calendar days (UTC+3, no DST).
+const istanbulDay = (offset) =>
+  new Date(Date.now() + 3 * 3600_000 + offset * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+
 export async function learningCases({
   t,
   app,
@@ -200,7 +206,7 @@ export async function learningCases({
           action: "assignment.create",
           title: "Denklem ödevi",
           instructions: "İlk beş soruyu çözün.",
-          dueOn: "2026-09-20",
+          dueOn: istanbulDay(7),
         })
       ).data;
       assert.ok(
@@ -239,6 +245,8 @@ export async function learningCases({
         feedback: "Üçüncü soruyu birlikte inceleyelim.",
         version: 0,
       });
+      // A stale version is refused; the current one may still edit a
+      // reviewed hand-in before the due date and sends it back for review.
       assert.equal(
         (
           await request(portal + "/actions", {
@@ -249,11 +257,71 @@ export async function learningCases({
         ).status,
         409,
       );
+      const edited = (
+        await ok(
+          portal + "/actions",
+          { ...command, body: "Üçüncü soruyu düzelttim.", version: 1 },
+          { auth: tokenStudent },
+        )
+      ).data;
+      assert.equal(edited.status, "SUBMITTED");
+      assert.equal(edited.version, 2);
+      submission = edited;
       assert.ok(
         (
           await ok(portal, undefined, { auth: tokenStudent })
         ).submissions[0].feedback.includes("Üçüncü"),
       );
+      const late = (
+        await ok(base + "/learning", {
+          action: "assignment.create",
+          title: "Geçmiş ödev",
+          instructions: "",
+          dueOn: istanbulDay(-1),
+        })
+      ).data;
+      const lateSubmit = {
+        action: "assignment.submit",
+        assignmentId: late.id,
+        body: "Geç kaldım.",
+        version: 0,
+      };
+      await ok(portal + "/actions", lateSubmit, { auth: tokenStudent });
+      assert.equal(
+        (
+          await request(portal + "/actions", {
+            method: "POST",
+            body: { ...lateSubmit, body: "Düzelttim.", version: 1 },
+            auth: tokenStudent,
+          })
+        ).status,
+        409,
+      );
+      assert.equal(
+        (
+          await request(media + "/files", {
+            method: "POST",
+            body: {
+              assignmentId: late.id,
+              purpose: "SUBMISSION",
+              name: "gec.pdf",
+              mimeType: "application/pdf",
+              sizeBytes: 128,
+            },
+            auth: tokenStudent,
+          })
+        ).status,
+        409,
+      );
+      await ok(base + "/learning", {
+        action: "assignment.update",
+        assignmentId: late.id,
+        title: late.title,
+        instructions: "",
+        dueOn: istanbulDay(-1),
+        status: "CANCELLED",
+        version: late.version,
+      });
       const inbox = (await ok("/v1/inbox", undefined, { auth: tokenStudent }))
         .data;
       assert.ok(inbox.some((n) => n.title === "Ödev değerlendirildi"));
