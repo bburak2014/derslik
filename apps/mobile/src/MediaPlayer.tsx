@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
-import type { Video } from "@derslik/api-client";
+import type { Video, VideoPlayback } from "@derslik/api-client";
 import { request } from "./core";
 import { t } from "@derslik/contracts";
 import { Button, ErrorText, Field, Input, Kicker, useTheme } from "./ui";
@@ -32,13 +32,17 @@ export function MediaPlayer({
     [busy, setBusy] = useState(false);
   const current = useRef(initialTime),
     actionRef = useRef(action);
-  actionRef.current = action;
+  useEffect(() => {
+    actionRef.current = action;
+  });
   useEffect(() => {
     let stopped = false,
       timer: ReturnType<typeof setTimeout>;
     async function load() {
       try {
-        const r = await request(path + `/videos/${video.id}/playback`);
+        const r = await request<{ data: VideoPlayback }>(
+          path + `/videos/${video.id}/playback`,
+        );
         if (stopped) return;
         const resume = player.playing;
         await player.replaceAsync({ uri: r.data.url, contentType: "hls" });

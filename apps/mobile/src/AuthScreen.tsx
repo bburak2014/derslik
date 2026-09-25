@@ -74,7 +74,8 @@ export function AuthScreen({
 }) {
   const { colors, styles, type } = useTheme();
   const auth = useMemo(() => makeAuth(colors, type), [colors, type]);
-  const [mode, setMode] = useState<Mode>(reset ? "password" : "signin");
+  const [mode, setMode] = useState<Mode>(reset ? "password" : "signin"),
+    [shownReset, setShownReset] = useState(reset);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
@@ -98,9 +99,11 @@ export function AuthScreen({
       alive = false;
     };
   }, []);
-  useEffect(() => {
+  // Switch to the new-password form when a recovery link arrives later.
+  if (reset !== shownReset) {
+    setShownReset(reset);
     if (reset) setMode("password");
-  }, [reset]);
+  }
   const changeMode = (next: Mode) => {
     setMode(next);
     setError("");

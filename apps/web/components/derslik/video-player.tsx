@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import type { Video } from "@derslik/api-client";
+import type { Video, VideoPlayback } from "@derslik/api-client";
 import { backend } from "@/lib/client";
 import { t } from "@derslik/contracts";
 import { MessageSquarePlus } from "lucide-react";
@@ -29,14 +29,16 @@ export function VideoPlayer({
     [error, setError] = useState(""),
     [ready, setReady] = useState(false);
   const progressFn = useRef(onProgress);
-  progressFn.current = onProgress;
+  useEffect(() => {
+    progressFn.current = onProgress;
+  });
   useEffect(() => {
     let stopped = false,
       timer: ReturnType<typeof setTimeout>,
       hls: Hls | undefined;
     async function load() {
       try {
-        const { data } = await backend(
+        const { data } = await backend<{ data: VideoPlayback }>(
           mediaPath + `/videos/${video.id}/playback`,
         );
         if (stopped) return;

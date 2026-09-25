@@ -55,6 +55,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
     }
   }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
   }, [reload]);
   if (loading)

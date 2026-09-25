@@ -9,7 +9,7 @@ export type MutationResult = {
   data: Record<string, unknown>;
   audit?: Record<string, unknown>;
 };
-export function toDto(value: unknown): any {
+export function toDto(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "bigint") return value.toString();
   if (Array.isArray(value)) return value.map(toDto);
