@@ -20,7 +20,11 @@ import {
   FileText,
   Video,
   ClipboardList,
+  Store,
 } from "lucide-react";
+import { ShowcaseView } from "./showcase";
+import { backend } from "@/lib/client";
+import type { Showcase } from "@derslik/contracts";
 import { Button } from "@/components/ui/button";
 import { PageLoader, Spinner } from "@/components/derslik/loading";
 import {
@@ -67,7 +71,7 @@ import { RecordDialog, type ModalState } from "./record-dialog";
 import { StudentDetail } from "./student-detail";
 import { useWorkspaceTools } from "./use-workspace-tools";
 
-type View = CoreView | TeachingView;
+type View = CoreView | TeachingView | "showcase";
 const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
   { id: "overview", label: "nav.overview", icon: LayoutDashboard },
   { id: "calendar", label: "nav.calendar", icon: CalendarDays },
@@ -76,8 +80,13 @@ const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
   { id: "assignments", label: "nav.assignments", icon: ClipboardList },
   { id: "files", label: "nav.files", icon: FileText },
   { id: "videos", label: "nav.videos", icon: Video },
+  { id: "showcase", label: "nav.showcase", icon: Store },
 ];
 const titles: Record<View, { title: MessageKey; subtitle: MessageKey }> = {
+  showcase: {
+    title: "nav.showcase",
+    subtitle: "dir.showcaseSubtitle",
+  },
   assignments: {
     title: "nav.assignments",
     subtitle: "ws.assignmentsSubtitle",
@@ -128,10 +137,13 @@ function Navigation({
   view,
   onNavigate,
   count,
+  requests,
 }: {
   view: View;
   onNavigate: (view: View) => void;
   count: number;
+  /** Vitrindeki yanıt bekleyen ders istekleri. */
+  requests: number;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
@@ -150,6 +162,9 @@ function Navigation({
             <span>{t(label)}</span>
             {id === "students" && count > 0 && (
               <span className="nav-count">{count}</span>
+            )}
+            {id === "showcase" && requests > 0 && (
+              <span className="nav-count nav-count-marker">{requests}</span>
             )}
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -228,6 +243,7 @@ export default function Workspace({
     setView(v);
     setSearch("");
     setHubFocus(null);
+    setShowcaseFocus(null);
     window.history.pushState({}, "", "/?view=" + v);
   }
   // Bildirim: ödev ve videolar kendi sayfalarında o öğrenciyle açılır;
@@ -235,14 +251,42 @@ export default function Workspace({
   // render sırasında uygulanır (React'in önerdiği "önceki değeri sakla" yolu).
   const [appliedFocus, setAppliedFocus] = useState(0),
     [hubFocus, setHubFocus] = useState<NoticeFocus | null>(null),
-    [notesFocus, setNotesFocus] = useState<NoticeFocus | null>(null);
+    [notesFocus, setNotesFocus] = useState<NoticeFocus | null>(null),
+    [showcaseFocus, setShowcaseFocus] = useState<{
+      id: string | null;
+      at: number;
+    } | null>(null),
+    [requests, setRequests] = useState(0);
+  // Kenar çubuğundaki istek sayacı sayfa açılışında bir kez alınır; vitrin
+  // sayfası açıkken oradaki liste sayacı günceller.
+  useEffect(() => {
+    let alive = true;
+    backend<{ data: Showcase }>(`/workspaces/${connected.id}/showcase`)
+      .then(
+        (r) =>
+          alive &&
+          setRequests(
+            r.data.requests.filter((x) => x.status === "PENDING").length,
+          ),
+      )
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [connected.id]);
   if (
     focus &&
     focus.at !== appliedFocus &&
     focus.workspaceId === connected.id
   ) {
     setAppliedFocus(focus.at);
-    if (focus.section === "notes") {
+    if (focus.section === "requests") {
+      setView("showcase");
+      setShowcaseFocus({ id: focus.itemId, at: focus.at });
+      setStudentId(null);
+    } else if (focus.section === "myRequests") {
+      // Öğrenci bildirimi; öğretmen görünümünde açılacak yeri yok.
+    } else if (focus.section === "notes") {
       setNotesFocus(focus);
       setStudentId(focus.studentId);
     } else {
@@ -253,7 +297,7 @@ export default function Workspace({
     }
   }
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
-  const focusedView = hubFocus?.section;
+  const focusedView = showcaseFocus ? "showcase" : hubFocus?.section;
   useEffect(() => {
     if (focusedView) window.history.pushState({}, "", "/?view=" + focusedView);
   }, [focusedView, appliedFocus]);
@@ -369,7 +413,12 @@ export default function Workspace({
         </SidebarHeader>
         <SidebarContent className="px-4 pt-6">
           <p className="nav-label">{upper(t("ws.myWorkspace"))}</p>
-          <Navigation view={view} onNavigate={navigate} count={active} />
+          <Navigation
+            view={view}
+            onNavigate={navigate}
+            count={active}
+            requests={requests}
+          />
           <div className="sidebar-note">
             <span className="note-flower">✳</span>
             <p>
@@ -446,7 +495,7 @@ export default function Workspace({
               <h1>{t(titles[view].title)}</h1>
               <p>{t(titles[view].subtitle)}</p>
             </div>
-            {!isTeachingView(view) && (
+            {!isTeachingView(view) && view !== "showcase" && (
               <Button
                 size="lg"
                 disabled={loading || busy}
@@ -550,6 +599,16 @@ export default function Workspace({
               )}
               {view === "payments" && (
                 <PaymentsView data={data} actions={actions} busy={busy} />
+              )}
+              {view === "showcase" && (
+                <ShowcaseView
+                  workspaceId={connected.id}
+                  fallbackName={connected.name}
+                  focus={showcaseFocus}
+                  onPending={setRequests}
+                  onAccepted={() => void reload()}
+                  onOpenStudent={setStudentId}
+                />
               )}
             </>
           )}

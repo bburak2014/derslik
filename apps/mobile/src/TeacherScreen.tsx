@@ -22,7 +22,8 @@ import {
   type Lesson,
   type Command,
 } from "@derslik/contracts";
-import { request } from "./core";
+import { client, request } from "./core";
+import { ShowcaseView } from "./DirectoryScreen";
 import {
   Avatar,
   Badge,
@@ -108,10 +109,20 @@ export function TeacherScreen({
     // öğrencinin öğrenme alanında açılır (web ile aynı kural).
     [appliedFocus, setAppliedFocus] = useState(0),
     [teachingFocus, setTeachingFocus] = useState<NoticeFocus | null>(null),
-    [learningFocus, setLearningFocus] = useState<NoticeFocus | null>(null);
+    [learningFocus, setLearningFocus] = useState<NoticeFocus | null>(null),
+    // Vitrin: bekleyen ders isteği sayısı ve bildirimden gelinen istek.
+    [requests, setRequests] = useState(0),
+    [showcaseFocus, setShowcaseFocus] = useState<string | null>(null);
   if (focus && focus.at !== appliedFocus && focus.workspaceId === access.id) {
     setAppliedFocus(focus.at);
-    if (focus.section === "notes") {
+    if (focus.section === "requests") {
+      setSelected(null);
+      setLearning(false);
+      setTab("showcase");
+      setShowcaseFocus(focus.itemId);
+    } else if (focus.section === "myRequests") {
+      // Öğrencinin kendi istekleri; öğretmen görünümünde açılacak yer yok.
+    } else if (focus.section === "notes") {
       setSelected(focus.studentId);
       setLearning(true);
       setLearningFocus(focus);
@@ -154,6 +165,22 @@ export function TeacherScreen({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void load();
   }, [load]);
+  // Vitrin simgesindeki sayaç; vitrin açılınca ekran kendisi günceller.
+  useEffect(() => {
+    let alive = true;
+    client
+      .showcase(access.id)
+      .then((r) => {
+        if (alive)
+          setRequests(
+            r.data.requests.filter((x) => x.status === "PENDING").length,
+          );
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [access.id]);
   async function mutate(command: Command) {
     if (inFlight.current) throw new Error(t("mt.busy"));
     inFlight.current = true;
@@ -622,6 +649,18 @@ export function TeacherScreen({
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <IconButton
           ghost
+          icon="storefront-outline"
+          label={t("nav.showcase")}
+          selected={tab === "showcase" && !student}
+          count={requests}
+          onPress={() => {
+            setSelected(null);
+            setShowcaseFocus(null);
+            setTab("showcase");
+          }}
+        />
+        <IconButton
+          ghost
           icon="notifications-outline"
           label={t("mt.notifications")}
           selected={tab === "inbox" && !student}
@@ -664,6 +703,19 @@ export function TeacherScreen({
   // Öğretim ekranı: webde sol menüdeki Ödevler / PDF ve dosyalar / Ders
   // videoları başlıklarının karşılığı. Mobilde alt çubukta tek sekme, içinde
   // öğrenci seçici ve bölüm segmenti var.
+  if (tab === "showcase" && !student)
+    return (
+      <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
+        {header}
+        <ShowcaseView
+          workspaceId={access.id}
+          onPending={setRequests}
+          onAccepted={() => void load()}
+          focus={showcaseFocus}
+        />
+        {tabBar}
+      </SafeAreaView>
+    );
   if (tab === "teaching") {
     const roster = [...data.students].sort(
       (a, b) =>

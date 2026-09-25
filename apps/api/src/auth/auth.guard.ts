@@ -30,7 +30,16 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<ActorRequest>();
-    const authorization = request.headers.authorization;
+    request.actor = await this.verify(request.headers.authorization);
+    return true;
+  }
+
+  /** Oturum isteğe bağlı uçlar (öğretmen vitrini) için: başlık yoksa null. */
+  async optional(authorization: string | undefined) {
+    return authorization ? this.verify(authorization) : null;
+  }
+
+  async verify(authorization: string | undefined): Promise<Actor> {
     if (
       !authorization?.startsWith("Bearer ") ||
       authorization.length > 16_384
@@ -48,13 +57,12 @@ export class AuthGuard implements CanActivate {
       if (payload.role !== "authenticated" || payload.is_anonymous === true) {
         throw new Error("Authenticated account required");
       }
-      request.actor = {
+      return {
         id: z.string().uuid().parse(payload.sub),
         ...(typeof payload.email === "string"
           ? { email: payload.email.toLowerCase() }
           : {}),
       };
-      return true;
     } catch {
       throw new UnauthorizedException("api.sessionInvalid");
     }

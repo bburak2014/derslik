@@ -67,9 +67,9 @@ export function csrf(request: Request) {
   )
     throw new HttpError(415, "web.appRequestRequired");
 }
-export async function readBody(request: Request) {
+export async function readBody(request: Request, limit = 16000) {
   const text = await request.text();
-  if (text.length > 16000) throw new HttpError(413, "web.requestTooLarge");
+  if (text.length > limit) throw new HttpError(413, "web.requestTooLarge");
   try {
     return JSON.parse(text);
   } catch {
@@ -125,6 +125,21 @@ export async function serverSession() {
       locale: () => locale,
     }),
   };
+}
+/** Oturum varsa istemci ve dil; yoksa null (herkese açık vitrin sayfaları). */
+export async function optionalToken() {
+  if (!configured()) return null;
+  try {
+    const auth = await authClient();
+    const {
+      data: { session },
+    } = await auth.auth.getSession();
+    if (!session) return null;
+    // Çerezdeki oturum API'de yeniden doğrulanır; burada yalnızca taşınır.
+    return session.access_token;
+  } catch {
+    return null;
+  }
 }
 export const accessKey = (a: Access) =>
   `${a.id}:${a.role}:${a.studentId || ""}`;

@@ -1,5 +1,6 @@
 import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
+import { directoryCases } from "./directory-cases.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -172,6 +173,7 @@ test(
           key = randomUUID(),
           auth = tokenA,
           headers = {},
+          raw = false,
         } = {},
       ) {
         const response = await fetch(base + path, {
@@ -186,7 +188,7 @@ test(
         });
         return {
           status: response.status,
-          body: await response.json(),
+          body: raw ? await response.arrayBuffer() : await response.json(),
           headers: response.headers,
         };
       }
@@ -779,6 +781,7 @@ test(
         verifiedUsers,
         sessionBody,
       });
+      await directoryCases({ t, admin, request, ok, token });
     } finally {
       if (app) await app.close();
       if (jwksServer) await new Promise((resolve) => jwksServer.close(resolve));

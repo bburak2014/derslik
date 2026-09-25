@@ -335,6 +335,14 @@ export function AuthForm({
           <ShieldCheck size={16} />
           {t("auth.footnote")}
         </p>
+        <p className="text-muted-foreground text-center text-sm">
+          <a
+            href="/teachers"
+            className="text-primary font-medium hover:underline"
+          >
+            {t("dir.browse")} →
+          </a>
+        </p>
       </section>
     </main>
   );
