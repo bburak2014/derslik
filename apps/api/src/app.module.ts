@@ -36,8 +36,10 @@ export class AppModule {
   static register(config: ApiConfig): DynamicModule {
     return {
       module: AppModule,
+      // Routes match in registration order. ApiController ends with the
+      // catch-all GET workspaces/:ws/:resource, so it goes last; placed first
+      // it answered GET workspaces/:ws/subscription with a 400.
       controllers: [
-        ApiController,
         HealthController,
         LearningController,
         MediaController,
@@ -45,6 +47,7 @@ export class AppModule {
         StreamWebhookController,
         SubscriptionController,
         SubscriptionWebhookController,
+        ApiController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
