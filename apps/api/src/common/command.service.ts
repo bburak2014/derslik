@@ -53,9 +53,7 @@ export class CommandService {
           )
         ).rows[0];
         if (!previous || previous.request_hash !== hash)
-          throw new ConflictException(
-            "Bu işlem anahtarı farklı bir istek için kullanılmış.",
-          );
+          throw new ConflictException("api.idempotencyKeyReused");
         return { ...previous.response, replayed: true };
       }
       const result = await execute(tx);

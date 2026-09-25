@@ -21,7 +21,7 @@ import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
 import { CommandService } from "../common/command.service.js";
 import { lockStudent } from "../students/students.service.js";
-import { notify } from "../learning/learning.service.js";
+import { ISTANBUL_TODAY, notify } from "../learning/learning.service.js";
 import { MediaProviders } from "./providers.js";
 
 const uuid = z.string().uuid();
@@ -49,7 +49,7 @@ const uploadSchema = z
   })
   .strict()
   .refine((v) => v.purpose === "RESOURCE" || v.assignmentId !== null, {
-    message: "Ödev veya teslim dosyası için ödev seçin.",
+    message: "api.pickAssignment",
     path: ["assignmentId"],
   });
 const videoSchema = z
@@ -102,9 +102,7 @@ export class MediaService {
           await tx.query("SELECT derslik.is_owner($1) AS yes", [ws])
         ).rows[0].yes;
         if (!owner && c.purpose !== "SUBMISSION")
-          throw new ForbiddenException(
-            "Öğrenci yalnızca ödev teslimi ekleyebilir.",
-          );
+          throw new ForbiddenException("api.studentSubmissionOnly");
         if (owner) await lockStudent(tx, ws, student, true);
         if (c.assignmentId)
           await tx.query(
@@ -115,14 +113,19 @@ export class MediaService {
           c.assignmentId &&
           (
             await tx.query(
-              "SELECT id,status FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3",
+              `SELECT a.id,a.status,a.due_on IS NOT NULL AND a.due_on<${ISTANBUL_TODAY} AND EXISTS(
+                 SELECT 1 FROM derslik.submissions s WHERE s.workspace_id=a.workspace_id AND s.assignment_id=a.id
+               ) AS locked
+               FROM derslik.assignments a WHERE a.workspace_id=$1 AND a.student_id=$2 AND a.id=$3`,
               [ws, student, c.assignmentId],
             )
           ).rows[0];
         if (c.assignmentId && !assignment)
-          throw new NotFoundException("Ödev bulunamadı.");
+          throw new NotFoundException("api.assignmentNotFound");
         if (!owner && assignment?.status !== "OPEN")
-          throw new ConflictException("Bu ödev teslimlere kapalı.");
+          throw new ConflictException("api.assignmentClosed");
+        if (!owner && assignment?.locked)
+          throw new ConflictException("api.dueDatePassedFile");
         await tx.query("SELECT derslik.expire_subscription($1)", [ws]);
         await tx.query("SELECT derslik.reserve_material_quota($1,$2,$3)", [
           ws,
@@ -181,9 +184,9 @@ export class MediaService {
             [ws, student, uuid.parse(id)],
           )
         ).rows[0];
-        if (!row) throw new NotFoundException("Dosya bulunamadı.");
+        if (!row) throw new NotFoundException("api.fileNotFound");
         if (write && !row.owner && row.user_id !== actor.id)
-          throw new ForbiddenException("Bu dosyayı değiştiremezsiniz.");
+          throw new ForbiddenException("api.fileNotYours");
         return row;
       },
       write,
@@ -196,9 +199,7 @@ export class MediaService {
     const size = Number(info.size ?? info.metadata?.size),
       mime = info.content_type ?? info.metadata?.mimetype;
     if (size !== Number(file.size_bytes) || mime !== file.mime_type)
-      throw new BadRequestException(
-        "Dosya boyutu veya türü bildirilen değerle eşleşmiyor.",
-      );
+      throw new BadRequestException("api.fileSizeTypeMismatch");
     const bytes = await this.providers.fileSignature(file.object_key);
     const signatures: Record<string, boolean> = {
       "application/pdf": bytes.subarray(0, 5).toString() === "%PDF-",
@@ -211,7 +212,7 @@ export class MediaService {
         bytes.subarray(8, 12).toString() === "WEBP",
     };
     if (!signatures[file.mime_type])
-      throw new BadRequestException("Dosya içeriği seçilen türle eşleşmiyor.");
+      throw new BadRequestException("api.fileContentMismatch");
     return this.access(
       actor,
       ws,
@@ -224,8 +225,7 @@ export class MediaService {
             [ws, student, id],
           )
         ).rows[0];
-        if (!data)
-          throw new ConflictException("Dosya durumu değişti. Yenileyin.");
+        if (!data) throw new ConflictException("api.fileStateChanged");
         return { data };
       },
       true,
@@ -239,8 +239,7 @@ export class MediaService {
     inline = false,
   ) {
     const f = await this.file(actor, ws, student, id);
-    if (f.status !== "READY")
-      throw new ConflictException("Dosya henüz hazır değil.");
+    if (f.status !== "READY") throw new ConflictException("api.fileNotReady");
     return {
       data: {
         url: await this.providers.downloadFileUrl(f.object_key, inline),
@@ -264,9 +263,9 @@ export class MediaService {
             [ws, student, uuid.parse(id)],
           )
         ).rows[0];
-        if (!row) throw new NotFoundException("Dosya bulunamadı.");
+        if (!row) throw new NotFoundException("api.fileNotFound");
         if (!row.owner && row.user_id !== actor.id)
-          throw new ForbiddenException("Bu dosyayı değiştiremezsiniz.");
+          throw new ForbiddenException("api.fileNotYours");
         await tx.query(
           "UPDATE derslik.materials SET delete_requested=true WHERE workspace_id=$1 AND id=$2",
           [ws, id],
@@ -318,7 +317,7 @@ export class MediaService {
             )
           ).rowCount
         )
-          throw new NotFoundException("Ders bulunamadı.");
+          throw new NotFoundException("api.lessonNotFound");
         await tx.query(
           "INSERT INTO derslik.workspace_limits(workspace_id) VALUES($1) ON CONFLICT DO NOTHING",
           [ws],
@@ -338,9 +337,7 @@ export class MediaService {
           ).rows[0].n,
         );
         if (used + c.maxDurationSeconds > limit)
-          throw new ConflictException(
-            "Video depolama sınırı dolu. Eski videoları silerek yer açın.",
-          );
+          throw new ConflictException("api.videoStorageFull");
         const video = (
           await tx.query(
             "INSERT INTO derslik.videos(workspace_id,student_id,lesson_id,title,reserved_seconds,size_bytes,upload_expires_at) VALUES($1,$2,$3,$4,$5,$6,now()+interval '1 hour') RETURNING id",
@@ -383,9 +380,7 @@ export class MediaService {
       const upload = r.headers.get("location"),
         uid = r.headers.get("stream-media-id");
       if (!upload || !uid || !/^[a-f0-9]{32}$/.test(uid))
-        throw new ServiceUnavailableException(
-          "Video bağlantısı hazırlanamadı. Kaydı iptal edip yeniden yükleyin.",
-        );
+        throw new ServiceUnavailableException("api.videoLinkFailed");
       const url = new URL(upload);
       if (
         url.protocol !== "https:" ||
@@ -393,7 +388,7 @@ export class MediaService {
           url.hostname,
         )
       )
-        throw new ServiceUnavailableException("Video yükleme adresi geçersiz.");
+        throw new ServiceUnavailableException("api.videoUploadUrlInvalid");
       const stored = await this.db.transaction(
         actor,
         ws,
@@ -407,7 +402,7 @@ export class MediaService {
       );
       if (!stored) {
         await this.providers.stream("/" + uid, { method: "DELETE" });
-        throw new ConflictException("Yükleme iptal edilmiş.");
+        throw new ConflictException("api.uploadCancelled");
       }
     }
     return this.db.transaction(actor, ws, async (tx) => {
@@ -417,14 +412,9 @@ export class MediaService {
           [ws, result.data.id],
         )
       ).rows[0];
-      if (!v?.upload_url)
-        throw new ConflictException(
-          "Yükleme bağlantısı hazırlanıyor veya kesintiye uğradı. Videolar listesinden kaydı iptal edebilirsiniz.",
-        );
+      if (!v?.upload_url) throw new ConflictException("api.uploadLinkPending");
       if (v.upload_expires_at < new Date())
-        throw new ConflictException(
-          "Yükleme bağlantısının süresi doldu. Kaydı silip yeniden yükleyin.",
-        );
+        throw new ConflictException("api.uploadLinkExpired");
       return {
         data: {
           id: v.id,
@@ -450,7 +440,7 @@ export class MediaService {
         ).rows[0],
     );
     if (!v?.provider_uid)
-      throw new NotFoundException("İzlenebilir video bulunamadı.");
+      throw new NotFoundException("api.playableVideoNotFound");
     const exp = Math.floor(Date.now() / 1000) + 300;
     const r = (await (
       await this.providers.stream(`/${v.provider_uid}/token`, {
@@ -460,9 +450,7 @@ export class MediaService {
       })
     ).json()) as { result: { token: string } };
     if (!r.result?.token || !/^[a-zA-Z0-9_.-]+$/.test(r.result.token))
-      throw new ServiceUnavailableException(
-        "İzleme bağlantısı oluşturulamadı.",
-      );
+      throw new ServiceUnavailableException("api.playbackLinkFailed");
     return {
       data: {
         url: `https://videodelivery.net/${r.result.token}/manifest/video.m3u8`,
@@ -482,7 +470,7 @@ export class MediaService {
           )
         ).rows[0],
     );
-    if (!v) throw new NotFoundException("Video bulunamadı.");
+    if (!v) throw new NotFoundException("api.videoNotFound");
     if (v.status !== "DELETED" && v.provider_uid)
       await this.providers.stream("/" + v.provider_uid, { method: "DELETE" });
     return this.db.transaction(actor, ws, async (tx) => ({
@@ -506,7 +494,7 @@ export class MediaService {
           )
         ).rows[0],
     );
-    if (!v) throw new NotFoundException("Video bulunamadı.");
+    if (!v) throw new NotFoundException("api.videoNotFound");
     if (v.delete_requested) return this.deleteVideo(actor, ws, student, id);
     if (!v.provider_uid) {
       if (v.upload_expires_at < new Date())
@@ -605,13 +593,12 @@ export class MediaService {
           ],
         );
         if (ready)
-          await notify(
-            tx,
-            mapping.workspace_id,
-            v.student_id,
-            "Ders videosu hazır",
-            v.title,
-          );
+          await notify(tx, mapping.workspace_id, v.student_id, {
+            title: "notice.videoReady",
+            body: v.title,
+            kind: "VIDEO",
+            targetId: v.id,
+          });
         return { received: true };
       },
     );

@@ -1,3 +1,5 @@
+import { intlLocale, t } from "./i18n/index.ts";
+
 export type Student = {
   id: string;
   name: string;
@@ -69,7 +71,7 @@ export type WorkspaceData = {
   notes: PrivateNote[];
   serverTime: string;
 };
-// Shapes returned by the access, inbox and limits endpoints (camelCased by
+// Shapes returned by the access and limits endpoints (camelCased by
 // the API's toDto; Postgres bigint/count values arrive as strings).
 export type AccessLink = {
   id: string;
@@ -89,15 +91,6 @@ export type AccessInvitation = {
 export type StudentAccessList = {
   data: AccessLink[];
   invitations: AccessInvitation[];
-};
-export type InboxNotification = {
-  id: string;
-  workspaceId: string | null;
-  studentId: string | null;
-  title: string;
-  body: string;
-  readAt: string | null;
-  createdAt: string;
 };
 export type WorkspaceLimits = {
   limits: {
@@ -120,7 +113,7 @@ export const emptyWorkspace: WorkspaceData = {
   serverTime: "",
 };
 export const money = (minor: string | number) =>
-  new Intl.NumberFormat("tr-TR", {
+  new Intl.NumberFormat(intlLocale(), {
     style: "currency",
     currency: "TRY",
     maximumFractionDigits: 2,
@@ -132,8 +125,18 @@ export const dateKey = (date: Date | string = new Date()) =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(date));
+// The API rule (learning.service assignment.submit): a student may hand in or
+// edit an open assignment until its due date, Istanbul calendar day included.
+// After that only a first, late hand-in is accepted.
+export const canEditSubmission = (
+  assignment: { status: string; due_on: string | null },
+  submitted: boolean,
+  today = dateKey(),
+) =>
+  assignment.status === "OPEN" &&
+  (!submitted || !assignment.due_on || assignment.due_on >= today);
 export const timeLabel = (date: string) =>
-  new Intl.DateTimeFormat("tr-TR", {
+  new Intl.DateTimeFormat(intlLocale(), {
     timeZone: "Europe/Istanbul",
     hour: "2-digit",
     minute: "2-digit",
@@ -142,7 +145,7 @@ export const dayLabel = (
   date: Date | string,
   options: Intl.DateTimeFormatOptions = {},
 ) =>
-  new Intl.DateTimeFormat("tr-TR", {
+  new Intl.DateTimeFormat(intlLocale(), {
     timeZone: "Europe/Istanbul",
     day: "numeric",
     month: "long",
@@ -156,7 +159,7 @@ export function addDays(date: string, days: number) {
 export function parseLira(value: string): string {
   const v = value.trim().replace(",", ".");
   if (!/^\d{1,7}(\.\d{1,2})?$/.test(v))
-    throw new Error("Tutarı 1250 veya 1250,50 biçiminde girin.");
+    throw new Error(t("common.amountFormat"));
   const [whole, decimal = ""] = v.split(".");
   return String(Number(whole) * 100 + Number(decimal.padEnd(2, "0")));
 }

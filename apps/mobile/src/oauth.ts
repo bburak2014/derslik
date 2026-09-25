@@ -1,6 +1,7 @@
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { configuration, supabase } from "./core";
+import { t } from "@derslik/contracts";
 
 WebBrowser.maybeCompleteAuthSession();
 export type SocialProvider = "google" | "apple" | "azure";
@@ -44,16 +45,13 @@ export async function completeAuthLink(value: string) {
   if (!authRoute(value)) return false;
   const query = Linking.parse(value).queryParams || {};
   if (query.error || query.error_description)
-    throw new Error("Giriş tamamlanamadı. Lütfen yeniden deneyin.");
+    throw new Error(t("oauth.failed"));
   const code = typeof query.code === "string" ? query.code : null;
   if (!code || !supabase) return false;
   let exchange = exchanges.get(code);
   if (!exchange) {
     exchange = supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error)
-        throw new Error(
-          "Bağlantının süresi dolmuş olabilir. Yeni bir giriş bağlantısı isteyin.",
-        );
+      if (error) throw new Error(t("oauth.linkExpired"));
     });
     exchanges.set(code, exchange);
     if (exchanges.size > 20) exchanges.delete(exchanges.keys().next().value!);
@@ -69,18 +67,25 @@ export async function availableProviders(): Promise<SocialProvider[]> {
       signal: AbortSignal.timeout(8000),
     },
   );
-  if (!response.ok)
-    throw new Error(
-      "Giriş seçenekleri yüklenemedi. E-posta ile devam edebilirsiniz.",
-    );
+  if (!response.ok) throw new Error(t("web.providersFailed"));
   const body = await response.json();
   return providers
     .filter((p) => body.external?.[p.id] === true)
     .map((p) => p.id);
 }
+// Supabase refuses a redirect address whose host is a bare IP other than
+// loopback, even when it is on the allow list, and quietly sends the browser to
+// the Site URL instead (docs/guncelleme-v6.md). Expo Go started on the LAN
+// builds exactly such an address, so stop before the browser opens.
+function unreachableRedirect(redirectTo: string) {
+  const ip = /^exp:\/\/(\d{1,3}(?:\.\d{1,3}){3})[:/]/.exec(redirectTo)?.[1];
+  return !!ip && !ip.startsWith("127.");
+}
+
 export async function socialSignIn(provider: SocialProvider) {
-  if (!supabase) throw new Error("Giriş bağlantısı hazır değil.");
+  if (!supabase) throw new Error(t("oauth.notReady"));
   const redirectTo = authRedirect("callback");
+  if (unreachableRedirect(redirectTo)) throw new Error(t("oauth.expoLan"));
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
@@ -89,8 +94,7 @@ export async function socialSignIn(provider: SocialProvider) {
       ...(provider === "azure" ? { scopes: "email" } : {}),
     },
   });
-  if (error || !data.url)
-    throw new Error("Bu giriş seçeneği şu anda kullanılamıyor.");
+  if (error || !data.url) throw new Error(t("oauth.providerUnavailable"));
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type === "success") {
     if (!(await completeAuthLink(result.url)))
@@ -106,10 +110,5 @@ export async function socialSignIn(provider: SocialProvider) {
 }
 
 function missingRedirect(redirectTo: string) {
-  return (
-    "Giriş tamamlanmadı. Vazgeçtiyseniz yeniden deneyebilirsiniz. " +
-    "Tarayıcı localhost gibi başka bir adrese gittiyse, Supabase panelinde " +
-    "Authentication > URL Configuration > Redirect URLs listesine şu adresi ekleyin:\n\n" +
-    redirectTo
-  );
+  return t("oauth.notCompleted") + "\n\n" + redirectTo;
 }

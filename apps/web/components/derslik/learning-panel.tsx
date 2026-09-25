@@ -1,9 +1,8 @@
 "use client";
 import { Subscription } from "@/components/account/subscription";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   uploadTus,
-  type Access,
   type LearningData,
   type PortalData,
   type Video,
@@ -18,23 +17,51 @@ import {
   money,
   dayLabel,
   dateKey,
-  type InboxNotification,
+  addDays,
+  timeLabel,
+  canEditSubmission,
+  noticeTarget,
+  noticeText,
+  intlLocale,
+  t,
+  type Notice,
+  type NoticeTarget,
   type StudentAccessList,
   type WorkspaceLimits,
 } from "@derslik/contracts";
 import { backend } from "@/lib/client";
-import { ThemeToggle } from "@/components/account/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Bell,
+  BellOff,
+  CalendarDays,
+  CheckCheck,
+  ChevronRight,
+  CircleAlert,
+  ClipboardList,
   Copy,
   Download,
   Eye,
   FileText,
+  Image as ImageIcon,
+  Mail,
+  MessageSquare,
+  NotebookPen,
+  Package,
+  Paperclip,
+  Pencil,
   Play,
+  Plus,
   RefreshCw,
+  Send,
+  Sparkles,
   Trash2,
+  Upload,
+  UserCheck,
+  UserPlus,
   Video as VideoIcon,
+  Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -54,7 +81,36 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -62,14 +118,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormError, FormSuccess, ToneBadge, type Tone } from "./feedback";
 import { VideoPlayer } from "./video-player";
 
 type Field = {
@@ -101,14 +169,15 @@ function ActionForm({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="learning-dialog">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{spec?.title}</DialogTitle>
-          <DialogDescription>Bilgileri girip kaydedin.</DialogDescription>
+          <DialogDescription>{t("learn.formHint")}</DialogDescription>
         </DialogHeader>
         {spec && (
           <form
             key={spec.title}
+            className="grid gap-4"
             onSubmit={async (e) => {
               e.preventDefault();
               setBusy(true);
@@ -129,13 +198,13 @@ function ActionForm({
             }}
           >
             {spec.fields.map((f) => (
-              <div className="form-field" key={f.name}>
+              <div className="grid gap-2" key={f.name}>
                 <Label htmlFor={"field-" + f.name}>{f.label}</Label>
                 {f.options ? (
                   // Radix Root, name verildiğinde form gönderimi için gizli bir
                   // yerel select basar; FormData okuması bozulmaz.
                   <Select name={f.name} defaultValue={f.value}>
-                    <SelectTrigger id={"field-" + f.name}>
+                    <SelectTrigger id={"field-" + f.name} className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -147,16 +216,17 @@ function ActionForm({
                     </SelectContent>
                   </Select>
                 ) : f.type === "textarea" ? (
-                  <textarea
+                  <Textarea
                     id={"field-" + f.name}
                     name={f.name}
                     defaultValue={f.value}
                     required={f.required !== false}
                     maxLength={5000}
                     rows={5}
+                    className="min-h-28"
                   />
                 ) : (
-                  <input
+                  <Input
                     id={"field-" + f.name}
                     name={f.name}
                     type={f.type || "text"}
@@ -168,15 +238,18 @@ function ActionForm({
                 )}
               </div>
             ))}
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="primary-button" disabled={busy}>
-              {busy && <Spinner />}
-              {busy ? "Kaydediliyor…" : "Kaydet"}
-            </button>
+            {error && <FormError>{error}</FormError>}
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={busy}>
+                  {t("common.cancel")}
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={busy}>
+                {busy && <Spinner />}
+                {busy ? t("learn.savingEllipsis") : t("common.save")}
+              </Button>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>
@@ -216,7 +289,7 @@ function ConfirmDialog({
           <AlertDialogDescription>{state?.description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               void state?.perform();
@@ -231,6 +304,20 @@ function ConfirmDialog({
   );
 }
 
+/** Panel sekmeleri. Öğretmen sayfaları ve öğrenci/veli portalı sekmeyi
+ *  dışarıdan `view` ile seçer; o zaman panel kendi sekme şeridini çizmez. */
+export type LearningTab =
+  | "lessons"
+  | "assignments"
+  | "files"
+  | "videos"
+  | "notes"
+  | "payments"
+  | "access";
+export type LearningTabInfo = { id: LearningTab; title: string };
+/** Bildirimden açılan yer; `at` aynı bildirime yeniden tıklanınca değişir. */
+export type NoticeFocus = NoticeTarget & { at: number };
+
 export function LearningPanel({
   workspaceId,
   studentId,
@@ -238,19 +325,27 @@ export function LearningPanel({
   studentPhone,
   role = "OWNER",
   view,
+  onTabs,
   initialTab,
   autoInvite = false,
+  focus,
 }: {
   workspaceId: string;
   studentId: string;
   studentName?: string;
   studentPhone?: string;
   role?: "OWNER" | "STUDENT" | "GUARDIAN";
-  view?: "assignments" | "files" | "videos";
+  view?: LearningTab;
+  /** İzin verilen sekmeler değiştikçe çağrılır; portalın sol menüsü bunları
+   *  listeler. */
+  onTabs?: (tabs: LearningTabInfo[]) => void;
   /** Açılışta seçili gelecek sekme (öğrenci panelindeki kısayollar için). */
   initialTab?: string;
   /** Açılışta davet formu doğrudan açılsın mı. */
   autoInvite?: boolean;
+  /** Bildirimden gelinen kayıt: görünür olunca kaydırılıp kısa süre
+   *  vurgulanır. `at` her tıklamada değişir. */
+  focus?: { id: string | null; at: number };
 }) {
   const owner = role === "OWNER",
     student = role === "STUDENT";
@@ -289,6 +384,22 @@ export function LearningPanel({
     setShownView(view);
     if (view) setTab(view);
   }
+  // Aynı bildirim ikinci kez kaydırmasın diye işlenen tıklamanın zamanı.
+  const focused = useRef(0),
+    focusId = focus?.id,
+    focusAt = focus?.at ?? 0;
+  useEffect(() => {
+    if (loading || !focusId || focused.current === focusAt) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-notice-target="${CSS.escape(focusId)}"]`,
+    );
+    if (!el) return;
+    focused.current = focusAt;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.dataset.highlight = "true";
+    const timer = setTimeout(() => delete el.dataset.highlight, 2400);
+    return () => clearTimeout(timer);
+  }, [loading, focusId, focusAt, selectedTab]);
   const uploadSession = useRef<{
     fingerprint: string;
     id: string;
@@ -353,7 +464,7 @@ export function LearningPanel({
   }
   async function attach(assignmentId: string | null, file: File) {
     if (!capabilities?.files) {
-      setError("Dosya yükleme şu anda kullanılamıyor.");
+      setError(t("learn.uploadUnavailable"));
       return;
     }
     setBusy(true);
@@ -380,7 +491,7 @@ export function LearningPanel({
           body: file,
         });
         if (!uploaded.ok && uploaded.status !== 409)
-          throw new Error("Dosya yüklenemedi. Yeniden deneyin.");
+          throw new Error(t("learn.uploadFailed"));
       }
       await backend(media + `/files/${r.id}/finish`, {});
       await reload();
@@ -394,25 +505,25 @@ export function LearningPanel({
    *  kısayol aynı formu açsın diye tek yerde duruyor. */
   function inviteSpec(): FormSpec {
     return {
-      title: "Davet bağlantısı oluştur",
+      title: t("learn.inviteTitle"),
       fields: [
-        { name: "email", label: "Davet edilecek e-posta", type: "email" },
+        { name: "email", label: t("learn.inviteEmail"), type: "email" },
         {
           name: "role",
-          label: "Hesap türü",
+          label: t("learn.accountType"),
           value: "STUDENT",
           options: [
-            { value: "STUDENT", label: "Öğrenci" },
-            { value: "GUARDIAN", label: "Veli" },
+            { value: "STUDENT", label: t("roles.STUDENT") },
+            { value: "GUARDIAN", label: t("roles.GUARDIAN") },
           ],
         },
         {
           name: "payments",
-          label: "Paket ve ödeme bilgisi",
+          label: t("learn.paymentInfo"),
           value: "no",
           options: [
-            { value: "no", label: "Gizli kalsın" },
-            { value: "yes", label: "Görüntüleyebilsin" },
+            { value: "no", label: t("learn.paymentHidden") },
+            { value: "yes", label: t("learn.paymentVisible") },
           ],
         },
       ],
@@ -466,9 +577,9 @@ export function LearningPanel({
   }
   function remove(file: Material) {
     setConfirmation({
-      title: "Dosya silinsin mi?",
-      description: `“${file.name}” kalıcı olarak kaldırılacak. Öğrenci artık indiremeyecek.`,
-      action: "Sil",
+      title: t("learn.deleteFileTitle"),
+      description: t("learn.deleteFileBody", { name: file.name }),
+      action: t("common.delete"),
       perform: () => removeNow(file),
     });
   }
@@ -484,145 +595,147 @@ export function LearningPanel({
       setBusy(false);
     }
   }
-  const tabs = [
-    ...(owner
-      ? []
-      : [{ id: "lessons", title: "Dersler", permission: "lessons" }]),
-    { id: "assignments", title: "Ödevler", permission: "assignments" },
-    { id: "files", title: "PDF ve dosyalar", permission: "assignments" },
-    { id: "videos", title: "Videolar", permission: "videos" },
-    { id: "notes", title: "Paylaşımlar", permission: "notes" },
-    ...(owner
-      ? [{ id: "access", title: "Davetler", permission: "lessons" }]
-      : [{ id: "payments", title: "Paket ve bakiye", permission: "payments" }]),
-  ].filter((t) => permissions.includes(t.permission));
+  const permissionKey = permissions.join(",");
+  const tabs = useMemo(() => {
+    const allowed = permissionKey.split(",");
+    const all: (LearningTabInfo & { permission: string })[] = [
+      ...(owner
+        ? []
+        : [
+            {
+              id: "lessons" as const,
+              title: t("nav.lessons"),
+              permission: "lessons",
+            },
+          ]),
+      {
+        id: "assignments",
+        title: t("nav.assignments"),
+        permission: "assignments",
+      },
+      { id: "files", title: t("nav.files"), permission: "assignments" },
+      { id: "videos", title: t("learn.tabVideos"), permission: "videos" },
+      { id: "notes", title: t("nav.notes"), permission: "notes" },
+      ...(owner
+        ? [
+            {
+              id: "access" as const,
+              title: t("learn.tabAccess"),
+              permission: "lessons",
+            },
+          ]
+        : [
+            {
+              id: "payments" as const,
+              title: t("nav.balance"),
+              permission: "payments",
+            },
+          ]),
+    ];
+    return all.filter((x) => allowed.includes(x.permission));
+  }, [owner, permissionKey]);
   // Fall back to the first permitted tab when the selected one is not allowed.
-  const tab = tabs.some((t) => t.id === selectedTab)
+  const tab = tabs.some((x) => x.id === selectedTab)
     ? selectedTab
     : (tabs[0]?.id ?? selectedTab);
+  useEffect(() => {
+    onTabs?.(tabs.map(({ id, title }) => ({ id, title })));
+  }, [onTabs, tabs]);
   if (loading)
     return (
       <div className="learning-panel">
         <PageLoader compact />
       </div>
     );
+  const today = dateKey();
+  const refresh = (
+    <IconAction
+      outline
+      label={t("learn.refresh")}
+      icon={<RefreshCw />}
+      onClick={() => void reload()}
+    />
+  );
   return (
     <section className="learning-panel">
       {!view && (
-        <div
-          className="learning-tabs"
-          role="tablist"
-          aria-label="Öğrenci içerikleri"
-        >
-          {tabs.map((t) => (
-            <button
-              role="tab"
-              aria-selected={tab === t.id}
-              key={t.id}
-              onClick={() => {
-                setTab(t.id);
-                if (t.id === "access") void accessReload();
-              }}
-            >
-              {t.title}
-            </button>
-          ))}
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="İçerikleri yenile"
-            onClick={() => void reload()}
+        <div className="flex items-center justify-between gap-3">
+          <Tabs
+            className="min-w-0"
+            value={tab}
+            onValueChange={(next) => {
+              setTab(next);
+              if (next === "access") void accessReload();
+            }}
           >
-            <RefreshCw size={16} />
-          </Button>
+            <TabsList
+              className="max-w-full justify-start overflow-x-auto"
+              aria-label={t("learn.studentContent")}
+            >
+              {tabs.map((x) => (
+                <TabsTrigger key={x.id} value={x.id} className="flex-none">
+                  {x.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          {refresh}
         </div>
       )}
-      {view && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="mb-4"
-          onClick={() => void reload()}
-        >
-          <RefreshCw size={15} /> İçerikleri yenile
-        </Button>
-      )}
-      {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
       {(owner || student) &&
         ((tab === "videos" && !capabilities?.videos) ||
           (["assignments", "files"].includes(tab) && !capabilities?.files)) && (
-          <div className="media-notice" role="status">
-            <div>
-              <strong>
-                {tab === "videos"
-                  ? "Video yükleme kullanıma hazır değil"
-                  : "Dosya yükleme kullanıma hazır değil"}
-              </strong>
-              <p>
-                Yükleme hizmetine şu anda erişilemiyor. Hizmet
-                etkinleştirildikten sonra tekrar kontrol edebilirsiniz.
-              </p>
-            </div>
-            <button type="button" onClick={() => void reload()}>
-              Tekrar kontrol et
-            </button>
-          </div>
+          <Alert role="status">
+            <CircleAlert />
+            <AlertTitle>
+              {tab === "videos"
+                ? t("learn.videoUploadNotReady")
+                : t("learn.fileUploadNotReady")}
+            </AlertTitle>
+            <AlertDescription>
+              <p>{t("learn.uploadServiceDown")}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => void reload()}
+              >
+                <RefreshCw /> {t("learn.checkAgain")}
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
       {tab === "lessons" && "lessons" in data && (
-        <div className="learning-list">
-          {data.lessons.length ? (
-            data.lessons.map((l) => (
-              <article key={l.id}>
-                <span className="eyebrow">
-                  {l.status === "SCHEDULED"
-                    ? "PLANLANDI"
-                    : l.status === "COMPLETED"
-                      ? "TAMAMLANDI"
-                      : "İPTAL"}
-                </span>
-                <h3>{l.topic}</h3>
-                <p>
-                  {dayLabel(l.starts_at, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  · {l.location || "Konum belirtilmedi"}
-                </p>
-              </article>
-            ))
-          ) : (
-            <p>Henüz ders planlanmamış.</p>
-          )}
-        </div>
+        <LessonSchedule lessons={data.lessons}>
+          {view && refresh}
+        </LessonSchedule>
       )}
       {tab === "assignments" && (
         <>
-          <div className="learning-heading">
-            <div>
-              <h2>Bir sonraki adıma hazırlık</h2>
-              <p>Ödevler, teslimler ve geri bildirimler.</p>
-            </div>
+          <SectionHeading
+            title={t("learn.assignmentsTitle")}
+            description={t("learn.assignmentsText")}
+          >
+            {view && refresh}
             {owner && (
-              <button
-                className="primary-button"
+              <Button
+                type="button"
                 onClick={() =>
                   simple(
-                    "Yeni ödev",
+                    t("notice.assignmentNew"),
                     [
-                      { name: "title", label: "Başlık" },
+                      { name: "title", label: t("learn.title") },
                       {
                         name: "instructions",
-                        label: "Yönerge",
+                        label: t("learn.instructions"),
                         type: "textarea",
                         required: false,
                       },
                       {
                         name: "dueOn",
-                        label: "Son teslim",
+                        label: t("learn.dueOn"),
                         required: false,
                         type: "date",
                         value: dateKey(),
@@ -632,113 +745,163 @@ export function LearningPanel({
                   )
                 }
               >
-                Ödev ver
-              </button>
+                <Plus /> {t("learn.assign")}
+              </Button>
             )}
-          </div>
-          <div className="learning-list">
+          </SectionHeading>
+          <ItemGroup className="gap-3">
             {!data.assignments.length && (
-              <p className="learning-empty">
-                Henüz ödev yok. Yeni ödevler burada görünecek.
-              </p>
+              <EmptyNote icon={ClipboardList} title={t("learn.noAssignments")}>
+                {t("learn.noAssignmentsHint")}
+              </EmptyNote>
             )}
             {data.assignments.map((a) => {
               const sub = data.submissions.find(
                 (s) => s.assignment_id === a.id,
               );
+              const state: [Tone, string] =
+                a.status === "CANCELLED"
+                  ? ["muted", t("lesson.cancelled")]
+                  : a.status === "COMPLETED"
+                    ? ["ok", t("lesson.completed")]
+                    : sub
+                      ? sub.status === "REVIEWED"
+                        ? ["ok", t("learn.reviewed")]
+                        : ["info", t("learn.submitted")]
+                      : a.due_on && a.due_on < today
+                        ? ["danger", t("learn.late")]
+                        : ["warn", t("learn.awaiting")];
+              const files = data.materials.filter(
+                (m) => m.assignment_id === a.id,
+              );
+              const editable = canEditSubmission(a, !!sub, today);
               return (
-                <article key={a.id}>
-                  <div className="learning-card-heading">
-                    <span className="eyebrow">
-                      {a.status === "CANCELLED"
-                        ? "İPTAL EDİLDİ"
-                        : a.status === "COMPLETED"
-                          ? "TAMAMLANDI"
-                          : sub
-                            ? sub.status === "REVIEWED"
-                              ? "DEĞERLENDİRİLDİ"
-                              : "TESLİM EDİLDİ"
-                            : "TESLİM BEKLENİYOR"}
-                    </span>
-                    <small>
+                <Item
+                  variant="outline"
+                  className="bg-card items-start"
+                  key={a.id}
+                  data-notice-target={a.id}
+                >
+                  <ItemMedia variant="icon">
+                    <ClipboardList />
+                  </ItemMedia>
+                  <ItemContent className="min-w-36">
+                    <ItemTitle>{a.title}</ItemTitle>
+                    <ItemDescription>
                       {a.due_on
-                        ? dayLabel(a.due_on + "T12:00:00+03:00")
-                        : "Son teslim tarihi yok"}
-                    </small>
-                  </div>
-                  <h3>{a.title}</h3>
-                  <p className="preserve-lines">{a.instructions}</p>
-                  {sub && (
-                    <div className="feedback">
-                      <strong>Öğrenci teslimi</strong>
-                      <p className="preserve-lines">{sub.body}</p>
-                      {sub.feedback && (
-                        <>
-                          <strong>Öğretmen geri bildirimi</strong>
-                          <p className="preserve-lines">{sub.feedback}</p>
-                        </>
+                        ? t("learn.dueDate", {
+                            date: dayLabel(a.due_on + "T12:00:00+03:00"),
+                          })
+                        : t("learn.noDueDate")}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions className="ml-auto">
+                    <ToneBadge tone={state[0]}>{state[1]}</ToneBadge>
+                  </ItemActions>
+                  {(a.instructions || sub || files.length > 0) && (
+                    <div className="grid basis-full gap-3 text-sm">
+                      {a.instructions && (
+                        <p className="leading-relaxed whitespace-pre-line">
+                          {a.instructions}
+                        </p>
+                      )}
+                      {sub && (
+                        <div className="bg-muted/50 grid gap-3 rounded-md border p-3">
+                          <div className="grid gap-1">
+                            <span className="text-muted-foreground text-xs font-medium">
+                              {t("learn.studentSubmission")}
+                            </span>
+                            <p className="leading-relaxed whitespace-pre-line">
+                              {sub.body}
+                            </p>
+                          </div>
+                          {sub.feedback && (
+                            <div className="grid gap-1 border-t pt-3">
+                              <span className="text-muted-foreground text-xs font-medium">
+                                {t("learn.teacherFeedback")}
+                              </span>
+                              <p className="leading-relaxed whitespace-pre-line">
+                                {sub.feedback}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {files.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {files.map((m) => (
+                            <Button
+                              key={m.id}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="max-w-full"
+                              disabled={
+                                m.status !== "READY" || m.delete_requested
+                              }
+                              onClick={() => void download(m)}
+                            >
+                              <Paperclip />
+                              <span className="truncate">{m.name}</span>
+                              <span className="text-muted-foreground font-normal">
+                                {m.status !== "READY"
+                                  ? t("learn.uploadPending")
+                                  : m.purpose === "SUBMISSION"
+                                    ? t("learn.fileSubmission")
+                                    : t("learn.fileResource")}
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
-                  <div className="material-list">
-                    {data.materials
-                      .filter((m) => m.assignment_id === a.id)
-                      .map((m) => (
-                        <button
-                          key={m.id}
-                          disabled={m.status !== "READY" || m.delete_requested}
-                          onClick={async () => {
-                            try {
-                              const r = await backend<{ data: SignedUrl }>(
-                                media + `/files/${m.id}/download`,
-                              );
-                              window.location.assign(r.data.url);
-                            } catch (e) {
-                              setError((e as Error).message);
-                            }
-                          }}
-                        >
-                          ↗ {m.name} ·{" "}
-                          {m.purpose === "SUBMISSION" ? "Teslim" : "Kaynak"}
-                          {m.status !== "READY" ? " (Yükleme bekliyor)" : ""}
-                        </button>
-                      ))}
-                  </div>
-                  <div className="learning-actions">
+                  <ItemFooter className="flex-wrap justify-start border-t pt-4">
                     {owner && (
-                      <button
-                        className="secondary-button"
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                           simple(
-                            "Ödevi düzenle",
+                            t("learn.editAssignment"),
                             [
                               {
                                 name: "title",
-                                label: "Başlık",
+                                label: t("learn.title"),
                                 value: a.title,
                               },
                               {
                                 name: "instructions",
-                                label: "Yönerge",
+                                label: t("learn.instructions"),
                                 type: "textarea",
                                 value: a.instructions,
                                 required: false,
                               },
                               {
                                 name: "dueOn",
-                                label: "Son teslim",
+                                label: t("learn.dueOn"),
                                 type: "date",
                                 value: a.due_on || "",
                                 required: false,
                               },
                               {
                                 name: "status",
-                                label: "Durum",
+                                label: t("common.status"),
                                 value: a.status,
                                 options: [
-                                  { value: "OPEN", label: "Devam ediyor" },
-                                  { value: "COMPLETED", label: "Tamamlandı" },
-                                  { value: "CANCELLED", label: "İptal edildi" },
+                                  {
+                                    value: "OPEN",
+                                    label: t("learn.inProgress"),
+                                  },
+                                  {
+                                    value: "COMPLETED",
+                                    label: t("lesson.completed"),
+                                  },
+                                  {
+                                    value: "CANCELLED",
+                                    label: t("lesson.cancelled"),
+                                  },
                                 ],
                               },
                             ],
@@ -751,47 +914,51 @@ export function LearningPanel({
                           )
                         }
                       >
-                        Düzenle / durum
-                      </button>
+                        <Pencil /> {t("common.edit")}
+                      </Button>
                     )}
-                    {student &&
-                      a.status === "OPEN" &&
-                      sub?.status !== "REVIEWED" && (
-                        <button
-                          className="secondary-button"
-                          onClick={() =>
-                            simple(
-                              "Ödevi teslim et",
-                              [
-                                {
-                                  name: "body",
-                                  label: "Çözümünüz / açıklamanız",
-                                  type: "textarea",
-                                  value: sub?.body || "",
-                                },
-                              ],
-                              (v) => ({
-                                action: "assignment.submit",
-                                assignmentId: a.id,
-                                body: v.body,
-                                version: sub?.version || 0,
-                              }),
-                            )
-                          }
-                        >
-                          {sub ? "Teslimi düzenle" : "Teslim et"}
-                        </button>
-                      )}
-                    {owner && sub && (
-                      <button
-                        className="secondary-button"
+                    {student && editable && (
+                      <Button
+                        type="button"
+                        size="sm"
                         onClick={() =>
                           simple(
-                            "Ödevi değerlendir",
+                            sub
+                              ? t("learn.editSubmission")
+                              : t("learn.submitTitle"),
+                            [
+                              {
+                                name: "body",
+                                label: t("learn.yourAnswer"),
+                                type: "textarea",
+                                value: sub?.body || "",
+                              },
+                            ],
+                            (v) => ({
+                              action: "assignment.submit",
+                              assignmentId: a.id,
+                              body: v.body,
+                              version: sub?.version || 0,
+                            }),
+                          )
+                        }
+                      >
+                        <Send />{" "}
+                        {sub ? t("learn.editSubmission") : t("learn.submit")}
+                      </Button>
+                    )}
+                    {owner && sub && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          simple(
+                            t("learn.reviewTitle"),
                             [
                               {
                                 name: "feedback",
-                                label: "Geri bildirim",
+                                label: t("learn.feedback"),
                                 type: "textarea",
                                 value: sub.feedback,
                               },
@@ -805,691 +972,937 @@ export function LearningPanel({
                           )
                         }
                       >
-                        Geri bildirim yaz
-                      </button>
+                        <MessageSquare /> {t("learn.writeFeedback")}
+                      </Button>
                     )}
-                    {(owner || (student && a.status === "OPEN")) && (
-                      <label className="file-button">
-                        {busy && <Spinner />}
-                        {busy ? "Yükleniyor…" : "Dosya ekle"}
-                        <input
-                          type="file"
-                          accept="application/pdf,image/jpeg,image/png,image/webp"
-                          disabled={busy || !capabilities?.files}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) void attach(a.id, file);
-                            e.target.value = "";
-                          }}
-                        />
-                      </label>
+                    {student &&
+                      sub &&
+                      a.status === "OPEN" &&
+                      (editable ? (
+                        a.due_on && (
+                          <span className="text-muted-foreground text-xs">
+                            {t("learn.editableUntil", {
+                              date: dayLabel(a.due_on + "T12:00:00+03:00"),
+                            })}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          {t("learn.locked")}
+                        </span>
+                      ))}
+                    {(owner || (student && editable)) && (
+                      <FilePicker
+                        busy={busy}
+                        disabled={busy || !capabilities?.files}
+                        onPick={(file) => void attach(a.id, file)}
+                      />
                     )}
-                  </div>
-                  <small>
-                    Dosyalar: PDF, JPG, PNG veya WebP · en fazla 10 MB.
-                  </small>
-                </article>
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      {t("learn.fileLimits")}
+                    </span>
+                  </ItemFooter>
+                </Item>
               );
             })}
-          </div>
+          </ItemGroup>
         </>
       )}
       {tab === "files" && (
         <>
-          <div className="learning-heading">
-            <div>
-              <h2>PDF ve dosyalar</h2>
-              <p>
-                Ödev ekleri, çözümler ve öğrenciye paylaşılan ders materyalleri.
-              </p>
-            </div>
-          </div>
+          <SectionHeading
+            title={t("nav.files")}
+            description={t("learn.filesText")}
+          >
+            {view && refresh}
+          </SectionHeading>
           {owner && (
             <div className="upload-layout">
-            <form
-              className="video-upload"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const values = new FormData(form),
-                  file = values.get("file") as File;
-                if (file?.size)
-                  await attach(
-                    String(values.get("assignmentId") || "") || null,
-                    file,
-                  );
-              }}
-            >
-              <div className="form-field">
-                <Label htmlFor="material-assignment">Bağlı ödev</Label>
-                <Select name="assignmentId" defaultValue="">
-                  <SelectTrigger id="material-assignment">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Genel ders materyali</SelectItem>
-                    {data.assignments.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <label>
-                PDF veya görsel
-                <input
-                  name="file"
-                  type="file"
-                  accept="application/pdf,image/jpeg,image/png,image/webp"
-                  required
-                  disabled={busy || !capabilities?.files}
-                />
-              </label>
-              <small>PDF, JPG, PNG veya WebP · en fazla 10 MB.</small>
-              <button
-                className="primary-button"
-                disabled={busy || !capabilities?.files}
-              >
-                {busy && <Spinner />}
-                {busy ? "Yükleniyor…" : "Dosya yükle"}
-              </button>
-            </form>
-            <UploadAside kind="files" />
+              <Card className="gap-5">
+                <CardHeader>
+                  <CardTitle>{t("learn.uploadFile")}</CardTitle>
+                  <CardDescription>{t("learn.uploadFileHint")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    className="grid gap-4"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const values = new FormData(e.currentTarget),
+                        file = values.get("file") as File,
+                        target = String(values.get("assignmentId") || "");
+                      if (file?.size)
+                        await attach(
+                          target === GENERAL ? null : target || null,
+                          file,
+                        );
+                    }}
+                  >
+                    <div className="grid gap-2">
+                      <Label htmlFor="material-assignment">
+                        {t("learn.linkedAssignment")}
+                      </Label>
+                      <Select name="assignmentId" defaultValue={GENERAL}>
+                        <SelectTrigger
+                          id="material-assignment"
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={GENERAL}>
+                            {t("learn.generalMaterial")}
+                          </SelectItem>
+                          {data.assignments.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="material-file">
+                        {t("learn.pdfOrImage")}
+                      </Label>
+                      <Input
+                        id="material-file"
+                        name="file"
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        required
+                        disabled={busy || !capabilities?.files}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        {t("learn.fileLimits")}
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      className="justify-self-start"
+                      disabled={busy || !capabilities?.files}
+                    >
+                      {busy ? <Spinner /> : <Upload />}
+                      {busy ? t("learn.uploading") : t("learn.uploadFile")}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+              <UploadAside kind="files" />
             </div>
           )}
-          <div className="learning-list">
+          <ItemGroup className="gap-3">
             {!data.materials.length && (
-              <p className="learning-empty">
-                Henüz dosya yok. Eklenen PDF ve materyaller burada görünecek.
-              </p>
+              <EmptyNote icon={FileText} title={t("learn.noFiles")}>
+                {t("learn.noFilesHint")}
+              </EmptyNote>
             )}
             {data.materials.map((file) => (
-              <article key={file.id}>
-                <div className="learning-row">
-                  <div className="learning-row-main">
-                    <h3>{file.name}</h3>
-                    <p>
-                      {file.assignment_id
-                        ? data.assignments.find(
-                            (a) => a.id === file.assignment_id,
-                          )?.title
-                        : "Genel ders materyali"}{" "}
-                      · {Math.ceil(Number(file.size_bytes) / 1024)} KB
-                    </p>
-                  </div>
-                <div className="learning-actions learning-actions-aligned">
+              <Item variant="outline" className="bg-card" key={file.id}>
+                <ItemMedia variant="icon">
+                  {isImageName(file.name) ? <ImageIcon /> : <FileText />}
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle className="max-w-full">
+                    <span className="truncate">{file.name}</span>
+                  </ItemTitle>
+                  <ItemDescription>
+                    {file.assignment_id
+                      ? data.assignments.find(
+                          (a) => a.id === file.assignment_id,
+                        )?.title
+                      : t("learn.generalMaterial")}{" "}
+                    · {Math.ceil(Number(file.size_bytes) / 1024)} KB
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions className="ml-auto gap-1">
                   {file.status === "READY" && !file.delete_requested ? (
                     <>
                       <IconAction
-                        label="Önizle"
-                        icon={<Eye size={16} />}
+                        label={t("learn.preview")}
+                        icon={<Eye />}
                         disabled={busy}
                         onClick={() => void openPreview(file)}
                       />
                       <IconAction
-                        label="Dosyayı indir"
-                        icon={<Download size={16} />}
+                        label={t("learn.download")}
+                        icon={<Download />}
                         onClick={() => void download(file)}
                       />
                     </>
                   ) : (
-                    <span className="learning-state">
+                    <ToneBadge tone="warn" className="mr-1">
                       {file.delete_requested
-                        ? "Silme bekliyor"
-                        : "Yükleme tamamlanmadı"}
-                    </span>
+                        ? t("learn.deletePending")
+                        : t("learn.uploadIncomplete")}
+                    </ToneBadge>
                   )}
                   {owner && (
                     <IconAction
                       danger
                       label={
-                        file.delete_requested ? "Silmeyi yeniden dene" : "Sil"
+                        file.delete_requested
+                          ? t("learn.retryDelete")
+                          : t("common.delete")
                       }
-                      icon={<Trash2 size={16} />}
+                      icon={<Trash2 />}
                       disabled={busy}
                       onClick={() => void remove(file)}
                     />
                   )}
-                </div>
-                </div>
-              </article>
+                </ItemActions>
+              </Item>
             ))}
-          </div>
+          </ItemGroup>
         </>
       )}
       {tab === "videos" && (
         <>
-          <div className="learning-heading">
-            <div>
-              <h2>Dersi yeniden keşfedin</h2>
-              <p>Videoyu izleyin; sorularınızı ilgili saniyeye ekleyin.</p>
-            </div>
-          </div>
+          <SectionHeading
+            title={t("learn.videosTitle")}
+            description={t("learn.videosText")}
+          >
+            {view && refresh}
+          </SectionHeading>
           {owner && (
             <div className="upload-layout">
-            <form
-              className="video-upload"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!capabilities?.videos) return;
-                const f = new FormData(e.currentTarget),
-                  file = f.get("file") as File;
-                if (!file?.size) return;
-                setBusy(true);
-                setError("");
-                setProgress(0);
-                try {
-                  const fingerprint = [
-                    file.name,
-                    file.size,
-                    file.lastModified,
-                    f.get("title"),
-                    f.get("duration"),
-                    f.get("lessonId"),
-                    studentId,
-                  ].join(":");
-                  let upload = uploadSession.current;
-                  if (upload?.fingerprint !== fingerprint) {
-                    const r = await backend<{ data: VideoReservation }>(
-                      media + "/videos",
-                      {
-                        title: f.get("title"),
-                        lessonId: f.get("lessonId") || null,
-                        sizeBytes: file.size,
-                        maxDurationSeconds: Number(f.get("duration")) * 60,
-                      },
-                    );
-                    upload = {
-                      fingerprint,
-                      id: r.data.id,
-                      url: r.data.uploadUrl,
-                    };
-                    uploadSession.current = upload;
-                  }
-                  await uploadTus(
-                    upload!.url,
-                    { size: file.size, slice: (a, b) => file.slice(a, b) },
-                    { onProgress: setProgress },
-                  );
-                  await backend(media + `/videos/${upload!.id}/refresh`, {});
-                  uploadSession.current = null;
-                  await reload();
-                } catch (e) {
-                  setError((e as Error).message);
-                  await reload();
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <div className="form-field">
-                <Label htmlFor="video-lesson">Ders</Label>
-                <Select name="lessonId" defaultValue="">
-                  <SelectTrigger id="video-lesson">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Genel ders videosu</SelectItem>
-                    {data.lessons.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.topic} · {dayLabel(l.starts_at)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <label>
-                Video başlığı
-                <input name="title" required maxLength={150} />
-              </label>
-              <label>
-                En fazla süre (dakika)
-                <input
-                  name="duration"
-                  type="number"
-                  min={1}
-                  max={120}
-                  defaultValue={60}
-                  required
-                />
-              </label>
-              <label>
-                Video dosyası
-                <input
-                  name="file"
-                  type="file"
-                  accept="video/*"
-                  disabled={busy || !capabilities?.videos}
-                  required
-                />
-              </label>
-              <small>
-                En fazla 2 GB. Yükleme kesilirse aynı dosya ile tekrar deneyin.
-              </small>
-              {progress !== null && (
-                <progress
-                  max={1}
-                  value={progress}
-                  aria-label="Video yükleme ilerlemesi"
-                />
-              )}
-              <button
-                className="primary-button"
-                disabled={busy || !capabilities?.videos}
-              >
-                {busy && <Spinner />}
-                {busy
-                  ? `Yükleniyor · %${Math.round((progress || 0) * 100)}`
-                  : "Videoyu yükle"}
-              </button>
-            </form>
-            <UploadAside kind="videos" />
+              <Card className="gap-5">
+                <CardHeader>
+                  <CardTitle>{t("learn.uploadVideo")}</CardTitle>
+                  <CardDescription>
+                    {t("learn.uploadVideoHint")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    className="grid gap-4"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!capabilities?.videos) return;
+                      const f = new FormData(e.currentTarget),
+                        file = f.get("file") as File,
+                        lesson = String(f.get("lessonId") || "");
+                      if (!file?.size) return;
+                      setBusy(true);
+                      setError("");
+                      setProgress(0);
+                      try {
+                        const fingerprint = [
+                          file.name,
+                          file.size,
+                          file.lastModified,
+                          f.get("title"),
+                          f.get("duration"),
+                          lesson,
+                          studentId,
+                        ].join(":");
+                        let upload = uploadSession.current;
+                        if (upload?.fingerprint !== fingerprint) {
+                          const r = await backend<{ data: VideoReservation }>(
+                            media + "/videos",
+                            {
+                              title: f.get("title"),
+                              lessonId:
+                                lesson === GENERAL ? null : lesson || null,
+                              sizeBytes: file.size,
+                              maxDurationSeconds:
+                                Number(f.get("duration")) * 60,
+                            },
+                          );
+                          upload = {
+                            fingerprint,
+                            id: r.data.id,
+                            url: r.data.uploadUrl,
+                          };
+                          uploadSession.current = upload;
+                        }
+                        await uploadTus(
+                          upload!.url,
+                          {
+                            size: file.size,
+                            slice: (a, b) => file.slice(a, b),
+                          },
+                          { onProgress: setProgress },
+                        );
+                        await backend(
+                          media + `/videos/${upload!.id}/refresh`,
+                          {},
+                        );
+                        uploadSession.current = null;
+                        await reload();
+                      } catch (e) {
+                        setError((e as Error).message);
+                        await reload();
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    <div className="grid gap-2">
+                      <Label htmlFor="video-lesson">{t("learn.lesson")}</Label>
+                      <Select name="lessonId" defaultValue={GENERAL}>
+                        <SelectTrigger id="video-lesson" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={GENERAL}>
+                            {t("learn.generalVideo")}
+                          </SelectItem>
+                          {data.lessons.map((l) => (
+                            <SelectItem key={l.id} value={l.id}>
+                              {l.topic} · {dayLabel(l.starts_at)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
+                      <div className="grid gap-2">
+                        <Label htmlFor="video-title">
+                          {t("learn.videoTitle")}
+                        </Label>
+                        <Input
+                          id="video-title"
+                          name="title"
+                          required
+                          maxLength={150}
+                          placeholder={t("learn.videoTitlePlaceholder")}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="video-duration">
+                          {t("learn.maxDuration")}
+                        </Label>
+                        <Input
+                          id="video-duration"
+                          name="duration"
+                          type="number"
+                          min={1}
+                          max={120}
+                          defaultValue={60}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="video-file">{t("learn.videoFile")}</Label>
+                      <Input
+                        id="video-file"
+                        name="file"
+                        type="file"
+                        accept="video/*"
+                        disabled={busy || !capabilities?.videos}
+                        required
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        {t("learn.videoLimits")}
+                      </p>
+                    </div>
+                    {progress !== null && (
+                      <Progress
+                        value={Math.round(progress * 100)}
+                        aria-label={t("learn.uploadProgress")}
+                      />
+                    )}
+                    <Button
+                      type="submit"
+                      className="justify-self-start"
+                      disabled={busy || !capabilities?.videos}
+                    >
+                      {busy ? <Spinner /> : <Upload />}
+                      {busy
+                        ? t("learn.uploadingPercent", {
+                            percent: Math.round((progress || 0) * 100),
+                          })
+                        : t("learn.uploadVideoSubmit")}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+              <UploadAside kind="videos" />
             </div>
           )}
-          <div className="learning-list">
+          <ItemGroup className="gap-3">
             {!data.videos.length && (
-              <p className="learning-empty">
-                Hazır olduğunda ders videoları burada görünecek.
-              </p>
+              <EmptyNote icon={VideoIcon} title={t("learn.noVideos")}>
+                {t("learn.noVideosHint")}
+              </EmptyNote>
             )}
-            {data.videos.map((v) => (
-              <article key={v.id}>
-                <div className="learning-row">
-                  <div className="learning-row-main">
-                    <div className="learning-card-heading">
-                      <h3>{v.title}</h3>
-                      <span className="eyebrow">
-                        {v.delete_requested
-                          ? "SİLME BEKLİYOR"
-                          : v.status === "READY"
-                            ? `${Math.ceil((v.duration_seconds || 0) / 60)} DK`
-                            : v.status === "FAILED"
-                              ? "YÜKLENEMEDİ"
-                              : "HAZIRLANIYOR"}
-                      </span>
-                    </div>
-                  </div>
-                <div className="learning-actions learning-actions-aligned">
-                  {v.status === "READY" && !v.delete_requested && (
-                    <IconAction
-                      label="Videoyu aç"
-                      icon={<Play size={16} />}
-                      onClick={() => setActiveVideo(v)}
-                    />
-                  )}
-                  {owner && (
-                    <>
-                      <IconAction
-                        label="Durumu yenile"
-                        icon={<RefreshCw size={16} />}
-                        disabled={busy}
-                        onClick={async () => {
-                          setBusy(true);
-                          try {
-                            await backend(
-                              media + `/videos/${v.id}/refresh`,
-                              {},
-                            );
-                            await reload();
-                          } catch (e) {
-                            setError((e as Error).message);
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      />
-                      <IconAction
-                        danger
-                        label="Sil"
-                        icon={<Trash2 size={16} />}
-                        disabled={busy}
-                        onClick={() =>
-                          setConfirmation({
-                            title: "Video silinsin mi?",
-                            description:
-                              "Kayıt kalıcı olarak kaldırılacak. Öğrenci artık izleyemeyecek.",
-                            action: "Sil",
-                            perform: async () => {
-                              setBusy(true);
-                              try {
-                                await backend(
-                                  media + `/videos/${v.id}/delete`,
-                                  {},
-                                );
-                                await reload();
-                              } catch (e) {
-                                setError((e as Error).message);
-                              } finally {
-                                setBusy(false);
-                              }
-                            },
+            {data.videos.map((v) => {
+              const questions = data.questions.filter(
+                (q) => q.video_id === v.id,
+              );
+              return (
+                <Item
+                  variant="outline"
+                  className="bg-card"
+                  key={v.id}
+                  data-notice-target={v.id}
+                >
+                  <ItemMedia variant="icon">
+                    <VideoIcon />
+                  </ItemMedia>
+                  <ItemContent className="min-w-36">
+                    <ItemTitle>{v.title}</ItemTitle>
+                    <ItemDescription>
+                      {v.status === "READY"
+                        ? t("learn.minutes", {
+                            count: Math.ceil((v.duration_seconds || 0) / 60),
                           })
+                        : t("learn.videoProcessing")}
+                      {questions.length > 0 &&
+                        " · " +
+                          t("learn.questionCount", { count: questions.length })}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions className="ml-auto gap-1">
+                    {(v.delete_requested || v.status !== "READY") && (
+                      <ToneBadge
+                        className="mr-1"
+                        tone={
+                          v.delete_requested || v.status === "FAILED"
+                            ? "danger"
+                            : "warn"
                         }
+                      >
+                        {v.delete_requested
+                          ? t("learn.deletePending")
+                          : v.status === "FAILED"
+                            ? t("learn.videoFailed")
+                            : t("learn.videoPreparing")}
+                      </ToneBadge>
+                    )}
+                    {v.status === "READY" && !v.delete_requested && (
+                      <IconAction
+                        label={t("learn.openVideo")}
+                        icon={<Play />}
+                        onClick={() => setActiveVideo(v)}
                       />
-                    </>
-                  )}
-                </div>
-                </div>
-                {data.questions
-                  .filter((q) => q.video_id === v.id)
-                  .map((q) => (
-                    <div className="video-question" key={q.id}>
-                      <strong>
-                        {Math.floor(q.at_seconds / 60)}:
-                        {String(q.at_seconds % 60).padStart(2, "0")} · Soru
-                      </strong>
-                      <p>{q.body}</p>
-                      {q.answer && (
-                        <p className="feedback">
-                          {q.answer} {q.resolved ? "✓" : ""}
-                        </p>
-                      )}
-                      {owner && (
-                        <button
-                          className="secondary-button"
+                    )}
+                    {owner && (
+                      <>
+                        <IconAction
+                          label={t("sub.refresh")}
+                          icon={<RefreshCw />}
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await backend(
+                                media + `/videos/${v.id}/refresh`,
+                                {},
+                              );
+                              await reload();
+                            } catch (e) {
+                              setError((e as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        />
+                        <IconAction
+                          danger
+                          label={t("common.delete")}
+                          icon={<Trash2 />}
+                          disabled={busy}
                           onClick={() =>
-                            simple(
-                              "Video sorusunu yanıtla",
-                              [
-                                {
-                                  name: "answer",
-                                  label: "Yanıtınız",
-                                  type: "textarea",
-                                  value: q.answer,
-                                },
-                              ],
-                              (val) => ({
-                                action: "question.answer",
-                                questionId: q.id,
-                                answer: val.answer,
-                                resolved: true,
-                                version: q.version,
-                              }),
-                            )
+                            setConfirmation({
+                              title: t("learn.deleteVideoTitle"),
+                              description: t("learn.deleteVideoBody"),
+                              action: t("common.delete"),
+                              perform: async () => {
+                                setBusy(true);
+                                try {
+                                  await backend(
+                                    media + `/videos/${v.id}/delete`,
+                                    {},
+                                  );
+                                  await reload();
+                                } catch (e) {
+                                  setError((e as Error).message);
+                                } finally {
+                                  setBusy(false);
+                                }
+                              },
+                            })
                           }
-                        >
-                          Yanıtla
-                        </button>
-                      )}
+                        />
+                      </>
+                    )}
+                  </ItemActions>
+                  {questions.length > 0 && (
+                    <div className="grid basis-full gap-3 border-t pt-4">
+                      {questions.map((q) => (
+                        <div className="grid gap-2 text-sm" key={q.id}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="tabular-nums">
+                              {Math.floor(q.at_seconds / 60)}:
+                              {String(q.at_seconds % 60).padStart(2, "0")}
+                            </Badge>
+                            <span className="font-medium">
+                              {t("learn.studentQuestion")}
+                            </span>
+                            {q.resolved && (
+                              <ToneBadge tone="ok">
+                                {t("learn.answered")}
+                              </ToneBadge>
+                            )}
+                          </div>
+                          <p className="leading-relaxed">{q.body}</p>
+                          {q.answer && (
+                            <p className="bg-muted/50 rounded-md border p-3 leading-relaxed">
+                              {q.answer}
+                            </p>
+                          )}
+                          {owner && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="justify-self-start"
+                              onClick={() =>
+                                simple(
+                                  t("learn.answerTitle"),
+                                  [
+                                    {
+                                      name: "answer",
+                                      label: t("learn.yourReply"),
+                                      type: "textarea",
+                                      value: q.answer,
+                                    },
+                                  ],
+                                  (val) => ({
+                                    action: "question.answer",
+                                    questionId: q.id,
+                                    answer: val.answer,
+                                    resolved: true,
+                                    version: q.version,
+                                  }),
+                                )
+                              }
+                            >
+                              <MessageSquare />
+                              {q.answer
+                                ? t("learn.editAnswer")
+                                : t("learn.reply")}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-              </article>
-            ))}
-          </div>
+                  )}
+                </Item>
+              );
+            })}
+          </ItemGroup>
         </>
       )}
       {tab === "notes" && (
         <>
-          <div className="learning-heading">
-            <div>
-              <h2>Gelişim günlüğü</h2>
-              <p>Paylaşılan notlar ve öğretmen onaylı haftalık özetler.</p>
-            </div>
-          </div>
-          {owner && (
-            <div className="learning-actions">
-              <button
-                className="primary-button"
-                onClick={() =>
-                  simple(
-                    "Not paylaş",
-                    [
-                      { name: "body", label: "Notunuz", type: "textarea" },
-                      {
-                        name: "audience",
-                        label: "Kim görebilsin?",
-                        value: "BOTH",
-                        options: [
-                          { value: "BOTH", label: "Öğrenci ve veli" },
-                          { value: "STUDENT", label: "Yalnız öğrenci" },
-                        ],
-                      },
-                    ],
-                    (v) => ({ action: "note.publish", ...v }),
-                  )
-                }
-              >
-                Not paylaş
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() =>
-                  simple(
-                    "Haftalık özet hazırla",
-                    [
-                      {
-                        name: "weekOn",
-                        label: "Hafta başlangıcı",
-                        type: "date",
-                        value: dateKey(),
-                      },
-                    ],
-                    (v) => ({ action: "summary.draft", weekOn: v.weekOn }),
-                  )
-                }
-              >
-                Özet taslağı hazırla
-              </button>
-            </div>
-          )}
-          <div className="learning-list">
+          <SectionHeading
+            title={t("learn.notesTitle")}
+            description={t("learn.notesText")}
+          >
+            {view && refresh}
+            {owner && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    simple(
+                      t("learn.summaryTitle"),
+                      [
+                        {
+                          name: "weekOn",
+                          label: t("learn.weekStart"),
+                          type: "date",
+                          value: dateKey(),
+                        },
+                      ],
+                      (v) => ({ action: "summary.draft", weekOn: v.weekOn }),
+                    )
+                  }
+                >
+                  <Sparkles /> {t("learn.draftSummary")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    simple(
+                      t("learn.shareNote"),
+                      [
+                        {
+                          name: "body",
+                          label: t("learn.yourNote"),
+                          type: "textarea",
+                        },
+                        {
+                          name: "audience",
+                          label: t("learn.audience"),
+                          value: "BOTH",
+                          options: [
+                            { value: "BOTH", label: t("learn.audienceBoth") },
+                            {
+                              value: "STUDENT",
+                              label: t("learn.audienceStudent"),
+                            },
+                          ],
+                        },
+                      ],
+                      (v) => ({ action: "note.publish", ...v }),
+                    )
+                  }
+                >
+                  <Plus /> {t("learn.shareNote")}
+                </Button>
+              </>
+            )}
+          </SectionHeading>
+          <ItemGroup className="gap-3">
             {!data.notes.length && !data.summaries.length && (
-              <p className="learning-empty">Paylaşılan bir not henüz yok.</p>
+              <EmptyNote icon={NotebookPen} title={t("learn.noNotes")}>
+                {t("learn.noNotesHint")}
+              </EmptyNote>
             )}
             {data.summaries.map((s) => (
-              <article key={s.id}>
-                <span className="eyebrow">
-                  HAFTALIK ÖZET ·{" "}
-                  {s.status === "DRAFT" ? "TASLAK" : "PAYLAŞILDI"}
-                </span>
-                <h3>{dayLabel(s.week_on + "T12:00:00+03:00")} haftası</h3>
-                <p className="preserve-lines">{s.body}</p>
-                {owner && (
-                  <button
-                    className="secondary-button"
-                    onClick={() =>
-                      simple(
-                        "Özeti incele ve paylaş",
-                        [
-                          {
-                            name: "body",
-                            label: "Özet",
-                            type: "textarea",
-                            value: s.body,
-                          },
-                        ],
-                        (v) => ({
-                          action: "summary.publish",
-                          summaryId: s.id,
-                          body: v.body,
-                          version: s.version,
-                        }),
-                      )
-                    }
-                  >
+              <Item
+                variant="outline"
+                className="bg-card items-start"
+                key={s.id}
+                data-notice-target={s.id}
+              >
+                <ItemMedia variant="icon">
+                  <Sparkles />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle>
+                    {t("learn.weekOf", {
+                      date: dayLabel(s.week_on + "T12:00:00+03:00"),
+                    })}
+                  </ItemTitle>
+                  <ItemDescription>{t("learn.weeklySummary")}</ItemDescription>
+                </ItemContent>
+                <ItemActions className="ml-auto">
+                  <ToneBadge tone={s.status === "DRAFT" ? "warn" : "ok"}>
                     {s.status === "DRAFT"
-                      ? "Düzenle ve onayla"
-                      : "Özeti güncelle"}
-                  </button>
+                      ? t("learn.draft")
+                      : t("learn.shared")}
+                  </ToneBadge>
+                </ItemActions>
+                <p className="basis-full text-sm leading-relaxed whitespace-pre-line">
+                  {s.body}
+                </p>
+                {owner && (
+                  <ItemFooter className="justify-start border-t pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        simple(
+                          t("learn.reviewSummary"),
+                          [
+                            {
+                              name: "body",
+                              label: t("learn.summary"),
+                              type: "textarea",
+                              value: s.body,
+                            },
+                          ],
+                          (v) => ({
+                            action: "summary.publish",
+                            summaryId: s.id,
+                            body: v.body,
+                            version: s.version,
+                          }),
+                        )
+                      }
+                    >
+                      <Pencil />
+                      {s.status === "DRAFT"
+                        ? t("learn.editApprove")
+                        : t("learn.updateSummary")}
+                    </Button>
+                  </ItemFooter>
                 )}
-              </article>
+              </Item>
             ))}
             {data.notes.map((n) => (
-              <article key={n.id}>
-                <span className="eyebrow">
-                  {n.audience === "BOTH" ? "ÖĞRENCİ VE VELİ" : "ÖĞRENCİ"}
-                </span>
-                <p className="preserve-lines">{n.body}</p>
-                <small>{dayLabel(n.created_at)}</small>
-              </article>
+              <Item
+                variant="outline"
+                className="bg-card items-start"
+                key={n.id}
+              >
+                <ItemMedia variant="icon">
+                  <NotebookPen />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle>{t("learn.teacherNote")}</ItemTitle>
+                  <ItemDescription>{dayLabel(n.created_at)}</ItemDescription>
+                </ItemContent>
+                <ItemActions className="ml-auto">
+                  <ToneBadge tone="muted">
+                    {n.audience === "BOTH"
+                      ? t("learn.audienceBoth")
+                      : t("roles.STUDENT")}
+                  </ToneBadge>
+                </ItemActions>
+                <p className="basis-full text-sm leading-relaxed whitespace-pre-line">
+                  {n.body}
+                </p>
+              </Item>
             ))}
-          </div>
+          </ItemGroup>
         </>
       )}
       {tab === "payments" && "packages" in data && (
-        <div className="learning-list">
-          <article>
-            <span className="eyebrow">AÇIK BAKİYE</span>
-            <h2>
-              {money(
-                data.packages.reduce((n, p) => n + Number(p.price_minor), 0) -
-                  data.payments
-                    .filter((p) => !p.voided_at)
-                    .reduce((n, p) => n + Number(p.amount_minor), 0),
-              )}
-            </h2>
-            <p>Öğretmeninizin kaydettiği paket ve tahsilatlara göre.</p>
-          </article>
-          {data.packages.map((p) => (
-            <article key={p.id}>
-              <h3>{p.name}</h3>
-              <p>
-                {p.remaining} / {p.granted} ders hakkı · {money(p.price_minor)}
-              </p>
-            </article>
-          ))}
-          {data.payments.map((p) => (
-            <article key={p.id}>
-              <h3>{money(p.amount_minor)}</h3>
-              <p>
-                {dayLabel(p.received_on + "T12:00:00+03:00")} ·{" "}
-                {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
-              </p>
-            </article>
-          ))}
-        </div>
+        <>
+          <SectionHeading
+            title={t("learn.paymentsTitle")}
+            description={t("portal.balanceGuardian")}
+          >
+            {view && refresh}
+          </SectionHeading>
+          <ItemGroup className="gap-3">
+            <Card className="gap-1 py-5">
+              <CardHeader className="px-5">
+                <CardDescription>{t("students.openBalance")}</CardDescription>
+                <CardTitle className="text-2xl tabular-nums">
+                  {money(
+                    data.packages.reduce(
+                      (n, p) => n + Number(p.price_minor),
+                      0,
+                    ) -
+                      data.payments
+                        .filter((p) => !p.voided_at)
+                        .reduce((n, p) => n + Number(p.amount_minor), 0),
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground px-5 text-sm">
+                {t("learn.balanceBasis")}
+              </CardContent>
+            </Card>
+            {data.packages.map((p) => (
+              <Item variant="outline" className="bg-card" key={p.id}>
+                <ItemMedia variant="icon">
+                  <Package />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle>{p.name}</ItemTitle>
+                  <ItemDescription>
+                    {t("learn.creditsOf", {
+                      remaining: p.remaining,
+                      count: p.granted,
+                    })}{" "}
+                    · {money(p.price_minor)}
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
+            ))}
+            {data.payments.map((p) => (
+              <Item variant="outline" className="bg-card" key={p.id}>
+                <ItemMedia variant="icon">
+                  <Wallet />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle className="tabular-nums">
+                    {money(p.amount_minor)}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {dayLabel(p.received_on + "T12:00:00+03:00")}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions className="ml-auto">
+                  <ToneBadge tone={p.voided_at ? "muted" : "ok"}>
+                    {p.voided_at ? t("lesson.cancelled") : t("learn.paid")}
+                  </ToneBadge>
+                </ItemActions>
+              </Item>
+            ))}
+          </ItemGroup>
+        </>
       )}
       {tab === "access" && owner && (
         <>
-          <div className="learning-heading">
-            <div>
-              <h2>Öğrenci ve veli erişimi</h2>
-              <p>
-                Davet yalnızca belirtilen, doğrulanmış e-posta hesabıyla kabul
-                edilir.
-              </p>
-            </div>
-          </div>
-          <button
-            className="primary-button"
-            onClick={() => setForm(inviteSpec())}
+          <SectionHeading
+            title={t("learn.accessTitle")}
+            description={t("learn.accessText")}
           >
-            Davet oluştur
-          </button>
+            <Button type="button" onClick={() => setForm(inviteSpec())}>
+              <UserPlus /> {t("learn.createInvite")}
+            </Button>
+          </SectionHeading>
           {invite && (
-            <div className="invite-link">
-              <p className="invite-state">
-                {invite.emailed
-                  ? `Davet ${invite.email} adresine e-posta ile gönderildi. Ulaşmadıysa aşağıdaki bağlantıyı kendiniz iletebilirsiniz.`
-                  : "E-posta gönderimi kapalı; bağlantıyı aşağıdan kopyalayıp iletin."}
-              </p>
-              <label>
-                Davet bağlantısı · 7 gün geçerli
-                <input
-                  readOnly
-                  value={invite.url}
-                  onFocus={(e) => e.target.select()}
-                />
-              </label>
-              <div className="invite-actions">
-                <button
-                  className="secondary-button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(invite.url);
-                    } catch {
-                      setError("Bağlantıyı seçip kopyalayın.");
-                    }
-                  }}
-                >
-                  <Copy size={15} /> Kopyala
-                </button>
+            <Card className="gap-4 py-5">
+              <CardContent className="grid gap-4 px-5">
+                <FormSuccess>
+                  {invite.emailed
+                    ? t("learn.inviteEmailed", { email: invite.email })
+                    : t("learn.inviteNoEmail")}
+                </FormSuccess>
+                <div className="grid gap-2">
+                  <Label htmlFor="invite-url">{t("learn.inviteLink")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="invite-url"
+                      readOnly
+                      value={invite.url}
+                      className="text-ellipsis"
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(invite.url);
+                        } catch {
+                          setError(t("learn.copyManually"));
+                        }
+                      }}
+                    >
+                      <Copy /> {t("learn.copy")}
+                    </Button>
+                  </div>
+                </div>
                 {whatsappNumber(studentPhone || "") && (
-                  <a
-                    className="secondary-button whatsapp-button"
-                    href={whatsappInviteUrl(
-                      studentPhone || "",
-                      studentName || "",
-                      invite.url,
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Button
+                    variant="outline"
+                    className="justify-self-start"
+                    asChild
                   >
-                    <WhatsappIcon /> WhatsApp ile gönder
-                  </a>
+                    <a
+                      href={whatsappInviteUrl(
+                        studentPhone || "",
+                        studentName || "",
+                        invite.url,
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <WhatsappIcon /> {t("learn.sendWhatsapp")}
+                    </a>
+                  </Button>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
-          <div className="learning-list">
+          <ItemGroup className="gap-3">
+            {access && !access.data?.length && !access.invitations?.length && (
+              <EmptyNote icon={UserPlus} title={t("learn.noInvites")}>
+                {t("learn.noInvitesHint")}
+              </EmptyNote>
+            )}
             {access?.data?.map((a) => (
-              <article key={a.id}>
-                <h3>
-                  {a.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
-                </h3>
-                <p>{a.revokedAt ? "Kaldırıldı" : "Etkin"}</p>
-                {!a.revokedAt && (
-                  <button
-                    className="text-danger"
-                    onClick={() =>
-                      setConfirmation({
-                        title: "Erişim kaldırılsın mı?",
-                        description:
-                          "Bu hesap öğrencinin ödev, dosya ve videolarını artık göremeyecek.",
-                        action: "Kaldır",
-                        perform: async () => {
+              <Item variant="outline" className="bg-card" key={a.id}>
+                <ItemMedia variant="icon">
+                  <UserCheck />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle>
+                    {a.role === "STUDENT"
+                      ? t("learn.studentAccess")
+                      : t("learn.guardianAccess")}
+                  </ItemTitle>
+                </ItemContent>
+                <ItemActions className="ml-auto">
+                  <ToneBadge tone={a.revokedAt ? "muted" : "ok"}>
+                    {a.revokedAt ? t("learn.removed") : t("sub.status.active")}
+                  </ToneBadge>
+                  {!a.revokedAt && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() =>
+                        setConfirmation({
+                          title: t("learn.revokeTitle"),
+                          description: t("learn.revokeBody"),
+                          action: t("learn.remove"),
+                          perform: async () => {
+                            try {
+                              await backend(
+                                `/workspaces/${workspaceId}/students/${studentId}/access/revoke`,
+                                { id: a.id, kind: "link" },
+                              );
+                              await accessReload();
+                            } catch (e) {
+                              setError((e as Error).message);
+                            }
+                          },
+                        })
+                      }
+                    >
+                      {t("learn.revokeAccess")}
+                    </Button>
+                  )}
+                </ItemActions>
+              </Item>
+            ))}
+            {access?.invitations?.map((a) => {
+              const expired = a.expiresAt < new Date().toISOString();
+              return (
+                <Item variant="outline" className="bg-card" key={a.id}>
+                  <ItemMedia variant="icon">
+                    <Mail />
+                  </ItemMedia>
+                  <ItemContent className="min-w-36">
+                    <ItemTitle className="max-w-full">
+                      <span className="truncate">{a.email}</span>
+                    </ItemTitle>
+                    <ItemDescription>
+                      {a.role === "GUARDIAN"
+                        ? t("learn.guardianInvite")
+                        : t("learn.studentInvite")}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions className="ml-auto">
+                    <ToneBadge
+                      tone={
+                        a.acceptedAt
+                          ? "ok"
+                          : a.revokedAt || expired
+                            ? "muted"
+                            : "warn"
+                      }
+                    >
+                      {a.acceptedAt
+                        ? t("learn.accepted")
+                        : a.revokedAt
+                          ? t("lesson.cancelled")
+                          : expired
+                            ? t("learn.expired")
+                            : t("learn.invitePending")}
+                    </ToneBadge>
+                    {!a.acceptedAt && !a.revokedAt && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={async () => {
                           try {
                             await backend(
                               `/workspaces/${workspaceId}/students/${studentId}/access/revoke`,
-                              { id: a.id, kind: "link" },
+                              { id: a.id, kind: "invitation" },
                             );
                             await accessReload();
                           } catch (e) {
                             setError((e as Error).message);
                           }
-                        },
-                      })
-                    }
-                  >
-                    Erişimi kaldır
-                  </button>
-                )}
-              </article>
-            ))}
-            {access?.invitations?.map((a) => (
-              <article key={a.id}>
-                <h3>{a.email}</h3>
-                <p>
-                  {a.acceptedAt
-                    ? "Kabul edildi"
-                    : a.revokedAt
-                      ? "İptal edildi"
-                      : new Date(a.expiresAt) < new Date()
-                        ? "Süresi doldu"
-                        : "Davet bekliyor"}
-                </p>
-                {!a.acceptedAt && !a.revokedAt && (
-                  <button
-                    className="text-danger"
-                    onClick={async () => {
-                      try {
-                        await backend(
-                          `/workspaces/${workspaceId}/students/${studentId}/access/revoke`,
-                          { id: a.id, kind: "invitation" },
-                        );
-                        await accessReload();
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
-                  >
-                    Daveti iptal et
-                  </button>
-                )}
-              </article>
-            ))}
-          </div>
+                        }}
+                      >
+                        {t("learn.cancelInvite")}
+                      </Button>
+                    )}
+                  </ItemActions>
+                </Item>
+              );
+            })}
+          </ItemGroup>
         </>
       )}
       <ActionForm
@@ -1503,12 +1916,10 @@ export function LearningPanel({
           if (!open) setFilePreview(null);
         }}
       >
-        <DialogContent className="preview-dialog">
+        <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle>{filePreview?.file.name}</DialogTitle>
-            <DialogDescription>
-              Önizleme · dosyayı indirmeden içeriğine göz atın.
-            </DialogDescription>
+            <DialogDescription>{t("learn.previewHint")}</DialogDescription>
           </DialogHeader>
           {filePreview &&
             (isImageName(filePreview.file.name) ? (
@@ -1530,7 +1941,7 @@ export function LearningPanel({
               variant="outline"
               onClick={() => void download(filePreview!.file)}
             >
-              <Download size={16} /> Dosyayı indir
+              <Download size={16} /> {t("learn.download")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1541,12 +1952,10 @@ export function LearningPanel({
           if (!open) setActiveVideo(null);
         }}
       >
-        <DialogContent className="video-dialog">
+        <DialogContent className="sm:max-w-[850px]">
           <DialogHeader>
             <DialogTitle>{activeVideo?.title}</DialogTitle>
-            <DialogDescription>
-              Ders videosu ve zaman damgalı sorular.
-            </DialogDescription>
+            <DialogDescription>{t("learn.videoDialogHint")}</DialogDescription>
           </DialogHeader>
           {activeVideo && (
             <VideoPlayer
@@ -1567,11 +1976,13 @@ export function LearningPanel({
               }
               onAsk={(seconds) =>
                 simple(
-                  "Bu saniyeye soru ekle",
+                  t("video.askHere"),
                   [
                     {
                       name: "body",
-                      label: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} için sorunuz`,
+                      label: t("learn.questionAt", {
+                        time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
+                      }),
                       type: "textarea",
                     },
                   ],
@@ -1594,51 +2005,253 @@ export function LearningPanel({
     </section>
   );
 }
-export function Portal({
-  access,
-  switcher,
-  onSignout,
+/** Seçimsiz "genel" seçenek. Radix Select boş değeri "seçim yok" sayıp
+ *  tetikleyiciyi boş bıraktığı için ayrı bir değerle temsil ediliyor. */
+const GENERAL = "general";
+
+function SectionHeading({
+  title,
+  description,
+  children,
 }: {
-  access: Access;
-  switcher?: React.ReactNode;
-  onSignout?: () => void;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <main className="portal-page">
-      <header className="portal-header">
-        <div>
-          <p className="eyebrow">
-            {access.role === "STUDENT"
-              ? "ÖĞRENCİ ÇALIŞMA ALANI"
-              : "VELİ TAKİP ALANI"}
-          </p>
-          <h1>{access.studentName}</h1>
-          <p>Her ders, yeni bir adım.</p>
-        </div>
-        <div className="portal-account">
-          {switcher}
-          <div className="portal-account-actions">
-            <ThemeToggle />
-            <AccountExtras />
-            {onSignout && (
-              <button className="secondary-button" onClick={onSignout}>
-                Çıkış yap
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-      <LearningPanel
-        workspaceId={access.id}
-        studentId={access.studentId!}
-        role={access.role as "STUDENT" | "GUARDIAN"}
-      />
-    </main>
+    <div className="flex items-center justify-between gap-4">
+      <div className="grid min-w-0 gap-1">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <p className="text-muted-foreground text-sm">{description}</p>
+      </div>
+      {children && (
+        <div className="flex shrink-0 items-center gap-2">{children}</div>
+      )}
+    </div>
   );
 }
-// Yükleme formu okunabilir genişlikte kalınca sağda geniş bir boşluk kalıyordu.
-// Oraya dekor yerine işin kendisine ait bilgi konuyor: akışın adımları, kabul
-// edilen dosya kuralları ve öğrencinin sonunda ne göreceği.
+
+type PortalLesson = PortalData["lessons"][number];
+
+/** Öğrenci/veli ders planı. Önce yaklaşan dersler gelir, en yakını üstte ve
+ *  fosforlu; sonra geçmiş dersler, en yenisi üstte. */
+function LessonSchedule({
+  lessons,
+  children,
+}: {
+  lessons: PortalLesson[];
+  /** Başlığın yanındaki düğmeler (yenile). */
+  children?: React.ReactNode;
+}) {
+  // Süren dersi ve "bugün/yarın" etiketini güncel tutmak için dakikada bir
+  // ilerleyen saat; öğretmen günlüğündeki ders satırlarıyla aynı yaklaşım.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const upcoming = lessons
+    .filter((l) => l.status === "SCHEDULED" && Date.parse(l.ends_at) > clock)
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const past = lessons
+    .filter((l) => !upcoming.includes(l))
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  const today = dateKey(new Date(clock)),
+    tomorrow = addDays(today, 1);
+  const day = (iso: string) => {
+    const key = dateKey(iso);
+    return key === today
+      ? t("common.today")
+      : key === tomorrow
+        ? t("common.tomorrow")
+        : dayLabel(iso, { weekday: "long" });
+  };
+  if (!lessons.length)
+    return (
+      <>
+        <SectionHeading
+          title={t("learn.scheduleTitle")}
+          description={t("learn.scheduleText")}
+        >
+          {children}
+        </SectionHeading>
+        <EmptyNote icon={CalendarDays} title={t("learn.noLessons")}>
+          {t("learn.noLessonsHint")}
+        </EmptyNote>
+      </>
+    );
+  return (
+    <>
+      <SectionHeading
+        title={t("learn.upcoming")}
+        description={t("learn.upcomingText")}
+      >
+        {children}
+      </SectionHeading>
+      <ItemGroup className="gap-3">
+        {upcoming.length ? (
+          upcoming.map((l, i) => (
+            <LessonItem
+              key={l.id}
+              lesson={l}
+              day={day(l.starts_at)}
+              chip={
+                i > 0
+                  ? undefined
+                  : Date.parse(l.starts_at) <= clock
+                    ? t("lesson.now")
+                    : t("learn.next")
+              }
+            />
+          ))
+        ) : (
+          <EmptyNote icon={CalendarDays} title={t("learn.noUpcoming")}>
+            {t("learn.noUpcomingHint")}
+          </EmptyNote>
+        )}
+      </ItemGroup>
+      {past.length > 0 && (
+        <>
+          <SectionHeading
+            title={t("learn.past")}
+            description={t("learn.pastText")}
+          />
+          <ItemGroup className="gap-3">
+            {past.map((l) => (
+              <LessonItem key={l.id} lesson={l} day={day(l.starts_at)} status />
+            ))}
+          </ItemGroup>
+        </>
+      )}
+    </>
+  );
+}
+
+function LessonItem({
+  lesson: l,
+  day,
+  chip,
+  status = false,
+}: {
+  lesson: PortalLesson;
+  day: string;
+  /** Sıradaki ya da süren ders: kart fosforlu, yanında bu etiket. */
+  chip?: string;
+  /** Geçmiş derslerde durum rozeti; yaklaşanların hepsi zaten planlı. */
+  status?: boolean;
+}) {
+  return (
+    <Item
+      variant="outline"
+      className={chip ? "border-(--marker) bg-(--marker-soft)" : "bg-card"}
+    >
+      <ItemMedia
+        variant="icon"
+        className={
+          chip ? "border-(--marker) bg-(--marker) text-(--marker-ink)" : ""
+        }
+      >
+        <CalendarDays />
+      </ItemMedia>
+      <ItemContent className="min-w-36">
+        <ItemTitle>{l.topic}</ItemTitle>
+        {/* Ayraç önceki parçaya bağlı kalsın; dar ekranda satır "·" ile
+            başlamasın. */}
+        <ItemDescription>
+          {day}
+          {"\u00a0· "}
+          {timeLabel(l.starts_at)}–{timeLabel(l.ends_at)}
+          {"\u00a0· "}
+          {l.location || t("lesson.noLocation")}
+        </ItemDescription>
+      </ItemContent>
+      {(chip || status) && (
+        <ItemActions className="ml-auto">
+          {chip && <span className="now-chip">{chip}</span>}
+          {status && (
+            <ToneBadge
+              tone={
+                l.status === "SCHEDULED"
+                  ? "info"
+                  : l.status === "COMPLETED"
+                    ? "ok"
+                    : "muted"
+              }
+            >
+              {l.status === "SCHEDULED"
+                ? t("lesson.scheduled")
+                : l.status === "COMPLETED"
+                  ? t("lesson.completed")
+                  : t("lesson.cancelled")}
+            </ToneBadge>
+          )}
+        </ItemActions>
+      )}
+    </Item>
+  );
+}
+
+function EmptyNote({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Empty className="border md:p-10">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon />
+        </EmptyMedia>
+        <EmptyTitle className="text-base">{title}</EmptyTitle>
+        <EmptyDescription>{children}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+/** Ödev satırındaki "Dosya ekle": gizli dosya girdisini açan sıradan bir
+ *  shadcn düğmesi; seçilen dosya hemen yüklenir. */
+function FilePicker({
+  busy,
+  disabled,
+  onPick,
+}: {
+  busy: boolean;
+  disabled: boolean;
+  onPick: (file: File) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+      >
+        {busy ? <Spinner /> : <Paperclip />}
+        {busy ? t("learn.uploading") : t("learn.addFile")}
+      </Button>
+      <input
+        ref={input}
+        type="file"
+        hidden
+        accept="application/pdf,image/jpeg,image/png,image/webp"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPick(file);
+          e.target.value = "";
+        }}
+      />
+    </>
+  );
+}
+
 // Liste satırlarındaki eylemler metin yerine ikon düğmesi: satır daralıyor,
 // adlar tooltip ve aria-label olarak kalıyor (yalnızca ikon erişilebilirliği
 // kaybettirmesin diye).
@@ -1648,12 +2261,14 @@ function IconAction({
   onClick,
   disabled,
   danger,
+  outline,
 }: {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  outline?: boolean;
 }) {
   return (
     <TooltipProvider>
@@ -1661,9 +2276,15 @@ function IconAction({
         <TooltipTrigger asChild>
           <Button
             type="button"
-            size="icon"
-            variant="outline"
-            className={"icon-action" + (danger ? " icon-action-danger" : "")}
+            size={outline ? "icon" : "icon-sm"}
+            variant={outline ? "outline" : "ghost"}
+            className={
+              danger
+                ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                : outline
+                  ? ""
+                  : "text-muted-foreground"
+            }
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
@@ -1694,8 +2315,10 @@ function whatsappNumber(raw: string) {
 
 function whatsappInviteUrl(phone: string, name: string, invite: string) {
   const text =
-    `Merhaba${name ? " " + name : ""}, Derslik'te size bir hesap tanımladım. ` +
-    `Aşağıdaki bağlantıdan 7 gün içinde giriş yapabilirsiniz:\n\n${invite}`;
+    (name ? t("learn.whatsappHelloName", { name }) : t("learn.whatsappHello")) +
+    " " +
+    t("learn.whatsappBody") +
+    `\n\n${invite}`;
   return `https://wa.me/${whatsappNumber(phone)}?text=${encodeURIComponent(text)}`;
 }
 
@@ -1703,56 +2326,163 @@ function isImageName(name: string) {
   return /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
 }
 
+// Yükleme formu okunabilir genişlikte kalınca sağda geniş bir boşluk kalıyordu.
+// Oraya dekor yerine işin kendisine ait bilgi konuyor: akışın adımları, kabul
+// edilen dosya kuralları ve öğrencinin sonunda ne göreceği.
 function UploadAside({ kind }: { kind: "files" | "videos" }) {
   const video = kind === "videos";
   const steps = video
-    ? ["Videonun ait olduğu dersi seçin.", "Dosyayı ekleyip süreyi doğrulayın.", "Yükleme bitince öğrenci izleyebilir."]
-    : ["Ödevi ya da genel materyali seçin.", "PDF veya görseli ekleyin.", "Dosya öğrencinin paneline düşer."];
+    ? [t("learn.videoStep1"), t("learn.videoStep2"), t("learn.videoStep3")]
+    : [t("learn.fileStep1"), t("learn.fileStep2"), t("learn.fileStep3")];
   const rules = video
-    ? ["MP4 veya MOV", "En fazla 2 GB", "En fazla 120 dakika"]
-    : ["PDF, JPG, PNG veya WebP", "En fazla 10 MB", "Ödeve ya da derse bağlanır"];
+    ? [t("learn.videoRule1"), t("learn.videoRule2"), t("learn.videoRule3")]
+    : ["PDF, JPG, PNG, WebP", t("learn.fileRule2"), t("learn.fileRule3")];
   return (
-    <aside className="upload-aside">
-      <span className="upload-aside-icon" aria-hidden="true">
-        {video ? <VideoIcon size={20} /> : <FileText size={20} />}
-      </span>
-      <h3>{video ? "Video nasıl yayına girer" : "Dosya nasıl paylaşılır"}</h3>
-      <ol className="upload-steps">
-        {steps.map((t) => (
-          <li key={t}>{t}</li>
-        ))}
-      </ol>
-      <dl className="upload-rules">
-        <dt>Kabul edilen</dt>
-        {rules.map((r) => (
-          <dd key={r}>{r}</dd>
-        ))}
-      </dl>
-      <p className="upload-aside-note">
-        {video
-          ? "Yükleme sürerken sayfadan ayrılmayın; bağlantı koparsa aynı dosyayla kaldığı yerden denenir."
-          : "Öğrenciler yalnızca kendilerine bağlanmış dosyaları görür."}
-      </p>
-    </aside>
+    <Card className="bg-muted/40 gap-5 shadow-none">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {video ? (
+            <VideoIcon className="text-muted-foreground size-4" />
+          ) : (
+            <FileText className="text-muted-foreground size-4" />
+          )}
+          {video ? t("learn.videoHow") : t("learn.fileHow")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-5 text-sm">
+        <ol className="grid gap-3">
+          {steps.map((step, i) => (
+            <li className="flex items-start gap-3" key={step}>
+              <span className="bg-background flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums">
+                {i + 1}
+              </span>
+              <span className="text-muted-foreground pt-0.5">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <Separator />
+        <div className="grid gap-2">
+          <p className="text-muted-foreground text-xs font-medium">
+            {t("learn.accepts")}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {rules.map((r) => (
+              <Badge variant="outline" className="bg-background" key={r}>
+                {r}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          {video ? t("learn.videoStay") : t("learn.fileScope")}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
-export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
+/** Simge bildirimin türünden seçilir; türü yazılmamış eski bildirimlerde
+ *  sunucunun sabit Türkçe başlığından. */
+function noticeIcon(n: Notice) {
+  if (n.kind === "QUESTION" || n.kind === "ANSWER") return <MessageSquare />;
+  if (n.kind === "VIDEO") return <VideoIcon />;
+  if (n.kind === "SUMMARY") return <Sparkles />;
+  if (n.kind) return <ClipboardList />;
+  const title = n.title.toLocaleLowerCase("tr");
+  if (title.includes("soru")) return <MessageSquare />;
+  if (title.includes("video")) return <VideoIcon />;
+  if (title.includes("özet")) return <Sparkles />;
+  if (title.includes("ödev")) return <ClipboardList />;
+  return <Bell />;
+}
+
+function ago(iso: string, now: number) {
+  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
+  if (minutes < 1) return t("time.justNow");
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return t("time.hoursAgo", { count: hours });
+  const days = Math.round(hours / 24);
+  if (days === 1) return t("time.yesterday");
+  if (days < 7) return t("time.daysAgo", { count: days });
+  return dayLabel(iso);
+}
+
+function UsageMeter({
+  label,
+  used,
+  limit,
+  unit,
+}: {
+  label: string;
+  used: number;
+  limit: number;
+  unit?: string;
+}) {
+  const percent = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground tabular-nums">
+          {used.toLocaleString(intlLocale())} /{" "}
+          {limit.toLocaleString(intlLocale())}
+          {unit ? " " + unit : ""}
+        </span>
+      </div>
+      <Progress
+        value={percent}
+        aria-label={label}
+        className={
+          percent >= 90
+            ? "bg-destructive/15 *:data-[slot=progress-indicator]:bg-destructive"
+            : undefined
+        }
+      />
+    </div>
+  );
+}
+
+export function AccountExtras({
+  workspaceId,
+  onOpen,
+}: {
+  workspaceId?: string;
+  /** Bildirime tıklanınca ilgili sayfayı açar. */
+  onOpen?: (target: NoticeTarget) => void;
+}) {
   const [open, setOpen] = useState(false),
-    [inbox, setInbox] = useState<InboxNotification[]>([]),
+    [tab, setTab] = useState("inbox"),
+    [inbox, setInbox] = useState<Notice[]>([]),
     [limits, setLimits] = useState<WorkspaceLimits | null>(null),
     [loading, setLoading] = useState(false),
-    [error, setError] = useState("");
-  // The two requests used to run one after the other while the dialog was
-  // already on screen, so it opened empty and then grew twice. They now run in
-  // parallel behind a skeleton that occupies the final layout.
+    [error, setError] = useState(""),
+    // Göreli zamanlar ("5 dk önce") liste yüklendiği andaki saate göre yazılır.
+    [now, setNow] = useState(0);
+  const unread = inbox.filter((n) => !n.readAt).length;
+  // Zildeki sayaç için liste sayfa açılışında bir kez sessizce alınır; hata
+  // olursa zil sayaçsız kalır, panel açıldığında yeniden denenir.
+  useEffect(() => {
+    let alive = true;
+    backend<{ data: Notice[] }>("/inbox")
+      .then((r) => {
+        if (!alive) return;
+        setInbox(r.data);
+        setNow(Date.now());
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  // İki istek paralel çalışır; panel son düzeni tutan bir iskeletle açılır.
   async function show() {
     setOpen(true);
     setError("");
     setLoading(true);
     try {
       const [inboxResult, limitsResult] = await Promise.all([
-        backend<{ data: InboxNotification[] }>("/inbox"),
+        backend<{ data: Notice[] }>("/inbox"),
         workspaceId
           ? backend<{ data: WorkspaceLimits }>(
               `/workspaces/${workspaceId}/settings/limits`,
@@ -1760,6 +2490,7 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
           : Promise.resolve(null),
       ]);
       setInbox(inboxResult.data);
+      setNow(Date.now());
       if (limitsResult) setLimits(limitsResult.data);
     } catch (e) {
       setError((e as Error).message);
@@ -1767,93 +2498,288 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
       setLoading(false);
     }
   }
+  async function markRead(ids: string[]) {
+    try {
+      await Promise.all(ids.map((id) => backend(`/inbox/${id}/read`, {})));
+      const at = new Date().toISOString();
+      setInbox((old) =>
+        old.map((n) => (ids.includes(n.id) ? { ...n, readAt: at } : n)),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  function openNotice(n: Notice, target: NoticeTarget) {
+    if (!n.readAt) void markRead([n.id]);
+    setOpen(false);
+    onOpen?.(target);
+  }
+  const list = loading ? (
+    <div className="grid gap-4 p-4" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div className="flex gap-3" key={i}>
+          <Skeleton className="size-8 rounded-full" />
+          <div className="grid flex-1 gap-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : inbox.length ? (
+    <ul className="divide-y">
+      {inbox.map((n) => {
+        const target = onOpen ? noticeTarget(n) : null;
+        return (
+          <li
+            key={n.id}
+            className={
+              "relative flex gap-3 px-4 py-3.5 " +
+              (n.readAt ? "" : "bg-primary/[0.04] ") +
+              (target ? "hover:bg-muted/60 transition-colors" : "")
+            }
+          >
+            <span
+              aria-hidden="true"
+              className={
+                "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full [&_svg]:size-4 " +
+                (n.readAt
+                  ? "bg-muted text-muted-foreground"
+                  : "bg-primary/10 text-primary")
+              }
+            >
+              {noticeIcon(n)}
+            </span>
+            <div className="grid min-w-0 flex-1 gap-0.5">
+              <div className="flex items-start justify-between gap-3">
+                <p
+                  className={
+                    "text-sm leading-snug " +
+                    (n.readAt ? "text-foreground/80" : "font-medium")
+                  }
+                >
+                  {target ? (
+                    // Başlık düğmesi tüm satırı kaplar; "Okundu say" üstte kalır.
+                    <button
+                      type="button"
+                      className="text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
+                      onClick={() => openNotice(n, target)}
+                    >
+                      {noticeText(n.title)}
+                    </button>
+                  ) : (
+                    noticeText(n.title)
+                  )}
+                </p>
+                {!n.readAt && (
+                  <span
+                    className="bg-primary mt-1.5 size-2 shrink-0 rounded-full"
+                    aria-label={t("inbox.unread")}
+                  />
+                )}
+              </div>
+              <p className="text-muted-foreground text-sm leading-snug">
+                {noticeText(n.body)}
+              </p>
+              <div className="flex items-center gap-3 pt-1">
+                <span className="text-muted-foreground text-xs">
+                  {ago(n.createdAt, now)}
+                </span>
+                {!n.readAt && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="xs"
+                    className="relative h-auto p-0 text-xs"
+                    onClick={() => void markRead([n.id])}
+                  >
+                    {t("inbox.markRead")}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {target && (
+              <ChevronRight
+                aria-hidden="true"
+                className="text-muted-foreground mt-1.5 size-4 shrink-0"
+              />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  ) : (
+    <Empty className="py-16">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <BellOff />
+        </EmptyMedia>
+        <EmptyTitle className="text-base">{t("inbox.empty")}</EmptyTitle>
+        <EmptyDescription>{t("inbox.emptyHint")}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+  const usage = (
+    <div className="grid gap-4 p-4">
+      {loading || !limits ? (
+        <Card className="gap-4 py-5" aria-hidden="true">
+          <CardContent className="grid gap-4 px-5">
+            <Skeleton className="h-5 w-1/3" />
+            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-2 w-full" />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="gap-5 py-5">
+          <CardHeader className="px-5">
+            <CardTitle>{t("inbox.usageTitle")}</CardTitle>
+            <CardDescription>{t("inbox.usageText")}</CardDescription>
+            <CardAction>
+              <Badge variant="secondary">
+                {limits.limits.plan === "PRO"
+                  ? t("inbox.planPro")
+                  : t("inbox.planPilot")}
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="grid gap-4 px-5">
+            <UsageMeter
+              label={t("overview.figureActive")}
+              used={Number(limits.used.students)}
+              limit={Number(limits.limits.studentLimit)}
+            />
+            <UsageMeter
+              label={t("inbox.video")}
+              used={Math.ceil(Number(limits.used.videoSeconds) / 60)}
+              limit={Math.floor(Number(limits.limits.videoSeconds) / 60)}
+              unit={t("inbox.minutesUnit")}
+            />
+            <UsageMeter
+              label={t("inbox.storage")}
+              used={Math.round(Number(limits.used.materialBytes) / 1024 ** 2)}
+              limit={Math.floor(
+                Number(limits.limits.materialBytes) / 1024 ** 2,
+              )}
+              unit="MB"
+            />
+          </CardContent>
+        </Card>
+      )}
+      {!loading && workspaceId && (
+        <Subscription workspaceId={workspaceId} onUpdate={() => void show()} />
+      )}
+    </div>
+  );
   return (
     <>
-      <Button
-        variant="outline"
-        className="topbar-action"
-        onClick={() => void show()}
-        aria-label={"Bildirimler" + (workspaceId ? " ve kullanım" : "")}
-      >
-        <Bell size={16} />
-        <span className="topbar-action-label">
-          Bildirimler{workspaceId ? " ve kullanım" : ""}
-        </span>
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="learning-dialog">
-          <DialogHeader>
-            <DialogTitle>Hesabınızdan haberler</DialogTitle>
-            <DialogDescription>
-              Bildirimler ve çalışma alanı kullanımı.
-            </DialogDescription>
-          </DialogHeader>
-          {error && <p role="alert">{error}</p>}
-          {loading && (
-            <div className="dialog-skeleton" aria-hidden="true">
-              <Skeleton className="skeleton-card" />
-              <Skeleton className="skeleton-card" />
-              <Skeleton className="skeleton-line" />
-              <Skeleton className="skeleton-line short" />
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="relative"
+              onClick={() => void show()}
+              aria-label={
+                unread
+                  ? t("inbox.titleUnread", { count: unread })
+                  : t("inbox.title")
+              }
+            >
+              <Bell />
+              {unread > 0 && (
+                <span className="bg-(--marker) text-(--marker-ink) ring-background absolute -top-1.5 -right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold tabular-nums ring-2">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {workspaceId ? t("inbox.tooltipOwner") : t("inbox.title")}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="w-full gap-0 sm:max-w-md">
+          <SheetHeader className="border-b pr-12">
+            <SheetTitle>{t("inbox.title")}</SheetTitle>
+            <SheetDescription>
+              {unread
+                ? t("inbox.unreadCount", { count: unread })
+                : t("inbox.allRead")}
+            </SheetDescription>
+          </SheetHeader>
+          {error && (
+            <div className="px-4 pt-4">
+              <FormError>{error}</FormError>
             </div>
           )}
-          {!loading && limits && (
-            <article className="usage-card">
-              <h3>
-                {limits.limits.plan === "PRO" ? "Pro plan" : "Pilot plan"}
-              </h3>
-              <p>
-                {limits.used.students} / {limits.limits.studentLimit} aktif
-                öğrenci
-              </p>
-              <p>
-                {Math.ceil(Number(limits.used.videoSeconds) / 60)} /{" "}
-                {Math.floor(limits.limits.videoSeconds / 60)} dakika video
-              </p>
-              <p>
-                {(Number(limits.used.materialBytes) / 1024 ** 2).toFixed(1)} /{" "}
-                {Math.floor(Number(limits.limits.materialBytes) / 1024 ** 2)} MB
-                dosya
-              </p>
-            </article>
-          )}
-          {!loading && workspaceId && (
-            <Subscription
-              workspaceId={workspaceId}
-              onUpdate={() => void show()}
-            />
-          )}
-          <div className="learning-list" hidden={loading}>
-            {!inbox.length && <p>Henüz bildirim yok.</p>}
-            {inbox.map((n) => (
-              <article key={n.id}>
-                <h3>{n.title}</h3>
-                <p>{n.body}</p>
-                {!n.readAt && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await backend(`/inbox/${n.id}/read`, {});
-                        setInbox((old) =>
-                          old.map((i) =>
-                            i.id === n.id
-                              ? { ...i, readAt: new Date().toISOString() }
-                              : i,
-                          ),
-                        );
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
+          {workspaceId ? (
+            <Tabs
+              value={tab}
+              onValueChange={setTab}
+              className="min-h-0 flex-1 gap-0"
+            >
+              <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+                <TabsList>
+                  <TabsTrigger value="inbox">
+                    {t("inbox.tabInbox")}
+                    {unread > 0 && (
+                      <Badge className="h-5 min-w-5 px-1.5 tabular-nums">
+                        {unread}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="usage">{t("inbox.tabUsage")}</TabsTrigger>
+                </TabsList>
+                {tab === "inbox" && unread > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      void markRead(
+                        inbox.filter((n) => !n.readAt).map((n) => n.id),
+                      )
+                    }
                   >
-                    Okundu olarak işaretle
-                  </button>
+                    <CheckCheck />
+                    <span className="max-sm:sr-only">{t("inbox.markAll")}</span>
+                  </Button>
                 )}
-              </article>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+              </div>
+              <TabsContent value="inbox" className="min-h-0 overflow-y-auto">
+                {list}
+              </TabsContent>
+              <TabsContent value="usage" className="min-h-0 overflow-y-auto">
+                {usage}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <>
+              {unread > 0 && (
+                <div className="flex justify-end border-b px-4 py-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      void markRead(
+                        inbox.filter((n) => !n.readAt).map((n) => n.id),
+                      )
+                    }
+                  >
+                    <CheckCheck /> {t("inbox.markAll")}
+                  </Button>
+                </div>
+              )}
+              <div className="min-h-0 flex-1 overflow-y-auto">{list}</div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

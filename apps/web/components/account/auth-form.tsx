@@ -11,7 +11,20 @@ import {
 } from "lucide-react";
 import { AppleIcon, GoogleIcon, MicrosoftIcon } from "./provider-icons";
 import { Spinner } from "@/components/derslik/loading";
+import { FormError, FormSuccess } from "@/components/derslik/feedback";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { webRequest } from "@/lib/client";
+import { t, upper } from "@derslik/contracts";
+import { LanguageSelect } from "@/components/i18n/language-select";
 const social = [
   { id: "google", name: "Google", icon: <GoogleIcon /> },
   { id: "apple", name: "Apple", icon: <AppleIcon /> },
@@ -49,9 +62,7 @@ export function AuthForm({
       });
     if (new URLSearchParams(location.search).has("auth_error"))
       // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable in the browser, after hydration.
-      setError(
-        "Giriş tamamlanamadı. Bağlantı iptal edilmiş veya süresi dolmuş olabilir. Lütfen yeniden deneyin.",
-      );
+      setError(t("auth.callbackFailed"));
     return () => {
       alive = false;
     };
@@ -72,244 +83,257 @@ export function AuthForm({
           </span>
         </a>
         <div className="auth-story-content">
-          <span className="auth-story-label">ÖZEL DERS ÇALIŞMA ALANINIZ</span>
+          <span className="auth-story-label">
+            {upper(t("auth.storyLabel"))}
+          </span>
           <h1>
-            Her öğrenciye
+            {t("auth.storyTitle1")}
             <br />
-            daha çok zaman.
+            <span className="ink-mark">{t("auth.storyTitle2")}</span>
           </h1>
-          <p>
-            Planlamadan gelişim takibine, dersinizle ilgili her şey bir arada.
-          </p>
+          <p>{t("auth.storyBody")}</p>
           <div className="auth-highlights">
             <div>
               <CalendarDays />
               <span>
-                <strong>Düzenli bir ders planı</strong>
-                <small>Takvim, paketler ve ders hakları</small>
+                <strong>{t("auth.highlight1Title")}</strong>
+                <small>{t("auth.highlight1Text")}</small>
               </span>
             </div>
             <div>
               <BookOpen />
               <span>
-                <strong>Öğrenme devam etsin</strong>
-                <small>Ödevler, PDF kaynakları ve ders videoları</small>
+                <strong>{t("auth.highlight2Title")}</strong>
+                <small>{t("auth.highlight2Text")}</small>
               </span>
             </div>
             <div>
               <Users />
               <span>
-                <strong>Birlikte takip edin</strong>
-                <small>Öğretmen, öğrenci ve veli erişimi</small>
+                <strong>{t("auth.highlight3Title")}</strong>
+                <small>{t("auth.highlight3Text")}</small>
               </span>
             </div>
           </div>
         </div>
         <div className="auth-story-footer">
           <ShieldCheck size={18} />
-          Size ve öğrencilerinize özel bir alan.
+          {t("auth.storyFooter")}
         </div>
       </aside>
       <section className="auth-card" aria-labelledby="auth-title">
-        <span className="eyebrow">DERSLİK HESABI</span>
+        <div className="flex items-start justify-between gap-3">
+          <span className="eyebrow">{upper(t("auth.account"))}</span>
+          <LanguageSelect className="w-auto" />
+        </div>
         <h2 id="auth-title">
           {mode === "signin"
-            ? "Tekrar hoş geldiniz"
+            ? t("auth.signinTitle")
             : mode === "signup"
-              ? "Hesabınızı oluşturun"
+              ? t("auth.signupTitle")
               : mode === "recover"
-                ? "Şifrenizi mi unuttunuz?"
-                : "Yeni şifrenizi belirleyin"}
+                ? t("auth.recoverTitle")
+                : t("auth.passwordTitle")}
         </h2>
         <p>
           {mode === "signin"
-            ? "Kaldığınız yerden devam etmek için giriş yapın."
+            ? t("auth.signinText")
             : mode === "signup"
-              ? "Öğretmen, öğrenci veya veli olarak başlayın."
-              : "Hesabınıza güvenle geri dönmenize yardımcı olalım."}
+              ? t("auth.signupText")
+              : t("auth.recoverText")}
         </p>
-        {(mode === "signin" || mode === "signup") && (
-          <>
-            <div
-              className="social-buttons"
-              aria-label="Diğer giriş seçenekleri"
-            >
-              {social.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="social-button"
-                  disabled={!!busy || !enabled.includes(p.id)}
-                  title={
-                    providersLoaded && !enabled.includes(p.id)
-                      ? "Bu giriş seçeneği henüz kullanıma açılmadı."
-                      : `${p.name} ile devam et`
-                  }
-                  onClick={async () => {
-                    setError("");
-                    setBusy(p.id);
-                    try {
-                      const r = await webRequest<{ url: string }>(
-                        "/api/auth/oauth",
-                        {
-                          provider: p.id,
-                          next: location.pathname,
-                        },
-                      );
-                      location.assign(r.url);
-                    } catch (e) {
-                      setError((e as Error).message);
-                      setBusy(null);
-                    }
-                  }}
+        <div className="grid gap-6">
+          {(mode === "signin" || mode === "signup") && (
+            <>
+              <div className="grid gap-3">
+                <div
+                  className="grid grid-cols-3 gap-2"
+                  aria-label={t("auth.otherOptions")}
                 >
-                  {p.icon}
-                  <span>{busy === p.id ? "Açılıyor…" : p.name}</span>
-                  {busy === p.id && <Spinner />}
-                </button>
-              ))}
-            </div>
-            {providersLoaded && !enabled.length && (
-              <p className="auth-provider-note">
-                {providerError
-                  ? "Diğer giriş seçeneklerine ulaşılamadı. E-posta ile devam edebilirsiniz."
-                  : "Diğer giriş seçenekleri henüz kullanıma açılmadı. E-posta ile devam edin."}
-              </p>
-            )}
-            <div className="auth-divider">
-              <span>veya e-posta ile</span>
-            </div>
-          </>
-        )}
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (busy) return;
-            setBusy("email");
-            setError("");
-            setMessage("");
-            const f = new FormData(e.currentTarget);
-            try {
-              const r = await webRequest<{ confirmationRequired?: boolean }>(
-                `/api/auth/${mode}`,
-                {
-                  ...(mode !== "password"
-                    ? { email: String(f.get("email")).trim() }
-                    : {}),
-                  ...(mode !== "recover"
-                    ? { password: f.get("password") }
-                    : {}),
-                },
-              );
-              if (mode === "recover" || r.confirmationRequired)
-                setMessage(
-                  "E-posta kutunuzu kontrol edin. Gelen bağlantıyla devam edebilirsiniz.",
-                );
-              else onSuccess();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(null);
-            }
-          }}
-        >
-          {mode !== "password" && (
-            <label>
-              E-posta adresi
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="ornek@eposta.com"
-                required
-                maxLength={200}
-                disabled={!!busy}
-              />
-            </label>
+                  {social.map((p) => (
+                    <Button
+                      key={p.id}
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={!!busy || !enabled.includes(p.id)}
+                      title={
+                        providersLoaded && !enabled.includes(p.id)
+                          ? t("auth.providerSoon")
+                          : t("auth.continueWith", { name: p.name })
+                      }
+                      onClick={async () => {
+                        setError("");
+                        setBusy(p.id);
+                        try {
+                          const r = await webRequest<{ url: string }>(
+                            "/api/auth/oauth",
+                            {
+                              provider: p.id,
+                              next: location.pathname,
+                            },
+                          );
+                          location.assign(r.url);
+                        } catch (e) {
+                          setError((e as Error).message);
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      {busy === p.id ? <Spinner /> : p.icon}
+                      <span>{busy === p.id ? t("auth.opening") : p.name}</span>
+                    </Button>
+                  ))}
+                </div>
+                {providersLoaded && !enabled.length && (
+                  <p className="text-muted-foreground text-xs">
+                    {providerError
+                      ? t("auth.providersUnreachable")
+                      : t("auth.providersSoon")}
+                  </p>
+                )}
+              </div>
+              <div className="text-muted-foreground flex items-center gap-3 text-xs">
+                <Separator className="flex-1" />
+                <span>{t("auth.orEmail")}</span>
+                <Separator className="flex-1" />
+              </div>
+            </>
           )}
-          {mode !== "recover" && (
-            <label>
-              Şifre
-              <div className="password-field">
-                <input
-                  name="password"
-                  type={visible ? "text" : "password"}
-                  autoComplete={
-                    mode === "signin" ? "current-password" : "new-password"
-                  }
-                  placeholder={
-                    mode === "signin" ? "Şifrenizi girin" : "En az 10 karakter"
-                  }
+          <form
+            className="grid gap-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (busy) return;
+              setBusy("email");
+              setError("");
+              setMessage("");
+              const f = new FormData(e.currentTarget);
+              try {
+                const r = await webRequest<{ confirmationRequired?: boolean }>(
+                  `/api/auth/${mode}`,
+                  {
+                    ...(mode !== "password"
+                      ? { email: String(f.get("email")).trim() }
+                      : {}),
+                    ...(mode !== "recover"
+                      ? { password: f.get("password") }
+                      : {}),
+                  },
+                );
+                if (mode === "recover" || r.confirmationRequired)
+                  setMessage(t("auth.checkInbox"));
+                else onSuccess();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {mode !== "password" && (
+              <div className="grid gap-2">
+                <Label htmlFor="auth-email">{t("auth.email")}</Label>
+                <Input
+                  id="auth-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder={t("auth.emailPlaceholder")}
                   required
-                  minLength={mode === "signin" ? 1 : 10}
-                  maxLength={128}
+                  maxLength={200}
                   disabled={!!busy}
                 />
-                <button
-                  type="button"
-                  aria-label={visible ? "Şifreyi gizle" : "Şifreyi göster"}
-                  aria-pressed={visible}
-                  onClick={() => setVisible(!visible)}
-                >
-                  {visible ? <EyeOff size={19} /> : <Eye size={19} />}
-                </button>
               </div>
-            </label>
-          )}
-          {mode === "signin" && (
-            <button
-              type="button"
-              className="forgot-link"
-              disabled={!!busy}
-              onClick={() => changeMode("recover")}
-            >
-              Şifremi unuttum
-            </button>
-          )}
-          {error && (
-            <p role="alert" className="form-error">
-              {error}
+            )}
+            {mode !== "recover" && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="auth-password">{t("auth.password")}</Label>
+                  {mode === "signin" && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      disabled={!!busy}
+                      onClick={() => changeMode("recover")}
+                    >
+                      {t("auth.forgot")}
+                    </Button>
+                  )}
+                </div>
+                <InputGroup data-disabled={!!busy || undefined}>
+                  <InputGroupInput
+                    id="auth-password"
+                    name="password"
+                    type={visible ? "text" : "password"}
+                    autoComplete={
+                      mode === "signin" ? "current-password" : "new-password"
+                    }
+                    placeholder={
+                      mode === "signin"
+                        ? t("auth.passwordPlaceholder")
+                        : t("auth.passwordMin")
+                    }
+                    required
+                    minLength={mode === "signin" ? 1 : 10}
+                    maxLength={128}
+                    disabled={!!busy}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      size="icon-xs"
+                      aria-label={
+                        visible
+                          ? t("auth.hidePassword")
+                          : t("auth.showPassword")
+                      }
+                      aria-pressed={visible}
+                      onClick={() => setVisible(!visible)}
+                    >
+                      {visible ? <EyeOff /> : <Eye />}
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+              </div>
+            )}
+            {error && <FormError>{error}</FormError>}
+            {message && <FormSuccess>{message}</FormSuccess>}
+            <Button type="submit" className="w-full" disabled={!!busy}>
+              {busy === "email" && <Spinner />}
+              {busy === "email"
+                ? t("auth.processing")
+                : mode === "signin"
+                  ? t("auth.signIn")
+                  : mode === "signup"
+                    ? t("auth.signUp")
+                    : mode === "recover"
+                      ? t("auth.sendReset")
+                      : t("auth.savePassword")}
+              {busy !== "email" && <ArrowRight />}
+            </Button>
+          </form>
+          {!reset && (
+            <p className="text-muted-foreground text-center text-sm">
+              {mode === "signin" ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0"
+                disabled={!!busy}
+                onClick={() =>
+                  changeMode(mode === "signin" ? "signup" : "signin")
+                }
+              >
+                {mode === "signin" ? t("auth.signUp") : t("auth.signIn")}
+              </Button>
             </p>
           )}
-          {message && (
-            <p role="status" className="form-success">
-              {message}
-            </p>
-          )}
-          <button className="primary-button auth-submit" disabled={!!busy}>
-            {busy === "email" && <Spinner />}
-            {busy === "email"
-              ? "İşleniyor…"
-              : mode === "signin"
-                ? "Giriş yap"
-                : mode === "signup"
-                  ? "Hesap oluştur"
-                  : mode === "recover"
-                    ? "Sıfırlama bağlantısı gönder"
-                    : "Yeni şifreyi kaydet"}
-            <ArrowRight size={18} />
-          </button>
-        </form>
-        {!reset && (
-          <div className="auth-switch">
-            <span>
-              {mode === "signin"
-                ? "Henüz hesabınız yok mu?"
-                : "Zaten hesabınız var mı?"}
-            </span>
-            <button
-              disabled={!!busy}
-              onClick={() =>
-                changeMode(mode === "signin" ? "signup" : "signin")
-              }
-            >
-              {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
-            </button>
-          </div>
-        )}
+        </div>
         <p className="auth-footnote">
           <ShieldCheck size={16} />
-          Hesabınız web ve mobilde birlikte çalışır.
+          {t("auth.footnote")}
         </p>
       </section>
     </main>

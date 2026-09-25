@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./validation": "./src/validation.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./i18n": "./src/i18n/index.ts"
   },
   "dependencies": {
     "zod": "^3.25.76"

@@ -7,7 +7,7 @@ minimumReleaseAgeIgnoreMissingTime: false
 trustLockfile: false
 strictDepBuilds: true
 allowBuilds:
-  '@embedded-postgres/darwin-arm64': set this to true or false
+  '@embedded-postgres/darwin-arm64': true
   '@embedded-postgres/linux-x64': true
   esbuild: true
   fsevents: true

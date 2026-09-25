@@ -29,8 +29,7 @@ export async function POST(
           next: z.string().optional(),
         })
         .safeParse(body);
-      if (!input.success)
-        throw new HttpError(400, "Giriş sağlayıcısı geçersiz.");
+      if (!input.success) throw new HttpError(400, "web.providerInvalid");
       const next =
         input.data.next && /^\/invite\/[a-f0-9]{64}\/?$/.test(input.data.next)
           ? input.data.next
@@ -44,10 +43,7 @@ export async function POST(
         },
       });
       if (error || !data.url)
-        throw new HttpError(
-          503,
-          "Bu giriş seçeneği şu anda kullanılamıyor. E-posta ile giriş yapabilirsiniz.",
-        );
+        throw new HttpError(503, "web.providerUnavailable");
       (await cookies()).set("derslik-auth-next", next, {
         httpOnly: true,
         secure: process.env.APP_ORIGIN!.startsWith("https:"),
@@ -59,7 +55,7 @@ export async function POST(
     }
     if (action === "signout") {
       const { error } = await auth.auth.signOut();
-      if (error) throw new HttpError(503, "Çıkış tamamlanamadı.");
+      if (error) throw new HttpError(503, "web.signoutFailed");
       (await cookies()).delete("derslik-context");
       return json({ ok: true });
     }
@@ -69,11 +65,7 @@ export async function POST(
           ? credentials.extend({ password: z.string().min(1).max(128) })
           : credentials
       ).safeParse(body);
-      if (!parsed.success)
-        throw new HttpError(
-          400,
-          "Geçerli e-posta ve en az 10 karakterli şifre girin.",
-        );
+      if (!parsed.success) throw new HttpError(400, "web.credentialsInvalid");
       const { error, data } =
         action === "signin"
           ? await auth.auth.signInWithPassword(parsed.data)
@@ -86,9 +78,7 @@ export async function POST(
       if (error)
         throw new HttpError(
           400,
-          action === "signin"
-            ? "Giriş yapılamadı. Bilgilerinizi ve e-posta doğrulamanızı kontrol edin."
-            : "Kayıt tamamlanamadı. E-posta adresinizi kontrol ederek yeniden deneyin.",
+          action === "signin" ? "web.signinFailed" : "web.signupFailed",
         );
       return json({ ok: true, confirmationRequired: !data.session });
     }
@@ -96,7 +86,7 @@ export async function POST(
       const parsed = z
         .object({ email: z.string().email().max(200) })
         .safeParse(body);
-      if (!parsed.success) throw new HttpError(400, "Geçerli e-posta girin.");
+      if (!parsed.success) throw new HttpError(400, "web.emailInvalid");
       const { error } = await auth.auth.resetPasswordForEmail(
         parsed.data.email,
         {
@@ -104,25 +94,19 @@ export async function POST(
             process.env.APP_ORIGIN + "/api/auth/callback?next=/reset-password",
         },
       );
-      if (error)
-        throw new HttpError(503, "Şifre sıfırlama isteği tamamlanamadı.");
+      if (error) throw new HttpError(503, "web.recoverFailed");
       return json({ ok: true });
     }
     if (action === "password") {
       const parsed = z
         .object({ password: z.string().min(10).max(128) })
         .safeParse(body);
-      if (!parsed.success)
-        throw new HttpError(400, "Şifre en az 10 karakter olmalı.");
+      if (!parsed.success) throw new HttpError(400, "web.passwordTooShort");
       const { error } = await auth.auth.updateUser(parsed.data);
-      if (error)
-        throw new HttpError(
-          400,
-          "Şifre değiştirilemedi. Yeni bir sıfırlama bağlantısı isteyin.",
-        );
+      if (error) throw new HttpError(400, "web.passwordChangeFailed");
       return json({ ok: true });
     }
-    throw new HttpError(404, "İşlem bulunamadı.");
+    throw new HttpError(404, "web.actionNotFound");
   } catch (e) {
     return errorResponse(e);
   }

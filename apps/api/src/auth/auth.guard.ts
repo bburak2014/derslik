@@ -35,7 +35,7 @@ export class AuthGuard implements CanActivate {
       !authorization?.startsWith("Bearer ") ||
       authorization.length > 16_384
     ) {
-      throw new UnauthorizedException("Geçerli bir erişim belirteci gerekli.");
+      throw new UnauthorizedException("api.tokenRequired");
     }
     try {
       const { payload } = await jwtVerify(authorization.slice(7), this.jwks, {
@@ -56,7 +56,7 @@ export class AuthGuard implements CanActivate {
       };
       return true;
     } catch {
-      throw new UnauthorizedException("Oturum geçersiz veya süresi dolmuş.");
+      throw new UnauthorizedException("api.sessionInvalid");
     }
   }
 }

@@ -11,6 +11,11 @@ import { DatabaseService } from "../db/database.service.js";
 import { CommandService } from "../common/command.service.js";
 import { rawDto } from "../workspaces/snapshot.service.js";
 import { lockStudent } from "../students/students.service.js";
+import { apiText } from "../common/i18n.js";
+import type { MessageKey } from "../../../../packages/contracts/src/i18n/index.js";
+
+// Due dates are calendar days in the workspace timezone (fixed to Istanbul).
+export const ISTANBUL_TODAY = "(now() AT TIME ZONE 'Europe/Istanbul')::date";
 
 const id = z.string().uuid(),
   short = z.string().trim().min(1).max(150),
@@ -88,21 +93,46 @@ const schema = z.discriminatedUnion("action", [
   }),
 ]);
 
+/** Records a notification is about; clients map these to a screen. */
+export type NoticeKind =
+  | "ASSIGNMENT"
+  | "SUBMISSION"
+  | "REVIEW"
+  | "VIDEO"
+  | "QUESTION"
+  | "ANSWER"
+  | "SUMMARY";
+
 export async function notify(
   tx: PoolClient,
   ws: string,
   student: string,
-  title: string,
-  message: string,
-  ownerOnly = false,
+  notice: {
+    /** Çeviri anahtarı; okuyan kişi kendi dilinde görür. */
+    title: MessageKey;
+    /** Çeviri anahtarı ya da ödev/video adı gibi serbest metin. */
+    body: MessageKey | string;
+    kind: NoticeKind;
+    /** The assignment, video or summary the notification opens. */
+    targetId: string;
+    ownerOnly?: boolean;
+  },
 ) {
   await tx.query(
-    `INSERT INTO derslik.notifications(workspace_id,user_id,student_id,title,body)
- SELECT $1,recipient,$2,$3,$4 FROM (
+    `INSERT INTO derslik.notifications(workspace_id,user_id,student_id,title,body,kind,target_id)
+ SELECT $1,recipient,$2,$3,$4,$6,$7 FROM (
   SELECT owner_id AS recipient FROM derslik.workspaces WHERE id=$1
   UNION SELECT user_id FROM derslik.portal_links WHERE workspace_id=$1 AND student_id=$2 AND revoked_at IS NULL AND NOT $5
  ) recipients WHERE recipient<>derslik.actor_id()`,
-    [ws, student, title, message, ownerOnly],
+    [
+      ws,
+      student,
+      notice.title,
+      notice.body,
+      notice.ownerOnly ?? false,
+      notice.kind,
+      notice.targetId,
+    ],
   );
 }
 
@@ -157,15 +187,14 @@ export class LearningService {
             [ws, student],
           )
         ).rows[0];
-        if (!person) throw new NotFoundException("Öğrenci bulunamadı.");
+        if (!person) throw new NotFoundException("api.studentNotFound");
         const link = (
           await tx.query(
             "SELECT role,permissions FROM derslik.portal_links WHERE workspace_id=$1 AND student_id=$2 AND user_id=$3 AND revoked_at IS NULL ORDER BY role DESC LIMIT 1",
             [ws, student, actor.id],
           )
         ).rows[0];
-        if (!link)
-          throw new ForbiddenException("Öğrenci/veli erişimi bulunamadı.");
+        if (!link) throw new ForbiddenException("api.portalAccessNotFound");
         const data = await this.read(tx, ws, student);
         return rawDto({
           ...data,
@@ -208,7 +237,7 @@ export class LearningService {
       "video.progress",
     ];
     if (portal && !studentActions.includes(c.action))
-      throw new ForbiddenException("Bu işlem öğretmen yetkisi gerektirir.");
+      throw new ForbiddenException("api.teacherOnly");
     const permission = c.action.startsWith("assignment.")
       ? "assignments"
       : "videos";
@@ -226,7 +255,12 @@ export class LearningService {
               [ws, student, c.title, c.instructions, c.dueOn],
             )
           ).rows[0];
-          await notify(tx, ws, student, "Yeni ödev", c.title);
+          await notify(tx, ws, student, {
+            title: "notice.assignmentNew",
+            body: c.title,
+            kind: "ASSIGNMENT",
+            targetId: data.id,
+          });
           return { data };
         }
         if (c.action === "assignment.update") {
@@ -249,10 +283,7 @@ export class LearningService {
               ],
             )
           ).rows[0];
-          if (!data)
-            throw new ConflictException(
-              "Ödev bulunamadı veya değişmiş. Yenileyin.",
-            );
+          if (!data) throw new ConflictException("api.assignmentChanged");
           return { data };
         }
         if (c.action === "assignment.submit") {
@@ -262,41 +293,45 @@ export class LearningService {
           );
           const assignment = (
             await tx.query(
-              "SELECT id,status FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3",
+              `SELECT id,status,due_on IS NOT NULL AND due_on<${ISTANBUL_TODAY} AS past_due
+               FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3`,
               [ws, student, c.assignmentId],
             )
           ).rows[0];
-          if (!assignment) throw new NotFoundException("Ödev bulunamadı.");
+          if (!assignment)
+            throw new NotFoundException("api.assignmentNotFound");
           if (assignment.status !== "OPEN")
-            throw new ConflictException("Bu ödev teslimlere kapalı.");
+            throw new ConflictException("api.assignmentClosed");
           const previous = (
             await tx.query(
               "SELECT * FROM derslik.submissions WHERE workspace_id=$1 AND assignment_id=$2 FOR UPDATE",
               [ws, c.assignmentId],
             )
           ).rows[0];
-          if (
-            (previous?.version ?? 0) !== c.version ||
-            previous?.status === "REVIEWED"
-          )
-            throw new ConflictException(
-              "Teslim değişmiş veya değerlendirilmiş.",
-            );
+          // A late first hand-in is still accepted; changing it is not.
+          if (previous && assignment.past_due)
+            throw new ConflictException("api.dueDatePassedSubmission");
+          if ((previous?.version ?? 0) !== c.version)
+            throw new ConflictException("api.submissionChanged");
+          // Editing a reviewed hand-in sends it back to the teacher's queue.
           const data = (
             await tx.query(
               `INSERT INTO derslik.submissions(workspace_id,student_id,assignment_id,user_id,body) VALUES($1,$2,$3,$4,$5)
-     ON CONFLICT(workspace_id,assignment_id) DO UPDATE SET body=EXCLUDED.body,version=submissions.version+1 RETURNING *`,
+     ON CONFLICT(workspace_id,assignment_id) DO UPDATE SET body=EXCLUDED.body,status='SUBMITTED',version=submissions.version+1 RETURNING *`,
               [ws, student, c.assignmentId, actor.id, c.body],
             )
           ).rows[0];
-          await notify(
-            tx,
-            ws,
-            student,
-            "Ödev teslim edildi",
-            "Yeni teslimi inceleyebilirsiniz.",
-            true,
-          );
+          await notify(tx, ws, student, {
+            title: previous
+              ? "notice.submissionUpdated"
+              : "notice.submissionNew",
+            body: previous
+              ? "notice.submissionUpdatedBody"
+              : "notice.submissionNewBody",
+            kind: "SUBMISSION",
+            targetId: data.assignment_id,
+            ownerOnly: true,
+          });
           return { data };
         }
         if (c.action === "assignment.review") {
@@ -306,17 +341,13 @@ export class LearningService {
               [ws, student, c.submissionId, c.feedback, c.version],
             )
           ).rows[0];
-          if (!data)
-            throw new ConflictException(
-              "Teslim bulunamadı veya sürümü değişti.",
-            );
-          await notify(
-            tx,
-            ws,
-            student,
-            "Ödev değerlendirildi",
-            "Öğretmeniniz geri bildirim ekledi.",
-          );
+          if (!data) throw new ConflictException("api.submissionNotFound");
+          await notify(tx, ws, student, {
+            title: "notice.reviewed",
+            body: "notice.reviewedBody",
+            kind: "REVIEW",
+            targetId: data.assignment_id,
+          });
           return { data };
         }
         if (c.action === "note.publish") {
@@ -335,11 +366,10 @@ export class LearningService {
               [ws, student, c.videoId],
             )
           ).rows[0];
-          if (!video)
-            throw new NotFoundException("İzlenebilir video bulunamadı.");
+          if (!video) throw new NotFoundException("api.playableVideoNotFound");
           const at = c.action === "question.create" ? c.atSeconds : c.seconds;
           if (at > (video.duration_seconds ?? 0))
-            throw new ConflictException("Zaman, video süresini aşıyor.");
+            throw new ConflictException("api.timeBeyondVideo");
           if (c.action === "question.create") {
             const data = (
               await tx.query(
@@ -347,14 +377,13 @@ export class LearningService {
                 [ws, student, c.videoId, actor.id, c.atSeconds, c.body],
               )
             ).rows[0];
-            await notify(
-              tx,
-              ws,
-              student,
-              "Videoda yeni soru",
-              "Zaman damgalı soruyu yanıtlayabilirsiniz.",
-              true,
-            );
+            await notify(tx, ws, student, {
+              title: "notice.question",
+              body: "notice.questionBody",
+              kind: "QUESTION",
+              targetId: c.videoId,
+              ownerOnly: true,
+            });
             return { data };
           }
           const data = (
@@ -372,15 +401,13 @@ export class LearningService {
               [ws, student, c.questionId, c.answer, c.resolved, c.version],
             )
           ).rows[0];
-          if (!data)
-            throw new ConflictException("Soru bulunamadı veya sürümü değişti.");
-          await notify(
-            tx,
-            ws,
-            student,
-            "Sorunuz yanıtlandı",
-            "Video sorunuzun yanıtını görebilirsiniz.",
-          );
+          if (!data) throw new ConflictException("api.questionNotFound");
+          await notify(tx, ws, student, {
+            title: "notice.answered",
+            body: "notice.answeredBody",
+            kind: "ANSWER",
+            targetId: data.video_id,
+          });
           return { data };
         }
         if (c.action === "summary.draft") {
@@ -396,15 +423,20 @@ export class LearningService {
               [ws, student, c.weekOn],
             )
           ).rows[0].n;
-          const text = `Bu hafta ${completed} ders tamamlandı. Teslim bekleyen ${pending} ödev bulunuyor. Bir sonraki ders için öğretmen değerlendirmesi: `;
+          // Taslak öğretmenin dilinde; öğretmen düzenleyip yayımlar.
+          const text =
+            [
+              apiText("api.summaryDraftLessons", { count: Number(completed) }),
+              apiText("api.summaryDraftPending", { count: Number(pending) }),
+              apiText("api.summaryDraftTail"),
+            ].join(" ") + " ";
           const data = (
             await tx.query(
               "INSERT INTO derslik.weekly_summaries(workspace_id,student_id,week_on,body) VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,student_id,week_on) DO NOTHING RETURNING *",
               [ws, student, c.weekOn, text],
             )
           ).rows[0];
-          if (!data)
-            throw new ConflictException("Bu hafta için bir özet zaten var.");
+          if (!data) throw new ConflictException("api.summaryExists");
           return { data };
         }
         const data = (
@@ -413,15 +445,13 @@ export class LearningService {
             [ws, student, c.summaryId, c.body, c.version],
           )
         ).rows[0];
-        if (!data)
-          throw new ConflictException("Özet bulunamadı veya sürümü değişti.");
-        await notify(
-          tx,
-          ws,
-          student,
-          "Haftalık özetiniz hazır",
-          "Öğretmeniniz haftalık özeti paylaştı.",
-        );
+        if (!data) throw new ConflictException("api.summaryNotFound");
+        await notify(tx, ws, student, {
+          title: "notice.summaryReady",
+          body: "notice.summaryReadyBody",
+          kind: "SUMMARY",
+          targetId: data.id,
+        });
         return { data };
       },
       portal

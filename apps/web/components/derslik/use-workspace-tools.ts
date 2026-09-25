@@ -5,6 +5,7 @@ import { commandSchema } from "@/lib/domain/validation";
 import type { WorkspaceData } from "@/lib/domain/types";
 import type { Mutate } from "./workspace";
 import type { ModalState } from "./record-dialog";
+import { t } from "@derslik/contracts";
 
 type ModelContext = {
   registerTool: (
@@ -46,7 +47,7 @@ export function useWorkspaceTools(
     };
     register({
       name: "list_students",
-      title: "Öğrencileri listele",
+      title: t("tools.listStudents"),
       description:
         "Return students and current lesson-package balances from the signed-in teacher's visible workspace. Does not return private notes or contact details.",
       inputSchema: {
@@ -77,7 +78,7 @@ export function useWorkspaceTools(
     });
     register({
       name: "create_student",
-      title: "Öğrenci oluştur",
+      title: t("tools.createStudent"),
       description:
         "Create and persist a student in the current teacher workspace using the same action as the student form. No invitation or message is sent.",
       inputSchema: {
@@ -107,11 +108,11 @@ export function useWorkspaceTools(
           phone: "",
           email: "",
         });
-        const ok = await latest.current.mutate(command, "Öğrenci oluşturuldu.");
-        if (!ok)
-          throw new Error(
-            "Öğrenci oluşturulamadı. Ekrandaki hata mesajını kontrol edin.",
-          );
+        const ok = await latest.current.mutate(
+          command,
+          t("tools.studentCreated"),
+        );
+        if (!ok) throw new Error(t("tools.studentCreateFailed"));
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => resolve()),
         );
@@ -120,7 +121,7 @@ export function useWorkspaceTools(
     });
     register({
       name: "start_lesson_planning",
-      title: "Ders planlama formunu aç",
+      title: t("tools.openLessonForm"),
       description:
         "Open the visible lesson planning form for an existing student. This stages the form only; it does not create or complete a lesson.",
       inputSchema: {
@@ -140,7 +141,7 @@ export function useWorkspaceTools(
             (s) => s.id === studentId && s.active,
           )
         )
-          throw new Error("Aktif öğrenci bulunamadı.");
+          throw new Error(t("tools.activeStudentNotFound"));
         latest.current.openForm({ type: "lesson", studentId });
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => resolve()),

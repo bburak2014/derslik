@@ -32,6 +32,9 @@ import {
 import type { Command } from "@/lib/domain/validation";
 import type { Mutate } from "./workspace";
 import { balanceFor } from "./views";
+import { FormError } from "./feedback";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { t } from "@derslik/contracts";
 
 export type ModalState =
   | { type: "student"; student?: Student }
@@ -50,10 +53,10 @@ function Field({
   hint?: string;
 }) {
   return (
-    <div className="form-field">
+    <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
       {children}
-      {hint && <small>{hint}</small>}
+      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
   );
 }
@@ -62,7 +65,7 @@ function Choice({
   value,
   onChange,
   options,
-  placeholder = "Seçin",
+  placeholder = t("common.choose"),
 }: {
   id: string;
   value: string;
@@ -72,7 +75,7 @@ function Choice({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={id} className="w-full h-11">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -117,10 +120,12 @@ export function RecordDialog({
   );
   const [name, setName] = useState(existing?.name || ""),
     [grade, setGrade] = useState(existing?.grade || ""),
-    [subject, setSubject] = useState(existing?.subject || "Matematik"),
+    [subject, setSubject] = useState(
+      existing?.subject || t("record.defaultSubject"),
+    ),
     [phone, setPhone] = useState(existing?.phone || ""),
     [email, setEmail] = useState(existing?.email || "");
-  const [packageName, setPackageName] = useState("8 derslik paket"),
+  const [packageName, setPackageName] = useState(t("record.defaultPackage")),
     [granted, setGranted] = useState("8"),
     [price, setPrice] = useState(""),
     [expires, setExpires] = useState("");
@@ -147,7 +152,7 @@ export function RecordDialog({
         ? data.lessons.find((l) => l.id === modal.makeupForId)?.topic || ""
         : "",
     ),
-    [location, setLocation] = useState("Yüz yüze");
+    [location, setLocation] = useState(t("record.defaultLocation"));
   const eligiblePackages = data.packages.filter(
     (p) =>
       p.student_id === studentId &&
@@ -166,27 +171,27 @@ export function RecordDialog({
   const title =
     modal.type === "student"
       ? existing
-        ? "Öğrenciyi düzenle"
-        : "Yeni öğrenci"
+        ? t("record.editStudent")
+        : t("record.newStudent")
       : modal.type === "package"
-        ? "Ders paketi ekle"
+        ? t("record.addPackage")
         : modal.type === "lesson"
           ? modal.makeupForId
-            ? "Telafi dersi planla"
-            : "Yeni ders planla"
+            ? t("lesson.planMakeup")
+            : t("record.newLesson")
           : modal.type === "payment"
-            ? "Tahsilat kaydet"
-            : "Ders tarihini değiştir";
+            ? t("record.recordPayment")
+            : t("record.reschedule");
   const description =
     modal.type === "student"
-      ? "Öğrencinizin temel bilgilerini çalışma alanınıza kaydedin."
+      ? t("record.studentHint")
       : modal.type === "package"
-        ? "Paket oluşturmak ders hakkı ve açık bakiye ekler."
+        ? t("record.packageHint")
         : modal.type === "lesson"
-          ? "Ders tamamlandığında bağlı paketten 1 hak düşülür."
+          ? t("record.lessonHint")
           : modal.type === "payment"
-            ? "Öğrencinizden aldığınız ödemeyi manuel olarak kaydedin."
-            : "Yalnızca seçtiğiniz dersin tarihi ve saati değişir.";
+            ? t("record.paymentHint")
+            : t("record.rescheduleHint");
   const needsStudent = modal.type !== "student" && modal.type !== "reschedule";
   const noStudents = needsStudent && activeStudents.length === 0;
   const noPackage = modal.type === "lesson" && !selectedPackage && !noStudents;
@@ -196,7 +201,7 @@ export function RecordDialog({
     setError("");
     try {
       let command: Command;
-      let message = "Kayıt kaydedildi.";
+      let message = t("record.saved");
       switch (modal.type) {
         case "student":
           command = existing
@@ -212,8 +217,8 @@ export function RecordDialog({
               }
             : { action: "student.create", name, grade, subject, phone, email };
           message = existing
-            ? "Öğrenci bilgileri güncellendi."
-            : "Öğrenci eklendi. Şimdi ders paketi tanımlayabilirsiniz.";
+            ? t("record.studentUpdated")
+            : t("record.studentAdded");
           break;
         case "package":
           command = {
@@ -224,7 +229,7 @@ export function RecordDialog({
             priceMinor: parseLira(price),
             expiresOn: expires || null,
           };
-          message = "Paket ve ders hakları eklendi.";
+          message = t("record.packageAdded");
           break;
         case "lesson":
           command = {
@@ -240,8 +245,8 @@ export function RecordDialog({
           };
           message =
             weeks === "1"
-              ? "Ders planlandı."
-              : weeks + " haftalık ders planı oluşturuldu.";
+              ? t("record.lessonPlanned")
+              : t("record.seriesPlanned", { count: Number(weeks) });
           break;
         case "reschedule":
           command = {
@@ -251,7 +256,7 @@ export function RecordDialog({
             startsAt: date + "T" + time + ":00+03:00",
             duration: Number(duration),
           };
-          message = "Dersin tarihi güncellendi.";
+          message = t("record.rescheduled");
           break;
         case "payment":
           command = {
@@ -262,12 +267,12 @@ export function RecordDialog({
             method: method as "TRANSFER" | "CASH" | "OTHER",
             reference,
           };
-          message = "Tahsilat kaydedildi.";
+          message = t("record.paymentSaved");
           break;
       }
       if (await mutate(command, message)) onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Alanları kontrol edin.");
+      setError(e instanceof Error ? e.message : t("record.checkFields"));
     }
   }
   return (
@@ -277,88 +282,95 @@ export function RecordDialog({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="record-dialog max-h-[90dvh] overflow-y-auto sm:max-w-[540px]">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[540px]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="record-form">
+        <form onSubmit={submit} className="grid gap-4">
           {noStudents ? (
-            <div className="form-notice">
-              <Info size={20} />
-              <p>Önce bir öğrenci ekleyerek başlayın.</p>
-              <Button
-                type="button"
-                onClick={() => onSwitch({ type: "student" })}
-              >
-                <Plus /> Öğrenci ekle
-              </Button>
-            </div>
+            <Alert>
+              <Info />
+              <AlertTitle>{t("record.noStudents")}</AlertTitle>
+              <AlertDescription>
+                <p>{t("record.noStudentsHint")}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => onSwitch({ type: "student" })}
+                >
+                  <Plus /> {t("ws.addStudent")}
+                </Button>
+              </AlertDescription>
+            </Alert>
           ) : (
             <>
               {needsStudent && (
-                <Field label="Öğrenci" id="student">
+                <Field label={t("common.student")} id="student">
                   <Choice
                     id="student"
                     value={studentId}
                     onChange={setStudentId}
                     options={activeStudents.map((s) => ({
                       value: s.id,
-                      label: s.name + (s.is_sample ? " · Örnek" : ""),
+                      label:
+                        s.name +
+                        (s.is_sample ? " · " + t("common.sample") : ""),
                     }))}
                   />
                 </Field>
               )}
               {modal.type === "student" && (
                 <>
-                  <Field label="Ad soyad" id="student-name">
+                  <Field label={t("record.fullName")} id="student-name">
                     <Input
                       id="student-name"
                       autoFocus
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Örn. Deniz Aksoy"
+                      placeholder={t("record.namePlaceholder")}
                       autoComplete="name"
                       required
                       maxLength={120}
                     />
                   </Field>
-                  <div className="form-grid">
-                    <Field label="Ders" id="subject">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label={t("record.subject")} id="subject">
                       <Input
                         id="subject"
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
-                        placeholder="Matematik"
+                        placeholder={t("record.defaultSubject")}
                         required
                         maxLength={120}
                       />
                     </Field>
-                    <Field label="Sınıf / seviye" id="grade">
+                    <Field label={t("record.grade")} id="grade">
                       <Input
                         id="grade"
                         value={grade}
                         onChange={(e) => setGrade(e.target.value)}
-                        placeholder="11. sınıf"
+                        placeholder={t("record.gradePlaceholder")}
                         maxLength={50}
                       />
                     </Field>
                   </div>
-                  <Field label="Telefon · isteğe bağlı" id="phone">
+                  <Field label={t("record.phoneOptional")} id="phone">
                     <Input
                       id="phone"
                       type="tel"
                       autoComplete="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="05XX XXX XX XX"
+                      placeholder={t("record.phonePlaceholder")}
                       maxLength={30}
                     />
                   </Field>
                   <Field
-                    label="E-posta · isteğe bağlı"
+                    label={t("record.emailOptional")}
                     id="email"
-                    hint="Bu kayıt e-posta veya davet göndermez."
+                    hint={t("record.emailHint")}
                   >
                     <Input
                       id="email"
@@ -366,7 +378,7 @@ export function RecordDialog({
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="ornek@eposta.com"
+                      placeholder={t("auth.emailPlaceholder")}
                       maxLength={150}
                     />
                   </Field>
@@ -374,7 +386,7 @@ export function RecordDialog({
               )}
               {modal.type === "package" && (
                 <>
-                  <Field label="Paket adı" id="package-name">
+                  <Field label={t("record.packageName")} id="package-name">
                     <Input
                       id="package-name"
                       value={packageName}
@@ -383,8 +395,8 @@ export function RecordDialog({
                       maxLength={120}
                     />
                   </Field>
-                  <div className="form-grid">
-                    <Field label="Ders hakkı" id="granted">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label={t("record.granted")} id="granted">
                       <Input
                         id="granted"
                         type="number"
@@ -396,7 +408,7 @@ export function RecordDialog({
                         onChange={(e) => setGranted(e.target.value)}
                       />
                     </Field>
-                    <Field label="Toplam paket ücreti (TL)" id="price">
+                    <Field label={t("record.price")} id="price">
                       <Input
                         id="price"
                         inputMode="decimal"
@@ -407,10 +419,7 @@ export function RecordDialog({
                       />
                     </Field>
                   </div>
-                  <Field
-                    label="Son kullanım tarihi · isteğe bağlı"
-                    id="expires"
-                  >
+                  <Field label={t("record.expiresOptional")} id="expires">
                     <Input
                       id="expires"
                       type="date"
@@ -419,47 +428,50 @@ export function RecordDialog({
                       onChange={(e) => setExpires(e.target.value)}
                     />
                   </Field>
-                  <div className="inline-info">
-                    <Info size={16} />
-                    <p>
-                      Paket ücreti açık bakiyeye eklenir. Aldığınız ödemeyi
-                      ayrıca “Tahsilat ekle” ile kaydedin.
-                    </p>
-                  </div>
+                  <Alert>
+                    <Info />
+                    <AlertDescription>
+                      {t("record.packageNote")}
+                    </AlertDescription>
+                  </Alert>
                 </>
               )}
               {(modal.type === "lesson" || modal.type === "reschedule") && (
                 <>
                   {modal.type === "lesson" && (
                     <>
-                      <Field label="Ders konusu" id="topic">
+                      <Field label={t("record.topic")} id="topic">
                         <Input
                           id="topic"
                           required
                           maxLength={120}
-                          placeholder="Örn. İkinci dereceden denklemler"
+                          placeholder={t("record.topicPlaceholder")}
                           value={topic}
                           onChange={(e) => setTopic(e.target.value)}
                         />
                       </Field>
-                      <Field label="Bağlı ders paketi" id="lesson-package">
+                      <Field
+                        label={t("record.linkedPackage")}
+                        id="lesson-package"
+                      >
                         {noPackage ? (
-                          <div className="inline-info flex-wrap">
-                            <p>
-                              Bu öğrenci için uygun tarihli, hakkı kalan bir
-                              paket bulunamadı.
-                            </p>
-                            <Button
-                              size="sm"
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                onSwitch({ type: "package", studentId })
-                              }
-                            >
-                              <Plus /> Paket ekle
-                            </Button>
-                          </div>
+                          <Alert>
+                            <Info />
+                            <AlertDescription>
+                              <p>{t("record.noEligiblePackage")}</p>
+                              <Button
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                                className="mt-2"
+                                onClick={() =>
+                                  onSwitch({ type: "package", studentId })
+                                }
+                              >
+                                <Plus /> {t("overview.addPackage")}
+                              </Button>
+                            </AlertDescription>
+                          </Alert>
                         ) : (
                           <Choice
                             id="lesson-package"
@@ -467,15 +479,18 @@ export function RecordDialog({
                             onChange={setPackageId}
                             options={eligiblePackages.map((p) => ({
                               value: p.id,
-                              label: p.name + " · " + p.remaining + " hak",
+                              label:
+                                p.name +
+                                " · " +
+                                t("common.creditCount", { count: p.remaining }),
                             }))}
                           />
                         )}
                       </Field>
                     </>
                   )}
-                  <div className="form-grid">
-                    <Field label="Ders tarihi" id="date">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label={t("record.date")} id="date">
                       <Input
                         id="date"
                         type="date"
@@ -484,7 +499,7 @@ export function RecordDialog({
                         onChange={(e) => setDate(e.target.value)}
                       />
                     </Field>
-                    <Field label="Başlangıç saati" id="time">
+                    <Field label={t("record.time")} id="time">
                       <Input
                         id="time"
                         type="time"
@@ -494,8 +509,8 @@ export function RecordDialog({
                       />
                     </Field>
                   </div>
-                  <div className="form-grid">
-                    <Field label="Süre (dakika)" id="duration">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label={t("record.duration")} id="duration">
                       <Input
                         id="duration"
                         type="number"
@@ -508,44 +523,54 @@ export function RecordDialog({
                       />
                     </Field>
                     {modal.type === "lesson" && !modal.makeupForId && (
-                      <Field label="Tekrar" id="weeks">
+                      <Field label={t("record.repeat")} id="weeks">
                         <Choice
                           id="weeks"
                           value={weeks}
                           onChange={setWeeks}
                           options={[
-                            { value: "1", label: "Tek ders" },
-                            { value: "4", label: "Haftalık · 4 ders" },
-                            { value: "8", label: "Haftalık · 8 ders" },
+                            { value: "1", label: t("record.single") },
+                            {
+                              value: "4",
+                              label: t("record.weekly", { count: 4 }),
+                            },
+                            {
+                              value: "8",
+                              label: t("record.weekly", { count: 8 }),
+                            },
                           ]}
                         />
                       </Field>
                     )}
                   </div>
                   {modal.type === "lesson" && (
-                    <Field label="Konum / ders biçimi" id="location">
+                    <Field label={t("record.location")} id="location">
                       <Input
                         id="location"
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
                         maxLength={100}
-                        placeholder="Yüz yüze, çevrim içi…"
+                        placeholder={t("record.locationPlaceholder")}
                       />
                     </Field>
                   )}
-                  <p className="field-footnote">
-                    Tüm saatler Türkiye saatiyle (İstanbul) kaydedilir.
+                  <p className="text-muted-foreground text-xs">
+                    {t("record.timezoneNote")}
                   </p>
                 </>
               )}
               {modal.type === "payment" && (
                 <>
-                  <div className="balance-notice">
-                    <span>Öğrencinin açık bakiyesi</span>
-                    <strong>{money(balanceFor(data, studentId))}</strong>
+                  <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm">
+                    <span className="text-muted-foreground">
+                      {t("record.studentBalance")}
+                    </span>
+                    <strong className="font-semibold tabular-nums">
+                      {money(balanceFor(data, studentId))}
+                    </strong>
                   </div>
-                  <div className="form-grid">
-                    <Field label="Alınan tutar (TL)" id="amount">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label={t("record.amount")} id="amount">
                       <Input
                         id="amount"
                         inputMode="decimal"
@@ -555,7 +580,7 @@ export function RecordDialog({
                         required
                       />
                     </Field>
-                    <Field label="Tahsilat tarihi" id="received">
+                    <Field label={t("record.received")} id="received">
                       <Input
                         id="received"
                         type="date"
@@ -566,43 +591,38 @@ export function RecordDialog({
                       />
                     </Field>
                   </div>
-                  <Field label="Ödeme yöntemi" id="method">
+                  <Field label={t("record.method")} id="method">
                     <Choice
                       id="method"
                       value={method}
                       onChange={setMethod}
                       options={[
-                        { value: "TRANSFER", label: "Havale / EFT" },
-                        { value: "CASH", label: "Nakit" },
-                        { value: "OTHER", label: "Diğer" },
+                        {
+                          value: "TRANSFER",
+                          label: t("payments.methods.TRANSFER"),
+                        },
+                        { value: "CASH", label: t("payments.methods.CASH") },
+                        { value: "OTHER", label: t("payments.methods.OTHER") },
                       ]}
                     />
                   </Field>
-                  <Field
-                    label="Açıklama / referans · isteğe bağlı"
-                    id="reference"
-                  >
+                  <Field label={t("record.referenceOptional")} id="reference">
                     <Input
                       id="reference"
                       value={reference}
                       onChange={(e) => setReference(e.target.value)}
                       maxLength={200}
-                      placeholder="Örn. Eylül paketi ilk ödeme"
+                      placeholder={t("record.referencePlaceholder")}
                     />
                   </Field>
-                  <p className="field-footnote">
-                    Bu işlem ödeme kaydı oluşturur. Öğrenciden otomatik para
-                    çekilmez.
+                  <p className="text-muted-foreground text-xs">
+                    {t("record.paymentNote")}
                   </p>
                 </>
               )}
             </>
           )}
-          {error && (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <FormError>{error}</FormError>}
           <DialogFooter>
             <Button
               type="button"
@@ -610,17 +630,17 @@ export function RecordDialog({
               disabled={busy}
               onClick={onClose}
             >
-              Vazgeç
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={busy || noStudents || noPackage}>
               {busy ? (
                 <>
-                  <Spinner /> Kaydediliyor
+                  <Spinner /> {t("common.saving")}
                 </>
               ) : modal.type === "lesson" ? (
-                "Dersi planla"
+                t("record.planSubmit")
               ) : (
-                "Kaydet"
+                t("common.save")
               )}
             </Button>
           </DialogFooter>

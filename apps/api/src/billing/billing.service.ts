@@ -52,7 +52,7 @@ export class BillingService {
     if (c.action === "payment.create") {
       await lockStudent(tx, ws, c.studentId);
       if (c.receivedOn > istanbulDay(new Date()))
-        throw new ConflictException("Tahsilat tarihi gelecekte olamaz.");
+        throw new ConflictException("api.paymentDateFuture");
       const charges = await openCharges(tx, ws, c.studentId);
       const outstanding = charges.reduce(
         (sum: bigint, row) => sum + BigInt(row.outstanding_minor),
@@ -60,7 +60,7 @@ export class BillingService {
       );
       let unallocated = BigInt(c.amountMinor);
       if (unallocated > outstanding)
-        throw new ConflictException("Tahsilat kalan alacaktan fazla olamaz.");
+        throw new ConflictException("api.paymentExceedsBalance");
       const payment = (
         await tx.query(
           "INSERT INTO derslik.payments (workspace_id,student_id,amount_minor,received_on,method,reference) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
@@ -98,7 +98,7 @@ export class BillingService {
           [ws, c.id],
         )
       ).rows[0];
-      if (!lookup) throw new NotFoundException("Tahsilat bulunamadı.");
+      if (!lookup) throw new NotFoundException("api.paymentNotFound");
       await lockStudent(tx, ws, lookup.student_id);
       const payment = (
         await tx.query(
@@ -107,9 +107,7 @@ export class BillingService {
         )
       ).rows[0];
       if (payment.version !== c.version || payment.voided_at)
-        throw new ConflictException(
-          "Tahsilat değişmiş veya zaten iptal edilmiş.",
-        );
+        throw new ConflictException("api.paymentChanged");
       const data = (
         await tx.query(
           "UPDATE derslik.payments SET voided_at=now(),version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
