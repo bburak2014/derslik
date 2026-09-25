@@ -79,6 +79,27 @@ export class DatabaseService implements OnModuleDestroy {
     }
   }
 
+  /** Giriş gerektirmeyen okumalar (öğretmen vitrini). Kimlik boş kalır; RLS
+   *  hiçbir tabloyu açmaz, yalnızca vitrin fonksiyonları sonuç döndürür. */
+  async publicQuery<T>(fn: (tx: PoolClient) => Promise<T>): Promise<T> {
+    const tx = await this.pool.connect();
+    try {
+      await tx.query("BEGIN READ ONLY");
+      await tx.query("SET LOCAL statement_timeout = '8s'");
+      await tx.query(
+        "SELECT set_config('app.actor_id', '', true), set_config('app.workspace_id', '', true)",
+      );
+      const result = await fn(tx);
+      await tx.query("COMMIT");
+      return result;
+    } catch (error) {
+      await tx.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      tx.release();
+    }
+  }
+
   async onModuleDestroy() {
     await this.pool.end();
   }

@@ -15,6 +15,46 @@ import { localeMiddleware } from "./common/i18n.js";
 // DATE is a calendar day, not a process-local midnight instant.
 types.setTypeParser(1082, (value) => value);
 
+/** Tek bir uç için daha büyük JSON gövdesi. Gövde burada okunursa genel
+ *  ayrıştırıcı (`_body` işaretini görür) onu yeniden okumaz. */
+function largeJson(limit: number) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (
+      req.method !== "PUT" ||
+      !req.headers["content-type"]?.startsWith("application/json")
+    )
+      return next();
+    const chunks: Buffer[] = [];
+    let size = 0,
+      failed = false;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > limit && !failed) {
+        failed = true;
+        next(
+          Object.assign(new Error("too large"), { type: "entity.too.large" }),
+        );
+      }
+      if (!failed) chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (failed) return;
+      try {
+        req.body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        (req as Request & { _body?: boolean })._body = true;
+        next();
+      } catch {
+        next(
+          Object.assign(new Error("invalid json"), {
+            type: "entity.parse.failed",
+          }),
+        );
+      }
+    });
+    req.on("error", next);
+  };
+}
+
 export async function createApplication(config: ApiConfig) {
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register(config),
@@ -32,6 +72,8 @@ export async function createApplication(config: ApiConfig) {
     next();
   });
   app.use(localeMiddleware);
+  // Vitrin fotoğrafı JSON içinde base64 gelir; yalnızca o uç daha büyük gövde alır.
+  app.use("/v1/workspaces/:ws/showcase/photo", largeJson(512 * 1024));
   app.useBodyParser("json", { limit: "16kb" });
   app.enableCors({
     origin: (origin, callback) =>

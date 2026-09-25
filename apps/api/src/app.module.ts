@@ -31,6 +31,11 @@ import {
   SubscriptionController,
   SubscriptionWebhookController,
 } from "./subscriptions/subscription.controller.js";
+import {
+  DirectoryController,
+  PublicDirectoryController,
+} from "./directory/directory.controller.js";
+import { DirectoryService } from "./directory/directory.service.js";
 @Module({})
 export class AppModule {
   static register(config: ApiConfig): DynamicModule {
@@ -47,6 +52,8 @@ export class AppModule {
         StreamWebhookController,
         SubscriptionController,
         SubscriptionWebhookController,
+        PublicDirectoryController,
+        DirectoryController,
         ApiController,
       ],
       providers: [
@@ -67,6 +74,7 @@ export class AppModule {
         MediaService,
         BillingProvider,
         SubscriptionService,
+        DirectoryService,
       ],
     };
   }
