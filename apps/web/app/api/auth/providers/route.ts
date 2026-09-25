@@ -1,4 +1,5 @@
 import { json } from "@/lib/server/session";
+import { serverText } from "@/lib/server/locale";
 export const dynamic = "force-dynamic";
 export async function GET() {
   try {
@@ -22,8 +23,7 @@ export async function GET() {
   } catch {
     return json(
       {
-        error:
-          "Giriş seçenekleri yüklenemedi. E-posta ile devam edebilirsiniz.",
+        error: await serverText("web.providersFailed"),
       },
       503,
     );

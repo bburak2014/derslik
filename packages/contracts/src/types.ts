@@ -1,3 +1,5 @@
+import { intlLocale, t } from "./i18n/index.ts";
+
 export type Student = {
   id: string;
   name: string;
@@ -80,7 +82,7 @@ export const emptyWorkspace: WorkspaceData = {
   serverTime: "",
 };
 export const money = (minor: string | number) =>
-  new Intl.NumberFormat("tr-TR", {
+  new Intl.NumberFormat(intlLocale(), {
     style: "currency",
     currency: "TRY",
     maximumFractionDigits: 2,
@@ -103,7 +105,7 @@ export const canEditSubmission = (
   assignment.status === "OPEN" &&
   (!submitted || !assignment.due_on || assignment.due_on >= today);
 export const timeLabel = (date: string) =>
-  new Intl.DateTimeFormat("tr-TR", {
+  new Intl.DateTimeFormat(intlLocale(), {
     timeZone: "Europe/Istanbul",
     hour: "2-digit",
     minute: "2-digit",
@@ -112,7 +114,7 @@ export const dayLabel = (
   date: Date | string,
   options: Intl.DateTimeFormatOptions = {},
 ) =>
-  new Intl.DateTimeFormat("tr-TR", {
+  new Intl.DateTimeFormat(intlLocale(), {
     timeZone: "Europe/Istanbul",
     day: "numeric",
     month: "long",
@@ -126,7 +128,7 @@ export function addDays(date: string, days: number) {
 export function parseLira(value: string): string {
   const v = value.trim().replace(",", ".");
   if (!/^\d{1,7}(\.\d{1,2})?$/.test(v))
-    throw new Error("Tutarı 1250 veya 1250,50 biçiminde girin.");
+    throw new Error(t("common.amountFormat"));
   const [whole, decimal = ""] = v.split(".");
   return String(Number(whole) * 100 + Number(decimal.padEnd(2, "0")));
 }

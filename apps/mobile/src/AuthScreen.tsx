@@ -35,29 +35,34 @@ import {
   type Typography,
   useTheme,
 } from "./ui";
+import { t, upper, type MessageKey } from "@derslik/contracts";
+import { LanguagePicker } from "./i18n";
 
-const copy = {
+const copy: Record<
+  "signin" | "signup" | "recover" | "password",
+  { title: MessageKey; lead: MessageKey; submit: MessageKey }
+> = {
   signin: {
-    title: "Tekrar hoş geldiniz",
-    lead: "Derslerinize ve öğrencilerinize kaldığınız yerden devam edin.",
-    submit: "Giriş yap",
+    title: "auth.signinTitle",
+    lead: "mobile.authSigninLead",
+    submit: "auth.signIn",
   },
   signup: {
-    title: "Birlikte başlayalım",
-    lead: "Öğretmen, öğrenci ve veli için ortak bir çalışma alanı.",
-    submit: "Hesap oluştur",
+    title: "mobile.authSignupTitle",
+    lead: "mobile.authSignupLead",
+    submit: "auth.signUp",
   },
   recover: {
-    title: "Şifrenizi mi unuttunuz?",
-    lead: "Kayıtlı e-posta adresinize sıfırlama bağlantısı gönderelim.",
-    submit: "Sıfırlama bağlantısı gönder",
+    title: "auth.recoverTitle",
+    lead: "mobile.authRecoverLead",
+    submit: "auth.sendReset",
   },
   password: {
-    title: "Yeni şifrenizi belirleyin",
-    lead: "En az 10 karakterli, tahmin edilmesi zor bir şifre seçin.",
-    submit: "Yeni şifreyi kaydet",
+    title: "auth.passwordTitle",
+    lead: "mobile.authPasswordLead",
+    submit: "auth.savePassword",
   },
-} as const;
+};
 type Mode = keyof typeof copy;
 
 export function AuthScreen({
@@ -84,14 +89,10 @@ export function AuthScreen({
       .then((list) => {
         if (!alive) return;
         setEnabled(list);
-        if (!list.length)
-          setProviderNotice("Diğer giriş seçenekleri henüz kullanıma açılmadı.");
+        if (!list.length) setProviderNotice(t("mobile.authProvidersSoon"));
       })
       .catch(() => {
-        if (alive)
-          setProviderNotice(
-            "Diğer giriş seçeneklerine ulaşılamadı. E-posta ile devam edebilirsiniz.",
-          );
+        if (alive) setProviderNotice(t("auth.providersUnreachable"));
       });
     return () => {
       alive = false;
@@ -112,11 +113,11 @@ export function AuthScreen({
     setError("");
     setMessage("");
     if ((mode === "signup" || mode === "password") && password.length < 10) {
-      setError("Şifre en az 10 karakter olmalı.");
+      setError(t("web.passwordTooShort"));
       return;
     }
     if (mode === "signin" && !password) {
-      setError("Şifrenizi girin.");
+      setError(t("mobile.authPasswordRequired"));
       return;
     }
     setBusy("email");
@@ -128,16 +129,14 @@ export function AuthScreen({
         return;
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-        throw new Error("Geçerli bir e-posta adresi girin.");
+        throw new Error(t("mobile.authEmailInvalid"));
       if (mode === "recover") {
         const { error } = await supabase!.auth.resetPasswordForEmail(
           email.trim(),
           { redirectTo: authRedirect("recovery") },
         );
         if (error) throw error;
-        setMessage(
-          "Şifre sıfırlama bağlantısı için e-posta kutunuzu kontrol edin.",
-        );
+        setMessage(t("mobile.authResetSent"));
       } else if (mode === "signup") {
         const { data, error } = await supabase!.auth.signUp({
           email: email.trim(),
@@ -145,17 +144,13 @@ export function AuthScreen({
           options: { emailRedirectTo: authRedirect("confirm") },
         });
         if (error) throw error;
-        if (!data.session)
-          setMessage("E-posta kutunuzdaki bağlantıyla hesabınızı doğrulayın.");
+        if (!data.session) setMessage(t("mobile.authVerifyEmail"));
       } else {
         const { error } = await supabase!.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
-        if (error)
-          throw new Error(
-            "Giriş yapılamadı. Bilgilerinizi ve e-posta doğrulamanızı kontrol edin.",
-          );
+        if (error) throw new Error(t("web.signinFailed"));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -187,32 +182,31 @@ export function AuthScreen({
             <Brand inverse />
             {intro && (
               <View style={auth.story}>
-                <Text style={auth.storyLabel}>ÖZEL DERS ÇALIŞMA ALANINIZ</Text>
+                <Text style={auth.storyLabel}>
+                  {upper(t("auth.storyLabel"))}
+                </Text>
                 <View>
-                  <Text style={auth.headline}>Her öğrenciye</Text>
+                  <Text style={auth.headline}>{t("auth.storyTitle1")}</Text>
                   <View style={auth.mark}>
                     <Text
                       numberOfLines={1}
                       adjustsFontSizeToFit
                       style={[auth.headline, { color: colors.markerInk }]}
                     >
-                      daha çok zaman.
+                      {t("auth.storyTitle2")}
                     </Text>
                   </View>
                 </View>
-                <Text style={auth.heroLead}>
-                  Planlamadan gelişim takibine, dersinizle ilgili her şey bir
-                  arada.
-                </Text>
+                <Text style={auth.heroLead}>{t("auth.storyBody")}</Text>
               </View>
             )}
           </View>
 
           <View style={auth.card}>
             <View style={{ gap: 8 }}>
-              <Kicker>Derslik hesabı</Kicker>
-              <Text style={auth.title}>{text.title}</Text>
-              <Text style={styles.muted}>{text.lead}</Text>
+              <Kicker>{t("auth.account")}</Kicker>
+              <Text style={auth.title}>{t(text.title)}</Text>
+              <Text style={styles.muted}>{t(text.lead)}</Text>
             </View>
 
             {(mode === "signin" || mode === "signup") && (
@@ -224,7 +218,9 @@ export function AuthScreen({
                       <Pressable
                         key={p.id}
                         accessibilityRole="button"
-                        accessibilityLabel={`${p.name} ile devam et`}
+                        accessibilityLabel={t("auth.continueWith", {
+                          name: p.name,
+                        })}
                         accessibilityState={{ disabled: !!busy || off }}
                         disabled={!!busy || off}
                         onPress={async () => {
@@ -252,7 +248,7 @@ export function AuthScreen({
                           <MicrosoftMark size={20} />
                         )}
                         <Text style={auth.socialLabel} numberOfLines={1}>
-                          {busy === p.id ? "Açılıyor…" : p.name}
+                          {busy === p.id ? t("auth.opening") : p.name}
                         </Text>
                       </Pressable>
                     );
@@ -263,19 +259,19 @@ export function AuthScreen({
                 )}
                 <View style={auth.separator}>
                   <View style={auth.line} />
-                  <Text style={auth.separatorText}>veya e-posta ile</Text>
+                  <Text style={auth.separatorText}>{t("auth.orEmail")}</Text>
                   <View style={auth.line} />
                 </View>
               </>
             )}
 
             {mode !== "password" && (
-              <Field label="E-posta adresi">
+              <Field label={t("auth.email")}>
                 <Input
-                  accessibilityLabel="E-posta adresi"
+                  accessibilityLabel={t("auth.email")}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="ornek@eposta.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -292,18 +288,20 @@ export function AuthScreen({
 
             {mode !== "recover" && (
               <Field
-                label="Şifre"
+                label={t("auth.password")}
                 hint={
-                  mode === "signin" ? undefined : "En az 10 karakter kullanın."
+                  mode === "signin" ? undefined : t("mobile.authPasswordHint")
                 }
               >
                 <View>
                   <Input
-                    accessibilityLabel="Şifre"
+                    accessibilityLabel={t("auth.password")}
                     value={password}
                     onChangeText={setPassword}
                     placeholder={
-                      mode === "signin" ? "Şifrenizi girin" : "En az 10 karakter"
+                      mode === "signin"
+                        ? t("auth.passwordPlaceholder")
+                        : t("auth.passwordMin")
                     }
                     secureTextEntry={!visible}
                     autoCapitalize="none"
@@ -320,7 +318,7 @@ export function AuthScreen({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={
-                      visible ? "Şifreyi gizle" : "Şifreyi göster"
+                      visible ? t("auth.hidePassword") : t("auth.showPassword")
                     }
                     accessibilityState={{ selected: visible }}
                     onPress={() => setVisible(!visible)}
@@ -343,7 +341,7 @@ export function AuthScreen({
                   disabled={!!busy}
                   onPress={() => changeMode("recover")}
                 >
-                  Şifremi unuttum
+                  {t("auth.forgot")}
                 </TextLink>
               </View>
             )}
@@ -357,7 +355,7 @@ export function AuthScreen({
               onPress={() => void submit()}
               trailingIcon={busy === "email" ? undefined : "arrow-forward"}
             >
-              {busy === "email" ? "İşleniyor…" : text.submit}
+              {busy === "email" ? t("auth.processing") : t(text.submit)}
             </Button>
 
             {mode === "recover" && (
@@ -367,7 +365,7 @@ export function AuthScreen({
                   disabled={!!busy}
                   onPress={() => changeMode("signin")}
                 >
-                  Girişe dön
+                  {t("mobile.authBackToSignin")}
                 </TextLink>
               </View>
             )}
@@ -376,8 +374,8 @@ export function AuthScreen({
               <View style={auth.switch}>
                 <Text style={styles.muted}>
                   {mode === "signin"
-                    ? "Henüz hesabınız yok mu?"
-                    : "Zaten hesabınız var mı?"}
+                    ? t("auth.noAccount")
+                    : t("auth.haveAccount")}
                 </Text>
                 <TextLink
                   disabled={!!busy}
@@ -385,7 +383,7 @@ export function AuthScreen({
                     changeMode(mode === "signin" ? "signup" : "signin")
                   }
                 >
-                  {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
+                  {mode === "signin" ? t("auth.signUp") : t("auth.signIn")}
                 </TextLink>
               </View>
             )}
@@ -397,9 +395,10 @@ export function AuthScreen({
               size={15}
               color={colors.onNavy}
             />
-            <Text style={auth.footerText}>
-              Hesabınız web ve mobilde birlikte çalışır.
-            </Text>
+            <Text style={auth.footerText}>{t("auth.footnote")}</Text>
+          </View>
+          <View style={auth.language}>
+            <LanguagePicker />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -516,6 +515,7 @@ const makeAuth = (colors: Palette, type: Typography) =>
       gap: 7,
       paddingHorizontal: 12,
     },
+    language: { width: "100%", maxWidth: 240, alignSelf: "center" },
     footerText: {
       ...type.regular,
       textAlign: "center",

@@ -1,5 +1,6 @@
 "use client";
 import { ApiError } from "@derslik/api-client";
+import { t } from "@derslik/contracts";
 const retries = new Map<string, string>();
 export async function webRequest<T = any>(
   path: string,
@@ -24,7 +25,7 @@ export async function webRequest<T = any>(
     if (r.status < 500) retries.delete(signature);
     throw new ApiError(
       r.status,
-      data.error || data.message || "İşlem tamamlanamadı.",
+      data.error || data.message || t("common.failed"),
     );
   }
   retries.delete(signature);

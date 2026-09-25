@@ -25,11 +25,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from "react-native";
-import {
-  deleteItemAsync,
-  getItemAsync,
-  setItemAsync,
-} from "expo-secure-store";
+import { deleteItemAsync, getItemAsync, setItemAsync } from "expo-secure-store";
 import { useFonts } from "expo-font";
 // Yalnızca kullanılan kalınlıklar alt yoldan alınır; paketin kökünden almak
 // bütün kalınlıkları (her biri ~95 KB) uygulamaya gömerdi.
@@ -44,7 +40,14 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
-import { dateKey, dayLabel } from "@derslik/contracts";
+import {
+  dateKey,
+  dayLabel,
+  intlLocale,
+  lower,
+  t,
+  upper,
+} from "@derslik/contracts";
 
 const THEME_KEY = "derslik.theme";
 
@@ -401,7 +404,12 @@ const makeStyles = (colors: Palette, type: Typography) =>
       fontSize: 14,
       color: colors.ink,
     },
-    hint: { ...type.regular, fontSize: 13, lineHeight: 18, color: colors.muted },
+    hint: {
+      ...type.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.muted,
+    },
     input: {
       ...type.regular,
       borderWidth: 1,
@@ -920,9 +928,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [family, scheme, mode, setMode],
   );
   if (!fontsReady && !fontError)
-    return (
-      <View style={{ flex: 1, backgroundColor: value.colors.canvas }} />
-    );
+    return <View style={{ flex: 1, backgroundColor: value.colors.canvas }} />;
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
@@ -982,9 +988,7 @@ export function Brand({ inverse = false }: { inverse?: boolean }) {
           <Ionicons name="book-outline" size={18} color={colors.marker} />
         </View>
       )}
-      <Text
-        style={[styles.brand, inverse && { color: colors.onNavyStrong }]}
-      >
+      <Text style={[styles.brand, inverse && { color: colors.onNavyStrong }]}>
         derslik
         <Text style={{ color: inverse ? colors.marker : colors.brand }}>.</Text>
       </Text>
@@ -1074,11 +1078,7 @@ export function BottomTabs({
 /* ------------------------------------------------------------------ */
 
 export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "ghost"
-  | "danger"
-  | "onInk";
+  "primary" | "secondary" | "ghost" | "danger" | "onInk";
 
 export function Button({
   children,
@@ -1285,8 +1285,8 @@ export function SectionHeading({
 
 export type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger";
 
-/** Üst başlık (web: .eyebrow). Metni Türkçe kurallarla büyük harfe çevirir:
- *  "Derslik hesabı" -> "DERSLİK HESABI". */
+/** Üst başlık (web: .eyebrow). Metni etkin dilin kurallarıyla büyük harfe
+ *  çevirir: Türkçede "Derslik hesabı" -> "DERSLİK HESABI". */
 export function Kicker({
   children,
   muted = false,
@@ -1299,7 +1299,7 @@ export function Kicker({
   const { styles } = useTheme();
   return (
     <Text style={[muted ? styles.label2 : styles.kicker, style]}>
-      {children.toLocaleUpperCase("tr")}
+      {upper(children)}
     </Text>
   );
 }
@@ -1351,15 +1351,15 @@ export function LessonStatus({
 }) {
   return status === "COMPLETED" ? (
     <Badge tone="success" icon="checkmark">
-      Tamamlandı
+      {t("lesson.completed")}
     </Badge>
   ) : status === "CANCELLED" ? (
     <Badge tone="neutral" dot>
-      İptal edildi
+      {t("lesson.cancelled")}
     </Badge>
   ) : (
     <Badge tone="info" dot>
-      Planlandı
+      {t("lesson.scheduled")}
     </Badge>
   );
 }
@@ -1382,7 +1382,7 @@ export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
     .slice(0, 2)
     .map((x) => x[0])
     .join("")
-    .toLocaleUpperCase("tr");
+    .toLocaleUpperCase(intlLocale());
   return (
     <View
       accessibilityElementsHidden
@@ -1416,12 +1416,8 @@ export function DateTile({ date }: { date: string }) {
     <View
       style={[section.dateTile, today && { backgroundColor: colors.marker }]}
     >
-      <Text
-        style={[section.dateMonth, today && { color: colors.markerInk }]}
-      >
-        {dayLabel(date, { month: "short", day: undefined }).toLocaleUpperCase(
-          "tr",
-        )}
+      <Text style={[section.dateMonth, today && { color: colors.markerInk }]}>
+        {upper(dayLabel(date, { month: "short", day: undefined }))}
       </Text>
       <Text style={[section.dateDay, today && { color: colors.markerInk }]}>
         {Number(dateKey(date).slice(-2))}
@@ -1445,10 +1441,15 @@ export function Metric({
     <View
       style={[
         section.metric,
-        warn && { backgroundColor: colors.warnSoft, borderColor: colors.warnLine },
+        warn && {
+          backgroundColor: colors.warnSoft,
+          borderColor: colors.warnLine,
+        },
       ]}
     >
-      <Text style={[styles.muted, warn && { color: colors.warn }]}>{label}</Text>
+      <Text style={[styles.muted, warn && { color: colors.warn }]}>
+        {label}
+      </Text>
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -1545,7 +1546,8 @@ export function Meter({
       <View style={[styles.row, { justifyContent: "space-between" }]}>
         <Text style={styles.label}>{label}</Text>
         <Text style={[styles.muted, { fontVariant: ["tabular-nums"] }]}>
-          {used.toLocaleString("tr-TR")} / {limit.toLocaleString("tr-TR")}
+          {used.toLocaleString(intlLocale())} /{" "}
+          {limit.toLocaleString(intlLocale())}
           {unit ? " " + unit : ""}
         </Text>
       </View>
@@ -1553,7 +1555,10 @@ export function Meter({
         accessibilityRole="progressbar"
         accessibilityLabel={label}
         accessibilityValue={{ min: 0, max: 100, now: percent }}
-        style={[section.meterTrack, full && { backgroundColor: colors.dangerSoft }]}
+        style={[
+          section.meterTrack,
+          full && { backgroundColor: colors.dangerSoft },
+        ]}
       >
         <View
           style={[
@@ -1597,7 +1602,7 @@ export function EmptyState({
 
 /** Yükleme göstergesi: yalnızca dönen simge. Metin ekran okuyucuda kalır,
  *  ekranda "yükleniyor" yazısı görünmez (web ile aynı davranış). */
-export function Loading({ label = "Yükleniyor" }) {
+export function Loading({ label = t("common.loading") }) {
   const { colors, styles } = useTheme();
   return (
     <View
@@ -1732,7 +1737,7 @@ export function Field({
       <View style={section.labelRow}>
         <Text style={styles.label}>{label}</Text>
         {required === false && (
-          <Text style={styles.caption}>isteğe bağlı</Text>
+          <Text style={styles.caption}>{t("common.optional")}</Text>
         )}
       </View>
       {children}
@@ -1900,7 +1905,9 @@ export function IconButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={count ? `${label}, ${count} okunmamış` : label}
+      accessibilityLabel={
+        count ? t("common.unreadLabel", { label, count }) : label
+      }
       accessibilityState={{ disabled, selected }}
       disabled={disabled}
       onPress={onPress}
@@ -1942,7 +1949,7 @@ export function Picker({
   options,
   onChange,
   label,
-  placeholder = "Seçin",
+  placeholder = t("common.choose"),
 }: {
   value: string;
   options: { value: string; label: string; hint?: string }[];
@@ -1954,9 +1961,9 @@ export function Picker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const selected = options.find((o) => o.value === value);
-  const needle = query.trim().toLocaleLowerCase("tr");
+  const needle = lower(query.trim());
   const shown = needle
-    ? options.filter((o) => o.label.toLocaleLowerCase("tr").includes(needle))
+    ? options.filter((o) => lower(o.label).includes(needle))
     : options;
   return (
     <>
@@ -1997,10 +2004,12 @@ export function Picker({
           <SafeAreaView edges={["bottom"]} style={section.pickerSheet}>
             <View style={section.grabber} />
             <View style={section.pickerHead}>
-              <Text style={section.sheetTitle}>{label ?? "Seçin"}</Text>
+              <Text style={section.sheetTitle}>
+                {label ?? t("common.choose")}
+              </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Kapat"
+                accessibilityLabel={t("common.close")}
                 onPress={() => setOpen(false)}
                 hitSlop={8}
                 style={({ pressed }) => [
@@ -2013,7 +2022,7 @@ export function Picker({
             </View>
             {options.length > 7 && (
               <Input
-                placeholder="Ara…"
+                placeholder={t("common.search")}
                 value={query}
                 onChangeText={setQuery}
                 autoCorrect={false}
@@ -2025,7 +2034,7 @@ export function Picker({
             >
               {!shown.length && (
                 <Text style={[styles.muted, { padding: 14 }]}>
-                  Eşleşen kayıt yok.
+                  {t("common.noMatch")}
                 </Text>
               )}
               {shown.map((o) => {
@@ -2074,13 +2083,17 @@ export function ThemeToggle() {
   const { mode, setMode } = useTheme();
   return (
     <Segmented
-      label="Görünüm"
+      label={t("common.appearance")}
       value={mode}
       onChange={(value) => setMode(value as ThemeMode)}
       options={[
-        { value: "light", label: "Açık", icon: "sunny-outline" },
-        { value: "dark", label: "Koyu", icon: "moon-outline" },
-        { value: "system", label: "Sistem", icon: "phone-portrait-outline" },
+        { value: "light", label: t("theme.light"), icon: "sunny-outline" },
+        { value: "dark", label: t("theme.dark"), icon: "moon-outline" },
+        {
+          value: "system",
+          label: t("theme.system"),
+          icon: "phone-portrait-outline",
+        },
       ]}
     />
   );
@@ -2134,7 +2147,7 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
       .map((f) => f.key);
     setMissing(empty);
     if (empty.length) {
-      setError("Lütfen işaretli alanları doldurun.");
+      setError(t("common.fillMarked"));
       return;
     }
     setBusy(true);
@@ -2165,7 +2178,7 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Kapat"
+          accessibilityLabel={t("common.close")}
           disabled={busy}
           onPress={onClose}
           android_ripple={ripple()}
@@ -2193,7 +2206,7 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
               label={f.label}
               hint={f.hint}
               required={f.required}
-              error={missing.includes(f.key) ? "Bu alan gerekli." : undefined}
+              error={missing.includes(f.key) ? t("common.required") : undefined}
             >
               {f.options && pickFromList(f.options) ? (
                 <Picker
@@ -2238,10 +2251,16 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
             onPress={onClose}
             style={{ flex: 1 }}
           >
-            Vazgeç
+            {t("common.cancel")}
           </Button>
-          <Button loading={busy} onPress={() => void save()} style={{ flex: 2 }}>
-            {busy ? "Kaydediliyor…" : form.submit_label || "Kaydet"}
+          <Button
+            loading={busy}
+            onPress={() => void save()}
+            style={{ flex: 2 }}
+          >
+            {busy
+              ? t("learn.savingEllipsis")
+              : form.submit_label || t("common.save")}
           </Button>
         </View>
       </KeyboardAvoidingView>
@@ -2256,9 +2275,9 @@ export function confirmAction(
   onError: (e: string) => void,
 ) {
   Alert.alert(title, description, [
-    { text: "Vazgeç", style: "cancel" },
+    { text: t("common.cancel"), style: "cancel" },
     {
-      text: "Onayla",
+      text: t("common.confirm"),
       onPress: () => {
         void perform().catch((e) => onError((e as Error).message));
       },

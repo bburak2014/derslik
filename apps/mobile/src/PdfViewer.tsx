@@ -5,6 +5,7 @@ import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import { Button, EmptyState, useTheme } from "./ui";
+import { t } from "@derslik/contracts";
 
 // Android'in tarayıcısında yerleşik PDF görüntüleyici yok; bağlantıyı açmak
 // indirme istemine düşüyordu. Burada PDF, pdf.js ile canvas'a çizilerek
@@ -23,7 +24,7 @@ function buildHtml(url: string, background: string, muted: string) {
 </style></head>
 <body>
 <div id="pages"></div>
-<div id="err">Önizleme açılamadı.</div>
+<div id="err">${t("pdf.failed")}</div>
 <script src="${PDFJS}/pdf.min.js"></script>
 <script>
 (function () {
@@ -102,7 +103,7 @@ export function PdfViewer({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Kapat"
+            accessibilityLabel={t("common.close")}
             onPress={onClose}
             hitSlop={8}
             style={({ pressed }) => [
@@ -117,8 +118,8 @@ export function PdfViewer({
           <View style={[styles.body, { gap: 14 }]}>
             <EmptyState
               icon="document-text-outline"
-              title="Önizleme açılamadı"
-              description="Bu dosya uygulama içinde açılamadı. Tarayıcıda deneyebilirsiniz."
+              title={t("pdf.failedTitle")}
+              description={t("pdf.failedBody")}
               action={
                 <Button
                   secondary
@@ -126,7 +127,7 @@ export function PdfViewer({
                   icon="open-outline"
                   onPress={() => void WebBrowser.openBrowserAsync(url)}
                 >
-                  Tarayıcıda aç
+                  {t("pdf.openBrowser")}
                 </Button>
               }
             />

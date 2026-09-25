@@ -25,9 +25,7 @@ export class BillingProvider {
   }
   async call(path: string, body?: unknown): Promise<any> {
     if (!this.ready())
-      throw new ServiceUnavailableException(
-        "Abonelik ödemeleri henüz açılmamış.",
-      );
+      throw new ServiceUnavailableException("api.billingNotOpen");
     const r = await fetch("https://api.lemonsqueezy.com/v1" + path, {
       method: body === undefined ? "GET" : "POST",
       headers: {
@@ -38,10 +36,7 @@ export class BillingProvider {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(10000),
     });
-    if (!r.ok)
-      throw new ServiceUnavailableException(
-        "Abonelik hizmetine ulaşılamadı. Yeniden deneyin.",
-      );
+    if (!r.ok) throw new ServiceUnavailableException("api.billingUnreachable");
     return r.json();
   }
   url(value: string) {
@@ -50,7 +45,7 @@ export class BillingProvider {
       url.protocol !== "https:" ||
       !url.hostname.endsWith(".lemonsqueezy.com")
     )
-      throw new ServiceUnavailableException("Ödeme adresi doğrulanamadı.");
+      throw new ServiceUnavailableException("api.checkoutUrlInvalid");
     return url.href;
   }
 }
@@ -81,9 +76,7 @@ export class SubscriptionService {
   }
   async checkout(actor: Actor, ws: string) {
     if (!this.provider.ready())
-      throw new ServiceUnavailableException(
-        "Abonelik ödemeleri henüz açılmamış.",
-      );
+      throw new ServiceUnavailableException("api.billingNotOpen");
     const state = await this.db.transaction(actor, ws, async (tx) => {
       await tx.query(
         "INSERT INTO derslik.subscriptions(workspace_id) VALUES($1) ON CONFLICT DO NOTHING",
@@ -99,9 +92,7 @@ export class SubscriptionService {
       if (row.checkout_url && row.checkout_expires_at > new Date())
         return { url: row.checkout_url };
       if (row.preparing_at && Date.now() - row.preparing_at.getTime() < 30000)
-        throw new ConflictException(
-          "Ödeme sayfası hazırlanıyor. Biraz sonra yeniden deneyin.",
-        );
+        throw new ConflictException("api.checkoutPreparing");
       await tx.query(
         "UPDATE derslik.subscriptions SET preparing_at=now() WHERE workspace_id=$1",
         [ws],
@@ -160,7 +151,7 @@ export class SubscriptionService {
         ).rows[0],
     );
     if (!row?.provider_id)
-      throw new ConflictException("Etkin abonelik bulunamadı.");
+      throw new ConflictException("api.subscriptionNotFound");
     const result = await this.provider.call(
       "/subscriptions/" + encodeURIComponent(row.provider_id),
     );
@@ -252,7 +243,7 @@ export class SubscriptionService {
       String(a.variant_id) !== this.config.LEMONSQUEEZY_VARIANT_ID ||
       a.test_mode !== (this.config.LEMONSQUEEZY_TEST_MODE === "true")
     )
-      throw new UnauthorizedException("Abonelik ürünü veya ortamı eşleşmiyor.");
+      throw new UnauthorizedException("api.subscriptionProductMismatch");
     const mapping = (
       await this.db.pool.query(
         "SELECT * FROM derslik.subscription_owner($1,$2)",
@@ -260,7 +251,7 @@ export class SubscriptionService {
       )
     ).rows;
     if (mapping.length !== 1)
-      throw new ConflictException("Abonelik çalışma alanıyla eşleştirilemedi.");
+      throw new ConflictException("api.subscriptionWorkspaceMismatch");
     const { workspace_id: ws, owner_id: owner } = mapping[0],
       hash = createHash("sha256").update(JSON.stringify(e.data)).digest("hex");
     return this.db.transaction({ id: owner }, ws, async (tx) => {
@@ -271,9 +262,7 @@ export class SubscriptionService {
         )
       ).rows[0];
       if (old.provider_id && old.provider_id !== e.data.id)
-        throw new ConflictException(
-          "Bu çalışma alanında farklı bir abonelik var.",
-        );
+        throw new ConflictException("api.subscriptionConflict");
       if (
         old.provider_updated_at &&
         old.provider_updated_at > new Date(a.updated_at)

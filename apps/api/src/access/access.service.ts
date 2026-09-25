@@ -76,7 +76,10 @@ export class AccessService {
           )
           .min(1)
           .max(5)
-          .refine((v) => v.includes("lessons"), "Ders erişimi gerekli."),
+          .refine(
+            (v) => v.includes("lessons"),
+            "api.lessonsPermissionRequired",
+          ),
       })
       .strict()
       .parse(input);
@@ -132,16 +135,14 @@ export class AccessService {
       },
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) throw new UnauthorizedException("Oturumunuzu yenileyin.");
+    if (!response.ok) throw new UnauthorizedException("api.refreshSession");
     const user = (await response.json()) as {
       id?: string;
       email?: string;
       email_confirmed_at?: string;
     };
     if (user.id !== actor.id || !user.email_confirmed_at || !user.email)
-      throw new ForbiddenException(
-        "Daveti kabul etmek için e-posta adresinizi doğrulayın.",
-      );
+      throw new ForbiddenException("api.verifyEmailForInvite");
     const hash = createHash("sha256").update(token).digest("hex");
     try {
       return await this.db.transaction(actor, null, async (tx) => ({
@@ -160,11 +161,7 @@ export class AccessService {
         (error as { code?: string })?.code === "23514" &&
         (error as Error).message?.includes("Invitation unavailable")
       )
-        throw new ConflictException(
-          "Bu davet bu hesapla kabul edilemedi. Davet yalnızca gönderildiği " +
-            "e-posta adresiyle kabul edilir; süresi dolmuş, iptal edilmiş ya da " +
-            "daha önce kullanılmış da olabilir.",
-        );
+        throw new ConflictException("api.inviteWrongAccount");
       throw error;
     }
   }
@@ -212,7 +209,7 @@ export class AccessService {
             [ws, student, c.id],
           )
         ).rows[0];
-        if (!data) throw new ConflictException("Erişim kaydı bulunamadı.");
+        if (!data) throw new ConflictException("api.accessNotFound");
         return { data };
       },
     );

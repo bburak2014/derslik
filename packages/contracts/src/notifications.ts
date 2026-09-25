@@ -1,3 +1,5 @@
+import { isMessageKey, t, translate, type MessageKey } from "./i18n/index.ts";
+
 /** Bildirimin ilgili olduğu kayıt. Sunucu her bildirime türünü ve kaydın
  *  kimliğini yazar; web ve mobil aynı kuralla ilgili sayfayı açar. */
 export type NoticeKind =
@@ -51,6 +53,33 @@ function sectionFromTitle(title: string): NoticeSection | null {
   if (t.includes("özet")) return "notes";
   if (t.includes("ödev")) return "assignments";
   return null;
+}
+
+// Sunucu bildirim başlığını ve sabit gövdeleri çeviri anahtarı olarak yazar
+// ("notice.assignmentNew"); okuyan kişi kendi dilinde görür. Anahtardan önce
+// yazılmış bildirimler Türkçe metin taşır, onlar da eşleşen anahtara çevrilir.
+const noticeKeys: MessageKey[] = [
+  "notice.assignmentNew",
+  "notice.submissionNew",
+  "notice.submissionNewBody",
+  "notice.submissionUpdated",
+  "notice.submissionUpdatedBody",
+  "notice.reviewed",
+  "notice.reviewedBody",
+  "notice.question",
+  "notice.questionBody",
+  "notice.answered",
+  "notice.answeredBody",
+  "notice.videoReady",
+  "notice.summaryReady",
+  "notice.summaryReadyBody",
+];
+/** Bildirim başlığı veya gövdesi, okuyanın dilinde. Öğretmenin yazdığı ödev
+ *  ya da video adı gibi serbest metinler olduğu gibi kalır. */
+export function noticeText(text: string): string {
+  if (text.startsWith("notice.") && isMessageKey(text)) return t(text);
+  const legacy = noticeKeys.find((key) => translate("tr", key) === text);
+  return legacy ? t(legacy) : text;
 }
 
 export function noticeTarget(n: Notice): NoticeTarget | null {

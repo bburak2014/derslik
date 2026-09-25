@@ -1,6 +1,7 @@
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { configuration, supabase } from "./core";
+import { t } from "@derslik/contracts";
 
 WebBrowser.maybeCompleteAuthSession();
 export type SocialProvider = "google" | "apple" | "azure";
@@ -44,16 +45,13 @@ export async function completeAuthLink(value: string) {
   if (!authRoute(value)) return false;
   const query = Linking.parse(value).queryParams || {};
   if (query.error || query.error_description)
-    throw new Error("Giriş tamamlanamadı. Lütfen yeniden deneyin.");
+    throw new Error(t("oauth.failed"));
   const code = typeof query.code === "string" ? query.code : null;
   if (!code || !supabase) return false;
   let exchange = exchanges.get(code);
   if (!exchange) {
     exchange = supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error)
-        throw new Error(
-          "Bağlantının süresi dolmuş olabilir. Yeni bir giriş bağlantısı isteyin.",
-        );
+      if (error) throw new Error(t("oauth.linkExpired"));
     });
     exchanges.set(code, exchange);
     if (exchanges.size > 20) exchanges.delete(exchanges.keys().next().value!);
@@ -69,10 +67,7 @@ export async function availableProviders(): Promise<SocialProvider[]> {
       signal: AbortSignal.timeout(8000),
     },
   );
-  if (!response.ok)
-    throw new Error(
-      "Giriş seçenekleri yüklenemedi. E-posta ile devam edebilirsiniz.",
-    );
+  if (!response.ok) throw new Error(t("web.providersFailed"));
   const body = await response.json();
   return providers
     .filter((p) => body.external?.[p.id] === true)
@@ -88,14 +83,9 @@ function unreachableRedirect(redirectTo: string) {
 }
 
 export async function socialSignIn(provider: SocialProvider) {
-  if (!supabase) throw new Error("Giriş bağlantısı hazır değil.");
+  if (!supabase) throw new Error(t("oauth.notReady"));
   const redirectTo = authRedirect("callback");
-  if (unreachableRedirect(redirectTo))
-    throw new Error(
-      "Expo Go yerel ağ adresiyle açıldığı için sosyal giriş uygulamaya dönemez. " +
-        'Telefonda "pnpm mobile:tunnel", simülatör veya emülatörde ' +
-        '"pnpm mobile:localhost" ile başlatın.',
-    );
+  if (unreachableRedirect(redirectTo)) throw new Error(t("oauth.expoLan"));
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
@@ -104,8 +94,7 @@ export async function socialSignIn(provider: SocialProvider) {
       ...(provider === "azure" ? { scopes: "email" } : {}),
     },
   });
-  if (error || !data.url)
-    throw new Error("Bu giriş seçeneği şu anda kullanılamıyor.");
+  if (error || !data.url) throw new Error(t("oauth.providerUnavailable"));
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type === "success") {
     if (!(await completeAuthLink(result.url)))
@@ -121,10 +110,5 @@ export async function socialSignIn(provider: SocialProvider) {
 }
 
 function missingRedirect(redirectTo: string) {
-  return (
-    "Giriş tamamlanmadı. Vazgeçtiyseniz yeniden deneyebilirsiniz. " +
-    "Tarayıcı localhost gibi başka bir adrese gittiyse, Supabase panelinde " +
-    "Authentication > URL Configuration > Redirect URLs listesine şu adresi ekleyin:\n\n" +
-    redirectTo
-  );
+  return t("oauth.notCompleted") + "\n\n" + redirectTo;
 }

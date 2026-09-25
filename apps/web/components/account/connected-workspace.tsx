@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { Access } from "@derslik/api-client";
-import type { NoticeTarget } from "@derslik/contracts";
+import { t, upper, type NoticeTarget } from "@derslik/contracts";
 import type { NoticeFocus } from "@/components/derslik/learning-panel";
 import { ApiError } from "@derslik/api-client";
 import Workspace from "@/components/derslik/workspace";
@@ -69,15 +69,13 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       <main className="connection-state">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-xl">Bağlantı kurulamadı</CardTitle>
-            <CardDescription>
-              Sunucuya ulaşılamadı. Bağlantınızı kontrol edip yeniden deneyin.
-            </CardDescription>
+            <CardTitle className="text-xl">{t("conn.failedTitle")}</CardTitle>
+            <CardDescription>{t("conn.failedText")}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <FormError>{error}</FormError>
             <Button type="button" onClick={() => void reload()}>
-              Yeniden dene
+              {t("common.retry")}
             </Button>
           </CardContent>
         </Card>
@@ -98,11 +96,9 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       <main className="connection-state">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-xl">Derslik davetiniz</CardTitle>
+            <CardTitle className="text-xl">{t("conn.inviteTitle")}</CardTitle>
             <CardDescription>
-              {session.user.email} ile giriş yaptınız. Davet yalnızca
-              gönderildiği e-posta adresiyle kabul edilir; başka bir adrese
-              geldiyse aşağıdan o hesapla giriş yapın.
+              {t("conn.inviteText", { email: session.user.email })}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -135,12 +131,12 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
               }}
             >
               {busy && <Spinner />}
-              Daveti kabul et
+              {t("conn.acceptInvite")}
             </Button>
           </CardContent>
           <CardFooter className="justify-center border-t">
             <Button type="button" variant="link" onClick={() => void signout()}>
-              Başka hesapla giriş yap
+              {t("conn.otherAccount")}
             </Button>
           </CardFooter>
         </Card>
@@ -151,12 +147,9 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       <main className="connection-state">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <p className="eyebrow">DERSLİĞİNİZİ HAZIRLAYIN.</p>
-            <CardTitle className="text-2xl">İlk adımı atalım.</CardTitle>
-            <CardDescription>
-              Öğretmenseniz çalışma alanı oluşturun. Öğrenci veya veliyseniz
-              öğretmeninizden gelen davet bağlantısını açın.
-            </CardDescription>
+            <p className="eyebrow">{upper(t("conn.setupEyebrow"))}</p>
+            <CardTitle className="text-2xl">{t("conn.setupTitle")}</CardTitle>
+            <CardDescription>{t("conn.setupText")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form
@@ -178,26 +171,28 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
               }}
             >
               <div className="grid gap-2">
-                <Label htmlFor="workspace-name">Çalışma alanı adı</Label>
+                <Label htmlFor="workspace-name">
+                  {t("conn.workspaceName")}
+                </Label>
                 <Input
                   id="workspace-name"
                   name="name"
                   required
                   minLength={2}
                   maxLength={100}
-                  placeholder="Örn. Matematik Atölyem"
+                  placeholder={t("conn.workspacePlaceholder")}
                 />
               </div>
               {error && <FormError>{error}</FormError>}
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                Öğretmen çalışma alanı oluştur
+                {t("conn.createWorkspace")}
               </Button>
             </form>
           </CardContent>
           <CardFooter className="justify-center border-t">
             <Button type="button" variant="link" onClick={() => void signout()}>
-              Çıkış yap
+              {t("common.signOut")}
             </Button>
           </CardFooter>
         </Card>
@@ -216,7 +211,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       : session!.list.find((a) => fits(a) && a.role === "OWNER") ||
         session!.list.find(fits);
     if (!next) {
-      setError("Bu bildirimin ait olduğu alana artık erişiminiz yok.");
+      setError(t("conn.noticeNoAccess"));
       return;
     }
     if (next !== active) {
@@ -242,7 +237,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
               htmlFor="workspace-switcher"
               className="text-[10.5px] font-semibold tracking-[0.07em] uppercase opacity-80"
             >
-              Çalışma alanı
+              {t("conn.workspace")}
             </Label>
             <Select
               value={key(active)}
@@ -262,7 +257,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
             >
               <SelectTrigger
                 id="workspace-switcher"
-                aria-label="Çalışma alanını değiştir"
+                aria-label={t("conn.switchWorkspace")}
                 className="w-full min-w-0"
               >
                 <SelectValue />
@@ -272,11 +267,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
                   <SelectItem key={key(a)} value={key(a)}>
                     {a.name}
                     {a.studentName ? ` · ${a.studentName}` : ""} ·{" "}
-                    {a.role === "OWNER"
-                      ? "Öğretmen"
-                      : a.role === "STUDENT"
-                        ? "Öğrenci"
-                        : "Veli"}
+                    {t(`roles.${a.role}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -298,7 +289,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       onSignout={() => void signout()}
       switcher={switcher}
       focus={focus}
-      onNotice={(t) => void openNotice(t)}
+      onNotice={(target) => void openNotice(target)}
     />
   ) : (
     <Portal
@@ -308,7 +299,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       switcher={switcher}
       onSignout={() => void signout()}
       focus={focus}
-      onNotice={(t) => void openNotice(t)}
+      onNotice={(target) => void openNotice(target)}
     />
   );
 }

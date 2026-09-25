@@ -57,15 +57,22 @@ import {
   type NoticeFocus,
   type TeachingView,
 } from "./LearningScreen";
-import type { NoticeTarget } from "@derslik/contracts";
+import {
+  compareText,
+  lower,
+  t,
+  upper,
+  type MessageKey,
+  type NoticeTarget,
+} from "@derslik/contracts";
 const dateTime = (day: string, time: string) => {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)
   )
-    throw new Error("Tarihi YYYY-AA-GG, saati SS:DD biçiminde girin.");
+    throw new Error(t("mt.dateTimeFormat"));
   const date = new Date(`${day}T${time}:00+03:00`);
-  if (Number.isNaN(date.getTime())) throw new Error("Tarih geçersiz.");
+  if (Number.isNaN(date.getTime())) throw new Error(t("mt.dateInvalid"));
   return date.toISOString();
 };
 export function TeacherScreen({
@@ -147,7 +154,7 @@ export function TeacherScreen({
     void load();
   }, [load]);
   async function mutate(command: Command) {
-    if (inFlight.current) throw new Error("Önceki işlem tamamlanıyor.");
+    if (inFlight.current) throw new Error(t("mt.busy"));
     inFlight.current = true;
     setBusy(true);
     try {
@@ -163,24 +170,29 @@ export function TeacherScreen({
     studentOptions = active.map((s) => ({ value: s.id, label: s.name }));
   function editStudent(person?: Student) {
     setForm({
-      title: person ? "Öğrenciyi düzenle" : "Yeni öğrenci",
+      title: person ? t("record.editStudent") : t("record.newStudent"),
       fields: [
-        { key: "name", label: "Ad soyad", value: person?.name },
+        { key: "name", label: t("record.fullName"), value: person?.name },
         {
           key: "subject",
-          label: "Ders",
-          value: person?.subject || "Matematik",
+          label: t("record.subject"),
+          value: person?.subject || t("record.defaultSubject"),
         },
-        { key: "grade", label: "Sınıf", value: person?.grade, required: false },
+        {
+          key: "grade",
+          label: t("mt.grade"),
+          value: person?.grade,
+          required: false,
+        },
         {
           key: "phone",
-          label: "Telefon",
+          label: t("mt.phone"),
           value: person?.phone,
           required: false,
         },
         {
           key: "email",
-          label: "E-posta",
+          label: t("mt.email"),
           value: person?.email,
           keyboard: "email-address",
           required: false,
@@ -213,26 +225,30 @@ export function TeacherScreen({
       return;
     }
     setForm({
-      title: "Ders paketi ekle",
-      description: "Tek ders ücreti için ders sayısını 1 girin.",
+      title: t("record.addPackage"),
+      description: t("mt.packageHint"),
       fields: [
         {
           key: "studentId",
-          label: "Öğrenci",
+          label: t("common.student"),
           value: id,
           options: studentOptions,
         },
-        { key: "name", label: "Paket adı", value: "Aylık ders paketi" },
+        {
+          key: "name",
+          label: t("record.packageName"),
+          value: t("mt.defaultPackage"),
+        },
         {
           key: "granted",
-          label: "Ders sayısı",
+          label: t("mt.lessonCount"),
           value: "8",
           keyboard: "decimal-pad",
         },
-        { key: "price", label: "Paket ücreti (₺)", keyboard: "decimal-pad" },
+        { key: "price", label: t("mt.packagePrice"), keyboard: "decimal-pad" },
         {
           key: "expiresOn",
-          label: "Son gün (YYYY-AA-GG, isteğe bağlı)",
+          label: t("mt.expiresField"),
           required: false,
         },
       ],
@@ -260,29 +276,29 @@ export function TeacherScreen({
       return;
     }
     setForm({
-      title: makeup ? "Telafi dersi planla" : "Ders planla",
-      description: "Tüm ders saatleri İstanbul saatidir.",
+      title: makeup ? t("lesson.planMakeup") : t("ws.planLesson"),
+      description: t("mt.timezoneNote"),
       fields: [
         {
           key: "packageId",
-          label: "Öğrenci / paket",
+          label: t("mt.studentPackage"),
           options: packages.map((p) => ({
             value: p.id,
-            label: `${data.students.find((s) => s.id === p.student_id)?.name} · ${p.name} (${p.remaining} hak)`,
+            label: `${data.students.find((s) => s.id === p.student_id)?.name} · ${p.name} (${t("common.creditCount", { count: p.remaining })})`,
           })),
         },
-        { key: "topic", label: "Ders konusu", value: makeup?.topic },
-        { key: "day", label: "Tarih (YYYY-AA-GG)", value: day },
-        { key: "time", label: "Saat (SS:DD)", value: "16:00" },
+        { key: "topic", label: t("record.topic"), value: makeup?.topic },
+        { key: "day", label: t("mt.dateField"), value: day },
+        { key: "time", label: t("mt.timeField"), value: "16:00" },
         {
           key: "duration",
-          label: "Süre (dakika)",
+          label: t("record.duration"),
           value: "60",
           keyboard: "decimal-pad",
         },
         {
           key: "location",
-          label: "Konum",
+          label: t("mt.location"),
           value: makeup?.location,
           required: false,
         },
@@ -290,12 +306,12 @@ export function TeacherScreen({
           ? [
               {
                 key: "weeks",
-                label: "Kaç hafta tekrar?",
+                label: t("mt.repeatWeeks"),
                 value: "1",
                 options: [
-                  { value: "1", label: "Tek ders" },
-                  { value: "4", label: "4 hafta" },
-                  { value: "8", label: "8 hafta" },
+                  { value: "1", label: t("record.single") },
+                  { value: "4", label: t("mt.weeks", { count: 4 }) },
+                  { value: "8", label: t("mt.weeks", { count: 8 }) },
                 ],
               },
             ]
@@ -319,16 +335,16 @@ export function TeacherScreen({
   }
   function reschedule(l: Lesson) {
     setForm({
-      title: "Dersi yeniden planla",
+      title: t("mt.rescheduleTitle"),
       fields: [
         {
           key: "day",
-          label: "Tarih (YYYY-AA-GG)",
+          label: t("mt.dateField"),
           value: dateKey(l.starts_at),
         },
         {
           key: "time",
-          label: "Saat (SS:DD)",
+          label: t("mt.timeField"),
           value: new Intl.DateTimeFormat("tr-TR", {
             timeZone: "Europe/Istanbul",
             hour: "2-digit",
@@ -337,7 +353,7 @@ export function TeacherScreen({
         },
         {
           key: "duration",
-          label: "Süre (dakika)",
+          label: t("record.duration"),
           value: String(
             (Date.parse(l.ends_at) - Date.parse(l.starts_at)) / 60000,
           ),
@@ -361,28 +377,28 @@ export function TeacherScreen({
       return;
     }
     setForm({
-      title: "Tahsilat kaydet",
-      description: "Bu kayıt alınan ödemeyi izler; bankadan para çekmez.",
+      title: t("record.recordPayment"),
+      description: t("mt.paymentNote"),
       fields: [
         {
           key: "studentId",
-          label: "Öğrenci",
+          label: t("common.student"),
           value: id,
           options: data.students.map((s) => ({ value: s.id, label: s.name })),
         },
-        { key: "amount", label: "Alınan tutar (₺)", keyboard: "decimal-pad" },
-        { key: "receivedOn", label: "Tarih (YYYY-AA-GG)", value: dateKey() },
+        { key: "amount", label: t("mt.amountField"), keyboard: "decimal-pad" },
+        { key: "receivedOn", label: t("mt.dateField"), value: dateKey() },
         {
           key: "method",
-          label: "Yöntem",
+          label: t("payments.method"),
           value: "TRANSFER",
           options: [
-            { value: "TRANSFER", label: "Havale" },
-            { value: "CASH", label: "Nakit" },
-            { value: "OTHER", label: "Diğer" },
+            { value: "TRANSFER", label: t("payments.methods.TRANSFER") },
+            { value: "CASH", label: t("payments.methods.CASH") },
+            { value: "OTHER", label: t("payments.methods.OTHER") },
           ],
         },
-        { key: "reference", label: "Açıklama", required: false },
+        { key: "reference", label: t("mt.reference"), required: false },
       ],
       submit: async (v) => {
         await mutate({
@@ -409,7 +425,7 @@ export function TeacherScreen({
             >
               <Pressable
                 accessibilityRole="button"
-                accessibilityHint="Öğrenci dosyasını açar"
+                accessibilityHint={t("mt.openStudentHint")}
                 onPress={() => setSelected(l.student_id)}
                 hitSlop={4}
                 style={{ flex: 1 }}
@@ -430,19 +446,21 @@ export function TeacherScreen({
               </Text>
               <Text style={styles.caption}>·</Text>
               <Text style={styles.caption} numberOfLines={1}>
-                {l.location || "Konum belirtilmedi"}
+                {l.location || t("lesson.noLocation")}
               </Text>
               {!!pack && l.status === "SCHEDULED" && (
                 <>
                   <Text style={styles.caption}>·</Text>
-                  <Text style={styles.caption}>{pack.remaining} hak kaldı</Text>
+                  <Text style={styles.caption}>
+                    {t("lesson.creditsLeft", { count: pack.remaining })}
+                  </Text>
                 </>
               )}
             </View>
             {!!l.makeup_for_id && (
               <View style={{ marginTop: 4 }}>
                 <Badge tone="warning" icon="refresh">
-                  Telafi dersi
+                  {t("mt.makeupBadge")}
                 </Badge>
               </View>
             )}
@@ -457,8 +475,8 @@ export function TeacherScreen({
               style={{ flexGrow: 1, flexBasis: "100%" }}
               onPress={() =>
                 confirmAction(
-                  "Ders tamamlansın mı?",
-                  "Paketten 1 hak düşülecek.",
+                  t("confirm.completeTitle"),
+                  t("mt.completeBody"),
                   () =>
                     mutate({
                       action: "lesson.complete",
@@ -469,7 +487,7 @@ export function TeacherScreen({
                 )
               }
             >
-              Dersi tamamla
+              {t("mt.completeLesson")}
             </Button>
             <Button
               secondary
@@ -479,7 +497,7 @@ export function TeacherScreen({
               onPress={() => reschedule(l)}
               style={{ flexGrow: 1 }}
             >
-              Saati değiştir
+              {t("mt.changeTime")}
             </Button>
             <Button
               variant="danger"
@@ -489,8 +507,8 @@ export function TeacherScreen({
               style={{ flexGrow: 1 }}
               onPress={() =>
                 confirmAction(
-                  "Dersi iptal et",
-                  "Ders hakkı düşülmeyecek.",
+                  t("mt.cancelTitle"),
+                  t("mt.cancelBody"),
                   () =>
                     mutate({
                       action: "lesson.cancel",
@@ -501,7 +519,7 @@ export function TeacherScreen({
                 )
               }
             >
-              İptal et
+              {t("mt.cancelLesson")}
             </Button>
           </View>
         ) : l.status === "COMPLETED" ? (
@@ -513,8 +531,8 @@ export function TeacherScreen({
             style={{ alignSelf: "flex-start" }}
             onPress={() =>
               confirmAction(
-                "Tamamlamayı geri al",
-                "Pakete 1 ders hakkı iade edilecek.",
+                t("confirm.reverseTitle"),
+                t("mt.reverseBody"),
                 () =>
                   mutate({
                     action: "lesson.reverse",
@@ -525,7 +543,7 @@ export function TeacherScreen({
               )
             }
           >
-            Tamamlamayı geri al
+            {t("confirm.reverseTitle")}
           </Button>
         ) : (
           <Button
@@ -535,7 +553,7 @@ export function TeacherScreen({
             style={{ alignSelf: "flex-start" }}
             onPress={() => newLesson(l.student_id, l)}
           >
-            Telafi dersi planla
+            {t("lesson.planMakeup")}
           </Button>
         )}
       </Card>
@@ -575,16 +593,16 @@ export function TeacherScreen({
     shown = todayLessons.length ? todayLessons : upcoming.slice(0, 4);
   const title =
     tab === "overview"
-      ? "Her ders,\nyeni bir adım."
+      ? t("portal.studentNote1") + "\n" + t("portal.studentNote2")
       : tab === "students"
-        ? "Öğrencileriniz"
+        ? t("ws.studentsTitle")
         : tab === "calendar"
-          ? "Ders takvimi"
+          ? t("nav.calendar")
           : tab === "payments"
-            ? "Tahsilatlar"
+            ? t("nav.payments")
             : tab === "teaching"
-              ? "Öğretim"
-              : "Bildirimler";
+              ? t("mt.teaching")
+              : t("mt.notifications");
   const header = (
     <View style={styles.header}>
       {student ? (
@@ -595,7 +613,7 @@ export function TeacherScreen({
           onPress={() => setSelected(null)}
           style={{ marginLeft: -10 }}
         >
-          Öğrenciler
+          {t("nav.students")}
         </Button>
       ) : (
         <Brand />
@@ -604,7 +622,7 @@ export function TeacherScreen({
         <IconButton
           ghost
           icon="notifications-outline"
-          label="Bildirimler"
+          label={t("mt.notifications")}
           selected={tab === "inbox" && !student}
           count={unread}
           onPress={() => {
@@ -618,7 +636,7 @@ export function TeacherScreen({
           icon="person-circle-outline"
           onPress={onAccount}
         >
-          Hesabım
+          {t("mt.myAccount")}
         </Button>
       </View>
     </View>
@@ -630,11 +648,15 @@ export function TeacherScreen({
       value={tab}
       onChange={setTab}
       items={[
-        { id: "overview", label: "Özet", icon: "grid-outline" },
-        { id: "calendar", label: "Takvim", icon: "calendar-outline" },
-        { id: "students", label: "Öğrenciler", icon: "people-outline" },
-        { id: "payments", label: "Tahsilatlar", icon: "wallet-outline" },
-        { id: "teaching", label: "Öğretim", icon: "school-outline" },
+        { id: "overview", label: t("mt.tabOverview"), icon: "grid-outline" },
+        {
+          id: "calendar",
+          label: t("mt.tabCalendar"),
+          icon: "calendar-outline",
+        },
+        { id: "students", label: t("nav.students"), icon: "people-outline" },
+        { id: "payments", label: t("nav.payments"), icon: "wallet-outline" },
+        { id: "teaching", label: t("mt.teaching"), icon: "school-outline" },
       ]}
     />
   );
@@ -644,8 +666,7 @@ export function TeacherScreen({
   if (tab === "teaching") {
     const roster = [...data.students].sort(
       (a, b) =>
-        Number(b.active) - Number(a.active) ||
-        a.name.localeCompare(b.name, "tr"),
+        Number(b.active) - Number(a.active) || compareText(a.name, b.name),
     );
     const chosen = roster.find((x) => x.id === teachingStudent) || roster[0];
     return (
@@ -655,15 +676,15 @@ export function TeacherScreen({
           <View style={styles.body}>
             <EmptyState
               icon="people-outline"
-              title="Önce bir öğrenci ekleyin"
-              description="Ödevleri, PDF dosyalarını ve ders videolarını burada paylaşabilirsiniz."
+              title={t("hub.emptyTitle")}
+              description={t("mt.teachingEmpty")}
             />
           </View>
         ) : (
           <>
             <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 10 }}>
               <Picker
-                label="Öğrenci"
+                label={t("common.student")}
                 value={chosen.id}
                 onChange={(id) => {
                   setTeachingStudent(id);
@@ -671,12 +692,12 @@ export function TeacherScreen({
                 }}
                 options={roster.map((x) => ({
                   value: x.id,
-                  label: x.name + (x.active ? "" : " · Arşivde"),
+                  label: x.name + (x.active ? "" : " · " + t("hub.archived")),
                   hint: x.subject,
                 }))}
               />
               <Segmented
-                label="Bölüm"
+                label={t("mt.section")}
                 value={teachingView}
                 onChange={(value) => {
                   setTeachingView(value as TeachingView);
@@ -685,11 +706,15 @@ export function TeacherScreen({
                 options={[
                   {
                     value: "assignments",
-                    label: "Ödevler",
+                    label: t("nav.assignments"),
                     icon: "clipboard-outline",
                   },
                   { value: "files", label: "PDF", icon: "document-outline" },
-                  { value: "videos", label: "Videolar", icon: "videocam-outline" },
+                  {
+                    value: "videos",
+                    label: t("mt.videos"),
+                    icon: "videocam-outline",
+                  },
                 ]}
               />
             </View>
@@ -742,7 +767,7 @@ export function TeacherScreen({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
             <Avatar name={student.name} size={56} />
             <View style={{ flex: 1, gap: 4 }}>
-              <Kicker>Öğrenci dosyası</Kicker>
+              <Kicker>{t("mt.studentFile")}</Kicker>
               <Text style={styles.title} numberOfLines={2}>
                 {student.name}
               </Text>
@@ -762,7 +787,7 @@ export function TeacherScreen({
             style={{ alignSelf: "flex-start" }}
             onPress={() => void load()}
           >
-            Yeniden dene
+            {t("common.retry")}
           </Button>
         )}
         {student ? (
@@ -771,34 +796,45 @@ export function TeacherScreen({
               <Text style={styles.muted}>
                 {[student.subject, student.grade].filter(Boolean).join(" · ")}
               </Text>
-              {!student.active && <Badge>Arşivlendi</Badge>}
+              {!student.active && <Badge>{t("detail.archived")}</Badge>}
             </View>
             <View style={styles.row}>
               <Metric
-                label="Kalan ders"
+                label={t("mt.remainingLessons")}
                 value={remaining}
                 warn={remaining <= 2}
               />
               <Metric
-                label="Açık bakiye"
+                label={t("students.openBalance")}
                 value={money(balance(student.id))}
               />
             </View>
             <Button icon="library-outline" onPress={() => setLearning(true)}>
-              Ödevler, videolar ve davetler
+              {t("mt.learningButton")}
             </Button>
             <View style={styles.row}>
               {(
                 [
-                  ["Düzenle", "create-outline", () => editStudent(student)],
+                  ["common.edit", "create-outline", () => editStudent(student)],
                   [
-                    "Ders planla",
+                    "ws.planLesson",
                     "calendar-outline",
                     () => newLesson(student.id),
                   ],
-                  ["Paket ekle", "cube-outline", () => newPackage(student.id)],
-                  ["Tahsilat", "wallet-outline", () => newPayment(student.id)],
-                ] as const
+                  [
+                    "mt.addPackage",
+                    "cube-outline",
+                    () => newPackage(student.id),
+                  ],
+                  [
+                    "mt.payment",
+                    "wallet-outline",
+                    () => newPayment(student.id),
+                  ],
+                ] as const satisfies readonly (readonly [
+                  MessageKey,
+                  ...unknown[],
+                ])[]
               ).map(([label, icon, action]) => (
                 <Button
                   key={label}
@@ -808,7 +844,7 @@ export function TeacherScreen({
                   onPress={action}
                   style={{ flexGrow: 1, flexBasis: 140 }}
                 >
-                  {label}
+                  {t(label)}
                 </Button>
               ))}
             </View>
@@ -819,11 +855,11 @@ export function TeacherScreen({
                   size={13}
                   color={colors.brand}
                 />
-                <Kicker>Yalnızca benim notum</Kicker>
+                <Kicker>{t("detail.privateNote")}</Kicker>
               </View>
               <Text style={styles.text}>
                 {data.notes.find((n) => n.student_id === student.id)?.body ||
-                  "Bir sonraki ders için not ekleyin."}
+                  t("mt.notePlaceholder")}
               </Text>
               <Button
                 secondary
@@ -835,12 +871,12 @@ export function TeacherScreen({
                     (n) => n.student_id === student.id,
                   );
                   setForm({
-                    title: "Öğretmene özel not",
-                    description: "Öğrenci ve veli bu notu göremez.",
+                    title: t("mt.noteTitle"),
+                    description: t("mt.noteHint"),
                     fields: [
                       {
                         key: "body",
-                        label: "Not",
+                        label: t("mt.note"),
                         value: note?.body,
                         multiline: true,
                         required: false,
@@ -857,35 +893,45 @@ export function TeacherScreen({
                   });
                 }}
               >
-                Notu düzenle
+                {t("mt.editNote")}
               </Button>
             </Card>
-            <SectionHeading title="Ders paketleri" />
+            <SectionHeading title={t("mt.packages")} />
             {!studentPackages.length && (
-              <Text style={styles.muted}>Henüz ders paketi yok.</Text>
+              <Text style={styles.muted}>{t("detail.noPackages")}</Text>
             )}
             {studentPackages.map((p) => (
               <Card key={p.id}>
                 <View
-                  style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                  }}
                 >
                   <Text style={[styles.h2, { flex: 1 }]}>{p.name}</Text>
                   <Badge
                     tone={p.remaining <= 2 ? "warning" : "info"}
                     icon={p.remaining <= 2 ? "alert-circle-outline" : undefined}
                   >
-                    {p.remaining} hak
+                    {t("common.creditCount", { count: p.remaining })}
                   </Badge>
                 </View>
                 <Text style={styles.muted}>
-                  {p.remaining} / {p.granted} hak · {money(p.price_minor)}
+                  {t("mt.creditsOf", {
+                    remaining: p.remaining,
+                    granted: p.granted,
+                  })}{" "}
+                  · {money(p.price_minor)}
                 </Text>
                 <Text style={styles.caption}>
-                  {p.expires_on ? `Son gün: ${p.expires_on}` : "Süre sınırı yok"}
+                  {p.expires_on
+                    ? t("detail.lastDay", { date: p.expires_on })
+                    : t("detail.noExpiry")}
                 </Text>
               </Card>
             ))}
-            <SectionHeading title="Ders geçmişi" />
+            <SectionHeading title={t("detail.lessonHistory")} />
             {data.lessons
               .filter((l) => l.student_id === student.id)
               .map(lessonCard)}
@@ -895,8 +941,8 @@ export function TeacherScreen({
                 icon="archive-outline"
                 onPress={() =>
                   confirmAction(
-                    "Öğrenciyi arşivle",
-                    "Planlanmış dersleri önce tamamlayın veya iptal edin. Geçmiş kayıtlar korunur.",
+                    t("confirm.archiveTitle"),
+                    t("mt.archiveBody"),
                     async () => {
                       await mutate({
                         action: "student.archive",
@@ -909,7 +955,7 @@ export function TeacherScreen({
                   )
                 }
               >
-                Öğrenciyi arşivle
+                {t("confirm.archiveTitle")}
               </Button>
             ) : (
               <Button
@@ -917,8 +963,8 @@ export function TeacherScreen({
                 icon="arrow-undo-outline"
                 onPress={() =>
                   confirmAction(
-                    "Öğrenciyi aktife al",
-                    "Öğrenci yeniden aktif listeye dönecek. Aktif öğrenci sınırınız doluysa bu işlem yapılamaz.",
+                    t("confirm.restoreTitle"),
+                    t("mt.restoreBody"),
                     async () => {
                       await mutate({
                         action: "student.restore",
@@ -930,14 +976,14 @@ export function TeacherScreen({
                   )
                 }
               >
-                Öğrenciyi aktife al
+                {t("confirm.restoreTitle")}
               </Button>
             )}
           </>
         ) : tab === "overview" ? (
           <>
             <Text style={[styles.muted, { marginTop: -6 }]}>
-              Günün planı ve öğrencilerinizin yolculuğu bir arada.
+              {t("ws.overviewSubtitle")}
             </Text>
             {/* Web'deki Bugün paneli: tarih, günün sayıları ve takvim kısayolu
                 tek bir mürekkep şeritte. */}
@@ -953,9 +999,11 @@ export function TeacherScreen({
                       { fontSize: 22, lineHeight: 28, color: colors.onFeature },
                     ]}
                   >
-                    Bugün
+                    {t("common.today")}
                   </Text>
-                  <Text style={[styles.muted, { color: colors.onFeatureMuted }]}>
+                  <Text
+                    style={[styles.muted, { color: colors.onFeatureMuted }]}
+                  >
                     {dayLabel(now, { weekday: "long", year: "numeric" })}
                   </Text>
                 </View>
@@ -963,17 +1011,17 @@ export function TeacherScreen({
               <InkFigures
                 items={[
                   {
-                    label: "Ders",
+                    label: t("overview.figureLessons"),
                     value: todayLessons.filter((l) => l.status !== "CANCELLED")
                       .length,
                   },
                   {
-                    label: "Tamamlanan",
+                    label: t("overview.figureCompleted"),
                     value: todayLessons.filter((l) => l.status === "COMPLETED")
                       .length,
                   },
-                  { label: "Aktif öğrenci", value: active.length },
-                  { label: "Bekleyen tahsilat", value: money(balance()) },
+                  { label: t("overview.figureActive"), value: active.length },
+                  { label: t("mt.figurePending"), value: money(balance()) },
                 ]}
               />
               <Button
@@ -983,33 +1031,37 @@ export function TeacherScreen({
                 style={{ alignSelf: "flex-start" }}
                 onPress={() => setTab("calendar")}
               >
-                Takvime git
+                {t("mt.goCalendar")}
               </Button>
             </InkPanel>
             <Button icon="add" onPress={() => newLesson()}>
-              Ders planla
+              {t("ws.planLesson")}
             </Button>
             {!active.length && (
               <EmptyState
                 icon="school-outline"
-                title="İlk öğrencinizle başlayın"
-                description="Öğrenci ekleyin, paket tanımlayın, dersinizi planlayın."
+                title={t("mt.firstStudentTitle")}
+                description={t("mt.firstStudentText")}
                 action={
                   <Button
                     size="sm"
                     icon="person-add-outline"
                     onPress={() => editStudent()}
                   >
-                    İlk öğrencimi ekle
+                    {t("overview.addFirstStudent")}
                   </Button>
                 }
               />
             )}
             {!!active.length && (
               <SectionHeading
-                title={todayLessons.length ? "Bugünün dersleri" : "Sıradaki dersler"}
+                title={
+                  todayLessons.length
+                    ? t("mt.todayLessons")
+                    : t("mt.nextLessons")
+                }
                 description={
-                  todayLessons.length ? undefined : "Bitmemiş en yakın dersler."
+                  todayLessons.length ? undefined : t("mt.nextLessonsHint")
                 }
               />
             )}
@@ -1017,15 +1069,15 @@ export function TeacherScreen({
             {!shown.length && !!active.length && (
               <EmptyState
                 icon="calendar-outline"
-                title="Planlanmış ders yok"
-                description="Takvimden yeni bir ders planlayabilirsiniz."
+                title={t("mt.noLessonsTitle")}
+                description={t("mt.noLessonsText")}
               />
             )}
             {!!lowPackages.length && (
               <>
                 <SectionHeading
-                  title="Azalan paketler"
-                  description="İki ders hakkı veya daha azı kalanlar."
+                  title={t("mt.lowPackages")}
+                  description={t("mt.lowPackagesHint")}
                 />
                 <List>
                   {lowPackages.map((p, i) => {
@@ -1040,7 +1092,11 @@ export function TeacherScreen({
                             {person.name}
                           </Text>
                           <Text style={styles.caption} numberOfLines={1}>
-                            {p.name} · {p.remaining} / {p.granted} hak
+                            {p.name} ·{" "}
+                            {t("mt.creditsOf", {
+                              remaining: p.remaining,
+                              granted: p.granted,
+                            })}
                           </Text>
                         </View>
                         <Button
@@ -1048,7 +1104,7 @@ export function TeacherScreen({
                           size="sm"
                           onPress={() => newPackage(p.student_id)}
                         >
-                          Paket ekle
+                          {t("mt.addPackage")}
                         </Button>
                       </ListRow>
                     );
@@ -1061,21 +1117,19 @@ export function TeacherScreen({
           <>
             <Input
               icon="search"
-              accessibilityLabel="Öğrenci ara"
+              accessibilityLabel={t("ws.searchStudents")}
               value={search}
               onChangeText={setSearch}
-              placeholder="İsim veya ders ara…"
+              placeholder={t("mt.searchPlaceholder")}
               autoCorrect={false}
               returnKeyType="search"
             />
             <Button icon="person-add-outline" onPress={() => editStudent()}>
-              Öğrenci ekle
+              {t("ws.addStudent")}
             </Button>
             {(() => {
               const found = data.students.filter((s) =>
-                `${s.name} ${s.subject}`
-                  .toLocaleLowerCase("tr")
-                  .includes(search.toLocaleLowerCase("tr")),
+                lower(`${s.name} ${s.subject}`).includes(lower(search)),
               );
               if (!found.length)
                 return (
@@ -1083,13 +1137,13 @@ export function TeacherScreen({
                     icon="people-outline"
                     title={
                       data.students.length
-                        ? "Eşleşen öğrenci yok"
-                        : "Henüz öğrenci yok"
+                        ? t("mt.noMatchTitle")
+                        : t("record.noStudents")
                     }
                     description={
                       data.students.length
-                        ? "Aramayı değiştirip yeniden deneyin."
-                        : "İlk öğrencinizi ekleyerek başlayın."
+                        ? t("mt.noMatchText")
+                        : t("mt.noStudentsText")
                     }
                   />
                 );
@@ -1114,7 +1168,7 @@ export function TeacherScreen({
                           </Text>
                         </View>
                         {!s.active ? (
-                          <Badge>Arşivde</Badge>
+                          <Badge>{t("hub.archived")}</Badge>
                         ) : open > 0 ? (
                           <Badge tone="warning">{money(open)}</Badge>
                         ) : null}
@@ -1133,21 +1187,22 @@ export function TeacherScreen({
         ) : tab === "calendar" ? (
           <>
             <View style={styles.field}>
-              <Text style={styles.label}>Tarih</Text>
+              <Text style={styles.label}>{t("mt.date")}</Text>
               <View style={[styles.row, { flexWrap: "nowrap" }]}>
                 <IconButton
                   icon="chevron-back"
-                  label="Önceki gün"
+                  label={t("mt.prevDay")}
                   onPress={() => {
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setDay(addDays(day, -1));
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(day))
+                      setDay(addDays(day, -1));
                   }}
                 />
                 <View style={{ flex: 1 }}>
                   <Input
                     value={day}
                     onChangeText={setDay}
-                    accessibilityLabel="Takvim tarihi"
-                    placeholder="YYYY-AA-GG"
+                    accessibilityLabel={t("mt.calendarDate")}
+                    placeholder={t("mt.datePattern")}
                     keyboardType="numbers-and-punctuation"
                     maxLength={10}
                     style={{ textAlign: "center" }}
@@ -1155,9 +1210,10 @@ export function TeacherScreen({
                 </View>
                 <IconButton
                   icon="chevron-forward"
-                  label="Sonraki gün"
+                  label={t("mt.nextDay")}
                   onPress={() => {
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setDay(addDays(day, 1));
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(day))
+                      setDay(addDays(day, 1));
                   }}
                 />
               </View>
@@ -1167,11 +1223,11 @@ export function TeacherScreen({
                       weekday: "long",
                       year: "numeric",
                     })
-                  : "Biçim: YYYY-AA-GG"}
+                  : t("mt.dateFormatHint")}
               </Text>
             </View>
             <Button icon="add" onPress={() => newLesson()}>
-              Ders planla
+              {t("ws.planLesson")}
             </Button>
             {data.lessons
               .filter((l) => dateKey(l.starts_at) === day)
@@ -1180,8 +1236,8 @@ export function TeacherScreen({
             {!data.lessons.some((l) => dateKey(l.starts_at) === day) && (
               <EmptyState
                 icon="calendar-clear-outline"
-                title="Bu gün için ders yok"
-                description="Seçili tarihte planlanmış bir ders bulunmuyor."
+                title={t("mt.dayEmptyTitle")}
+                description={t("mt.dayEmptyText")}
               />
             )}
           </>
@@ -1189,12 +1245,15 @@ export function TeacherScreen({
           <>
             <InkPanel>
               <Text style={[section.figureLabel, { color: colors.marker }]}>
-                TOPLAM AÇIK BAKİYE
+                {upper(t("mt.totalBalance"))}
               </Text>
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                style={[styles.title, { color: colors.onFeature, marginTop: -8 }]}
+                style={[
+                  styles.title,
+                  { color: colors.onFeature, marginTop: -8 },
+                ]}
               >
                 {money(balance())}
               </Text>
@@ -1204,17 +1263,17 @@ export function TeacherScreen({
                   { color: colors.onFeatureMuted, marginTop: -8 },
                 ]}
               >
-                Öğrenci tahsilatları; Derslik abonelik ücreti değildir.
+                {t("mt.balanceNote")}
               </Text>
             </InkPanel>
             <Button icon="add" onPress={() => newPayment()}>
-              Tahsilat kaydet
+              {t("record.recordPayment")}
             </Button>
             {!data.payments.length && (
               <EmptyState
                 icon="wallet-outline"
-                title="Henüz tahsilat yok"
-                description="Aldığınız ödemeleri kaydettikçe burada listelenir."
+                title={t("mt.paymentsEmptyTitle")}
+                description={t("mt.paymentsEmptyText")}
               />
             )}
             {data.payments.map((p) => {
@@ -1232,11 +1291,11 @@ export function TeacherScreen({
                           year: "numeric",
                         })}{" "}
                         ·{" "}
-                        {p.method === "CASH"
-                          ? "Nakit"
-                          : p.method === "TRANSFER"
-                            ? "Havale"
-                            : "Diğer"}
+                        {t(
+                          p.method === "CASH" || p.method === "TRANSFER"
+                            ? `payments.methods.${p.method}`
+                            : "payments.methods.OTHER",
+                        )}
                       </Text>
                     </View>
                     <View style={{ alignItems: "flex-end", gap: 5 }}>
@@ -1256,7 +1315,7 @@ export function TeacherScreen({
                         tone={p.voided_at ? "neutral" : "success"}
                         icon={p.voided_at ? undefined : "checkmark"}
                       >
-                        {p.voided_at ? "İptal edildi" : "Kaydedildi"}
+                        {p.voided_at ? t("mt.voided") : t("payments.recorded")}
                       </Badge>
                     </View>
                   </View>
@@ -1272,8 +1331,8 @@ export function TeacherScreen({
                       style={{ alignSelf: "flex-start" }}
                       onPress={() =>
                         confirmAction(
-                          "Tahsilat kaydını iptal et",
-                          "Öğrenci bakiyesi yeniden artacak. Bankadan iade yapılmaz.",
+                          t("confirm.voidTitle"),
+                          t("mt.voidBody"),
                           () =>
                             mutate({
                               action: "payment.void",
@@ -1284,7 +1343,7 @@ export function TeacherScreen({
                         )
                       }
                     >
-                      Kaydı iptal et
+                      {t("payments.void")}
                     </Button>
                   )}
                 </Card>

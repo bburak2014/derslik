@@ -16,6 +16,9 @@ import {
   timeLabel,
   canEditSubmission,
   noticeTarget,
+  noticeText,
+  intlLocale,
+  t,
   type Notice,
   type NoticeTarget,
 } from "@derslik/contracts";
@@ -162,7 +165,7 @@ function ActionForm({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{spec?.title}</DialogTitle>
-          <DialogDescription>Bilgileri girip kaydedin.</DialogDescription>
+          <DialogDescription>{t("learn.formHint")}</DialogDescription>
         </DialogHeader>
         {spec && (
           <form
@@ -232,12 +235,12 @@ function ActionForm({
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={busy}>
-                  Vazgeç
+                  {t("common.cancel")}
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                {busy ? "Kaydediliyor…" : "Kaydet"}
+                {busy ? t("learn.savingEllipsis") : t("common.save")}
               </Button>
             </DialogFooter>
           </form>
@@ -279,7 +282,7 @@ function ConfirmDialog({
           <AlertDialogDescription>{state?.description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               void state?.perform();
@@ -449,7 +452,7 @@ export function LearningPanel({
   }
   async function attach(assignmentId: string | null, file: File) {
     if (!capabilities?.files) {
-      setError("Dosya yükleme şu anda kullanılamıyor.");
+      setError(t("learn.uploadUnavailable"));
       return;
     }
     setBusy(true);
@@ -473,7 +476,7 @@ export function LearningPanel({
           body: file,
         });
         if (!uploaded.ok && uploaded.status !== 409)
-          throw new Error("Dosya yüklenemedi. Yeniden deneyin.");
+          throw new Error(t("learn.uploadFailed"));
       }
       await backend(media + `/files/${r.id}/finish`, {});
       await reload();
@@ -487,25 +490,25 @@ export function LearningPanel({
    *  kısayol aynı formu açsın diye tek yerde duruyor. */
   function inviteSpec(): FormSpec {
     return {
-      title: "Davet bağlantısı oluştur",
+      title: t("learn.inviteTitle"),
       fields: [
-        { name: "email", label: "Davet edilecek e-posta", type: "email" },
+        { name: "email", label: t("learn.inviteEmail"), type: "email" },
         {
           name: "role",
-          label: "Hesap türü",
+          label: t("learn.accountType"),
           value: "STUDENT",
           options: [
-            { value: "STUDENT", label: "Öğrenci" },
-            { value: "GUARDIAN", label: "Veli" },
+            { value: "STUDENT", label: t("roles.STUDENT") },
+            { value: "GUARDIAN", label: t("roles.GUARDIAN") },
           ],
         },
         {
           name: "payments",
-          label: "Paket ve ödeme bilgisi",
+          label: t("learn.paymentInfo"),
           value: "no",
           options: [
-            { value: "no", label: "Gizli kalsın" },
-            { value: "yes", label: "Görüntüleyebilsin" },
+            { value: "no", label: t("learn.paymentHidden") },
+            { value: "yes", label: t("learn.paymentVisible") },
           ],
         },
       ],
@@ -555,9 +558,9 @@ export function LearningPanel({
   }
   function remove(file: Material) {
     setConfirmation({
-      title: "Dosya silinsin mi?",
-      description: `“${file.name}” kalıcı olarak kaldırılacak. Öğrenci artık indiremeyecek.`,
-      action: "Sil",
+      title: t("learn.deleteFileTitle"),
+      description: t("learn.deleteFileBody", { name: file.name }),
+      action: t("common.delete"),
       perform: () => removeNow(file),
     });
   }
@@ -582,28 +585,38 @@ export function LearningPanel({
         : [
             {
               id: "lessons" as const,
-              title: "Dersler",
+              title: t("nav.lessons"),
               permission: "lessons",
             },
           ]),
-      { id: "assignments", title: "Ödevler", permission: "assignments" },
-      { id: "files", title: "PDF ve dosyalar", permission: "assignments" },
-      { id: "videos", title: "Videolar", permission: "videos" },
-      { id: "notes", title: "Paylaşımlar", permission: "notes" },
+      {
+        id: "assignments",
+        title: t("nav.assignments"),
+        permission: "assignments",
+      },
+      { id: "files", title: t("nav.files"), permission: "assignments" },
+      { id: "videos", title: t("learn.tabVideos"), permission: "videos" },
+      { id: "notes", title: t("nav.notes"), permission: "notes" },
       ...(owner
-        ? [{ id: "access" as const, title: "Davetler", permission: "lessons" }]
+        ? [
+            {
+              id: "access" as const,
+              title: t("learn.tabAccess"),
+              permission: "lessons",
+            },
+          ]
         : [
             {
               id: "payments" as const,
-              title: "Paket ve bakiye",
+              title: t("nav.balance"),
               permission: "payments",
             },
           ]),
     ];
-    return all.filter((t) => allowed.includes(t.permission));
+    return all.filter((x) => allowed.includes(x.permission));
   }, [owner, permissionKey]);
   useEffect(() => {
-    if (tabs.length && !tabs.some((t) => t.id === tab)) setTab(tabs[0].id);
+    if (tabs.length && !tabs.some((x) => x.id === tab)) setTab(tabs[0].id);
   }, [tabs, tab]);
   useEffect(() => {
     onTabs?.(tabs.map(({ id, title }) => ({ id, title })));
@@ -618,7 +631,7 @@ export function LearningPanel({
   const refresh = (
     <IconAction
       outline
-      label="İçerikleri yenile"
+      label={t("learn.refresh")}
       icon={<RefreshCw />}
       onClick={() => void reload()}
     />
@@ -637,11 +650,11 @@ export function LearningPanel({
           >
             <TabsList
               className="max-w-full justify-start overflow-x-auto"
-              aria-label="Öğrenci içerikleri"
+              aria-label={t("learn.studentContent")}
             >
-              {tabs.map((t) => (
-                <TabsTrigger key={t.id} value={t.id} className="flex-none">
-                  {t.title}
+              {tabs.map((x) => (
+                <TabsTrigger key={x.id} value={x.id} className="flex-none">
+                  {x.title}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -657,14 +670,11 @@ export function LearningPanel({
             <CircleAlert />
             <AlertTitle>
               {tab === "videos"
-                ? "Video yükleme kullanıma hazır değil"
-                : "Dosya yükleme kullanıma hazır değil"}
+                ? t("learn.videoUploadNotReady")
+                : t("learn.fileUploadNotReady")}
             </AlertTitle>
             <AlertDescription>
-              <p>
-                Yükleme hizmetine şu anda erişilemiyor. Hizmet
-                etkinleştirildikten sonra tekrar kontrol edebilirsiniz.
-              </p>
+              <p>{t("learn.uploadServiceDown")}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -672,7 +682,7 @@ export function LearningPanel({
                 className="mt-2"
                 onClick={() => void reload()}
               >
-                <RefreshCw /> Tekrar kontrol et
+                <RefreshCw /> {t("learn.checkAgain")}
               </Button>
             </AlertDescription>
           </Alert>
@@ -685,8 +695,8 @@ export function LearningPanel({
       {tab === "assignments" && (
         <>
           <SectionHeading
-            title="Bir sonraki adıma hazırlık"
-            description="Ödevler, teslimler ve geri bildirimler."
+            title={t("learn.assignmentsTitle")}
+            description={t("learn.assignmentsText")}
           >
             {view && refresh}
             {owner && (
@@ -694,18 +704,18 @@ export function LearningPanel({
                 type="button"
                 onClick={() =>
                   simple(
-                    "Yeni ödev",
+                    t("notice.assignmentNew"),
                     [
-                      { name: "title", label: "Başlık" },
+                      { name: "title", label: t("learn.title") },
                       {
                         name: "instructions",
-                        label: "Yönerge",
+                        label: t("learn.instructions"),
                         type: "textarea",
                         required: false,
                       },
                       {
                         name: "dueOn",
-                        label: "Son teslim",
+                        label: t("learn.dueOn"),
                         required: false,
                         type: "date",
                         value: dateKey(),
@@ -715,14 +725,14 @@ export function LearningPanel({
                   )
                 }
               >
-                <Plus /> Ödev ver
+                <Plus /> {t("learn.assign")}
               </Button>
             )}
           </SectionHeading>
           <ItemGroup className="gap-3">
             {!data.assignments.length && (
-              <EmptyNote icon={ClipboardList} title="Henüz ödev yok">
-                Verilen ödevler, teslimler ve geri bildirimler burada görünecek.
+              <EmptyNote icon={ClipboardList} title={t("learn.noAssignments")}>
+                {t("learn.noAssignmentsHint")}
               </EmptyNote>
             )}
             {data.assignments.map((a) => {
@@ -731,16 +741,16 @@ export function LearningPanel({
               );
               const state: [Tone, string] =
                 a.status === "CANCELLED"
-                  ? ["muted", "İptal edildi"]
+                  ? ["muted", t("lesson.cancelled")]
                   : a.status === "COMPLETED"
-                    ? ["ok", "Tamamlandı"]
+                    ? ["ok", t("lesson.completed")]
                     : sub
                       ? sub.status === "REVIEWED"
-                        ? ["ok", "Değerlendirildi"]
-                        : ["info", "Teslim edildi"]
+                        ? ["ok", t("learn.reviewed")]
+                        : ["info", t("learn.submitted")]
                       : a.due_on && a.due_on < today
-                        ? ["danger", "Gecikti"]
-                        : ["warn", "Teslim bekleniyor"];
+                        ? ["danger", t("learn.late")]
+                        : ["warn", t("learn.awaiting")];
               const files = data.materials.filter(
                 (m) => m.assignment_id === a.id,
               );
@@ -759,8 +769,10 @@ export function LearningPanel({
                     <ItemTitle>{a.title}</ItemTitle>
                     <ItemDescription>
                       {a.due_on
-                        ? "Son teslim " + dayLabel(a.due_on + "T12:00:00+03:00")
-                        : "Son teslim tarihi yok"}
+                        ? t("learn.dueDate", {
+                            date: dayLabel(a.due_on + "T12:00:00+03:00"),
+                          })
+                        : t("learn.noDueDate")}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions className="ml-auto">
@@ -777,7 +789,7 @@ export function LearningPanel({
                         <div className="bg-muted/50 grid gap-3 rounded-md border p-3">
                           <div className="grid gap-1">
                             <span className="text-muted-foreground text-xs font-medium">
-                              Öğrenci teslimi
+                              {t("learn.studentSubmission")}
                             </span>
                             <p className="leading-relaxed whitespace-pre-line">
                               {sub.body}
@@ -786,7 +798,7 @@ export function LearningPanel({
                           {sub.feedback && (
                             <div className="grid gap-1 border-t pt-3">
                               <span className="text-muted-foreground text-xs font-medium">
-                                Öğretmen geri bildirimi
+                                {t("learn.teacherFeedback")}
                               </span>
                               <p className="leading-relaxed whitespace-pre-line">
                                 {sub.feedback}
@@ -813,10 +825,10 @@ export function LearningPanel({
                               <span className="truncate">{m.name}</span>
                               <span className="text-muted-foreground font-normal">
                                 {m.status !== "READY"
-                                  ? "Yükleme bekliyor"
+                                  ? t("learn.uploadPending")
                                   : m.purpose === "SUBMISSION"
-                                    ? "Teslim"
-                                    : "Kaynak"}
+                                    ? t("learn.fileSubmission")
+                                    : t("learn.fileResource")}
                               </span>
                             </Button>
                           ))}
@@ -832,35 +844,44 @@ export function LearningPanel({
                         size="sm"
                         onClick={() =>
                           simple(
-                            "Ödevi düzenle",
+                            t("learn.editAssignment"),
                             [
                               {
                                 name: "title",
-                                label: "Başlık",
+                                label: t("learn.title"),
                                 value: a.title,
                               },
                               {
                                 name: "instructions",
-                                label: "Yönerge",
+                                label: t("learn.instructions"),
                                 type: "textarea",
                                 value: a.instructions,
                                 required: false,
                               },
                               {
                                 name: "dueOn",
-                                label: "Son teslim",
+                                label: t("learn.dueOn"),
                                 type: "date",
                                 value: a.due_on || "",
                                 required: false,
                               },
                               {
                                 name: "status",
-                                label: "Durum",
+                                label: t("common.status"),
                                 value: a.status,
                                 options: [
-                                  { value: "OPEN", label: "Devam ediyor" },
-                                  { value: "COMPLETED", label: "Tamamlandı" },
-                                  { value: "CANCELLED", label: "İptal edildi" },
+                                  {
+                                    value: "OPEN",
+                                    label: t("learn.inProgress"),
+                                  },
+                                  {
+                                    value: "COMPLETED",
+                                    label: t("lesson.completed"),
+                                  },
+                                  {
+                                    value: "CANCELLED",
+                                    label: t("lesson.cancelled"),
+                                  },
                                 ],
                               },
                             ],
@@ -873,7 +894,7 @@ export function LearningPanel({
                           )
                         }
                       >
-                        <Pencil /> Düzenle
+                        <Pencil /> {t("common.edit")}
                       </Button>
                     )}
                     {student && editable && (
@@ -882,11 +903,13 @@ export function LearningPanel({
                         size="sm"
                         onClick={() =>
                           simple(
-                            sub ? "Teslimi düzenle" : "Ödevi teslim et",
+                            sub
+                              ? t("learn.editSubmission")
+                              : t("learn.submitTitle"),
                             [
                               {
                                 name: "body",
-                                label: "Çözümünüz / açıklamanız",
+                                label: t("learn.yourAnswer"),
                                 type: "textarea",
                                 value: sub?.body || "",
                               },
@@ -900,7 +923,8 @@ export function LearningPanel({
                           )
                         }
                       >
-                        <Send /> {sub ? "Teslimi düzenle" : "Teslim et"}
+                        <Send />{" "}
+                        {sub ? t("learn.editSubmission") : t("learn.submit")}
                       </Button>
                     )}
                     {owner && sub && (
@@ -910,11 +934,11 @@ export function LearningPanel({
                         size="sm"
                         onClick={() =>
                           simple(
-                            "Ödevi değerlendir",
+                            t("learn.reviewTitle"),
                             [
                               {
                                 name: "feedback",
-                                label: "Geri bildirim",
+                                label: t("learn.feedback"),
                                 type: "textarea",
                                 value: sub.feedback,
                               },
@@ -928,7 +952,7 @@ export function LearningPanel({
                           )
                         }
                       >
-                        <MessageSquare /> Geri bildirim yaz
+                        <MessageSquare /> {t("learn.writeFeedback")}
                       </Button>
                     )}
                     {student &&
@@ -937,13 +961,14 @@ export function LearningPanel({
                       (editable ? (
                         a.due_on && (
                           <span className="text-muted-foreground text-xs">
-                            {dayLabel(a.due_on + "T12:00:00+03:00")} gününün
-                            sonuna kadar düzenleyebilirsiniz
+                            {t("learn.editableUntil", {
+                              date: dayLabel(a.due_on + "T12:00:00+03:00"),
+                            })}
                           </span>
                         )
                       ) : (
                         <span className="text-muted-foreground text-xs">
-                          Son teslim tarihi geçti, teslim kilitlendi
+                          {t("learn.locked")}
                         </span>
                       ))}
                     {(owner || (student && editable)) && (
@@ -954,7 +979,7 @@ export function LearningPanel({
                       />
                     )}
                     <span className="text-muted-foreground ml-auto text-xs">
-                      PDF, JPG, PNG veya WebP · en fazla 10 MB
+                      {t("learn.fileLimits")}
                     </span>
                   </ItemFooter>
                 </Item>
@@ -966,8 +991,8 @@ export function LearningPanel({
       {tab === "files" && (
         <>
           <SectionHeading
-            title="PDF ve dosyalar"
-            description="Ödev ekleri, çözümler ve öğrenciye paylaşılan ders materyalleri."
+            title={t("nav.files")}
+            description={t("learn.filesText")}
           >
             {view && refresh}
           </SectionHeading>
@@ -975,11 +1000,8 @@ export function LearningPanel({
             <div className="upload-layout">
               <Card className="gap-5">
                 <CardHeader>
-                  <CardTitle>Dosya yükle</CardTitle>
-                  <CardDescription>
-                    Bir ödeve bağlayın ya da genel ders materyali olarak
-                    paylaşın.
-                  </CardDescription>
+                  <CardTitle>{t("learn.uploadFile")}</CardTitle>
+                  <CardDescription>{t("learn.uploadFileHint")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form
@@ -997,7 +1019,9 @@ export function LearningPanel({
                     }}
                   >
                     <div className="grid gap-2">
-                      <Label htmlFor="material-assignment">Bağlı ödev</Label>
+                      <Label htmlFor="material-assignment">
+                        {t("learn.linkedAssignment")}
+                      </Label>
                       <Select name="assignmentId" defaultValue={GENERAL}>
                         <SelectTrigger
                           id="material-assignment"
@@ -1007,7 +1031,7 @@ export function LearningPanel({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={GENERAL}>
-                            Genel ders materyali
+                            {t("learn.generalMaterial")}
                           </SelectItem>
                           {data.assignments.map((a) => (
                             <SelectItem key={a.id} value={a.id}>
@@ -1018,7 +1042,9 @@ export function LearningPanel({
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="material-file">PDF veya görsel</Label>
+                      <Label htmlFor="material-file">
+                        {t("learn.pdfOrImage")}
+                      </Label>
                       <Input
                         id="material-file"
                         name="file"
@@ -1028,7 +1054,7 @@ export function LearningPanel({
                         disabled={busy || !capabilities?.files}
                       />
                       <p className="text-muted-foreground text-xs">
-                        PDF, JPG, PNG veya WebP · en fazla 10 MB.
+                        {t("learn.fileLimits")}
                       </p>
                     </div>
                     <Button
@@ -1037,7 +1063,7 @@ export function LearningPanel({
                       disabled={busy || !capabilities?.files}
                     >
                       {busy ? <Spinner /> : <Upload />}
-                      {busy ? "Yükleniyor…" : "Dosya yükle"}
+                      {busy ? t("learn.uploading") : t("learn.uploadFile")}
                     </Button>
                   </form>
                 </CardContent>
@@ -1047,8 +1073,8 @@ export function LearningPanel({
           )}
           <ItemGroup className="gap-3">
             {!data.materials.length && (
-              <EmptyNote icon={FileText} title="Henüz dosya yok">
-                Eklenen PDF ve materyaller burada görünecek.
+              <EmptyNote icon={FileText} title={t("learn.noFiles")}>
+                {t("learn.noFilesHint")}
               </EmptyNote>
             )}
             {data.materials.map((file) => (
@@ -1065,7 +1091,7 @@ export function LearningPanel({
                       ? data.assignments.find(
                           (a) => a.id === file.assignment_id,
                         )?.title
-                      : "Genel ders materyali"}{" "}
+                      : t("learn.generalMaterial")}{" "}
                     · {Math.ceil(Number(file.size_bytes) / 1024)} KB
                   </ItemDescription>
                 </ItemContent>
@@ -1073,13 +1099,13 @@ export function LearningPanel({
                   {file.status === "READY" && !file.delete_requested ? (
                     <>
                       <IconAction
-                        label="Önizle"
+                        label={t("learn.preview")}
                         icon={<Eye />}
                         disabled={busy}
                         onClick={() => void openPreview(file)}
                       />
                       <IconAction
-                        label="Dosyayı indir"
+                        label={t("learn.download")}
                         icon={<Download />}
                         onClick={() => void download(file)}
                       />
@@ -1087,15 +1113,17 @@ export function LearningPanel({
                   ) : (
                     <ToneBadge tone="warn" className="mr-1">
                       {file.delete_requested
-                        ? "Silme bekliyor"
-                        : "Yükleme tamamlanmadı"}
+                        ? t("learn.deletePending")
+                        : t("learn.uploadIncomplete")}
                     </ToneBadge>
                   )}
                   {owner && (
                     <IconAction
                       danger
                       label={
-                        file.delete_requested ? "Silmeyi yeniden dene" : "Sil"
+                        file.delete_requested
+                          ? t("learn.retryDelete")
+                          : t("common.delete")
                       }
                       icon={<Trash2 />}
                       disabled={busy}
@@ -1111,8 +1139,8 @@ export function LearningPanel({
       {tab === "videos" && (
         <>
           <SectionHeading
-            title="Dersi yeniden keşfedin"
-            description="Videoyu izleyin; sorularınızı ilgili saniyeye ekleyin."
+            title={t("learn.videosTitle")}
+            description={t("learn.videosText")}
           >
             {view && refresh}
           </SectionHeading>
@@ -1120,9 +1148,9 @@ export function LearningPanel({
             <div className="upload-layout">
               <Card className="gap-5">
                 <CardHeader>
-                  <CardTitle>Video yükle</CardTitle>
+                  <CardTitle>{t("learn.uploadVideo")}</CardTitle>
                   <CardDescription>
-                    Ders kaydını öğrencinin paneline ekleyin.
+                    {t("learn.uploadVideoHint")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1187,14 +1215,14 @@ export function LearningPanel({
                     }}
                   >
                     <div className="grid gap-2">
-                      <Label htmlFor="video-lesson">Ders</Label>
+                      <Label htmlFor="video-lesson">{t("learn.lesson")}</Label>
                       <Select name="lessonId" defaultValue={GENERAL}>
                         <SelectTrigger id="video-lesson" className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={GENERAL}>
-                            Genel ders videosu
+                            {t("learn.generalVideo")}
                           </SelectItem>
                           {data.lessons.map((l) => (
                             <SelectItem key={l.id} value={l.id}>
@@ -1206,18 +1234,20 @@ export function LearningPanel({
                     </div>
                     <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
                       <div className="grid gap-2">
-                        <Label htmlFor="video-title">Video başlığı</Label>
+                        <Label htmlFor="video-title">
+                          {t("learn.videoTitle")}
+                        </Label>
                         <Input
                           id="video-title"
                           name="title"
                           required
                           maxLength={150}
-                          placeholder="Örn. Denklemler · 1. ders"
+                          placeholder={t("learn.videoTitlePlaceholder")}
                         />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="video-duration">
-                          En fazla süre (dk)
+                          {t("learn.maxDuration")}
                         </Label>
                         <Input
                           id="video-duration"
@@ -1231,7 +1261,7 @@ export function LearningPanel({
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="video-file">Video dosyası</Label>
+                      <Label htmlFor="video-file">{t("learn.videoFile")}</Label>
                       <Input
                         id="video-file"
                         name="file"
@@ -1241,14 +1271,13 @@ export function LearningPanel({
                         required
                       />
                       <p className="text-muted-foreground text-xs">
-                        En fazla 2 GB. Yükleme kesilirse aynı dosya ile tekrar
-                        deneyin.
+                        {t("learn.videoLimits")}
                       </p>
                     </div>
                     {progress !== null && (
                       <Progress
                         value={Math.round(progress * 100)}
-                        aria-label="Video yükleme ilerlemesi"
+                        aria-label={t("learn.uploadProgress")}
                       />
                     )}
                     <Button
@@ -1258,8 +1287,10 @@ export function LearningPanel({
                     >
                       {busy ? <Spinner /> : <Upload />}
                       {busy
-                        ? `Yükleniyor · %${Math.round((progress || 0) * 100)}`
-                        : "Videoyu yükle"}
+                        ? t("learn.uploadingPercent", {
+                            percent: Math.round((progress || 0) * 100),
+                          })
+                        : t("learn.uploadVideoSubmit")}
                     </Button>
                   </form>
                 </CardContent>
@@ -1269,8 +1300,8 @@ export function LearningPanel({
           )}
           <ItemGroup className="gap-3">
             {!data.videos.length && (
-              <EmptyNote icon={VideoIcon} title="Henüz video yok">
-                Hazır olduğunda ders videoları burada görünecek.
+              <EmptyNote icon={VideoIcon} title={t("learn.noVideos")}>
+                {t("learn.noVideosHint")}
               </EmptyNote>
             )}
             {data.videos.map((v) => {
@@ -1291,9 +1322,13 @@ export function LearningPanel({
                     <ItemTitle>{v.title}</ItemTitle>
                     <ItemDescription>
                       {v.status === "READY"
-                        ? `${Math.ceil((v.duration_seconds || 0) / 60)} dakika`
-                        : "Video işleniyor"}
-                      {questions.length > 0 && ` · ${questions.length} soru`}
+                        ? t("learn.minutes", {
+                            count: Math.ceil((v.duration_seconds || 0) / 60),
+                          })
+                        : t("learn.videoProcessing")}
+                      {questions.length > 0 &&
+                        " · " +
+                          t("learn.questionCount", { count: questions.length })}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions className="ml-auto gap-1">
@@ -1307,15 +1342,15 @@ export function LearningPanel({
                         }
                       >
                         {v.delete_requested
-                          ? "Silme bekliyor"
+                          ? t("learn.deletePending")
                           : v.status === "FAILED"
-                            ? "Yüklenemedi"
-                            : "Hazırlanıyor"}
+                            ? t("learn.videoFailed")
+                            : t("learn.videoPreparing")}
                       </ToneBadge>
                     )}
                     {v.status === "READY" && !v.delete_requested && (
                       <IconAction
-                        label="Videoyu aç"
+                        label={t("learn.openVideo")}
                         icon={<Play />}
                         onClick={() => setActiveVideo(v)}
                       />
@@ -1323,7 +1358,7 @@ export function LearningPanel({
                     {owner && (
                       <>
                         <IconAction
-                          label="Durumu yenile"
+                          label={t("sub.refresh")}
                           icon={<RefreshCw />}
                           disabled={busy}
                           onClick={async () => {
@@ -1343,15 +1378,14 @@ export function LearningPanel({
                         />
                         <IconAction
                           danger
-                          label="Sil"
+                          label={t("common.delete")}
                           icon={<Trash2 />}
                           disabled={busy}
                           onClick={() =>
                             setConfirmation({
-                              title: "Video silinsin mi?",
-                              description:
-                                "Kayıt kalıcı olarak kaldırılacak. Öğrenci artık izleyemeyecek.",
-                              action: "Sil",
+                              title: t("learn.deleteVideoTitle"),
+                              description: t("learn.deleteVideoBody"),
+                              action: t("common.delete"),
                               perform: async () => {
                                 setBusy(true);
                                 try {
@@ -1381,9 +1415,13 @@ export function LearningPanel({
                               {Math.floor(q.at_seconds / 60)}:
                               {String(q.at_seconds % 60).padStart(2, "0")}
                             </Badge>
-                            <span className="font-medium">Öğrenci sorusu</span>
+                            <span className="font-medium">
+                              {t("learn.studentQuestion")}
+                            </span>
                             {q.resolved && (
-                              <ToneBadge tone="ok">Yanıtlandı</ToneBadge>
+                              <ToneBadge tone="ok">
+                                {t("learn.answered")}
+                              </ToneBadge>
                             )}
                           </div>
                           <p className="leading-relaxed">{q.body}</p>
@@ -1400,11 +1438,11 @@ export function LearningPanel({
                               className="justify-self-start"
                               onClick={() =>
                                 simple(
-                                  "Video sorusunu yanıtla",
+                                  t("learn.answerTitle"),
                                   [
                                     {
                                       name: "answer",
-                                      label: "Yanıtınız",
+                                      label: t("learn.yourReply"),
                                       type: "textarea",
                                       value: q.answer,
                                     },
@@ -1420,7 +1458,9 @@ export function LearningPanel({
                               }
                             >
                               <MessageSquare />
-                              {q.answer ? "Yanıtı düzenle" : "Yanıtla"}
+                              {q.answer
+                                ? t("learn.editAnswer")
+                                : t("learn.reply")}
                             </Button>
                           )}
                         </div>
@@ -1436,8 +1476,8 @@ export function LearningPanel({
       {tab === "notes" && (
         <>
           <SectionHeading
-            title="Gelişim günlüğü"
-            description="Paylaşılan notlar ve öğretmen onaylı haftalık özetler."
+            title={t("learn.notesTitle")}
+            description={t("learn.notesText")}
           >
             {view && refresh}
             {owner && (
@@ -1447,11 +1487,11 @@ export function LearningPanel({
                   variant="outline"
                   onClick={() =>
                     simple(
-                      "Haftalık özet hazırla",
+                      t("learn.summaryTitle"),
                       [
                         {
                           name: "weekOn",
-                          label: "Hafta başlangıcı",
+                          label: t("learn.weekStart"),
                           type: "date",
                           value: dateKey(),
                         },
@@ -1460,22 +1500,29 @@ export function LearningPanel({
                     )
                   }
                 >
-                  <Sparkles /> Özet taslağı hazırla
+                  <Sparkles /> {t("learn.draftSummary")}
                 </Button>
                 <Button
                   type="button"
                   onClick={() =>
                     simple(
-                      "Not paylaş",
+                      t("learn.shareNote"),
                       [
-                        { name: "body", label: "Notunuz", type: "textarea" },
+                        {
+                          name: "body",
+                          label: t("learn.yourNote"),
+                          type: "textarea",
+                        },
                         {
                           name: "audience",
-                          label: "Kim görebilsin?",
+                          label: t("learn.audience"),
                           value: "BOTH",
                           options: [
-                            { value: "BOTH", label: "Öğrenci ve veli" },
-                            { value: "STUDENT", label: "Yalnız öğrenci" },
+                            { value: "BOTH", label: t("learn.audienceBoth") },
+                            {
+                              value: "STUDENT",
+                              label: t("learn.audienceStudent"),
+                            },
                           ],
                         },
                       ],
@@ -1483,15 +1530,15 @@ export function LearningPanel({
                     )
                   }
                 >
-                  <Plus /> Not paylaş
+                  <Plus /> {t("learn.shareNote")}
                 </Button>
               </>
             )}
           </SectionHeading>
           <ItemGroup className="gap-3">
             {!data.notes.length && !data.summaries.length && (
-              <EmptyNote icon={NotebookPen} title="Henüz paylaşım yok">
-                Paylaşılan notlar ve haftalık özetler burada görünecek.
+              <EmptyNote icon={NotebookPen} title={t("learn.noNotes")}>
+                {t("learn.noNotesHint")}
               </EmptyNote>
             )}
             {data.summaries.map((s) => (
@@ -1506,13 +1553,17 @@ export function LearningPanel({
                 </ItemMedia>
                 <ItemContent className="min-w-36">
                   <ItemTitle>
-                    {dayLabel(s.week_on + "T12:00:00+03:00")} haftası
+                    {t("learn.weekOf", {
+                      date: dayLabel(s.week_on + "T12:00:00+03:00"),
+                    })}
                   </ItemTitle>
-                  <ItemDescription>Haftalık özet</ItemDescription>
+                  <ItemDescription>{t("learn.weeklySummary")}</ItemDescription>
                 </ItemContent>
                 <ItemActions className="ml-auto">
                   <ToneBadge tone={s.status === "DRAFT" ? "warn" : "ok"}>
-                    {s.status === "DRAFT" ? "Taslak" : "Paylaşıldı"}
+                    {s.status === "DRAFT"
+                      ? t("learn.draft")
+                      : t("learn.shared")}
                   </ToneBadge>
                 </ItemActions>
                 <p className="basis-full text-sm leading-relaxed whitespace-pre-line">
@@ -1526,11 +1577,11 @@ export function LearningPanel({
                       size="sm"
                       onClick={() =>
                         simple(
-                          "Özeti incele ve paylaş",
+                          t("learn.reviewSummary"),
                           [
                             {
                               name: "body",
-                              label: "Özet",
+                              label: t("learn.summary"),
                               type: "textarea",
                               value: s.body,
                             },
@@ -1546,8 +1597,8 @@ export function LearningPanel({
                     >
                       <Pencil />
                       {s.status === "DRAFT"
-                        ? "Düzenle ve onayla"
-                        : "Özeti güncelle"}
+                        ? t("learn.editApprove")
+                        : t("learn.updateSummary")}
                     </Button>
                   </ItemFooter>
                 )}
@@ -1563,12 +1614,14 @@ export function LearningPanel({
                   <NotebookPen />
                 </ItemMedia>
                 <ItemContent className="min-w-36">
-                  <ItemTitle>Öğretmen notu</ItemTitle>
+                  <ItemTitle>{t("learn.teacherNote")}</ItemTitle>
                   <ItemDescription>{dayLabel(n.created_at)}</ItemDescription>
                 </ItemContent>
                 <ItemActions className="ml-auto">
                   <ToneBadge tone="muted">
-                    {n.audience === "BOTH" ? "Öğrenci ve veli" : "Öğrenci"}
+                    {n.audience === "BOTH"
+                      ? t("learn.audienceBoth")
+                      : t("roles.STUDENT")}
                   </ToneBadge>
                 </ItemActions>
                 <p className="basis-full text-sm leading-relaxed whitespace-pre-line">
@@ -1582,15 +1635,15 @@ export function LearningPanel({
       {tab === "payments" && "packages" in data && (
         <>
           <SectionHeading
-            title="Paket ve ödemeler"
-            description="Ders hakları, açık bakiye ve kayıtlı ödemeler."
+            title={t("learn.paymentsTitle")}
+            description={t("portal.balanceGuardian")}
           >
             {view && refresh}
           </SectionHeading>
           <ItemGroup className="gap-3">
             <Card className="gap-1 py-5">
               <CardHeader className="px-5">
-                <CardDescription>Açık bakiye</CardDescription>
+                <CardDescription>{t("students.openBalance")}</CardDescription>
                 <CardTitle className="text-2xl tabular-nums">
                   {money(
                     data.packages.reduce(
@@ -1604,7 +1657,7 @@ export function LearningPanel({
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-muted-foreground px-5 text-sm">
-                Öğretmeninizin kaydettiği paket ve tahsilatlara göre.
+                {t("learn.balanceBasis")}
               </CardContent>
             </Card>
             {data.packages.map((p) => (
@@ -1615,8 +1668,11 @@ export function LearningPanel({
                 <ItemContent className="min-w-36">
                   <ItemTitle>{p.name}</ItemTitle>
                   <ItemDescription>
-                    {p.remaining} / {p.granted} ders hakkı ·{" "}
-                    {money(p.price_minor)}
+                    {t("learn.creditsOf", {
+                      remaining: p.remaining,
+                      count: p.granted,
+                    })}{" "}
+                    · {money(p.price_minor)}
                   </ItemDescription>
                 </ItemContent>
               </Item>
@@ -1636,7 +1692,7 @@ export function LearningPanel({
                 </ItemContent>
                 <ItemActions className="ml-auto">
                   <ToneBadge tone={p.voided_at ? "muted" : "ok"}>
-                    {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
+                    {p.voided_at ? t("lesson.cancelled") : t("learn.paid")}
                   </ToneBadge>
                 </ItemActions>
               </Item>
@@ -1647,11 +1703,11 @@ export function LearningPanel({
       {tab === "access" && owner && (
         <>
           <SectionHeading
-            title="Öğrenci ve veli erişimi"
-            description="Davet yalnızca belirtilen, doğrulanmış e-posta hesabıyla kabul edilir."
+            title={t("learn.accessTitle")}
+            description={t("learn.accessText")}
           >
             <Button type="button" onClick={() => setForm(inviteSpec())}>
-              <UserPlus /> Davet oluştur
+              <UserPlus /> {t("learn.createInvite")}
             </Button>
           </SectionHeading>
           {invite && (
@@ -1659,13 +1715,11 @@ export function LearningPanel({
               <CardContent className="grid gap-4 px-5">
                 <FormSuccess>
                   {invite.emailed
-                    ? `Davet ${invite.email} adresine e-posta ile gönderildi. Ulaşmadıysa aşağıdaki bağlantıyı kendiniz iletebilirsiniz.`
-                    : "E-posta gönderimi kapalı; bağlantıyı aşağıdan kopyalayıp iletin."}
+                    ? t("learn.inviteEmailed", { email: invite.email })
+                    : t("learn.inviteNoEmail")}
                 </FormSuccess>
                 <div className="grid gap-2">
-                  <Label htmlFor="invite-url">
-                    Davet bağlantısı · 7 gün geçerli
-                  </Label>
+                  <Label htmlFor="invite-url">{t("learn.inviteLink")}</Label>
                   <div className="flex gap-2">
                     <Input
                       id="invite-url"
@@ -1681,11 +1735,11 @@ export function LearningPanel({
                         try {
                           await navigator.clipboard.writeText(invite.url);
                         } catch {
-                          setError("Bağlantıyı seçip kopyalayın.");
+                          setError(t("learn.copyManually"));
                         }
                       }}
                     >
-                      <Copy /> Kopyala
+                      <Copy /> {t("learn.copy")}
                     </Button>
                   </div>
                 </div>
@@ -1704,7 +1758,7 @@ export function LearningPanel({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <WhatsappIcon /> WhatsApp ile gönder
+                      <WhatsappIcon /> {t("learn.sendWhatsapp")}
                     </a>
                   </Button>
                 )}
@@ -1713,8 +1767,8 @@ export function LearningPanel({
           )}
           <ItemGroup className="gap-3">
             {access && !access.data?.length && !access.invitations?.length && (
-              <EmptyNote icon={UserPlus} title="Henüz davet yok">
-                Öğrenci veya veliyi davet ettiğinizde burada görünür.
+              <EmptyNote icon={UserPlus} title={t("learn.noInvites")}>
+                {t("learn.noInvitesHint")}
               </EmptyNote>
             )}
             {access?.data?.map((a: any) => (
@@ -1724,12 +1778,14 @@ export function LearningPanel({
                 </ItemMedia>
                 <ItemContent className="min-w-36">
                   <ItemTitle>
-                    {a.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
+                    {a.role === "STUDENT"
+                      ? t("learn.studentAccess")
+                      : t("learn.guardianAccess")}
                   </ItemTitle>
                 </ItemContent>
                 <ItemActions className="ml-auto">
                   <ToneBadge tone={a.revokedAt ? "muted" : "ok"}>
-                    {a.revokedAt ? "Kaldırıldı" : "Etkin"}
+                    {a.revokedAt ? t("learn.removed") : t("sub.status.active")}
                   </ToneBadge>
                   {!a.revokedAt && (
                     <Button
@@ -1739,10 +1795,9 @@ export function LearningPanel({
                       className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={() =>
                         setConfirmation({
-                          title: "Erişim kaldırılsın mı?",
-                          description:
-                            "Bu hesap öğrencinin ödev, dosya ve videolarını artık göremeyecek.",
-                          action: "Kaldır",
+                          title: t("learn.revokeTitle"),
+                          description: t("learn.revokeBody"),
+                          action: t("learn.remove"),
                           perform: async () => {
                             try {
                               await backend(
@@ -1757,7 +1812,7 @@ export function LearningPanel({
                         })
                       }
                     >
-                      Erişimi kaldır
+                      {t("learn.revokeAccess")}
                     </Button>
                   )}
                 </ItemActions>
@@ -1775,7 +1830,9 @@ export function LearningPanel({
                       <span className="truncate">{a.email}</span>
                     </ItemTitle>
                     <ItemDescription>
-                      {a.role === "GUARDIAN" ? "Veli daveti" : "Öğrenci daveti"}
+                      {a.role === "GUARDIAN"
+                        ? t("learn.guardianInvite")
+                        : t("learn.studentInvite")}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions className="ml-auto">
@@ -1789,12 +1846,12 @@ export function LearningPanel({
                       }
                     >
                       {a.acceptedAt
-                        ? "Kabul edildi"
+                        ? t("learn.accepted")
                         : a.revokedAt
-                          ? "İptal edildi"
+                          ? t("lesson.cancelled")
                           : expired
-                            ? "Süresi doldu"
-                            : "Davet bekliyor"}
+                            ? t("learn.expired")
+                            : t("learn.invitePending")}
                     </ToneBadge>
                     {!a.acceptedAt && !a.revokedAt && (
                       <Button
@@ -1814,7 +1871,7 @@ export function LearningPanel({
                           }
                         }}
                       >
-                        Daveti iptal et
+                        {t("learn.cancelInvite")}
                       </Button>
                     )}
                   </ItemActions>
@@ -1838,9 +1895,7 @@ export function LearningPanel({
         <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle>{filePreview?.file.name}</DialogTitle>
-            <DialogDescription>
-              Önizleme · dosyayı indirmeden içeriğine göz atın.
-            </DialogDescription>
+            <DialogDescription>{t("learn.previewHint")}</DialogDescription>
           </DialogHeader>
           {filePreview &&
             (isImageName(filePreview.file.name) ? (
@@ -1862,7 +1917,7 @@ export function LearningPanel({
               variant="outline"
               onClick={() => void download(filePreview!.file)}
             >
-              <Download size={16} /> Dosyayı indir
+              <Download size={16} /> {t("learn.download")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1876,9 +1931,7 @@ export function LearningPanel({
         <DialogContent className="sm:max-w-[850px]">
           <DialogHeader>
             <DialogTitle>{activeVideo?.title}</DialogTitle>
-            <DialogDescription>
-              Ders videosu ve zaman damgalı sorular.
-            </DialogDescription>
+            <DialogDescription>{t("learn.videoDialogHint")}</DialogDescription>
           </DialogHeader>
           {activeVideo && (
             <VideoPlayer
@@ -1899,11 +1952,13 @@ export function LearningPanel({
               }
               onAsk={(seconds) =>
                 simple(
-                  "Bu saniyeye soru ekle",
+                  t("video.askHere"),
                   [
                     {
                       name: "body",
-                      label: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} için sorunuz`,
+                      label: t("learn.questionAt", {
+                        time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
+                      }),
                       type: "textarea",
                     },
                   ],
@@ -1982,30 +2037,30 @@ function LessonSchedule({
   const day = (iso: string) => {
     const key = dateKey(iso);
     return key === today
-      ? "Bugün"
+      ? t("common.today")
       : key === tomorrow
-        ? "Yarın"
+        ? t("common.tomorrow")
         : dayLabel(iso, { weekday: "long" });
   };
   if (!lessons.length)
     return (
       <>
         <SectionHeading
-          title="Ders planı"
-          description="Planlanan ve tamamlanan dersler burada listelenir."
+          title={t("learn.scheduleTitle")}
+          description={t("learn.scheduleText")}
         >
           {children}
         </SectionHeading>
-        <EmptyNote icon={CalendarDays} title="Henüz ders yok">
-          Planlanan dersler burada görünecek.
+        <EmptyNote icon={CalendarDays} title={t("learn.noLessons")}>
+          {t("learn.noLessonsHint")}
         </EmptyNote>
       </>
     );
   return (
     <>
       <SectionHeading
-        title="Yaklaşan dersler"
-        description="En yakın ders en üstte."
+        title={t("learn.upcoming")}
+        description={t("learn.upcomingText")}
       >
         {children}
       </SectionHeading>
@@ -2020,22 +2075,22 @@ function LessonSchedule({
                 i > 0
                   ? undefined
                   : Date.parse(l.starts_at) <= clock
-                    ? "Şimdi"
-                    : "Sıradaki"
+                    ? t("lesson.now")
+                    : t("learn.next")
               }
             />
           ))
         ) : (
-          <EmptyNote icon={CalendarDays} title="Yaklaşan ders yok">
-            Yeni bir ders planlandığında burada görünecek.
+          <EmptyNote icon={CalendarDays} title={t("learn.noUpcoming")}>
+            {t("learn.noUpcomingHint")}
           </EmptyNote>
         )}
       </ItemGroup>
       {past.length > 0 && (
         <>
           <SectionHeading
-            title="Geçmiş dersler"
-            description="Tamamlanan ve iptal edilen dersler, en yenisi üstte."
+            title={t("learn.past")}
+            description={t("learn.pastText")}
           />
           <ItemGroup className="gap-3">
             {past.map((l) => (
@@ -2083,7 +2138,7 @@ function LessonItem({
           {"\u00a0· "}
           {timeLabel(l.starts_at)}–{timeLabel(l.ends_at)}
           {"\u00a0· "}
-          {l.location || "Konum belirtilmedi"}
+          {l.location || t("lesson.noLocation")}
         </ItemDescription>
       </ItemContent>
       {(chip || status) && (
@@ -2100,10 +2155,10 @@ function LessonItem({
               }
             >
               {l.status === "SCHEDULED"
-                ? "Planlandı"
+                ? t("lesson.scheduled")
                 : l.status === "COMPLETED"
-                  ? "Tamamlandı"
-                  : "İptal edildi"}
+                  ? t("lesson.completed")
+                  : t("lesson.cancelled")}
             </ToneBadge>
           )}
         </ItemActions>
@@ -2156,7 +2211,7 @@ function FilePicker({
         onClick={() => input.current?.click()}
       >
         {busy ? <Spinner /> : <Paperclip />}
-        {busy ? "Yükleniyor…" : "Dosya ekle"}
+        {busy ? t("learn.uploading") : t("learn.addFile")}
       </Button>
       <input
         ref={input}
@@ -2236,8 +2291,10 @@ function whatsappNumber(raw: string) {
 
 function whatsappInviteUrl(phone: string, name: string, invite: string) {
   const text =
-    `Merhaba${name ? " " + name : ""}, Derslik'te size bir hesap tanımladım. ` +
-    `Aşağıdaki bağlantıdan 7 gün içinde giriş yapabilirsiniz:\n\n${invite}`;
+    (name ? t("learn.whatsappHelloName", { name }) : t("learn.whatsappHello")) +
+    " " +
+    t("learn.whatsappBody") +
+    `\n\n${invite}`;
   return `https://wa.me/${whatsappNumber(phone)}?text=${encodeURIComponent(text)}`;
 }
 
@@ -2251,19 +2308,11 @@ function isImageName(name: string) {
 function UploadAside({ kind }: { kind: "files" | "videos" }) {
   const video = kind === "videos";
   const steps = video
-    ? [
-        "Videonun ait olduğu dersi seçin.",
-        "Dosyayı ekleyip süreyi doğrulayın.",
-        "Yükleme bitince öğrenci izleyebilir.",
-      ]
-    : [
-        "Ödevi ya da genel materyali seçin.",
-        "PDF veya görseli ekleyin.",
-        "Dosya öğrencinin paneline düşer.",
-      ];
+    ? [t("learn.videoStep1"), t("learn.videoStep2"), t("learn.videoStep3")]
+    : [t("learn.fileStep1"), t("learn.fileStep2"), t("learn.fileStep3")];
   const rules = video
-    ? ["MP4 veya MOV", "En fazla 2 GB", "En fazla 120 dakika"]
-    : ["PDF, JPG, PNG, WebP", "En fazla 10 MB", "Ödeve ya da derse bağlı"];
+    ? [t("learn.videoRule1"), t("learn.videoRule2"), t("learn.videoRule3")]
+    : ["PDF, JPG, PNG, WebP", t("learn.fileRule2"), t("learn.fileRule3")];
   return (
     <Card className="bg-muted/40 gap-5 shadow-none">
       <CardHeader>
@@ -2273,24 +2322,24 @@ function UploadAside({ kind }: { kind: "files" | "videos" }) {
           ) : (
             <FileText className="text-muted-foreground size-4" />
           )}
-          {video ? "Video nasıl yayına girer" : "Dosya nasıl paylaşılır"}
+          {video ? t("learn.videoHow") : t("learn.fileHow")}
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-5 text-sm">
         <ol className="grid gap-3">
-          {steps.map((t, i) => (
-            <li className="flex items-start gap-3" key={t}>
+          {steps.map((step, i) => (
+            <li className="flex items-start gap-3" key={step}>
               <span className="bg-background flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium tabular-nums">
                 {i + 1}
               </span>
-              <span className="text-muted-foreground pt-0.5">{t}</span>
+              <span className="text-muted-foreground pt-0.5">{step}</span>
             </li>
           ))}
         </ol>
         <Separator />
         <div className="grid gap-2">
           <p className="text-muted-foreground text-xs font-medium">
-            Kabul edilen
+            {t("learn.accepts")}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {rules.map((r) => (
@@ -2301,34 +2350,37 @@ function UploadAside({ kind }: { kind: "files" | "videos" }) {
           </div>
         </div>
         <p className="text-muted-foreground text-xs leading-relaxed">
-          {video
-            ? "Yükleme sürerken sayfadan ayrılmayın; bağlantı koparsa aynı dosyayla kaldığı yerden denenir."
-            : "Öğrenciler yalnızca kendilerine bağlanmış dosyaları görür."}
+          {video ? t("learn.videoStay") : t("learn.fileScope")}
         </p>
       </CardContent>
     </Card>
   );
 }
 
-/** Bildirim başlıkları sunucuda sabit metinler; simge başlıktan seçiliyor. */
-function noticeIcon(title: string) {
-  const t = title.toLocaleLowerCase("tr");
-  if (t.includes("soru")) return <MessageSquare />;
-  if (t.includes("video")) return <VideoIcon />;
-  if (t.includes("özet")) return <Sparkles />;
-  if (t.includes("ödev")) return <ClipboardList />;
+/** Simge bildirimin türünden seçilir; türü yazılmamış eski bildirimlerde
+ *  sunucunun sabit Türkçe başlığından. */
+function noticeIcon(n: Notice) {
+  if (n.kind === "QUESTION" || n.kind === "ANSWER") return <MessageSquare />;
+  if (n.kind === "VIDEO") return <VideoIcon />;
+  if (n.kind === "SUMMARY") return <Sparkles />;
+  if (n.kind) return <ClipboardList />;
+  const title = n.title.toLocaleLowerCase("tr");
+  if (title.includes("soru")) return <MessageSquare />;
+  if (title.includes("video")) return <VideoIcon />;
+  if (title.includes("özet")) return <Sparkles />;
+  if (title.includes("ödev")) return <ClipboardList />;
   return <Bell />;
 }
 
 function ago(iso: string, now: number) {
   const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
-  if (minutes < 1) return "Az önce";
-  if (minutes < 60) return `${minutes} dk önce`;
+  if (minutes < 1) return t("time.justNow");
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} sa önce`;
+  if (hours < 24) return t("time.hoursAgo", { count: hours });
   const days = Math.round(hours / 24);
-  if (days === 1) return "Dün";
-  if (days < 7) return `${days} gün önce`;
+  if (days === 1) return t("time.yesterday");
+  if (days < 7) return t("time.daysAgo", { count: days });
   return dayLabel(iso);
 }
 
@@ -2349,7 +2401,8 @@ function UsageMeter({
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="font-medium">{label}</span>
         <span className="text-muted-foreground tabular-nums">
-          {used.toLocaleString("tr-TR")} / {limit.toLocaleString("tr-TR")}
+          {used.toLocaleString(intlLocale())} /{" "}
+          {limit.toLocaleString(intlLocale())}
           {unit ? " " + unit : ""}
         </span>
       </div>
@@ -2469,7 +2522,7 @@ export function AccountExtras({
                   : "bg-primary/10 text-primary")
               }
             >
-              {noticeIcon(n.title)}
+              {noticeIcon(n)}
             </span>
             <div className="grid min-w-0 flex-1 gap-0.5">
               <div className="flex items-start justify-between gap-3">
@@ -2486,21 +2539,21 @@ export function AccountExtras({
                       className="text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
                       onClick={() => openNotice(n, target)}
                     >
-                      {n.title}
+                      {noticeText(n.title)}
                     </button>
                   ) : (
-                    n.title
+                    noticeText(n.title)
                   )}
                 </p>
                 {!n.readAt && (
                   <span
                     className="bg-primary mt-1.5 size-2 shrink-0 rounded-full"
-                    aria-label="Okunmadı"
+                    aria-label={t("inbox.unread")}
                   />
                 )}
               </div>
               <p className="text-muted-foreground text-sm leading-snug">
-                {n.body}
+                {noticeText(n.body)}
               </p>
               <div className="flex items-center gap-3 pt-1">
                 <span className="text-muted-foreground text-xs">
@@ -2514,7 +2567,7 @@ export function AccountExtras({
                     className="relative h-auto p-0 text-xs"
                     onClick={() => void markRead([n.id])}
                   >
-                    Okundu say
+                    {t("inbox.markRead")}
                   </Button>
                 )}
               </div>
@@ -2535,10 +2588,8 @@ export function AccountExtras({
         <EmptyMedia variant="icon">
           <BellOff />
         </EmptyMedia>
-        <EmptyTitle className="text-base">Yeni bildirim yok</EmptyTitle>
-        <EmptyDescription>
-          Teslimler, yeni videolar ve geri bildirimler burada görünecek.
-        </EmptyDescription>
+        <EmptyTitle className="text-base">{t("inbox.empty")}</EmptyTitle>
+        <EmptyDescription>{t("inbox.emptyHint")}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );
@@ -2556,30 +2607,30 @@ export function AccountExtras({
       ) : (
         <Card className="gap-5 py-5">
           <CardHeader className="px-5">
-            <CardTitle>Çalışma alanı kullanımı</CardTitle>
-            <CardDescription>
-              Plan sınırlarına göre kullanımınız.
-            </CardDescription>
+            <CardTitle>{t("inbox.usageTitle")}</CardTitle>
+            <CardDescription>{t("inbox.usageText")}</CardDescription>
             <CardAction>
               <Badge variant="secondary">
-                {limits.limits.plan === "PRO" ? "Pro plan" : "Pilot plan"}
+                {limits.limits.plan === "PRO"
+                  ? t("inbox.planPro")
+                  : t("inbox.planPilot")}
               </Badge>
             </CardAction>
           </CardHeader>
           <CardContent className="grid gap-4 px-5">
             <UsageMeter
-              label="Aktif öğrenci"
+              label={t("overview.figureActive")}
               used={Number(limits.used.students)}
               limit={Number(limits.limits.studentLimit)}
             />
             <UsageMeter
-              label="Video"
+              label={t("inbox.video")}
               used={Math.ceil(Number(limits.used.videoSeconds) / 60)}
               limit={Math.floor(Number(limits.limits.videoSeconds) / 60)}
-              unit="dk"
+              unit={t("inbox.minutesUnit")}
             />
             <UsageMeter
-              label="Dosya alanı"
+              label={t("inbox.storage")}
               used={Math.round(Number(limits.used.materialBytes) / 1024 ** 2)}
               limit={Math.floor(
                 Number(limits.limits.materialBytes) / 1024 ** 2,
@@ -2606,7 +2657,9 @@ export function AccountExtras({
               className="relative"
               onClick={() => void show()}
               aria-label={
-                "Bildirimler" + (unread ? `, ${unread} okunmamış` : "")
+                unread
+                  ? t("inbox.titleUnread", { count: unread })
+                  : t("inbox.title")
               }
             >
               <Bell />
@@ -2618,18 +2671,18 @@ export function AccountExtras({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            {workspaceId ? "Bildirimler ve kullanım" : "Bildirimler"}
+            {workspaceId ? t("inbox.tooltipOwner") : t("inbox.title")}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full gap-0 sm:max-w-md">
           <SheetHeader className="border-b pr-12">
-            <SheetTitle>Bildirimler</SheetTitle>
+            <SheetTitle>{t("inbox.title")}</SheetTitle>
             <SheetDescription>
               {unread
-                ? `${unread} okunmamış bildiriminiz var.`
-                : "Hepsini okudunuz."}
+                ? t("inbox.unreadCount", { count: unread })
+                : t("inbox.allRead")}
             </SheetDescription>
           </SheetHeader>
           {error && (
@@ -2646,14 +2699,14 @@ export function AccountExtras({
               <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
                 <TabsList>
                   <TabsTrigger value="inbox">
-                    Gelen kutusu
+                    {t("inbox.tabInbox")}
                     {unread > 0 && (
                       <Badge className="h-5 min-w-5 px-1.5 tabular-nums">
                         {unread}
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="usage">Kullanım ve plan</TabsTrigger>
+                  <TabsTrigger value="usage">{t("inbox.tabUsage")}</TabsTrigger>
                 </TabsList>
                 {tab === "inbox" && unread > 0 && (
                   <Button
@@ -2667,7 +2720,7 @@ export function AccountExtras({
                     }
                   >
                     <CheckCheck />
-                    <span className="max-sm:sr-only">Tümü okundu</span>
+                    <span className="max-sm:sr-only">{t("inbox.markAll")}</span>
                   </Button>
                 )}
               </div>
@@ -2692,7 +2745,7 @@ export function AccountExtras({
                       )
                     }
                   >
-                    <CheckCheck /> Tümü okundu
+                    <CheckCheck /> {t("inbox.markAll")}
                   </Button>
                 </div>
               )}

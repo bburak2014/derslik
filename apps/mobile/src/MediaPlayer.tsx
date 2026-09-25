@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import type { Video } from "@derslik/api-client";
 import { request } from "./core";
+import { t } from "@derslik/contracts";
 import { Button, ErrorText, Field, Input, Kicker, useTheme } from "./ui";
 export function MediaPlayer({
   video,
@@ -61,8 +62,7 @@ export function MediaPlayer({
       current.current = e.currentTime;
     });
     const status = player.addListener("statusChange", (e) => {
-      if (e.status === "error")
-        setError("Video oynatılamadı. Kapatıp tekrar açın.");
+      if (e.status === "error") setError(t("video.playFailed"));
     });
     const save = () => {
       if (current.current > 0)
@@ -95,14 +95,14 @@ export function MediaPlayer({
       >
         <View style={section.sheetHeader}>
           <View style={{ flex: 1, gap: 3 }}>
-            <Kicker>Ders videosu</Kicker>
+            <Kicker>{t("mobile.lessonVideo")}</Kicker>
             <Text style={section.sheetTitle} numberOfLines={2}>
               {video.title}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Kapat"
+            accessibilityLabel={t("common.close")}
             onPress={onClose}
             hitSlop={8}
             style={({ pressed }) => [
@@ -145,18 +145,20 @@ export function MediaPlayer({
                 );
               }}
             >
-              Bu saniyeye soru ekle
+              {t("video.askHere")}
             </Button>
           )}
           {at !== null && (
             <>
               <Field
-                label={`${Math.floor(at / 60)}:${String(at % 60).padStart(2, "0")} için sorunuz`}
-                hint="Öğretmeniniz yanıtladığında bildirim alırsınız."
+                label={t("learn.questionAt", {
+                  time: `${Math.floor(at / 60)}:${String(at % 60).padStart(2, "0")}`,
+                })}
+                hint={t("mobile.questionHint")}
               >
                 <Input
                   multiline
-                  accessibilityLabel="Video sorusu"
+                  accessibilityLabel={t("mobile.videoQuestion")}
                   value={question}
                   onChangeText={setQuestion}
                   maxLength={5000}
@@ -171,7 +173,7 @@ export function MediaPlayer({
                     setQuestion("");
                   }}
                 >
-                  Vazgeç
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   icon="paper-plane-outline"
@@ -196,7 +198,7 @@ export function MediaPlayer({
                     }
                   }}
                 >
-                  Soruyu gönder
+                  {t("mobile.sendQuestion")}
                 </Button>
               </View>
             </>

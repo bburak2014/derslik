@@ -191,12 +191,29 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --font-sans:
-    var(--font-derslik), "Segoe UI", system-ui, -apple-system, sans-serif;
+    var(--font-derslik), var(--font-cjk, "Segoe UI"), "Segoe UI", system-ui,
+    -apple-system, sans-serif;
 }
 
 /* shadcn'in taban kuralı: Tailwind v4'te kenarlık rengi varsayılan olarak
    metin rengidir (currentColor). shadcn bileşenleri yalnızca "border" yazar ve
    rengi buradan bekler; bu kural yokken bütün kenarlıklar mürekkep rengindeydi. */
+/* Onest ve Bricolage'da Çince ve Japonca glifi yok. Tarayıcı eksik glifleri
+   yığındaki sonraki yazı tipinden alır; dile uygun sistem yazı tipini öne
+   koymak Japoncada Çince glif biçimlerinin görünmesini önler. */
+@layer base {
+  html:lang(zh) {
+    --font-cjk:
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
+      "Noto Sans CJK SC";
+  }
+  html:lang(ja) {
+    --font-cjk:
+      "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo,
+      "Noto Sans JP", "Noto Sans CJK JP";
+  }
+}
+
 @layer base {
   * {
     border-color: var(--border);
@@ -2388,8 +2405,8 @@
    ================================================================== */
   :root {
     --font-display:
-      var(--font-derslik-display), var(--font-derslik), "Segoe UI", system-ui,
-      sans-serif;
+      var(--font-derslik-display), var(--font-derslik),
+      var(--font-cjk, "Segoe UI"), "Segoe UI", system-ui, sans-serif;
     /* Kareli defter dokusu: yalnızca mürekkep yüzeylerde, çok hafif. */
     --grid-texture:
       linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),

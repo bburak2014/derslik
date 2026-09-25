@@ -1,14 +1,15 @@
 "use client";
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { t, type MessageKey } from "@derslik/contracts";
 
 type Theme = "light" | "dark" | "system";
 const COOKIE = "derslik-theme";
 const EVENT = "derslik-theme-change";
-const options: { id: Theme; label: string; Icon: typeof Sun }[] = [
-  { id: "light", label: "Açık", Icon: Sun },
-  { id: "dark", label: "Koyu", Icon: Moon },
-  { id: "system", label: "Sistem", Icon: Monitor },
+const options: { id: Theme; label: MessageKey; Icon: typeof Sun }[] = [
+  { id: "light", label: "theme.light", Icon: Sun },
+  { id: "dark", label: "theme.dark", Icon: Moon },
+  { id: "system", label: "theme.system", Icon: Monitor },
 ];
 
 // The root element is the source of truth. The server stamps it from the
@@ -45,20 +46,24 @@ export function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, readTheme, () => "system");
 
   return (
-    <div className="theme-toggle" role="radiogroup" aria-label="Görünüm teması">
+    <div
+      className="theme-toggle"
+      role="radiogroup"
+      aria-label={t("theme.label")}
+    >
       {options.map(({ id, label, Icon }) => (
         <button
           key={id}
           type="button"
           role="radio"
           aria-checked={theme === id}
-          aria-label={label + " tema"}
-          title={label}
+          aria-label={t("theme.option", { name: t(label) })}
+          title={t(label)}
           data-active={theme === id ? "true" : undefined}
           onClick={() => choose(id)}
         >
           <Icon size={15} aria-hidden="true" />
-          <span>{label}</span>
+          <span>{t(label)}</span>
         </button>
       ))}
     </div>

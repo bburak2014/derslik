@@ -2,6 +2,8 @@
 import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras, type NoticeFocus } from "./learning-panel";
 import { ThemeToggle } from "@/components/account/theme-toggle";
+import { LanguageSelect } from "@/components/i18n/language-select";
+import { t, upper, type MessageKey } from "@derslik/contracts";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   BookOpen,
@@ -66,45 +68,43 @@ import { StudentDetail } from "./student-detail";
 import { useWorkspaceTools } from "./use-workspace-tools";
 
 type View = CoreView | TeachingView;
-const navigation = [
-  { id: "overview" as View, label: "Genel bakış", icon: LayoutDashboard },
-  { id: "calendar" as View, label: "Ders takvimi", icon: CalendarDays },
-  { id: "students" as View, label: "Öğrenciler", icon: Users },
-  { id: "payments" as View, label: "Tahsilatlar", icon: Wallet },
-  { id: "assignments" as View, label: "Ödevler", icon: ClipboardList },
-  { id: "files" as View, label: "PDF ve dosyalar", icon: FileText },
-  { id: "videos" as View, label: "Ders videoları", icon: Video },
+const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
+  { id: "overview", label: "nav.overview", icon: LayoutDashboard },
+  { id: "calendar", label: "nav.calendar", icon: CalendarDays },
+  { id: "students", label: "nav.students", icon: Users },
+  { id: "payments", label: "nav.payments", icon: Wallet },
+  { id: "assignments", label: "nav.assignments", icon: ClipboardList },
+  { id: "files", label: "nav.files", icon: FileText },
+  { id: "videos", label: "nav.videos", icon: Video },
 ];
-const titles: Record<View, { title: string; subtitle: string }> = {
+const titles: Record<View, { title: MessageKey; subtitle: MessageKey }> = {
   assignments: {
-    title: "Ödevler",
-    subtitle:
-      "Öğrenciye ödev verin, PDF ekleyin ve tamamlanma durumunu takip edin.",
+    title: "nav.assignments",
+    subtitle: "ws.assignmentsSubtitle",
   },
   files: {
-    title: "PDF ve dosyalar",
-    subtitle:
-      "Çalışma kağıtlarını ve ders materyallerini öğrenciye bağlı olarak saklayın.",
+    title: "nav.files",
+    subtitle: "ws.filesSubtitle",
   },
   videos: {
-    title: "Ders videoları",
-    subtitle: "Ders kayıtlarını yükleyin ve buradan izleyin.",
+    title: "nav.videos",
+    subtitle: "ws.videosSubtitle",
   },
   overview: {
-    title: "Her ders, yeni bir adım.",
-    subtitle: "Günün planı ve öğrencilerinizin yolculuğu bir arada.",
+    title: "ws.overviewTitle",
+    subtitle: "ws.overviewSubtitle",
   },
   calendar: {
-    title: "Ders takvimi",
-    subtitle: "Haftanızı planlayın, derslerinizi kolayca takip edin.",
+    title: "nav.calendar",
+    subtitle: "ws.calendarSubtitle",
   },
   students: {
-    title: "Öğrencileriniz",
-    subtitle: "Her öğrencinin gelişimine, kaldığınız yerden devam edin.",
+    title: "ws.studentsTitle",
+    subtitle: "ws.studentsSubtitle",
   },
   payments: {
-    title: "Tahsilatlar",
-    subtitle: "Paket ücretlerini ve aldığınız ödemeleri takip edin.",
+    title: "nav.payments",
+    subtitle: "ws.paymentsSubtitle",
   },
 };
 export type Actions = {
@@ -147,7 +147,7 @@ function Navigation({
             }}
           >
             <Icon />
-            <span>{label}</span>
+            <span>{t(label)}</span>
             {id === "students" && count > 0 && (
               <span className="nav-count">{count}</span>
             )}
@@ -198,15 +198,13 @@ export default function Workspace({
     try {
       const r = await fetch("/api/workspace", { cache: "no-store" });
       const json = (await r.json()) as WorkspaceData & { error?: string };
-      if (!r.ok) throw new Error(json.error || "Kayıtlar yüklenemedi.");
+      if (!r.ok) throw new Error(json.error || t("ws.loadFailed"));
       setData(json);
       setLoadError("");
       return true;
     } catch (e) {
       setLoadError(
-        e instanceof Error
-          ? e.message
-          : "Bağlantınızı kontrol ederek yeniden deneyin.",
+        e instanceof Error ? e.message : t("common.checkConnection"),
       );
       return false;
     } finally {
@@ -276,19 +274,15 @@ export default function Workspace({
         body: signature,
       });
       const result = (await r.json()) as { error?: string };
-      if (!r.ok) throw new Error(result.error || "Kayıt tamamlanamadı.");
+      if (!r.ok) throw new Error(result.error || t("ws.saveFailed"));
       retryKeys.current.delete(signature);
       const refreshed = await reload();
       toast.success(message, {
-        description: refreshed
-          ? undefined
-          : "Kayıt kaydedildi. Güncel liste için Yenile düğmesini kullanın.",
+        description: refreshed ? undefined : t("ws.savedRefresh"),
       });
       return true;
     } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Kaydedilemedi. Yeniden deneyin.",
-      );
+      toast.error(e instanceof Error ? e.message : t("ws.saveRetry"));
       return false;
     } finally {
       inFlight.current = false;
@@ -313,53 +307,47 @@ export default function Workspace({
     newPayment: (id) => setModal({ type: "payment", studentId: id }),
     complete: (l) =>
       setConfirmation({
-        title: "Ders tamamlansın mı?",
-        description:
-          "Ders tamamlandı olarak işaretlenecek ve bağlı paketten 1 ders hakkı düşülecek. Gerektiğinde bu işlemi geri alabilirsiniz.",
+        title: t("confirm.completeTitle"),
+        description: t("confirm.completeBody"),
         command: { action: "lesson.complete", id: l.id, version: l.version },
-        message: "Ders tamamlandı. Paketten 1 hak düşüldü.",
+        message: t("confirm.completeDone"),
       }),
     reverse: (l) =>
       setConfirmation({
-        title: "Tamamlamayı geri al",
-        description:
-          "1 ders hakkı pakete iade edilecek. Ders yeniden planlananlar arasına taşınacak; önceki hareket kaydı korunacak.",
+        title: t("confirm.reverseTitle"),
+        description: t("confirm.reverseBody"),
         command: { action: "lesson.reverse", id: l.id, version: l.version },
-        message: "1 ders hakkı iade edildi.",
+        message: t("confirm.reverseDone"),
       }),
     cancel: (l) =>
       setConfirmation({
-        title: "Dersi iptal et",
-        description:
-          "Bu ders takvimde iptal olarak saklanacak. Paket hakkı düşülmeyecek. Haftalık serinin diğer dersleri etkilenmez.",
+        title: t("confirm.cancelTitle"),
+        description: t("confirm.cancelBody"),
         command: { action: "lesson.cancel", id: l.id, version: l.version },
-        message: "Ders iptal edildi.",
+        message: t("confirm.cancelDone"),
       }),
     reschedule: (l) => setModal({ type: "reschedule", lesson: l }),
     voidPayment: (p) =>
       setConfirmation({
-        title: "Tahsilat kaydını iptal et",
-        description:
-          "Bu kayıt hesaplamadan çıkarılacak ve öğrencinin açık bakiyesi yeniden artacak. Kayıt geçmişte görünmeye devam edecek. Bu işlem bankadan para iadesi yapmaz.",
+        title: t("confirm.voidTitle"),
+        description: t("confirm.voidBody"),
         command: { action: "payment.void", id: p.id, version: p.version },
-        message: "Tahsilat kaydı iptal edildi.",
+        message: t("confirm.voidDone"),
       }),
     editStudent: (s) => setModal({ type: "student", student: s }),
     archiveStudent: (s) =>
       setConfirmation({
-        title: "Öğrenciyi arşivle",
-        description:
-          "Öğrenci aktif listeden çıkarılacak. Paketleri, tahsilatları ve geçmiş dersleri saklanacak. Planlanan dersi olan öğrenciler arşivlenemez.",
+        title: t("confirm.archiveTitle"),
+        description: t("confirm.archiveBody"),
         command: { action: "student.archive", id: s.id, version: s.version },
-        message: "Öğrenci arşivlendi.",
+        message: t("confirm.archiveDone"),
       }),
     restoreStudent: (s) =>
       setConfirmation({
-        title: "Öğrenciyi aktife al",
-        description:
-          "Öğrenci yeniden aktif listeye dönecek; ders planlayabilir, içerik paylaşabilir ve davet gönderebilirsiniz. Aktif öğrenci sınırınız doluysa bu işlem yapılamaz.",
+        title: t("confirm.restoreTitle"),
+        description: t("confirm.restoreBody"),
         command: { action: "student.restore", id: s.id, version: s.version },
-        message: "Öğrenci yeniden aktif.",
+        message: t("confirm.restoreDone"),
       }),
   };
   const active = data.students.filter((s) => s.active).length;
@@ -370,41 +358,36 @@ export default function Workspace({
     >
       <Sidebar>
         <SidebarHeader className="p-7">
-          <a href="/" className="brand" aria-label="Derslik ana sayfa">
+          <a href="/" className="brand" aria-label={t("ws.homeLink")}>
             <BookOpen />
             <span>
               derslik<span className="brand-dot">.</span>
             </span>
           </a>
-          <p className="sidebar-kicker">ÖĞRETMEN ÇALIŞMA ALANI</p>
+          <p className="sidebar-kicker">{upper(t("ws.teacherWorkspace"))}</p>
         </SidebarHeader>
         <SidebarContent className="px-4 pt-6">
-          <p className="nav-label">ÇALIŞMA ALANIM</p>
+          <p className="nav-label">{upper(t("ws.myWorkspace"))}</p>
           <Navigation view={view} onNavigate={navigate} count={active} />
           <div className="sidebar-note">
             <span className="note-flower">✳</span>
             <p>
-              Küçük adımlar.
+              {t("ws.noteSmall")}
               <br />
-              <strong>Büyük gelişimler.</strong>
+              <strong>{t("ws.noteBig")}</strong>
             </p>
-            <span>
-              Her öğrencinin yolculuğunda
-              <br />
-              bir sonraki adıma odaklanın.
-            </span>
+            <span>{t("ws.noteFocus")}</span>
           </div>
         </SidebarContent>
         <SidebarFooter className="p-6 gap-4">
           <ThemeToggle />
+          <LanguageSelect />
           {switcher}
           <div className="profile">
-            <span className="avatar">
-              {displayName.charAt(0).toLocaleUpperCase("tr")}
-            </span>
+            <span className="avatar">{upper(displayName.charAt(0))}</span>
             <div>
               <strong title={displayName}>{displayName}</strong>
-              <small>Öğretmen hesabı</small>
+              <small>{t("ws.teacherAccount")}</small>
             </div>
           </div>
           <Button
@@ -414,21 +397,21 @@ export default function Workspace({
             className="signout justify-start"
             onClick={() => setSignoutOpen(true)}
           >
-            <LogOut /> Çıkış yap
+            <LogOut /> {t("common.signOut")}
           </Button>
         </SidebarFooter>
       </Sidebar>
       <main className="workspace">
         <a href="#main-content" className="skip-link">
-          İçeriğe geç
+          {t("common.skipToContent")}
         </a>
         <header className="topbar">
           <div className="topbar-crumbs">
-            <SidebarTrigger aria-label="Menüyü aç veya kapat" />
-            <span className="crumb-root">Çalışma alanım</span>
+            <SidebarTrigger aria-label={t("common.toggleMenu")} />
+            <span className="crumb-root">{t("ws.myWorkspace")}</span>
             <ChevronRight size={13} className="crumb-sep" />
             <span className="crumb-current">
-              {navigation.find((n) => n.id === view)?.label}
+              {t(navigation.find((n) => n.id === view)!.label)}
             </span>
           </div>
           <div className="topbar-actions">
@@ -436,12 +419,12 @@ export default function Workspace({
               <AccountExtras workspaceId={connected.id} onOpen={onNotice} />
             )}
             <span className="workspace-tag">
-              <span /> Yalnızca size özel
+              <span /> {t("ws.privateToYou")}
             </span>
             <Button
               size="icon"
               variant="ghost"
-              aria-label="Kayıtları yenile"
+              aria-label={t("ws.refresh")}
               onClick={() => void reload()}
               disabled={busy || loading}
             >
@@ -454,14 +437,13 @@ export default function Workspace({
             <div>
               <p className="eyebrow">
                 {view === "overview"
-                  ? "ÖĞRETMEYE ODAKLANIN."
-                  : "DERSLİK / " +
-                    navigation
-                      .find((n) => n.id === view)
-                      ?.label.toLocaleUpperCase("tr")}
+                  ? upper(t("ws.focusOnTeaching"))
+                  : upper("Derslik") +
+                    " / " +
+                    upper(t(navigation.find((n) => n.id === view)!.label))}
               </p>
-              <h1>{titles[view].title}</h1>
-              <p>{titles[view].subtitle}</p>
+              <h1>{t(titles[view].title)}</h1>
+              <p>{t(titles[view].subtitle)}</p>
             </div>
             {!isTeachingView(view) && (
               <Button
@@ -477,10 +459,10 @@ export default function Workspace({
               >
                 <Plus />
                 {view === "students"
-                  ? "Öğrenci ekle"
+                  ? t("ws.addStudent")
                   : view === "payments"
-                    ? "Tahsilat ekle"
-                    : "Ders planla"}
+                    ? t("ws.addPayment")
+                    : t("ws.planLesson")}
               </Button>
             )}
           </div>
@@ -488,17 +470,14 @@ export default function Workspace({
             <div className="error-banner" role="alert">
               <span>{loadError}</span>
               <Button size="sm" variant="outline" onClick={() => void reload()}>
-                Yeniden dene
+                {t("common.retry")}
               </Button>
             </div>
           )}
           {data.students.some((s) => s.is_sample === 1) && (
             <div className="sample-banner">
               <FlaskConical size={15} />
-              <span>
-                Örnek kayıtlar içerir. “Örnek” etiketli öğrenciler ve işlemleri
-                kurgusaldır.
-              </span>
+              <span>{t("ws.sampleBanner")}</span>
             </div>
           )}
           {loading ? (
@@ -516,11 +495,10 @@ export default function Workspace({
                       ? undefined
                       : () =>
                           setConfirmation({
-                            title: "Örnek kayıtları ekle",
-                            description:
-                              "4 kurgusal öğrenci, dersler, paketler ve örnek tahsilatlar çalışma alanınıza eklenecek. Böylece tüm akışları deneyebilirsiniz.",
+                            title: t("confirm.seedTitle"),
+                            description: t("confirm.seedBody"),
                             command: { action: "seed" },
-                            message: "Örnek çalışma alanı hazır.",
+                            message: t("confirm.seedDone"),
                           })
                   }
                   busy={busy}
@@ -543,14 +521,14 @@ export default function Workspace({
                         <Search size={17} />
                       </InputGroupAddon>
                       <InputGroupInput
-                        aria-label="Öğrenci ara"
-                        placeholder="İsim, sınıf veya ders ara…"
+                        aria-label={t("ws.searchStudents")}
+                        placeholder={t("ws.searchPlaceholder")}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
                     </InputGroup>
                     <span className="shrink-0 whitespace-nowrap">
-                      {data.students.length} öğrenci kaydı
+                      {t("ws.studentRecords", { count: data.students.length })}
                     </span>
                   </div>
                   <StudentsView
@@ -577,9 +555,9 @@ export default function Workspace({
           <footer className="workspace-footer">
             <span>
               derslik<span className="brand-dot">.</span>{" "}
-              <span>Öğretmeye daha çok zaman.</span>
+              <span>{t("ws.footerTagline")}</span>
             </span>
-            <span>Türkiye saati · İstanbul</span>
+            <span>{t("ws.footerTimezone")}</span>
           </footer>
         </div>
       </main>
@@ -607,21 +585,20 @@ export default function Workspace({
       <AlertDialog open={signoutOpen} onOpenChange={setSignoutOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hesabınızdan çıkılsın mı?</AlertDialogTitle>
+            <AlertDialogTitle>{t("ws.signOutTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Oturumunuz kapanacak ve tekrar giriş yapmanız gerekecek.
-              Kaydedilmemiş bir değişikliğiniz varsa önce kaydedin.
+              {t("ws.signOutBody")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setSignoutOpen(false);
                 onSignout();
               }}
             >
-              Çıkış yap
+              {t("common.signOut")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -640,7 +617,9 @@ export default function Workspace({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={async (e) => {
@@ -654,10 +633,10 @@ export default function Workspace({
             >
               {busy ? (
                 <>
-                  <Spinner /> Kaydediliyor
+                  <Spinner /> {t("common.saving")}
                 </>
               ) : (
-                "Onayla"
+                t("common.confirm")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
