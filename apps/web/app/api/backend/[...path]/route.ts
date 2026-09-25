@@ -21,7 +21,13 @@ async function proxy(
       throw new HttpError(400, "web.invalidPath");
     const { client } = await serverSession();
     if (request.method !== "GET") csrf(request);
-    const body = request.method === "GET" ? undefined : await readBody(request);
+    // Vitrin fotoğrafı base64 olarak gelir; yalnızca o uç büyük gövde alır.
+    const photo =
+      request.method === "PUT" && path.at(-1) === "photo" && path.length === 4;
+    const body =
+      request.method === "GET"
+        ? undefined
+        : await readBody(request, photo ? 520_000 : 16000);
     const data = await client.request(
       "/v1/" +
         path.map(encodeURIComponent).join("/") +

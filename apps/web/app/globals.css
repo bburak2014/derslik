@@ -2584,6 +2584,118 @@
       0 0 0 2px var(--marker),
       0 0 0 6px color-mix(in oklab, var(--marker) 28%, transparent);
   }
+
+  /* Öğretmen vitrini. Yıldızlar fosforlu kalem sarısı: puan bir "dikkat"
+     işareti değil ama vitrindeki tek sıcak renk o. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  .teacher-photo {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface-sunken);
+  }
+  .stars {
+    display: inline-flex;
+    gap: 1px;
+    flex-shrink: 0;
+  }
+  .star-on {
+    fill: var(--marker);
+    color: color-mix(in oklab, var(--marker) 72%, var(--marker-ink));
+  }
+  .star-off {
+    color: var(--line-control);
+  }
+  .star-pick {
+    border-radius: 6px;
+    padding: 2px;
+    outline: none;
+  }
+  .star-pick:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+  .teacher-card {
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .teacher-card:hover,
+  .teacher-card:focus-within {
+    border-color: var(--brand-line);
+    box-shadow: var(--shadow-raised);
+  }
+  .card-link {
+    text-align: left;
+    outline: none;
+  }
+  .card-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  .card-link:focus-visible::after {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+  .nav-count-marker {
+    background: var(--marker);
+    color: var(--marker-ink);
+  }
+  .filter-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--marker);
+    box-shadow: 0 0 0 1px var(--marker-ink);
+  }
+  .choice-card {
+    display: grid;
+    gap: 4px;
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: var(--panel-radius);
+    padding: 16px 18px;
+    background: var(--card);
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+  .choice-card:hover {
+    border-color: var(--brand-line);
+    background: var(--brand-soft);
+  }
+  .choice-card strong {
+    font-family: var(--font-display);
+    font-size: 17px;
+    color: var(--ink);
+  }
+  .choice-card span {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .public-shell {
+    min-height: 100vh;
+    background: var(--canvas);
+  }
+  .public-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px clamp(16px, 4vw, 40px);
+    background: var(--navy);
+    color: #fff;
+  }
+  .public-body {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px clamp(16px, 4vw, 40px) 64px;
+    display: grid;
+    gap: 24px;
+  }
 }
 
 /* ==================================================================

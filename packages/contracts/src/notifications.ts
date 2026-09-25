@@ -9,7 +9,9 @@ export type NoticeKind =
   | "VIDEO"
   | "QUESTION"
   | "ANSWER"
-  | "SUMMARY";
+  | "SUMMARY"
+  | "REQUEST"
+  | "REQUEST_DECISION";
 
 export type Notice = {
   id: string;
@@ -26,10 +28,18 @@ export type Notice = {
 
 /** Bildirimin açtığı bölüm: öğretmende Ödevler / Ders videoları sayfası ya da
  *  öğrenci dosyasındaki Paylaşımlar, öğrenci ve velide aynı adlı sekme. */
-export type NoticeSection = "assignments" | "videos" | "notes";
+export type NoticeSection =
+  | "assignments"
+  | "videos"
+  | "notes"
+  /** Öğretmenin vitrin sayfasındaki gelen ders istekleri. */
+  | "requests"
+  /** Öğrencinin gönderdiği istekler (kabul edildiyse o öğretmenin dersleri). */
+  | "myRequests";
 
 export type NoticeTarget = {
   workspaceId: string;
+  /** İstek bildirimlerinde öğrenci kaydı henüz yoksa boş. */
   studentId: string;
   section: NoticeSection;
   /** Bölümde öne çıkarılacak ödev, video veya özet. */
@@ -44,6 +54,8 @@ const sections: Record<NoticeKind, NoticeSection> = {
   QUESTION: "videos",
   ANSWER: "videos",
   SUMMARY: "notes",
+  REQUEST: "requests",
+  REQUEST_DECISION: "myRequests",
 };
 
 /** Başlıklar sunucuda sabit metinler; türü yazılmamış eski bildirimler için. */
@@ -73,6 +85,9 @@ const noticeKeys: MessageKey[] = [
   "notice.videoReady",
   "notice.summaryReady",
   "notice.summaryReadyBody",
+  "notice.requestNew",
+  "notice.requestAccepted",
+  "notice.requestDeclined",
 ];
 /** Bildirim başlığı veya gövdesi, okuyanın dilinde. Öğretmenin yazdığı ödev
  *  ya da video adı gibi serbest metinler olduğu gibi kalır. */
@@ -83,6 +98,13 @@ export function noticeText(text: string): string {
 }
 
 export function noticeTarget(n: Notice): NoticeTarget | null {
+  if (n.kind === "REQUEST" || n.kind === "REQUEST_DECISION")
+    return {
+      workspaceId: n.workspaceId,
+      studentId: n.studentId ?? "",
+      section: sections[n.kind],
+      itemId: n.targetId,
+    };
   if (!n.studentId) return null;
   const section = n.kind ? sections[n.kind] : sectionFromTitle(n.title);
   if (!section) return null;

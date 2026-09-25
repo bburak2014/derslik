@@ -1,5 +1,18 @@
 import type { Command } from "../../contracts/src/validation.js";
 import type { WorkspaceData } from "../../contracts/src/types.js";
+import type {
+  LessonRequest,
+  LessonRequestInput,
+  MyLessonRequest,
+  PublicReview,
+  PublicTeacher,
+  ReviewInput,
+  Showcase,
+  TeacherFilter,
+  TeacherProfile,
+  TeacherProfileInput,
+  TeacherRelation,
+} from "../../contracts/src/directory.ts";
 import { getLocale, t } from "../../contracts/src/i18n/index.ts";
 
 export class ApiError extends Error {
@@ -36,11 +49,14 @@ export class DerslikClient {
       body?: unknown;
       key?: string;
       signal?: AbortSignal;
+      /** Vitrin gibi herkese açık uçlar: oturum varsa gönderilir, yoksa da olur. */
+      optionalAuth?: boolean;
     } = {},
   ): Promise<T> {
     if (!path.startsWith("/v1/")) throw new Error("Unsupported API path");
     const token = await this.options.getToken();
-    if (!token) throw new ApiError(401, t("common.signInRequired"));
+    if (!token && !init.optionalAuth)
+      throw new ApiError(401, t("common.signInRequired"));
     const res = await (this.options.fetch || fetch)(
       this.options.baseUrl.replace(/\/$/, "") + path,
       {
@@ -48,7 +64,7 @@ export class DerslikClient {
         cache: "no-store",
         signal: init.signal,
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           "Content-Type": "application/json",
           "Accept-Language": this.options.locale?.() || getLocale(),
           ...(init.key ? { "Idempotency-Key": init.key } : {}),
@@ -97,6 +113,99 @@ export class DerslikClient {
       `/v1/portal/${encodeURIComponent(ws)}/${encodeURIComponent(student)}`,
     );
   }
+  // --- Öğretmen vitrini -------------------------------------------------
+  teachers(filter: TeacherFilter = {}) {
+    return this.request<TeacherPage>("/v1/teachers" + teacherQuery(filter), {
+      optionalAuth: true,
+    });
+  }
+  teacher(id: string) {
+    return this.request<{ data: PublicTeacher; reviews: PublicReview[] }>(
+      `/v1/teachers/${encodeURIComponent(id)}`,
+      { optionalAuth: true },
+    );
+  }
+  teacherRelation(id: string) {
+    return this.request<{ data: TeacherRelation }>(
+      `/v1/teacher-relations/${encodeURIComponent(id)}`,
+    );
+  }
+  sendLessonRequest(id: string, body: LessonRequestInput) {
+    return this.request<{ data: LessonRequest }>(
+      `/v1/teacher-relations/${encodeURIComponent(id)}/requests`,
+      { method: "POST", body },
+    );
+  }
+  saveReview(id: string, body: ReviewInput) {
+    return this.request<{ data: PublicReview }>(
+      `/v1/teacher-relations/${encodeURIComponent(id)}/review`,
+      { method: "PUT", body },
+    );
+  }
+  deleteReview(id: string) {
+    return this.request<{ data: unknown }>(
+      `/v1/teacher-relations/${encodeURIComponent(id)}/review/delete`,
+      { method: "POST", body: {} },
+    );
+  }
+  myLessonRequests() {
+    return this.request<{ data: MyLessonRequest[] }>("/v1/requests");
+  }
+  cancelLessonRequest(id: string) {
+    return this.request<{ data: LessonRequest }>(
+      `/v1/requests/${encodeURIComponent(id)}/cancel`,
+      { method: "POST", body: {} },
+    );
+  }
+  showcase(ws: string) {
+    return this.request<{ data: Showcase }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/showcase`,
+    );
+  }
+  saveShowcase(ws: string, body: TeacherProfileInput) {
+    return this.request<{ data: TeacherProfile }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/showcase`,
+      { method: "PUT", body },
+    );
+  }
+  saveShowcasePhoto(
+    ws: string,
+    body: { mimeType: "image/jpeg" | "image/png" | "image/webp"; data: string },
+  ) {
+    return this.request<{ data: { photoVersion: number } }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/showcase/photo`,
+      { method: "PUT", body },
+    );
+  }
+  deleteShowcasePhoto(ws: string) {
+    return this.request<{ data: unknown }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/showcase/photo/delete`,
+      { method: "POST", body: {} },
+    );
+  }
+  decideLessonRequest(ws: string, id: string, decision: "accept" | "decline") {
+    return this.request<{ data: LessonRequest }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/requests/${encodeURIComponent(id)}/${decision}`,
+      { method: "POST", body: {} },
+    );
+  }
+}
+
+export type TeacherPage = {
+  data: PublicTeacher[];
+  total: number;
+  page: number;
+  perPage: number;
+  cities: string[];
+};
+/** Boş filtreler adrese yazılmaz; web ve mobil aynı sorguyu üretir. */
+export function teacherQuery(filter: TeacherFilter) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter))
+    if (value !== undefined && value !== null && value !== "")
+      params.set(key, String(value));
+  const query = params.toString();
+  return query ? "?" + query : "";
 }
 
 export type Assignment = {
