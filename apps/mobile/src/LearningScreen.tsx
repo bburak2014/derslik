@@ -22,8 +22,20 @@ import {
   type LearningData,
   type PortalData,
   type Video,
+  type FileReservation,
+  type InvitationResult,
+  type MediaCapabilities,
+  type SignedUrl,
+  type VideoReservation,
 } from "@derslik/api-client";
-import { dateKey, dayLabel, money } from "@derslik/contracts";
+import {
+  dateKey,
+  dayLabel,
+  money,
+  type InboxNotification,
+  type StudentAccessList,
+  type WorkspaceLimits,
+} from "@derslik/contracts";
 import { request } from "./core";
 import {
   Badge,
@@ -90,7 +102,7 @@ export function LearningScreen({
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
-    [tab, setTab] = useState(owner ? "assignments" : "lessons"),
+    [selectedTab, setTab] = useState(owner ? "assignments" : "lessons"),
     [form, setForm] = useState<FormSpec | null>(null),
     [busy, setBusy] = useState(false),
     [video, setVideo] = useState<Video | null>(null),
@@ -100,7 +112,7 @@ export function LearningScreen({
       url: string;
     } | null>(null),
     [progress, setProgress] = useState<number | null>(null),
-    [links, setLinks] = useState<any>(null);
+    [links, setLinks] = useState<StudentAccessList | null>(null);
   const inFlight = useRef(false),
     fileReservations = useRef(new Map<string, string>());
   const base = owner
@@ -110,8 +122,8 @@ export function LearningScreen({
   const reload = useCallback(async () => {
     try {
       const [result, status] = await Promise.all([
-        request(base),
-        request("/media/capabilities").catch(() => ({
+        request<LearningData | PortalData>(base),
+        request<MediaCapabilities>("/media/capabilities").catch(() => ({
           files: false,
           videos: false,
         })),
@@ -127,6 +139,7 @@ export function LearningScreen({
     }
   }, [base]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
   }, [reload]);
   async function action(command: unknown) {
@@ -165,13 +178,16 @@ export function LearningScreen({
       : [{ id: "payments", label: "Bakiye", permission: "payments" }]),
     { id: "inbox", label: "Bildirimler", permission: "lessons" },
   ].filter((t) => permissions.includes(t.permission));
-  useEffect(() => {
-    if (tabs.length && !tabs.some((t) => t.id === tab)) setTab(tabs[0].id);
-  }, [permissions.join(","), tab]);
+  // Fall back to the first permitted tab when the selected one is not allowed.
+  const tab = tabs.some((t) => t.id === selectedTab)
+    ? selectedTab
+    : (tabs[0]?.id ?? selectedTab);
   async function loadLinks() {
     try {
       setLinks(
-        await request(`/workspaces/${access.id}/students/${studentId}/access`),
+        await request<StudentAccessList>(
+          `/workspaces/${access.id}/students/${studentId}/access`,
+        ),
       );
     } catch (e) {
       setError((e as Error).message);
@@ -199,7 +215,7 @@ export function LearningScreen({
         reserved = fileReservations.current.get(fingerprint);
       let id = reserved;
       if (!id) {
-        const r = await request(media + "/files", {
+        const r = await request<{ data: FileReservation }>(media + "/files", {
           assignmentId,
           purpose: owner
             ? assignmentId
@@ -316,12 +332,15 @@ export function LearningScreen({
           },
         ],
         submit: async (v) => {
-          const r = await request(media + "/videos", {
-            title: v.title,
-            lessonId: v.lessonId || null,
-            sizeBytes: file.size,
-            maxDurationSeconds: Number(v.duration) * 60,
-          });
+          const r = await request<{ data: VideoReservation }>(
+            media + "/videos",
+            {
+              title: v.title,
+              lessonId: v.lessonId || null,
+              sizeBytes: file.size,
+              maxDurationSeconds: Number(v.duration) * 60,
+            },
+          );
           const session = { asset, id: r.data.id, url: r.data.uploadUrl };
           setUpload(session);
           void sendVideo(session);
@@ -510,8 +529,7 @@ export function LearningScreen({
                     tone={
                       a.status === "CANCELLED"
                         ? "danger"
-                        : a.status === "COMPLETED" ||
-                            sub?.status === "REVIEWED"
+                        : a.status === "COMPLETED" || sub?.status === "REVIEWED"
                           ? "success"
                           : sub
                             ? "neutral"
@@ -557,7 +575,7 @@ export function LearningScreen({
                         disabled={m.status !== "READY" || m.delete_requested}
                         onPress={async () => {
                           try {
-                            const r = await request(
+                            const r = await request<{ data: SignedUrl }>(
                               media + `/files/${m.id}/download`,
                             );
                             await Linking.openURL(r.data.url);
@@ -711,7 +729,7 @@ export function LearningScreen({
                   disabled={file.status !== "READY" || file.delete_requested}
                   onPress={async () => {
                     try {
-                      const r = await request(
+                      const r = await request<{ data: SignedUrl }>(
                         media + `/files/${file.id}/download`,
                       );
                       await Linking.openURL(r.data.url);
@@ -1060,7 +1078,7 @@ export function LearningScreen({
                     },
                   ],
                   submit: async (v) => {
-                    const r = await request(
+                    const r = await request<{ data: InvitationResult }>(
                       `/workspaces/${access.id}/students/${studentId}/invitations`,
                       {
                         email: v.email,
@@ -1084,7 +1102,7 @@ export function LearningScreen({
             >
               Davet bağlantısı oluştur
             </Button>
-            {links?.data?.map((l: any) => (
+            {links?.data?.map((l) => (
               <Card key={l.id}>
                 <Text style={styles.h2}>
                   {l.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
@@ -1115,7 +1133,7 @@ export function LearningScreen({
                 )}
               </Card>
             ))}
-            {links?.invitations?.map((i: any) => (
+            {links?.invitations?.map((i) => (
               <Card key={i.id}>
                 <Text style={styles.h2}>{i.email}</Text>
                 <Text style={styles.muted}>
@@ -1171,16 +1189,20 @@ export function LearningScreen({
   );
 }
 export function Inbox({ workspaceId }: { workspaceId?: string }) {
-  const [rows, setRows] = useState<any[]>([]),
-    [limits, setLimits] = useState<any>(null),
+  const [rows, setRows] = useState<InboxNotification[]>([]),
+    [limits, setLimits] = useState<WorkspaceLimits | null>(null),
     [error, setError] = useState("");
   useEffect(() => {
     void (async () => {
       try {
-        setRows((await request("/inbox")).data);
+        setRows((await request<{ data: InboxNotification[] }>("/inbox")).data);
         if (workspaceId)
           setLimits(
-            (await request(`/workspaces/${workspaceId}/settings/limits`)).data,
+            (
+              await request<{ data: WorkspaceLimits }>(
+                `/workspaces/${workspaceId}/settings/limits`,
+              )
+            ).data,
           );
       } catch (e) {
         setError((e as Error).message);

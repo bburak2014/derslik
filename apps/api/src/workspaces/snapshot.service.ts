@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
-export function rawDto(value: unknown): any {
+export function rawDto(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "bigint") return value.toString();
   if (Array.isArray(value)) return value.map(rawDto);

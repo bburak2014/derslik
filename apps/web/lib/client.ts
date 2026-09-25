@@ -1,7 +1,7 @@
 "use client";
 import { ApiError } from "@derslik/api-client";
 const retries = new Map<string, string>();
-export async function webRequest<T = any>(
+export async function webRequest<T = unknown>(
   path: string,
   body?: unknown,
   method = body === undefined ? "GET" : "POST",
@@ -19,7 +19,7 @@ export async function webRequest<T = any>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = (await r.json()) as any;
+  const data = (await r.json()) as T & { error?: string; message?: string };
   if (!r.ok) {
     if (r.status < 500) retries.delete(signature);
     throw new ApiError(
@@ -30,5 +30,5 @@ export async function webRequest<T = any>(
   retries.delete(signature);
   return data;
 }
-export const backend = <T = any>(path: string, body?: unknown) =>
+export const backend = <T = unknown>(path: string, body?: unknown) =>
   webRequest<T>("/api/backend" + path, body);

@@ -26,7 +26,8 @@ import {
 
 function Application() {
   const [session, setSession] = useState<Session | null>(null),
-    [boot, setBoot] = useState(true),
+    // Without a Supabase client there is no session to restore.
+    [boot, setBoot] = useState(supabase !== null),
     [access, setAccess] = useState<Access[]>([]),
     [active, setActive] = useState<Access | null>(null),
     [error, setError] = useState(""),
@@ -57,10 +58,7 @@ function Application() {
     }
   }, []);
   useEffect(() => {
-    if (!supabase) {
-      setBoot(false);
-      return;
-    }
+    if (!supabase) return;
     let alive = true;
     void supabase.auth
       .getSession()
@@ -128,6 +126,7 @@ function Application() {
     };
   }, []);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     if (session) void load();
   }, [session?.user.id, load]);
   async function signout() {
@@ -187,17 +186,17 @@ function Application() {
             </Text>
             <Text style={styles.title}>Çalışma alanınız</Text>
             <View style={[styles.row, { gap: 6 }]}>
-              <Ionicons
-                name="mail-outline"
-                size={14}
-                color={colors.muted}
-              />
+              <Ionicons name="mail-outline" size={14} color={colors.muted} />
               <Text style={styles.muted}>{session.user.email}</Text>
             </View>
           </View>
           <ErrorText message={error} />
           {error && (
-            <Button secondary icon="refresh-outline" onPress={() => void load()}>
+            <Button
+              secondary
+              icon="refresh-outline"
+              onPress={() => void load()}
+            >
               Yeniden dene
             </Button>
           )}

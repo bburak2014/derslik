@@ -61,7 +61,8 @@ export function AuthScreen({
   reset?: boolean;
   onDone?: () => void;
 }) {
-  const [mode, setMode] = useState<Mode>(reset ? "password" : "signin");
+  const [mode, setMode] = useState<Mode>(reset ? "password" : "signin"),
+    [shownReset, setShownReset] = useState(reset);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
@@ -77,7 +78,9 @@ export function AuthScreen({
         if (!alive) return;
         setEnabled(list);
         if (!list.length)
-          setProviderNotice("Diğer giriş seçenekleri henüz kullanıma açılmadı.");
+          setProviderNotice(
+            "Diğer giriş seçenekleri henüz kullanıma açılmadı.",
+          );
       })
       .catch(() => {
         if (alive)
@@ -89,9 +92,11 @@ export function AuthScreen({
       alive = false;
     };
   }, []);
-  useEffect(() => {
+  // Switch to the new-password form when a recovery link arrives later.
+  if (reset !== shownReset) {
+    setShownReset(reset);
     if (reset) setMode("password");
-  }, [reset]);
+  }
   const changeMode = (next: Mode) => {
     setMode(next);
     setError("");
@@ -282,7 +287,9 @@ export function AuthScreen({
                     value={password}
                     onChangeText={setPassword}
                     placeholder={
-                      mode === "signin" ? "Şifrenizi girin" : "En az 10 karakter"
+                      mode === "signin"
+                        ? "Şifrenizi girin"
+                        : "En az 10 karakter"
                     }
                     secureTextEntry={!visible}
                     autoCapitalize="none"

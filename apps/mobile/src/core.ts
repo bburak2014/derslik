@@ -107,7 +107,7 @@ export const client = new DerslikClient({
   },
 });
 const retryKeys = new Map<string, string>();
-export async function request<T = any>(
+export async function request<T = unknown>(
   path: string,
   body?: unknown,
 ): Promise<T> {

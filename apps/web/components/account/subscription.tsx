@@ -1,6 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { backend } from "@/lib/client";
+type SubscriptionState = {
+  providerId?: string | null;
+  status: string;
+  endsAt?: string | null;
+  renewsAt?: string | null;
+  available: boolean;
+  pro: { students: number; videoHours: number; materialGb: number };
+  testMode: boolean;
+};
 export function Subscription({
   workspaceId,
   onUpdate,
@@ -8,11 +17,13 @@ export function Subscription({
   workspaceId: string;
   onUpdate: () => void;
 }) {
-  const [data, setData] = useState<any>(null),
+  const [data, setData] = useState<SubscriptionState | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    void backend(`/workspaces/${workspaceId}/subscription`)
+    void backend<{ data: SubscriptionState }>(
+      `/workspaces/${workspaceId}/subscription`,
+    )
       .then((r) => setData(r.data))
       .catch((e) => setError(e.message));
   }, [workspaceId]);
@@ -20,7 +31,7 @@ export function Subscription({
     setBusy(true);
     setError("");
     try {
-      const r = await backend(
+      const r = await backend<{ data: { url: string } }>(
         `/workspaces/${workspaceId}/subscription/${kind}`,
         {},
       );
@@ -78,7 +89,7 @@ export function Subscription({
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const r = await backend(
+                  const r = await backend<{ data: SubscriptionState }>(
                     `/workspaces/${workspaceId}/subscription/sync`,
                     {},
                   );

@@ -85,6 +85,7 @@ export function TeacherScreen({
     }
   }, [access.id]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void load();
   }, [load]);
   async function mutate(command: Command) {
@@ -373,9 +374,7 @@ export function TeacherScreen({
             {dayLabel(l.starts_at, { hour: "2-digit", minute: "2-digit" })}
           </Text>
           <Text style={[styles.muted, { color: colors.faint }]}>·</Text>
-          <Text style={styles.muted}>
-            {l.location || "Konum belirtilmedi"}
-          </Text>
+          <Text style={styles.muted}>{l.location || "Konum belirtilmedi"}</Text>
         </View>
         {l.status === "SCHEDULED" ? (
           <>

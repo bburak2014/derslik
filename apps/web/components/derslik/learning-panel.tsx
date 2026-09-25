@@ -8,8 +8,20 @@ import {
   type PortalData,
   type Video,
   type Material,
+  type FileReservation,
+  type InvitationResult,
+  type MediaCapabilities,
+  type SignedUrl,
+  type VideoReservation,
 } from "@derslik/api-client";
-import { money, dayLabel, dateKey } from "@derslik/contracts";
+import {
+  money,
+  dayLabel,
+  dateKey,
+  type InboxNotification,
+  type StudentAccessList,
+  type WorkspaceLimits,
+} from "@derslik/contracts";
 import { backend } from "@/lib/client";
 import { ThemeToggle } from "@/components/account/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -250,7 +262,8 @@ export function LearningPanel({
     [loading, setLoading] = useState(true),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null),
     [error, setError] = useState(""),
-    [tab, setTab] = useState(initialTab ?? "assignments"),
+    [selectedTab, setTab] = useState(view ?? initialTab ?? "assignments"),
+    [shownView, setShownView] = useState(view),
     // Davet kısayolu formu ilk render'da açar; effect ile açmak fazladan bir
     // render turu ve yanıp sönme demek olurdu.
     [form, setForm] = useState<FormSpec | null>(() =>
@@ -263,16 +276,19 @@ export function LearningPanel({
     } | null>(null),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState<number | null>(null),
-    [access, setAccess] = useState<any>(null),
+    [access, setAccess] = useState<StudentAccessList | null>(null),
     // Davet sonucu: bağlantı + e-postanın gerçekten gidip gitmediği.
     [invite, setInvite] = useState<{
       url: string;
       email: string;
       emailed: boolean;
     } | null>(null);
-  useEffect(() => {
+  // Follow the `view` prop when the parent changes it (adjusting state during
+  // render instead of in an effect avoids a second render pass).
+  if (view !== shownView) {
+    setShownView(view);
     if (view) setTab(view);
-  }, [view]);
+  }
   const uploadSession = useRef<{
     fingerprint: string;
     id: string;
@@ -285,8 +301,8 @@ export function LearningPanel({
   const reload = useCallback(async () => {
     try {
       const [result, status] = await Promise.all([
-        backend(base),
-        backend("/media/capabilities").catch(() => ({
+        backend<LearningData | PortalData>(base),
+        backend<MediaCapabilities>("/media/capabilities").catch(() => ({
           files: false,
           videos: false,
         })),
@@ -301,6 +317,7 @@ export function LearningPanel({
     }
   }, [base]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
   }, [reload]);
   const permissions = owner
@@ -326,7 +343,7 @@ export function LearningPanel({
   async function accessReload() {
     try {
       setAccess(
-        await backend(
+        await backend<StudentAccessList>(
           `/workspaces/${workspaceId}/students/${studentId}/access`,
         ),
       );
@@ -342,17 +359,20 @@ export function LearningPanel({
     setBusy(true);
     setError("");
     try {
-      const { data: r } = await backend(media + "/files", {
-        assignmentId,
-        purpose: owner
-          ? assignmentId
-            ? "ASSIGNMENT"
-            : "RESOURCE"
-          : "SUBMISSION",
-        name: file.name,
-        mimeType: file.type,
-        sizeBytes: file.size,
-      });
+      const { data: r } = await backend<{ data: FileReservation }>(
+        media + "/files",
+        {
+          assignmentId,
+          purpose: owner
+            ? assignmentId
+              ? "ASSIGNMENT"
+              : "RESOURCE"
+            : "SUBMISSION",
+          name: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+        },
+      );
       if (r.uploadUrl) {
         const uploaded = await fetch(r.uploadUrl, {
           method: "PUT",
@@ -397,7 +417,7 @@ export function LearningPanel({
         },
       ],
       submit: async (v) => {
-        const r = await backend(
+        const r = await backend<{ data: InvitationResult }>(
           `/workspaces/${workspaceId}/students/${studentId}/invitations`,
           {
             email: v.email,
@@ -424,7 +444,9 @@ export function LearningPanel({
     setBusy(true);
     try {
       // inline=1: imzalı bağlantı indirme yerine satır içi gösterim için gelsin.
-      const r = await backend(media + `/files/${file.id}/download?inline=1`);
+      const r = await backend<{ data: SignedUrl }>(
+        media + `/files/${file.id}/download?inline=1`,
+      );
       setFilePreview({ file, url: r.data.url });
     } catch (e) {
       setError((e as Error).message);
@@ -434,7 +456,9 @@ export function LearningPanel({
   }
   async function download(file: Material) {
     try {
-      const r = await backend(media + `/files/${file.id}/download`);
+      const r = await backend<{ data: SignedUrl }>(
+        media + `/files/${file.id}/download`,
+      );
       window.location.assign(r.data.url);
     } catch (e) {
       setError((e as Error).message);
@@ -472,9 +496,10 @@ export function LearningPanel({
       ? [{ id: "access", title: "Davetler", permission: "lessons" }]
       : [{ id: "payments", title: "Paket ve bakiye", permission: "payments" }]),
   ].filter((t) => permissions.includes(t.permission));
-  useEffect(() => {
-    if (tabs.length && !tabs.some((t) => t.id === tab)) setTab(tabs[0].id);
-  }, [permissions.join(","), tab]);
+  // Fall back to the first permitted tab when the selected one is not allowed.
+  const tab = tabs.some((t) => t.id === selectedTab)
+    ? selectedTab
+    : (tabs[0]?.id ?? selectedTab);
   if (loading)
     return (
       <div className="learning-panel">
@@ -664,7 +689,7 @@ export function LearningPanel({
                           disabled={m.status !== "READY" || m.delete_requested}
                           onClick={async () => {
                             try {
-                              const r = await backend(
+                              const r = await backend<{ data: SignedUrl }>(
                                 media + `/files/${m.id}/download`,
                               );
                               window.location.assign(r.data.url);
@@ -966,12 +991,15 @@ export function LearningPanel({
                   ].join(":");
                   let upload = uploadSession.current;
                   if (upload?.fingerprint !== fingerprint) {
-                    const r = await backend(media + "/videos", {
-                      title: f.get("title"),
-                      lessonId: f.get("lessonId") || null,
-                      sizeBytes: file.size,
-                      maxDurationSeconds: Number(f.get("duration")) * 60,
-                    });
+                    const r = await backend<{ data: VideoReservation }>(
+                      media + "/videos",
+                      {
+                        title: f.get("title"),
+                        lessonId: f.get("lessonId") || null,
+                        sizeBytes: file.size,
+                        maxDurationSeconds: Number(f.get("duration")) * 60,
+                      },
+                    );
                     upload = {
                       fingerprint,
                       id: r.data.id,
@@ -1395,7 +1423,7 @@ export function LearningPanel({
             </div>
           )}
           <div className="learning-list">
-            {access?.data?.map((a: any) => (
+            {access?.data?.map((a) => (
               <article key={a.id}>
                 <h3>
                   {a.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
@@ -1429,7 +1457,7 @@ export function LearningPanel({
                 )}
               </article>
             ))}
-            {access?.invitations?.map((a: any) => (
+            {access?.invitations?.map((a) => (
               <article key={a.id}>
                 <h3>{a.email}</h3>
                 <p>
@@ -1711,8 +1739,8 @@ function UploadAside({ kind }: { kind: "files" | "videos" }) {
 
 export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
   const [open, setOpen] = useState(false),
-    [inbox, setInbox] = useState<any[]>([]),
-    [limits, setLimits] = useState<any>(null),
+    [inbox, setInbox] = useState<InboxNotification[]>([]),
+    [limits, setLimits] = useState<WorkspaceLimits | null>(null),
     [loading, setLoading] = useState(false),
     [error, setError] = useState("");
   // The two requests used to run one after the other while the dialog was
@@ -1724,9 +1752,11 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
     setLoading(true);
     try {
       const [inboxResult, limitsResult] = await Promise.all([
-        backend("/inbox"),
+        backend<{ data: InboxNotification[] }>("/inbox"),
         workspaceId
-          ? backend(`/workspaces/${workspaceId}/settings/limits`)
+          ? backend<{ data: WorkspaceLimits }>(
+              `/workspaces/${workspaceId}/settings/limits`,
+            )
           : Promise.resolve(null),
       ]);
       setInbox(inboxResult.data);

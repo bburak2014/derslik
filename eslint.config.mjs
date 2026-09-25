@@ -12,9 +12,20 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated output: the compiled API, framework builds and Expo state.
+    ".api-build/**",
+    "dist/**",
+    "**/.next/**",
+    ".vinext/**",
+    ".wrangler/**",
+    ".sites-runtime/**",
+    "**/.expo/**",
   ]),
   {
-    files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
+    files: [
+      "apps/web/components/ui/**/*.{ts,tsx}",
+      "apps/web/hooks/use-mobile.ts",
+    ],
     rules: {
       // These files are vendored verbatim from shadcn@4.17.0. Keep the
       // registry source intact while applying the stricter rules to Site code.
@@ -22,6 +33,17 @@ const eslintConfig = defineConfig([
       "react-hooks/purity": "off",
       "react-hooks/set-state-in-effect": "off",
     },
+  },
+  {
+    // The web app navigates with plain anchors and location.assign on purpose:
+    // it never uses next/link, and full loads reset session and view state.
+    files: ["apps/web/**/*.{ts,tsx}"],
+    rules: { "@next/next/no-html-link-for-pages": "off" },
+  },
+  {
+    // CommonJS tool configs (Metro) must use require().
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
 ]);
 

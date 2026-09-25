@@ -176,4 +176,21 @@ export type PortalData = LearningData & {
   packages: WorkspaceData["packages"];
   payments: WorkspaceData["payments"];
 };
+// Media and invitation responses, as the API's `data` field returns them.
+export type MediaCapabilities = { files: boolean; videos: boolean };
+export type FileReservation = {
+  id: string;
+  status: string;
+  uploadUrl?: string;
+  mimeType?: string;
+};
+export type VideoReservation = {
+  id: string;
+  status: string;
+  uploadUrl: string;
+  expiresAt: string;
+};
+export type SignedUrl = { url: string };
+export type VideoPlayback = { url: string; expiresAt: number };
+export type InvitationResult = { id: string; url: string; emailed?: boolean };
 export { uploadTus, type UploadSource } from "./uploads.ts";

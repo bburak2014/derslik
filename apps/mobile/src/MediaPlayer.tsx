@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Modal, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView } from "expo-video";
-import type { Video } from "@derslik/api-client";
+import type { Video, VideoPlayback } from "@derslik/api-client";
 import { request } from "./core";
 import { Button, ErrorText, styles } from "./ui";
 export function MediaPlayer({
@@ -29,13 +29,17 @@ export function MediaPlayer({
     [busy, setBusy] = useState(false);
   const current = useRef(initialTime),
     actionRef = useRef(action);
-  actionRef.current = action;
+  useEffect(() => {
+    actionRef.current = action;
+  });
   useEffect(() => {
     let stopped = false,
       timer: ReturnType<typeof setTimeout>;
     async function load() {
       try {
-        const r = await request(path + `/videos/${video.id}/playback`);
+        const r = await request<{ data: VideoPlayback }>(
+          path + `/videos/${video.id}/playback`,
+        );
         if (stopped) return;
         const resume = player.playing;
         await player.replaceAsync({ uri: r.data.url, contentType: "hls" });
@@ -87,7 +91,10 @@ export function MediaPlayer({
   }, [video.id, path, player]);
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.screen} edges={["top", "bottom", "left", "right"]}>
+      <SafeAreaView
+        style={styles.screen}
+        edges={["top", "bottom", "left", "right"]}
+      >
         <ScrollView
           contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"

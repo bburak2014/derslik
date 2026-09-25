@@ -69,6 +69,46 @@ export type WorkspaceData = {
   notes: PrivateNote[];
   serverTime: string;
 };
+// Shapes returned by the access, inbox and limits endpoints (camelCased by
+// the API's toDto; Postgres bigint/count values arrive as strings).
+export type AccessLink = {
+  id: string;
+  role: "STUDENT" | "GUARDIAN";
+  permissions: string[];
+  revokedAt: string | null;
+  createdAt: string;
+};
+export type AccessInvitation = {
+  id: string;
+  email: string;
+  role: "STUDENT" | "GUARDIAN";
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+};
+export type StudentAccessList = {
+  data: AccessLink[];
+  invitations: AccessInvitation[];
+};
+export type InboxNotification = {
+  id: string;
+  workspaceId: string | null;
+  studentId: string | null;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+};
+export type WorkspaceLimits = {
+  limits: {
+    plan: string;
+    studentLimit: number;
+    videoSeconds: number;
+    materialBytes: string;
+  };
+  used: { students: string; videoSeconds: string; materialBytes: string };
+  capabilities: { videoUploads: boolean; attachments: boolean };
+};
 export type View = "overview" | "calendar" | "students" | "payments";
 export const emptyWorkspace: WorkspaceData = {
   students: [],

@@ -25,7 +25,9 @@ export function useWorkspaceTools(
   openForm: (m: ModalState) => void,
 ) {
   const latest = useRef({ data, mutate, openForm });
-  latest.current = { data, mutate, openForm };
+  useEffect(() => {
+    latest.current = { data, mutate, openForm };
+  });
   useEffect(() => {
     const context = (document as Document & { modelContext?: ModelContext })
       .modelContext;

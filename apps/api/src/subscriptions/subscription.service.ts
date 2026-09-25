@@ -23,7 +23,7 @@ export class BillingProvider {
       this.config.LEMONSQUEEZY_WEBHOOK_SECRET
     );
   }
-  async call(path: string, body?: unknown): Promise<any> {
+  async call<T>(path: string, body?: unknown): Promise<T> {
     if (!this.ready())
       throw new ServiceUnavailableException(
         "Abonelik ödemeleri henüz açılmamış.",
@@ -42,7 +42,7 @@ export class BillingProvider {
       throw new ServiceUnavailableException(
         "Abonelik hizmetine ulaşılamadı. Yeniden deneyin.",
       );
-    return r.json();
+    return (await r.json()) as T;
   }
   url(value: string) {
     const url = new URL(value);
@@ -71,7 +71,7 @@ export class SubscriptionService {
       ).rows[0] || { status: "none" };
       return {
         data: {
-          ...toDto(row),
+          ...(toDto(row) as Record<string, unknown>),
           available: this.provider.ready(),
           pro: { students: 100, videoHours: 50, materialGb: 2 },
           testMode: this.config.LEMONSQUEEZY_TEST_MODE === "true",
@@ -137,7 +137,9 @@ export class SubscriptionService {
         },
       },
     };
-    const result = await this.provider.call("/checkouts", payload),
+    const result = await this.provider.call<{
+        data: { attributes: { url: string } };
+      }>("/checkouts", payload),
       url = this.provider.url(result.data.attributes.url);
     await this.db.transaction(actor, ws, async (tx) => {
       await tx.query(
@@ -161,9 +163,9 @@ export class SubscriptionService {
     );
     if (!row?.provider_id)
       throw new ConflictException("Etkin abonelik bulunamadı.");
-    const result = await this.provider.call(
-      "/subscriptions/" + encodeURIComponent(row.provider_id),
-    );
+    const result = await this.provider.call<{
+      data: { attributes: { urls: { customer_portal: string } } };
+    }>("/subscriptions/" + encodeURIComponent(row.provider_id));
     return {
       data: {
         url: this.provider.url(result.data.attributes.urls.customer_portal),
@@ -183,7 +185,7 @@ export class SubscriptionService {
         ).rows[0],
     );
     if (row?.provider_id) {
-      const result = await this.provider.call(
+      const result = await this.provider.call<{ data: unknown }>(
         "/subscriptions/" + encodeURIComponent(row.provider_id),
       );
       await this.apply({
@@ -208,7 +210,9 @@ export class SubscriptionService {
     if (event.data?.type !== "subscriptions") return { received: true };
     // Re-fetch canonical state: delayed/replayed events cannot restore old privileges.
     const id = z.string().regex(/^\d+$/).parse(String(event.data.id));
-    const current = await this.provider.call("/subscriptions/" + id);
+    const current = await this.provider.call<{ data: unknown }>(
+      "/subscriptions/" + id,
+    );
     return this.apply({ data: current.data, meta: event.meta });
   }
   private async apply(input: unknown) {
