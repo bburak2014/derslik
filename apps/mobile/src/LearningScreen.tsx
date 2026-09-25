@@ -24,7 +24,15 @@ import {
   type PortalData,
   type Video,
 } from "@derslik/api-client";
-import { dateKey, dayLabel, money, timeLabel } from "@derslik/contracts";
+import {
+  dateKey,
+  dayLabel,
+  money,
+  noticeTarget,
+  timeLabel,
+  type Notice,
+  type NoticeTarget,
+} from "@derslik/contracts";
 import { request } from "./core";
 import {
   Avatar,
@@ -69,12 +77,19 @@ const empty: LearningData = {
   summaries: [],
   progress: [],
 };
+/** Bildirimden açılan yer; `at` aynı bildirime yeniden dokununca değişir. */
+export type NoticeFocus = NoticeTarget & { at: number };
+
 export function PortalScreen({
   access,
   onAccount,
+  focus,
+  onNotice,
 }: {
   access: Access;
   onAccount: () => void;
+  focus?: NoticeFocus | null;
+  onNotice?: (target: NoticeTarget) => void;
 }) {
   return (
     <LearningScreen
@@ -82,6 +97,8 @@ export function PortalScreen({
       studentId={access.studentId!}
       studentName={access.studentName!}
       onBack={onAccount}
+      focus={focus}
+      onNotice={onNotice}
     />
   );
 }
@@ -122,6 +139,8 @@ export function LearningScreen({
   studentName,
   onBack,
   view,
+  focus,
+  onNotice,
 }: {
   access: Access;
   studentId: string;
@@ -130,6 +149,11 @@ export function LearningScreen({
   /** Tek bir bölümü gömülü göstermek için (Öğretim sekmesi). Verilince
    *  ekranın kendi başlığı ve sekme şeridi çizilmez. */
   view?: TeachingView;
+  /** Bildirimden gelinen kayıt: bölümü açılır, karta kaydırılıp kısa süre
+   *  vurgulanır. */
+  focus?: NoticeFocus | null;
+  /** Bildirimler sekmesinde bir bildirime dokunulunca. */
+  onNotice?: (target: NoticeTarget) => void;
 }) {
   const { colors, styles, section } = useTheme();
   const owner = access.role === "OWNER",
@@ -171,6 +195,55 @@ export function LearningScreen({
     [links, setLinks] = useState<any>(null);
   const inFlight = useRef(false),
     fileReservations = useRef(new Map<string, string>());
+  // Bildirim hedefi: kartların kaydırma içindeki yeri onLayout ile tutulur;
+  // hedef kart yerleşince (ya da zaten yerindeyse) oraya kaydırılır.
+  const scroller = useRef<ScrollView>(null),
+    spots = useRef(new Map<string, number>()),
+    pending = useRef<string | null>(null),
+    [appliedFocus, setAppliedFocus] = useState(0),
+    [highlight, setHighlight] = useState<string | null>(null);
+  if (
+    focus &&
+    focus.at !== appliedFocus &&
+    focus.workspaceId === access.id &&
+    focus.studentId === studentId
+  ) {
+    setAppliedFocus(focus.at);
+    if (!view) setTab(focus.section);
+    setHighlight(focus.itemId);
+  }
+  useEffect(() => {
+    if (!highlight) return;
+    pending.current = highlight;
+    // Hedef zaten ekrandaysa onLayout yeniden gelmez; kısa bir bekleyişten
+    // sonra bilinen konuma kaydırılır.
+    const scroll = setTimeout(() => {
+      const y = spots.current.get(highlight);
+      if (pending.current === highlight && y !== undefined) {
+        pending.current = null;
+        scroller.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+      }
+    }, 300);
+    const clear = setTimeout(() => setHighlight(null), 2600);
+    return () => {
+      clearTimeout(scroll);
+      clearTimeout(clear);
+    };
+  }, [highlight, appliedFocus]);
+  const spot = (id: string) => ({
+    onLayout: (e: { nativeEvent: { layout: { y: number } } }) => {
+      const y = e.nativeEvent.layout.y;
+      spots.current.set(id, y);
+      if (pending.current === id) {
+        pending.current = null;
+        scroller.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+      }
+    },
+    style:
+      highlight === id
+        ? { borderColor: colors.marker, borderWidth: 2 }
+        : undefined,
+  });
   const base = owner
       ? `/workspaces/${access.id}/students/${studentId}/learning`
       : `/portal/${access.id}/${studentId}`,
@@ -489,6 +562,7 @@ export function LearningScreen({
         />
       )}
       <ScrollView
+        ref={scroller}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -662,7 +736,7 @@ export function LearningScreen({
               );
               const [tone, state] = assignmentState(a, sub);
               return (
-                <Card key={a.id}>
+                <Card key={a.id} {...spot(a.id)}>
                   <View
                     style={{
                       flexDirection: "row",
@@ -1007,7 +1081,7 @@ export function LearningScreen({
             {data.videos.map((v) => {
               const ready = v.status === "READY" && !v.delete_requested;
               return (
-                <Card key={v.id}>
+                <Card key={v.id} {...spot(v.id)}>
                   <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
                     <Pressable
                       accessibilityRole="button"
@@ -1217,7 +1291,7 @@ export function LearningScreen({
               </View>
             )}
             {data.summaries.map((s) => (
-              <Card key={s.id}>
+              <Card key={s.id} {...spot(s.id)}>
                 <View style={[styles.row, { justifyContent: "space-between" }]}>
                   <Kicker>Haftalık özet</Kicker>
                   <Badge tone={s.status === "DRAFT" ? "warning" : "success"} dot>
@@ -1575,7 +1649,10 @@ export function LearningScreen({
           </>
         )}
         {tab === "inbox" && (
-          <Inbox workspaceId={owner ? access.id : undefined} />
+          <Inbox
+            workspaceId={owner ? access.id : undefined}
+            onOpen={onNotice}
+          />
         )}
       </ScrollView>
       {preview?.kind === "pdf" && (
@@ -1669,14 +1746,6 @@ function FileIcon({ icon }: { icon: IconName }) {
   );
 }
 
-type Notice = {
-  id: string;
-  title: string;
-  body: string;
-  readAt: string | null;
-  createdAt: string;
-};
-
 /** Bildirim başlıkları sunucuda sabit metinler; simge başlıktan seçiliyor
  *  (web ile aynı eşleme). */
 function noticeIcon(title: string): IconName {
@@ -1705,9 +1774,12 @@ function ago(iso: string, now: number) {
 export function Inbox({
   workspaceId,
   onUnread,
+  onOpen,
 }: {
   workspaceId?: string;
   onUnread?: (count: number) => void;
+  /** Bildirime dokununca ilgili ekranı açar. */
+  onOpen?: (target: NoticeTarget) => void;
 }) {
   const { colors, styles, section } = useTheme();
   const [rows, setRows] = useState<Notice[] | null>(null),
@@ -1780,58 +1852,78 @@ export function Inbox({
       )}
       {!!rows?.length && (
         <List>
-          {rows.map((n, i) => (
-            <View
-              key={n.id}
-              style={[
-                section.notice,
-                i > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
-                !n.readAt && { backgroundColor: colors.infoSoft },
-              ]}
-            >
-              <View
-                style={[
-                  section.noticeIcon,
-                  n.readAt
-                    ? { backgroundColor: colors.sunken }
-                    : { backgroundColor: colors.brandSoft },
+          {rows.map((n, i) => {
+            const target = onOpen ? noticeTarget(n) : null;
+            return (
+              <Pressable
+                key={n.id}
+                disabled={!target}
+                accessibilityRole={target ? "button" : undefined}
+                accessibilityHint={target ? "İlgili sayfayı açar" : undefined}
+                onPress={() => {
+                  if (!target) return;
+                  if (!n.readAt) void markRead([n.id]);
+                  onOpen?.(target);
+                }}
+                style={({ pressed }) => [
+                  section.notice,
+                  i > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
+                  !n.readAt && { backgroundColor: colors.infoSoft },
+                  pressed && { backgroundColor: colors.sunken },
                 ]}
               >
-                <Ionicons
-                  name={noticeIcon(n.title)}
-                  size={16}
-                  color={n.readAt ? colors.muted : colors.brand}
-                />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <View style={[styles.row, { flexWrap: "nowrap", alignItems: "flex-start" }]}>
-                  <Text
-                    style={[
-                      n.readAt ? styles.text : styles.label,
-                      { flex: 1, fontSize: 14.5 },
-                    ]}
-                  >
-                    {n.title}
-                  </Text>
-                  {!n.readAt && (
-                    <View
-                      accessibilityLabel="Okunmadı"
-                      style={section.unreadDot}
-                    />
-                  )}
+                <View
+                  style={[
+                    section.noticeIcon,
+                    n.readAt
+                      ? { backgroundColor: colors.sunken }
+                      : { backgroundColor: colors.brandSoft },
+                  ]}
+                >
+                  <Ionicons
+                    name={noticeIcon(n.title)}
+                    size={16}
+                    color={n.readAt ? colors.muted : colors.brand}
+                  />
                 </View>
-                <Text style={styles.muted}>{n.body}</Text>
-                <View style={[styles.row, { gap: 14, marginTop: 4 }]}>
-                  <Text style={styles.caption}>{ago(n.createdAt, now)}</Text>
-                  {!n.readAt && (
-                    <TextLink onPress={() => void markRead([n.id])}>
-                      Okundu say
-                    </TextLink>
-                  )}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={[styles.row, { flexWrap: "nowrap", alignItems: "flex-start" }]}>
+                    <Text
+                      style={[
+                        n.readAt ? styles.text : styles.label,
+                        { flex: 1, fontSize: 14.5 },
+                      ]}
+                    >
+                      {n.title}
+                    </Text>
+                    {!n.readAt && (
+                      <View
+                        accessibilityLabel="Okunmadı"
+                        style={section.unreadDot}
+                      />
+                    )}
+                  </View>
+                  <Text style={styles.muted}>{n.body}</Text>
+                  <View style={[styles.row, { gap: 14, marginTop: 4 }]}>
+                    <Text style={styles.caption}>{ago(n.createdAt, now)}</Text>
+                    {!n.readAt && (
+                      <TextLink onPress={() => void markRead([n.id])}>
+                        Okundu say
+                      </TextLink>
+                    )}
+                  </View>
                 </View>
-              </View>
-            </View>
-          ))}
+                {target && (
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={colors.faint}
+                    style={{ alignSelf: "center" }}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
         </List>
       )}
       {limits && (

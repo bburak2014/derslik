@@ -255,7 +255,7 @@ export class AccessService {
       data: toDto(
         (
           await tx.query(
-            "SELECT id,workspace_id,student_id,title,body,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
+            "SELECT id,workspace_id,student_id,title,body,kind,target_id,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
             [actor.id],
           )
         ).rows,

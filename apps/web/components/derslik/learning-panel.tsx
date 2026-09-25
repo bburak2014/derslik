@@ -14,6 +14,9 @@ import {
   dateKey,
   addDays,
   timeLabel,
+  noticeTarget,
+  type Notice,
+  type NoticeTarget,
 } from "@derslik/contracts";
 import { backend } from "@/lib/client";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,7 @@ import {
   BellOff,
   CalendarDays,
   CheckCheck,
+  ChevronRight,
   CircleAlert,
   ClipboardList,
   Copy,
@@ -300,6 +304,8 @@ export type LearningTab =
   | "payments"
   | "access";
 export type LearningTabInfo = { id: LearningTab; title: string };
+/** Bildirimden açılan yer; `at` aynı bildirime yeniden tıklanınca değişir. */
+export type NoticeFocus = NoticeTarget & { at: number };
 
 export function LearningPanel({
   workspaceId,
@@ -311,6 +317,7 @@ export function LearningPanel({
   onTabs,
   initialTab,
   autoInvite = false,
+  focus,
 }: {
   workspaceId: string;
   studentId: string;
@@ -325,6 +332,9 @@ export function LearningPanel({
   initialTab?: string;
   /** Açılışta davet formu doğrudan açılsın mı. */
   autoInvite?: boolean;
+  /** Bildirimden gelinen kayıt: görünür olunca kaydırılıp kısa süre
+   *  vurgulanır. `at` her tıklamada değişir. */
+  focus?: { id: string | null; at: number };
 }) {
   const owner = role === "OWNER",
     student = role === "STUDENT";
@@ -359,6 +369,22 @@ export function LearningPanel({
   useEffect(() => {
     if (view) setTab(view);
   }, [view]);
+  // Aynı bildirim ikinci kez kaydırmasın diye işlenen tıklamanın zamanı.
+  const focused = useRef(0),
+    focusId = focus?.id,
+    focusAt = focus?.at ?? 0;
+  useEffect(() => {
+    if (loading || !focusId || focused.current === focusAt) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-notice-target="${CSS.escape(focusId)}"]`,
+    );
+    if (!el) return;
+    focused.current = focusAt;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.dataset.highlight = "true";
+    const timer = setTimeout(() => delete el.dataset.highlight, 2400);
+    return () => clearTimeout(timer);
+  }, [loading, focusId, focusAt, tab]);
   const uploadSession = useRef<{
     fingerprint: string;
     id: string;
@@ -722,6 +748,7 @@ export function LearningPanel({
                   variant="outline"
                   className="bg-card items-start"
                   key={a.id}
+                  data-notice-target={a.id}
                 >
                   <ItemMedia variant="icon">
                     <ClipboardList />
@@ -1236,7 +1263,12 @@ export function LearningPanel({
                 (q) => q.video_id === v.id,
               );
               return (
-                <Item variant="outline" className="bg-card" key={v.id}>
+                <Item
+                  variant="outline"
+                  className="bg-card"
+                  key={v.id}
+                  data-notice-target={v.id}
+                >
                   <ItemMedia variant="icon">
                     <VideoIcon />
                   </ItemMedia>
@@ -1452,6 +1484,7 @@ export function LearningPanel({
                 variant="outline"
                 className="bg-card items-start"
                 key={s.id}
+                data-notice-target={s.id}
               >
                 <ItemMedia variant="icon">
                   <Sparkles />
@@ -2262,14 +2295,6 @@ function UploadAside({ kind }: { kind: "files" | "videos" }) {
   );
 }
 
-type Notice = {
-  id: string;
-  title: string;
-  body: string;
-  readAt: string | null;
-  createdAt: string;
-};
-
 /** Bildirim başlıkları sunucuda sabit metinler; simge başlıktan seçiliyor. */
 function noticeIcon(title: string) {
   const t = title.toLocaleLowerCase("tr");
@@ -2326,7 +2351,14 @@ function UsageMeter({
   );
 }
 
-export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
+export function AccountExtras({
+  workspaceId,
+  onOpen,
+}: {
+  workspaceId?: string;
+  /** Bildirime tıklanınca ilgili sayfayı açar. */
+  onOpen?: (target: NoticeTarget) => void;
+}) {
   const [open, setOpen] = useState(false),
     [tab, setTab] = useState("inbox"),
     [inbox, setInbox] = useState<Notice[]>([]),
@@ -2383,6 +2415,11 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
       setError((e as Error).message);
     }
   }
+  function openNotice(n: Notice, target: NoticeTarget) {
+    if (!n.readAt) void markRead([n.id]);
+    setOpen(false);
+    onOpen?.(target);
+  }
   const list = loading ? (
     <div className="grid gap-4 p-4" aria-hidden="true">
       {[0, 1, 2].map((i) => (
@@ -2397,63 +2434,85 @@ export function AccountExtras({ workspaceId }: { workspaceId?: string }) {
     </div>
   ) : inbox.length ? (
     <ul className="divide-y">
-      {inbox.map((n) => (
-        <li
-          key={n.id}
-          className={
-            "flex gap-3 px-4 py-3.5 " + (n.readAt ? "" : "bg-primary/[0.04]")
-          }
-        >
-          <span
-            aria-hidden="true"
+      {inbox.map((n) => {
+        const target = onOpen ? noticeTarget(n) : null;
+        return (
+          <li
+            key={n.id}
             className={
-              "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full [&_svg]:size-4 " +
-              (n.readAt
-                ? "bg-muted text-muted-foreground"
-                : "bg-primary/10 text-primary")
+              "relative flex gap-3 px-4 py-3.5 " +
+              (n.readAt ? "" : "bg-primary/[0.04] ") +
+              (target ? "hover:bg-muted/60 transition-colors" : "")
             }
           >
-            {noticeIcon(n.title)}
-          </span>
-          <div className="grid min-w-0 flex-1 gap-0.5">
-            <div className="flex items-start justify-between gap-3">
-              <p
-                className={
-                  "text-sm leading-snug " +
-                  (n.readAt ? "text-foreground/80" : "font-medium")
-                }
-              >
-                {n.title}
-              </p>
-              {!n.readAt && (
-                <span
-                  className="bg-primary mt-1.5 size-2 shrink-0 rounded-full"
-                  aria-label="Okunmadı"
-                />
-              )}
-            </div>
-            <p className="text-muted-foreground text-sm leading-snug">
-              {n.body}
-            </p>
-            <div className="flex items-center gap-3 pt-1">
-              <span className="text-muted-foreground text-xs">
-                {ago(n.createdAt, now)}
-              </span>
-              {!n.readAt && (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="xs"
-                  className="h-auto p-0 text-xs"
-                  onClick={() => void markRead([n.id])}
+            <span
+              aria-hidden="true"
+              className={
+                "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full [&_svg]:size-4 " +
+                (n.readAt
+                  ? "bg-muted text-muted-foreground"
+                  : "bg-primary/10 text-primary")
+              }
+            >
+              {noticeIcon(n.title)}
+            </span>
+            <div className="grid min-w-0 flex-1 gap-0.5">
+              <div className="flex items-start justify-between gap-3">
+                <p
+                  className={
+                    "text-sm leading-snug " +
+                    (n.readAt ? "text-foreground/80" : "font-medium")
+                  }
                 >
-                  Okundu say
-                </Button>
-              )}
+                  {target ? (
+                    // Başlık düğmesi tüm satırı kaplar; "Okundu say" üstte kalır.
+                    <button
+                      type="button"
+                      className="text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
+                      onClick={() => openNotice(n, target)}
+                    >
+                      {n.title}
+                    </button>
+                  ) : (
+                    n.title
+                  )}
+                </p>
+                {!n.readAt && (
+                  <span
+                    className="bg-primary mt-1.5 size-2 shrink-0 rounded-full"
+                    aria-label="Okunmadı"
+                  />
+                )}
+              </div>
+              <p className="text-muted-foreground text-sm leading-snug">
+                {n.body}
+              </p>
+              <div className="flex items-center gap-3 pt-1">
+                <span className="text-muted-foreground text-xs">
+                  {ago(n.createdAt, now)}
+                </span>
+                {!n.readAt && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="xs"
+                    className="relative h-auto p-0 text-xs"
+                    onClick={() => void markRead([n.id])}
+                  >
+                    Okundu say
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </li>
-      ))}
+            {target && (
+              <ChevronRight
+                aria-hidden="true"
+                className="text-muted-foreground mt-1.5 size-4 shrink-0"
+              />
+            )}
+          </li>
+        );
+      })}
     </ul>
   ) : (
     <Empty className="py-16">

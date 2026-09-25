@@ -22,6 +22,7 @@ import {
   type StyleProp,
   type TextInputProps,
   type TextStyle,
+  type ViewProps,
   type ViewStyle,
 } from "react-native";
 import {
@@ -1216,11 +1217,13 @@ export function Card({
   tone = "plain",
   onPress,
   style,
+  onLayout,
 }: {
   children: React.ReactNode;
   tone?: "plain" | "brand" | "muted";
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  onLayout?: ViewProps["onLayout"];
 }) {
   const { colors, styles } = useTheme();
   const toned =
@@ -1234,11 +1237,16 @@ export function Card({
           }
         : null;
   if (!onPress)
-    return <View style={[styles.card, toned, style]}>{children}</View>;
+    return (
+      <View style={[styles.card, toned, style]} onLayout={onLayout}>
+        {children}
+      </View>
+    );
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
+      onLayout={onLayout}
       android_ripple={ripple()}
       style={({ pressed }) => [
         styles.card,
