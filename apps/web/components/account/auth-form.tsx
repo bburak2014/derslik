@@ -9,12 +9,19 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import {
-  AppleIcon,
-  GoogleIcon,
-  MicrosoftIcon,
-} from "./provider-icons";
+import { AppleIcon, GoogleIcon, MicrosoftIcon } from "./provider-icons";
 import { Spinner } from "@/components/derslik/loading";
+import { FormError, FormSuccess } from "@/components/derslik/feedback";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { webRequest } from "@/lib/client";
 const social = [
   { id: "google", name: "Google", icon: <GoogleIcon /> },
@@ -131,177 +138,189 @@ export function AuthForm({
               ? "Öğretmen, öğrenci veya veli olarak başlayın."
               : "Hesabınıza güvenle geri dönmenize yardımcı olalım."}
         </p>
-        {(mode === "signin" || mode === "signup") && (
-          <>
-            <div
-              className="social-buttons"
-              aria-label="Diğer giriş seçenekleri"
-            >
-              {social.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="social-button"
-                  disabled={!!busy || !enabled.includes(p.id)}
-                  title={
-                    providersLoaded && !enabled.includes(p.id)
-                      ? "Bu giriş seçeneği henüz kullanıma açılmadı."
-                      : `${p.name} ile devam et`
-                  }
-                  onClick={async () => {
-                    setError("");
-                    setBusy(p.id);
-                    try {
-                      const r = await webRequest("/api/auth/oauth", {
-                        provider: p.id,
-                        next: location.pathname,
-                      });
-                      location.assign(r.url);
-                    } catch (e) {
-                      setError((e as Error).message);
-                      setBusy(null);
-                    }
-                  }}
+        <div className="grid gap-6">
+          {(mode === "signin" || mode === "signup") && (
+            <>
+              <div className="grid gap-3">
+                <div
+                  className="grid grid-cols-3 gap-2"
+                  aria-label="Diğer giriş seçenekleri"
                 >
-                  {p.icon}
-                  <span>{busy === p.id ? "Açılıyor…" : p.name}</span>
-                  {busy === p.id && <Spinner />}
-                </button>
-              ))}
-            </div>
-            {providersLoaded && !enabled.length && (
-              <p className="auth-provider-note">
-                {providerError
-                  ? "Diğer giriş seçeneklerine ulaşılamadı. E-posta ile devam edebilirsiniz."
-                  : "Diğer giriş seçenekleri henüz kullanıma açılmadı. E-posta ile devam edin."}
-              </p>
-            )}
-            <div className="auth-divider">
-              <span>veya e-posta ile</span>
-            </div>
-          </>
-        )}
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (busy) return;
-            setBusy("email");
-            setError("");
-            setMessage("");
-            const f = new FormData(e.currentTarget);
-            try {
-              const r = await webRequest(`/api/auth/${mode}`, {
-                ...(mode !== "password"
-                  ? { email: String(f.get("email")).trim() }
-                  : {}),
-                ...(mode !== "recover" ? { password: f.get("password") } : {}),
-              });
-              if (mode === "recover" || r.confirmationRequired)
-                setMessage(
-                  "E-posta kutunuzu kontrol edin. Gelen bağlantıyla devam edebilirsiniz.",
-                );
-              else onSuccess();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(null);
-            }
-          }}
-        >
-          {mode !== "password" && (
-            <label>
-              E-posta adresi
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="ornek@eposta.com"
-                required
-                maxLength={200}
-                disabled={!!busy}
-              />
-            </label>
+                  {social.map((p) => (
+                    <Button
+                      key={p.id}
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={!!busy || !enabled.includes(p.id)}
+                      title={
+                        providersLoaded && !enabled.includes(p.id)
+                          ? "Bu giriş seçeneği henüz kullanıma açılmadı."
+                          : `${p.name} ile devam et`
+                      }
+                      onClick={async () => {
+                        setError("");
+                        setBusy(p.id);
+                        try {
+                          const r = await webRequest("/api/auth/oauth", {
+                            provider: p.id,
+                            next: location.pathname,
+                          });
+                          location.assign(r.url);
+                        } catch (e) {
+                          setError((e as Error).message);
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      {busy === p.id ? <Spinner /> : p.icon}
+                      <span>{busy === p.id ? "Açılıyor…" : p.name}</span>
+                    </Button>
+                  ))}
+                </div>
+                {providersLoaded && !enabled.length && (
+                  <p className="text-muted-foreground text-xs">
+                    {providerError
+                      ? "Diğer giriş seçeneklerine ulaşılamadı. E-posta ile devam edebilirsiniz."
+                      : "Diğer giriş seçenekleri henüz kullanıma açılmadı. E-posta ile devam edin."}
+                  </p>
+                )}
+              </div>
+              <div className="text-muted-foreground flex items-center gap-3 text-xs">
+                <Separator className="flex-1" />
+                <span>veya e-posta ile</span>
+                <Separator className="flex-1" />
+              </div>
+            </>
           )}
-          {mode !== "recover" && (
-            <label>
-              Şifre
-              <div className="password-field">
-                <input
-                  name="password"
-                  type={visible ? "text" : "password"}
-                  autoComplete={
-                    mode === "signin" ? "current-password" : "new-password"
-                  }
-                  placeholder={
-                    mode === "signin" ? "Şifrenizi girin" : "En az 10 karakter"
-                  }
+          <form
+            className="grid gap-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (busy) return;
+              setBusy("email");
+              setError("");
+              setMessage("");
+              const f = new FormData(e.currentTarget);
+              try {
+                const r = await webRequest(`/api/auth/${mode}`, {
+                  ...(mode !== "password"
+                    ? { email: String(f.get("email")).trim() }
+                    : {}),
+                  ...(mode !== "recover"
+                    ? { password: f.get("password") }
+                    : {}),
+                });
+                if (mode === "recover" || r.confirmationRequired)
+                  setMessage(
+                    "E-posta kutunuzu kontrol edin. Gelen bağlantıyla devam edebilirsiniz.",
+                  );
+                else onSuccess();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {mode !== "password" && (
+              <div className="grid gap-2">
+                <Label htmlFor="auth-email">E-posta adresi</Label>
+                <Input
+                  id="auth-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="ornek@eposta.com"
                   required
-                  minLength={mode === "signin" ? 1 : 10}
-                  maxLength={128}
+                  maxLength={200}
                   disabled={!!busy}
                 />
-                <button
-                  type="button"
-                  aria-label={visible ? "Şifreyi gizle" : "Şifreyi göster"}
-                  aria-pressed={visible}
-                  onClick={() => setVisible(!visible)}
-                >
-                  {visible ? <EyeOff size={19} /> : <Eye size={19} />}
-                </button>
               </div>
-            </label>
-          )}
-          {mode === "signin" && (
-            <button
-              type="button"
-              className="forgot-link"
-              disabled={!!busy}
-              onClick={() => changeMode("recover")}
-            >
-              Şifremi unuttum
-            </button>
-          )}
-          {error && (
-            <p role="alert" className="form-error">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p role="status" className="form-success">
-              {message}
-            </p>
-          )}
-          <button className="primary-button auth-submit" disabled={!!busy}>
-            {busy === "email" && <Spinner />}
-            {busy === "email"
-              ? "İşleniyor…"
-              : mode === "signin"
-                ? "Giriş yap"
-                : mode === "signup"
-                  ? "Hesap oluştur"
-                  : mode === "recover"
-                    ? "Sıfırlama bağlantısı gönder"
-                    : "Yeni şifreyi kaydet"}
-            <ArrowRight size={18} />
-          </button>
-        </form>
-        {!reset && (
-          <div className="auth-switch">
-            <span>
+            )}
+            {mode !== "recover" && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="auth-password">Şifre</Label>
+                  {mode === "signin" && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-xs"
+                      disabled={!!busy}
+                      onClick={() => changeMode("recover")}
+                    >
+                      Şifremi unuttum
+                    </Button>
+                  )}
+                </div>
+                <InputGroup data-disabled={!!busy || undefined}>
+                  <InputGroupInput
+                    id="auth-password"
+                    name="password"
+                    type={visible ? "text" : "password"}
+                    autoComplete={
+                      mode === "signin" ? "current-password" : "new-password"
+                    }
+                    placeholder={
+                      mode === "signin"
+                        ? "Şifrenizi girin"
+                        : "En az 10 karakter"
+                    }
+                    required
+                    minLength={mode === "signin" ? 1 : 10}
+                    maxLength={128}
+                    disabled={!!busy}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      size="icon-xs"
+                      aria-label={visible ? "Şifreyi gizle" : "Şifreyi göster"}
+                      aria-pressed={visible}
+                      onClick={() => setVisible(!visible)}
+                    >
+                      {visible ? <EyeOff /> : <Eye />}
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+              </div>
+            )}
+            {error && <FormError>{error}</FormError>}
+            {message && <FormSuccess>{message}</FormSuccess>}
+            <Button type="submit" className="w-full" disabled={!!busy}>
+              {busy === "email" && <Spinner />}
+              {busy === "email"
+                ? "İşleniyor…"
+                : mode === "signin"
+                  ? "Giriş yap"
+                  : mode === "signup"
+                    ? "Hesap oluştur"
+                    : mode === "recover"
+                      ? "Sıfırlama bağlantısı gönder"
+                      : "Yeni şifreyi kaydet"}
+              {busy !== "email" && <ArrowRight />}
+            </Button>
+          </form>
+          {!reset && (
+            <p className="text-muted-foreground text-center text-sm">
               {mode === "signin"
                 ? "Henüz hesabınız yok mu?"
-                : "Zaten hesabınız var mı?"}
-            </span>
-            <button
-              disabled={!!busy}
-              onClick={() =>
-                changeMode(mode === "signin" ? "signup" : "signin")
-              }
-            >
-              {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
-            </button>
-          </div>
-        )}
+                : "Zaten hesabınız var mı?"}{" "}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0"
+                disabled={!!busy}
+                onClick={() =>
+                  changeMode(mode === "signin" ? "signup" : "signin")
+                }
+              >
+                {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
+              </Button>
+            </p>
+          )}
+        </div>
         <p className="auth-footnote">
           <ShieldCheck size={16} />
           Hesabınız web ve mobilde birlikte çalışır.

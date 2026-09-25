@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import type { Video } from "@derslik/api-client";
 import { backend } from "@/lib/client";
+import { MessageSquarePlus } from "lucide-react";
 import { Spinner } from "@/components/derslik/loading";
+import { FormError } from "@/components/derslik/feedback";
+import { Button } from "@/components/ui/button";
 export function VideoPlayer({
   video,
   mediaPath,
@@ -108,14 +111,11 @@ export function VideoPlayer({
           <Spinner /> Video açılıyor…
         </p>
       )}
-      {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
       {canAsk && (
-        <button
-          className="primary-button"
+        <Button
+          type="button"
+          className="justify-self-start"
           disabled={!ready}
           onClick={() => {
             ref.current?.pause();
@@ -127,8 +127,8 @@ export function VideoPlayer({
             );
           }}
         >
-          Bu saniyeye soru ekle
-        </button>
+          <MessageSquarePlus /> Bu saniyeye soru ekle
+        </Button>
       )}
     </div>
   );

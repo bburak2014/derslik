@@ -1,7 +1,17 @@
 "use client";
 import { useState } from "react";
 import type { WorkspaceData } from "@derslik/contracts";
+import { Users } from "lucide-react";
 import { LearningPanel } from "./learning-panel";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,19 +42,30 @@ export function TeachingHub({
   const student = students.find((s) => s.id === selected) || students[0];
   if (!student)
     return (
-      <div className="learning-panel learning-empty">
-        Öğrenciler bölümünden bir öğrenci ekleyin. Ödevleri, PDF dosyalarını ve
-        ders videolarını burada paylaşabilirsiniz.
-      </div>
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Users />
+          </EmptyMedia>
+          <EmptyTitle className="text-base">
+            Önce bir öğrenci ekleyin
+          </EmptyTitle>
+          <EmptyDescription>
+            Öğrenciler bölümünden bir öğrenci ekleyin. Ödevleri, PDF dosyalarını
+            ve ders videolarını burada paylaşabilirsiniz.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   return (
-    <section>
-      <div className="teaching-student-bar">
-        <div className="form-field">
+    <section className="grid grid-cols-1 gap-6">
+      <Card className="flex-row flex-wrap items-end justify-between gap-4 px-5 py-4">
+        <div className="grid w-full max-w-xs gap-2">
           <Label htmlFor="teaching-student">Öğrenci</Label>
           <Select value={student.id} onValueChange={setSelected}>
             <SelectTrigger
               id="teaching-student"
+              className="w-full"
               aria-label="İçerikleri gösterilecek öğrenci"
             >
               <SelectValue />
@@ -59,8 +80,10 @@ export function TeachingHub({
             </SelectContent>
           </Select>
         </div>
-        <span className="teaching-student-subject">{student.subject}</span>
-      </div>
+        {student.subject && (
+          <Badge variant="secondary">{student.subject}</Badge>
+        )}
+      </Card>
       <LearningPanel
         key={`${workspaceId}:${student.id}`}
         workspaceId={workspaceId}

@@ -23,6 +23,7 @@ import {
   Package,
   Banknote,
   ArrowDownLeft,
+  CircleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { ToneBadge } from "./feedback";
 import {
   money,
   dateKey,
@@ -115,19 +118,28 @@ export function StudentAvatar({
   );
 }
 export function Status({ status }: { status: Lesson["status"] }) {
+  if (status === "COMPLETED")
+    return (
+      <ToneBadge tone="ok">
+        <Check /> Tamamlandı
+      </ToneBadge>
+    );
   return (
-    <span className={`status status-${status.toLowerCase()}`}>
-      {status === "COMPLETED" ? (
-        <Check size={12} />
-      ) : (
-        <span className="status-dot" />
-      )}
-      {status === "COMPLETED"
-        ? "Tamamlandı"
-        : status === "CANCELLED"
-          ? "İptal edildi"
-          : "Planlandı"}
-    </span>
+    <ToneBadge tone={status === "CANCELLED" ? "muted" : "info"}>
+      <span className="size-1 rounded-full bg-current" aria-hidden="true" />
+      {status === "CANCELLED" ? "İptal edildi" : "Planlandı"}
+    </ToneBadge>
+  );
+}
+/** Kalan ders hakkı. Azalan paket yalnızca renkle değil ünlem simgesiyle de
+ *  işaretlenir; renk körlüğünde veya gri baskıda ayrım kaybolmasın. */
+export function CreditBadge({ count, unit }: { count: number; unit: string }) {
+  const low = count <= 2;
+  return (
+    <ToneBadge tone={low ? "warn" : "info"} className="tabular-nums">
+      {low && <CircleAlert />}
+      {count} {unit}
+    </ToneBadge>
   );
 }
 export function Empty({
@@ -524,16 +536,12 @@ export function Overview({
                         </button>
                         <small>{item.note}</small>
                       </div>
-                      <span
-                        className={
-                          "status " +
-                          (item.kind === "package"
-                            ? "status-warning"
-                            : "status-neutral")
-                        }
+                      <ToneBadge
+                        tone={item.kind === "package" ? "warn" : "muted"}
+                        className="tabular-nums"
                       >
                         {item.badge}
-                      </span>
+                      </ToneBadge>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -787,7 +795,9 @@ export function StudentsView({
                       <span>
                         <strong>{s.name}</strong>
                         {s.is_sample === 1 && (
-                          <small className="sample-label">Örnek</small>
+                          <ToneBadge tone="warn" className="mt-1">
+                            Örnek
+                          </ToneBadge>
                         )}
                       </span>
                     </button>
@@ -799,11 +809,7 @@ export function StudentsView({
                     </small>
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={`credit-pill ${creditsFor(data, s.id) <= 2 ? "low" : ""}`}
-                    >
-                      {creditsFor(data, s.id)} ders
-                    </span>
+                    <CreditBadge count={creditsFor(data, s.id)} unit="ders" />
                   </TableCell>
                   <TableCell className="font-medium">
                     {money(balanceFor(data, s.id))}
@@ -908,9 +914,9 @@ export function PaymentsView({
               <h2>Tahsilat geçmişi</h2>
               <p>Aldığınız ödemelerin manuel kayıtları</p>
             </div>
-            <span className="subtle-badge">
-              <Banknote size={13} /> Manuel
-            </span>
+            <Badge variant="outline" className="text-muted-foreground">
+              <Banknote /> Manuel
+            </Badge>
           </div>
           {data.payments.length ? (
             <Table>
@@ -965,11 +971,9 @@ export function PaymentsView({
                         {money(p.amount_minor)}
                       </TableCell>
                       <TableCell>
-                        <span
-                          className={`status ${p.voided_at ? "status-cancelled" : "status-completed"}`}
-                        >
+                        <ToneBadge tone={p.voided_at ? "muted" : "ok"}>
                           {p.voided_at ? "İptal" : "Kaydedildi"}
-                        </span>
+                        </ToneBadge>
                       </TableCell>
                       <TableCell>
                         {!p.voided_at && (
@@ -1015,7 +1019,9 @@ export function PaymentsView({
         <aside className="panel self-start">
           <div className="section-heading">
             <h2>Açık bakiyeler</h2>
-            <span className="subtle-badge">{due.length} öğrenci</span>
+            <Badge variant="outline" className="text-muted-foreground">
+              {due.length} öğrenci
+            </Badge>
           </div>
           {due.length ? (
             <div className="due-list">
