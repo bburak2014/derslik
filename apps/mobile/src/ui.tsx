@@ -355,10 +355,13 @@ const makeStyles = (colors: Palette, type: Typography) =>
       backgroundColor: colors.brand,
       boxShadow: colors.shadowXs,
     },
+    // Metin satıra sığmazsa kısalır; yoksa RN'de (flexShrink 0) yanındaki
+    // simgeleri düğmenin dışına iter.
     buttonText: {
       ...type.medium,
       fontSize: 15,
       color: colors.onBrand,
+      flexShrink: 1,
     },
     secondary: {
       backgroundColor: colors.surface,
@@ -524,7 +527,7 @@ const makeSection = (colors: Palette, type: Typography) =>
       borderRadius: radius.pill,
       alignSelf: "flex-start",
     },
-    badgeText: { ...type.medium, fontSize: 12, lineHeight: 16 },
+    badgeText: { ...type.medium, fontSize: 12, lineHeight: 16, flexShrink: 1 },
     badgeDot: { width: 6, height: 6, borderRadius: 3 },
     empty: {
       alignItems: "center",
@@ -614,7 +617,12 @@ const makeSection = (colors: Palette, type: Typography) =>
       borderColor: colors.line,
       boxShadow: colors.shadowXs,
     },
-    segmentText: { ...type.medium, fontSize: 14, color: colors.muted },
+    segmentText: {
+      ...type.medium,
+      fontSize: 14,
+      color: colors.muted,
+      flexShrink: 1,
+    },
     segmentTextOn: { color: colors.ink },
     close: {
       width: 40,
