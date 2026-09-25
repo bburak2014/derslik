@@ -21,13 +21,18 @@ import {
   type SocialProvider,
 } from "./oauth";
 import {
+  Brand,
   Button,
   ErrorText,
   Field,
+  GridTexture,
   Input,
+  Kicker,
   type Palette,
   radius,
   SuccessText,
+  TextLink,
+  type Typography,
   useTheme,
 } from "./ui";
 
@@ -62,8 +67,8 @@ export function AuthScreen({
   reset?: boolean;
   onDone?: () => void;
 }) {
-  const { colors, styles } = useTheme();
-  const auth = useMemo(() => makeAuth(colors), [colors]);
+  const { colors, styles, type } = useTheme();
+  const auth = useMemo(() => makeAuth(colors, type), [colors, type]);
   const [mode, setMode] = useState<Mode>(reset ? "password" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -159,12 +164,16 @@ export function AuthScreen({
     }
   }
   const text = copy[mode];
+  // Tanıtım başlığı yalnızca giriş ve kayıtta; şifre ekranlarında form daha
+  // yukarıda kalsın diye yalnızca logo görünür.
+  const intro = mode === "signin" || mode === "signup";
   return (
     <SafeAreaView
       style={[styles.screen, { backgroundColor: colors.navy }]}
       edges={["top", "bottom", "left", "right"]}
     >
       <StatusBar style="light" />
+      <GridTexture />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -175,23 +184,36 @@ export function AuthScreen({
           contentContainerStyle={auth.container}
         >
           <View style={auth.hero}>
-            <View style={auth.header}>
-              <View style={auth.brandIcon}>
-                <Text style={auth.brandLetter}>d.</Text>
+            <Brand inverse />
+            {intro && (
+              <View style={auth.story}>
+                <Text style={auth.storyLabel}>ÖZEL DERS ÇALIŞMA ALANINIZ</Text>
+                <View>
+                  <Text style={auth.headline}>Her öğrenciye</Text>
+                  <View style={auth.mark}>
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      style={[auth.headline, { color: colors.markerInk }]}
+                    >
+                      daha çok zaman.
+                    </Text>
+                  </View>
+                </View>
+                <Text style={auth.heroLead}>
+                  Planlamadan gelişim takibine, dersinizle ilgili her şey bir
+                  arada.
+                </Text>
               </View>
-              <Text style={auth.brand}>
-                derslik<Text style={{ color: colors.greenBorder }}>.</Text>
-              </Text>
-            </View>
-            <Text style={auth.heroLead}>
-              Dersleriniz. Öğrencileriniz. Tek bir yer.
-            </Text>
+            )}
           </View>
 
           <View style={auth.card}>
-            <Text style={styles.kicker}>Derslik hesabı</Text>
-            <Text style={auth.title}>{text.title}</Text>
-            <Text style={[styles.muted, { marginBottom: 4 }]}>{text.lead}</Text>
+            <View style={{ gap: 8 }}>
+              <Kicker>Derslik hesabı</Kicker>
+              <Text style={auth.title}>{text.title}</Text>
+              <Text style={styles.muted}>{text.lead}</Text>
+            </View>
 
             {(mode === "signin" || mode === "signup") && (
               <>
@@ -219,15 +241,15 @@ export function AuthScreen({
                         style={({ pressed }) => [
                           auth.social,
                           pressed && !off && auth.socialPressed,
-                          { opacity: off || busy ? 0.45 : 1 },
+                          { opacity: off || busy ? 0.5 : 1 },
                         ]}
                       >
                         {p.id === "google" ? (
-                          <GoogleMark size={21} />
+                          <GoogleMark size={20} />
                         ) : p.id === "apple" ? (
-                          <AppleMark size={21} color={colors.ink} />
+                          <AppleMark size={20} color={colors.ink} />
                         ) : (
-                          <MicrosoftMark size={21} />
+                          <MicrosoftMark size={20} />
                         )}
                         <Text style={auth.socialLabel} numberOfLines={1}>
                           {busy === p.id ? "Açılıyor…" : p.name}
@@ -293,7 +315,7 @@ export function AuthScreen({
                     maxLength={128}
                     returnKeyType="go"
                     onSubmitEditing={() => void submit()}
-                    style={{ paddingRight: 56 }}
+                    style={{ paddingRight: 52 }}
                   />
                   <Pressable
                     accessibilityRole="button"
@@ -307,7 +329,7 @@ export function AuthScreen({
                   >
                     <Ionicons
                       name={visible ? "eye-off-outline" : "eye-outline"}
-                      size={20}
+                      size={19}
                       color={colors.muted}
                     />
                   </Pressable>
@@ -316,14 +338,14 @@ export function AuthScreen({
             )}
 
             {mode === "signin" && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={!!busy}
-                style={auth.forgot}
-                onPress={() => changeMode("recover")}
-              >
-                <Text style={auth.link}>Şifremi unuttum</Text>
-              </Pressable>
+              <View style={auth.forgot}>
+                <TextLink
+                  disabled={!!busy}
+                  onPress={() => changeMode("recover")}
+                >
+                  Şifremi unuttum
+                </TextLink>
+              </View>
             )}
 
             <ErrorText message={error} />
@@ -333,21 +355,21 @@ export function AuthScreen({
               loading={busy === "email"}
               disabled={!!busy}
               onPress={() => void submit()}
-              style={{ marginTop: 2 }}
+              trailingIcon={busy === "email" ? undefined : "arrow-forward"}
             >
               {busy === "email" ? "İşleniyor…" : text.submit}
             </Button>
 
             {mode === "recover" && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={!!busy}
-                onPress={() => changeMode("signin")}
-                style={auth.backRow}
-              >
-                <Ionicons name="arrow-back" size={16} color={colors.green} />
-                <Text style={auth.link}>Girişe dön</Text>
-              </Pressable>
+              <View style={auth.backRow}>
+                <TextLink
+                  icon="arrow-back"
+                  disabled={!!busy}
+                  onPress={() => changeMode("signin")}
+                >
+                  Girişe dön
+                </TextLink>
+              </View>
             )}
 
             {!reset && mode !== "recover" && (
@@ -357,18 +379,14 @@ export function AuthScreen({
                     ? "Henüz hesabınız yok mu?"
                     : "Zaten hesabınız var mı?"}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
+                <TextLink
                   disabled={!!busy}
-                  style={auth.switchLink}
                   onPress={() =>
                     changeMode(mode === "signin" ? "signup" : "signin")
                   }
                 >
-                  <Text style={auth.link}>
-                    {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
-                  </Text>
-                </Pressable>
+                  {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
+                </TextLink>
               </View>
             )}
           </View>
@@ -377,7 +395,7 @@ export function AuthScreen({
             <Ionicons
               name="shield-checkmark-outline"
               size={15}
-              color={colors.greenBorder}
+              color={colors.onNavy}
             />
             <Text style={auth.footerText}>
               Hesabınız web ve mobilde birlikte çalışır.
@@ -389,120 +407,119 @@ export function AuthScreen({
   );
 }
 
-const makeAuth = (colors: Palette) =>
+const makeAuth = (colors: Palette, type: Typography) =>
   StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    justifyContent: "center",
-    gap: 20,
-    padding: 18,
-    paddingBottom: 28,
-    width: "100%",
-    maxWidth: 560,
-    alignSelf: "center",
-  },
-  hero: { gap: 10, paddingHorizontal: 6, paddingTop: 8 },
-  header: { flexDirection: "row", alignItems: "center", gap: 11 },
-  brandIcon: {
-    width: 42,
-    height: 42,
-    backgroundColor: colors.green,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandLetter: {
-    color: colors.white,
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: -1.6,
-  },
-  brand: {
-    fontSize: 25,
-    fontWeight: "800",
-    letterSpacing: -1,
-    color: colors.white,
-  },
-  heroLead: { color: colors.onNavy, fontSize: 14.5, lineHeight: 21 },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.xl,
-    padding: 22,
-    gap: 14,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "700",
-    letterSpacing: -0.7,
-  },
-  socialRow: { flexDirection: "row", gap: 8 },
-  social: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 62,
-    paddingHorizontal: 6,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.white,
-    gap: 5,
-  },
-  socialPressed: {
-    borderColor: colors.greenBorder,
-    backgroundColor: colors.greenSoft,
-  },
-  socialLabel: { fontSize: 12, fontWeight: "600", color: colors.ink },
-  separator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginVertical: 2,
-  },
-  line: { flex: 1, height: 1, backgroundColor: colors.line },
-  separatorText: { fontSize: 12.5, color: colors.muted },
-  reveal: {
-    position: "absolute",
-    right: 2,
-    top: 2,
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.sm,
-  },
-  link: { color: colors.green, fontSize: 14, fontWeight: "700" },
-  forgot: {
-    alignSelf: "flex-end",
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    marginTop: -8,
-  },
-  backRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 48,
-  },
-  switch: {
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 2,
-  },
-  switchLink: { minHeight: 48, justifyContent: "center", paddingHorizontal: 4 },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 12,
-  },
-  footerText: { textAlign: "center", color: colors.onNavy, fontSize: 12.5 },
+    container: {
+      flexGrow: 1,
+      justifyContent: "center",
+      gap: 28,
+      padding: 18,
+      paddingTop: 28,
+      paddingBottom: 28,
+      width: "100%",
+      maxWidth: 560,
+      alignSelf: "center",
+    },
+    hero: { gap: 28, paddingHorizontal: 6 },
+    story: { gap: 14 },
+    // Web'deki .auth-story-label: fosforlu, aralıklı.
+    storyLabel: {
+      ...type.semibold,
+      fontSize: 11,
+      letterSpacing: 1.6,
+      color: colors.marker,
+    },
+    headline: {
+      ...type.heavy,
+      fontSize: 34,
+      lineHeight: 42,
+      letterSpacing: -1.2,
+      color: colors.onNavyStrong,
+    },
+    // Fosforlu kalem: web'deki .auth-story .ink-mark.
+    mark: {
+      alignSelf: "flex-start",
+      marginTop: 2,
+      paddingHorizontal: 7,
+      borderRadius: 7,
+      backgroundColor: colors.marker,
+    },
+    heroLead: {
+      ...type.regular,
+      color: colors.onNavy,
+      fontSize: 15,
+      lineHeight: 23,
+      maxWidth: 360,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.sheet,
+      borderWidth: 1,
+      borderColor: colors.line,
+      padding: 22,
+      gap: 18,
+      boxShadow: colors.shadowRaised,
+    },
+    title: {
+      ...type.heavy,
+      color: colors.ink,
+      fontSize: 27,
+      lineHeight: 33,
+      letterSpacing: -0.8,
+    },
+    socialRow: { flexDirection: "row", gap: 8 },
+    social: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 58,
+      paddingHorizontal: 6,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.lineControl,
+      backgroundColor: colors.surface,
+      boxShadow: colors.shadowXs,
+      gap: 5,
+    },
+    socialPressed: { backgroundColor: colors.sunken },
+    socialLabel: { ...type.medium, fontSize: 12.5, color: colors.ink },
+    separator: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    line: { flex: 1, height: 1, backgroundColor: colors.line },
+    separatorText: { ...type.regular, fontSize: 12.5, color: colors.muted },
+    reveal: {
+      position: "absolute",
+      right: 2,
+      top: 2,
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radius.inner,
+    },
+    forgot: { alignSelf: "flex-end", marginTop: -6 },
+    backRow: { alignItems: "center", paddingVertical: 4 },
+    switch: {
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    footer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      paddingHorizontal: 12,
+    },
+    footerText: {
+      ...type.regular,
+      textAlign: "center",
+      color: colors.onNavy,
+      fontSize: 12.5,
+    },
   });

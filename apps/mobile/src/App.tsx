@@ -12,7 +12,9 @@ import { TeacherScreen } from "./TeacherScreen";
 import { PortalScreen } from "./LearningScreen";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  Avatar,
   Badge,
+  Brand,
   Button,
   Card,
   EmptyState,
@@ -20,6 +22,7 @@ import {
   FormSheet,
   type FormSpec,
   confirmAction,
+  Kicker,
   Loading,
   ThemeProvider,
   ThemeToggle,
@@ -162,9 +165,7 @@ function Application() {
         edges={["top", "bottom", "left", "right"]}
       >
         <View style={[styles.body, { flex: 1, justifyContent: "center" }]}>
-          <Text style={styles.brand}>
-            derslik<Text style={{ color: colors.green }}>.</Text>
-          </Text>
+          <Brand />
           <Text style={styles.title}>Uygulamayı bağlayın.</Text>
           <Text style={styles.text}>
             Mobil uygulamanın bağlantı ayarları henüz tamamlanmamış. Kurulum
@@ -184,10 +185,9 @@ function Application() {
         edges={["top", "bottom", "left", "right"]}
       >
         <ScrollView contentContainerStyle={styles.body}>
-          <View style={{ gap: 4 }}>
-            <Text style={styles.brand}>
-              derslik<Text style={{ color: colors.green }}>.</Text>
-            </Text>
+          <Brand />
+          <View style={{ gap: 6, marginTop: 8 }}>
+            <Kicker>Hesabınız</Kicker>
             <Text style={styles.title}>Çalışma alanınız</Text>
             <View style={[styles.row, { gap: 6 }]}>
               <Ionicons
@@ -220,19 +220,24 @@ function Application() {
                 setInvite(null);
               }}
             >
-              <View style={[styles.row, { flexWrap: "nowrap" }]}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={styles.h2}>{a.name}</Text>
-                  <Text style={styles.muted}>
+              <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
+                <Avatar name={a.studentName || a.name} size={44} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={styles.h2} numberOfLines={1}>
+                    {a.name}
+                  </Text>
+                  <Text style={styles.muted} numberOfLines={1}>
                     {a.studentName || "Öğretmen hesabı"}
                   </Text>
-                  <Badge tone={a.role === "OWNER" ? "success" : "neutral"}>
-                    {a.role === "GUARDIAN"
-                      ? "Veli"
-                      : a.role === "STUDENT"
-                        ? "Öğrenci"
-                        : "Öğretmen"}
-                  </Badge>
+                  <View style={{ marginTop: 3 }}>
+                    <Badge tone={a.role === "OWNER" ? "info" : "neutral"}>
+                      {a.role === "GUARDIAN"
+                        ? "Veli"
+                        : a.role === "STUDENT"
+                          ? "Öğrenci"
+                          : "Öğretmen"}
+                    </Badge>
+                  </View>
                 </View>
                 <Ionicons
                   name="chevron-forward"
@@ -263,8 +268,8 @@ function Application() {
           <Button secondary icon="mail-open-outline" onPress={accountForm}>
             Davet kabul et
           </Button>
-          <View style={{ gap: 8, marginTop: 4 }}>
-            <Text style={styles.label2}>Görünüm</Text>
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <Kicker muted>Görünüm</Kicker>
             <ThemeToggle />
           </View>
           <Button
@@ -300,7 +305,7 @@ function Shell() {
   return (
     <>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      <View style={{ flex: 1, backgroundColor: colors.cream }}>
+      <View style={{ flex: 1, backgroundColor: colors.canvas }}>
         <Application />
       </View>
     </>

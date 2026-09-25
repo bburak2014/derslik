@@ -7,17 +7,16 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { Access } from "@derslik/api-client";
 import {
+  addDays,
   emptyWorkspace,
   dateKey,
   dayLabel,
   money,
   parseLira,
+  timeLabel,
   type WorkspaceData,
   type Student,
   type Lesson,
@@ -25,19 +24,29 @@ import {
 } from "@derslik/contracts";
 import { request } from "./core";
 import {
+  Avatar,
   Badge,
+  BottomTabs,
+  Brand,
   Button,
   Card,
   confirmAction,
+  DateTile,
   EmptyState,
   ErrorText,
   FormSheet,
   type FormSpec,
+  IconButton,
+  InkFigures,
+  InkPanel,
   Input,
+  Kicker,
+  LessonStatus,
+  List,
+  ListRow,
   Loading,
+  Metric,
   Picker,
-  radius,
-  ripple,
   SectionHeading,
   Segmented,
   useTheme,
@@ -64,7 +73,7 @@ export function TeacherScreen({
   access: Access;
   onAccount: () => void;
 }) {
-  const { colors, styles } = useTheme();
+  const { colors, styles, section } = useTheme();
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
@@ -79,11 +88,23 @@ export function TeacherScreen({
     [search, setSearch] = useState(""),
     [day, setDay] = useState(dateKey()),
     [form, setForm] = useState<FormSpec | null>(null),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [unread, setUnread] = useState(0);
   const inFlight = useRef(false);
-  // Ekranın SafeAreaView'ı alt kenarı kapsamıyor (gövde tam yükseklikte kalsın
-  // diye); alt güvenli alanı sekme çubuğu kendi taşıyor.
-  const insets = useSafeAreaInsets();
+  // Zildeki sayaç için bildirimler sessizce alınır (web ile aynı); hata olursa
+  // zil sayaçsız kalır. Bildirimler sekmesinden çıkınca yeniden sayılır.
+  const inInbox = tab === "inbox";
+  useEffect(() => {
+    let alive = true;
+    request<{ data: { readAt: string | null }[] }>("/inbox")
+      .then((r) => {
+        if (alive) setUnread(r.data.filter((n) => !n.readAt).length);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [inInbox]);
   const load = useCallback(async () => {
     try {
       setData(await request(`/workspaces/${access.id}/snapshot`));
@@ -349,49 +370,64 @@ export function TeacherScreen({
     });
   }
   function lessonCard(l: Lesson) {
+    const person = data.students.find((s) => s.id === l.student_id),
+      pack = data.packages.find((p) => p.id === l.package_id);
     return (
       <Card key={l.id}>
-        <View style={styles.row}>
-          <Badge
-            tone={
-              l.status === "SCHEDULED"
-                ? "neutral"
-                : l.status === "COMPLETED"
-                  ? "success"
-                  : "danger"
-            }
-          >
-            {l.status === "SCHEDULED"
-              ? "Planlandı"
-              : l.status === "COMPLETED"
-                ? "Tamamlandı"
-                : "İptal edildi"}
-          </Badge>
-          {!!l.makeup_for_id && <Badge tone="warning">Telafi</Badge>}
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setSelected(l.student_id)}
-        >
-          <Text style={styles.h2}>
-            {data.students.find((s) => s.id === l.student_id)?.name}
-          </Text>
-        </Pressable>
-        <Text style={styles.text}>{l.topic}</Text>
-        <View style={[styles.row, { gap: 6 }]}>
-          <Ionicons name="time-outline" size={15} color={colors.muted} />
-          <Text style={styles.muted}>
-            {dayLabel(l.starts_at, { hour: "2-digit", minute: "2-digit" })}
-          </Text>
-          <Text style={[styles.muted, { color: colors.faint }]}>·</Text>
-          <Text style={styles.muted}>
-            {l.location || "Konum belirtilmedi"}
-          </Text>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <DateTile date={l.starts_at} />
+          <View style={{ flex: 1, gap: 3 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityHint="Öğrenci dosyasını açar"
+                onPress={() => setSelected(l.student_id)}
+                hitSlop={4}
+                style={{ flex: 1 }}
+              >
+                <Text style={styles.h2} numberOfLines={1}>
+                  {person?.name}
+                </Text>
+              </Pressable>
+              <LessonStatus status={l.status} />
+            </View>
+            <Text style={styles.text} numberOfLines={2}>
+              {l.topic}
+            </Text>
+            <View style={[styles.row, { gap: 5, marginTop: 2 }]}>
+              <Ionicons name="time-outline" size={14} color={colors.faint} />
+              <Text style={styles.caption}>
+                {timeLabel(l.starts_at)}–{timeLabel(l.ends_at)}
+              </Text>
+              <Text style={styles.caption}>·</Text>
+              <Text style={styles.caption} numberOfLines={1}>
+                {l.location || "Konum belirtilmedi"}
+              </Text>
+              {!!pack && l.status === "SCHEDULED" && (
+                <>
+                  <Text style={styles.caption}>·</Text>
+                  <Text style={styles.caption}>{pack.remaining} hak kaldı</Text>
+                </>
+              )}
+            </View>
+            {!!l.makeup_for_id && (
+              <View style={{ marginTop: 4 }}>
+                <Badge tone="warning" icon="refresh">
+                  Telafi dersi
+                </Badge>
+              </View>
+            )}
+          </View>
         </View>
         {l.status === "SCHEDULED" ? (
-          <>
+          <View style={[styles.row, { marginTop: 2 }]}>
             <Button
+              size="sm"
+              icon="checkmark"
               disabled={busy}
+              style={{ flexGrow: 1, flexBasis: "100%" }}
               onPress={() =>
                 confirmAction(
                   "Ders tamamlansın mı?",
@@ -405,51 +441,49 @@ export function TeacherScreen({
                   setError,
                 )
               }
-              icon="checkmark-circle-outline"
             >
               Dersi tamamla
             </Button>
-            <View style={styles.row}>
-              <Button
-                secondary
-                size="sm"
-                icon="calendar-outline"
-                disabled={busy}
-                onPress={() => reschedule(l)}
-                style={{ flexGrow: 1 }}
-              >
-                Saati değiştir
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon="close-circle-outline"
-                disabled={busy}
-                style={{ flexGrow: 1 }}
-                onPress={() =>
-                  confirmAction(
-                    "Dersi iptal et",
-                    "Ders hakkı düşülmeyecek.",
-                    () =>
-                      mutate({
-                        action: "lesson.cancel",
-                        id: l.id,
-                        version: l.version,
-                      }),
-                    setError,
-                  )
-                }
-              >
-                İptal et
-              </Button>
-            </View>
-          </>
+            <Button
+              secondary
+              size="sm"
+              icon="calendar-outline"
+              disabled={busy}
+              onPress={() => reschedule(l)}
+              style={{ flexGrow: 1 }}
+            >
+              Saati değiştir
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon="close"
+              disabled={busy}
+              style={{ flexGrow: 1 }}
+              onPress={() =>
+                confirmAction(
+                  "Dersi iptal et",
+                  "Ders hakkı düşülmeyecek.",
+                  () =>
+                    mutate({
+                      action: "lesson.cancel",
+                      id: l.id,
+                      version: l.version,
+                    }),
+                  setError,
+                )
+              }
+            >
+              İptal et
+            </Button>
+          </View>
         ) : l.status === "COMPLETED" ? (
           <Button
             secondary
             size="sm"
             icon="arrow-undo-outline"
             disabled={busy}
+            style={{ alignSelf: "flex-start" }}
             onPress={() =>
               confirmAction(
                 "Tamamlamayı geri al",
@@ -471,6 +505,7 @@ export function TeacherScreen({
             secondary
             size="sm"
             icon="refresh-outline"
+            style={{ alignSelf: "flex-start" }}
             onPress={() => newLesson(l.student_id, l)}
           >
             Telafi dersi planla
@@ -496,12 +531,19 @@ export function TeacherScreen({
     data.payments
       .filter((p) => !p.voided_at && (!id || p.student_id === id))
       .reduce((n, p) => n + Number(p.amount_minor), 0);
-  const upcoming = data.lessons
-    .filter((l) => l.status === "SCHEDULED")
-    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-  const title = student
-    ? student.name
-    : tab === "overview"
+  // Özet, web'deki Genel bakış ile aynı: bugünün dersleri varsa onlar, yoksa
+  // bitmemiş en yakın dört ders.
+  const today = dateKey(),
+    todayLessons = data.lessons
+      .filter((l) => dateKey(l.starts_at) === today)
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
+    now = new Date().toISOString(),
+    upcoming = data.lessons
+      .filter((l) => l.status === "SCHEDULED" && l.ends_at >= now)
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
+    shown = todayLessons.length ? todayLessons : upcoming.slice(0, 4);
+  const title =
+    tab === "overview"
       ? "Her ders,\nyeni bir adım."
       : tab === "students"
         ? "Öğrencileriniz"
@@ -512,63 +554,58 @@ export function TeacherScreen({
             : tab === "teaching"
               ? "Öğretim"
               : "Bildirimler";
-  // Alt sekme çubuğu iki yerden çiziliyor (normal görünüm ve Öğretim
-  // ekranı), o yüzden tek yerde duruyor.
-  const tabBar = !student && (
-      <View style={[styles.tabs, { paddingBottom: insets.bottom + 6 }]}>
-        {[
-          { id: "overview", label: "Özet", icon: "grid-outline" as const },
-          {
-            id: "calendar",
-            label: "Takvim",
-            icon: "calendar-outline" as const,
-          },
-          {
-            id: "students",
-            label: "Öğrenciler",
-            icon: "people-outline" as const,
-          },
-          {
-            id: "payments",
-            label: "Tahsilatlar",
-            icon: "wallet-outline" as const,
-          },
-          {
-            id: "teaching",
-            label: "Öğretim",
-            icon: "school-outline" as const,
-          },
-        ].map((t) => (
-          <Pressable
-            key={t.id}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tab === t.id }}
-            onPress={() => setTab(t.id)}
-            style={({ pressed }) => [
-              styles.tab,
-              tab === t.id && {
-                backgroundColor: colors.greenSoft,
-                borderRadius: radius.md,
-              },
-              pressed && tab !== t.id && { backgroundColor: colors.subtle },
-            ]}
-          >
-            <Ionicons
-              name={t.icon}
-              size={22}
-              color={tab === t.id ? colors.green : colors.muted}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                tab === t.id && { color: colors.green },
-              ]}
-            >
-              {t.label}
-            </Text>
-          </Pressable>
-        ))}
+  const header = (
+    <View style={styles.header}>
+      {student ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="chevron-back"
+          onPress={() => setSelected(null)}
+          style={{ marginLeft: -10 }}
+        >
+          Öğrenciler
+        </Button>
+      ) : (
+        <Brand />
+      )}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <IconButton
+          ghost
+          icon="notifications-outline"
+          label="Bildirimler"
+          selected={tab === "inbox" && !student}
+          count={unread}
+          onPress={() => {
+            setSelected(null);
+            setTab("inbox");
+          }}
+        />
+        <Button
+          secondary
+          size="sm"
+          icon="person-circle-outline"
+          onPress={onAccount}
+        >
+          Hesabım
+        </Button>
       </View>
+    </View>
+  );
+  // Alt gezinme iki yerden çiziliyor (normal görünüm ve Öğretim ekranı), o
+  // yüzden tek yerde duruyor. Öğrenci dosyası açıkken gizlenir.
+  const tabBar = !student && (
+    <BottomTabs
+      value={tab}
+      onChange={setTab}
+      items={[
+        { id: "overview", label: "Özet", icon: "grid-outline" },
+        { id: "calendar", label: "Takvim", icon: "calendar-outline" },
+        { id: "students", label: "Öğrenciler", icon: "people-outline" },
+        { id: "payments", label: "Tahsilatlar", icon: "wallet-outline" },
+        { id: "teaching", label: "Öğretim", icon: "school-outline" },
+      ]}
+    />
   );
   // Öğretim ekranı: webde sol menüdeki Ödevler / PDF ve dosyalar / Ders
   // videoları başlıklarının karşılığı. Mobilde alt çubukta tek sekme, içinde
@@ -582,19 +619,7 @@ export function TeacherScreen({
     const chosen = roster.find((x) => x.id === teachingStudent) || roster[0];
     return (
       <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
-        <View style={styles.header}>
-          <Text style={styles.brand}>
-            derslik<Text style={{ color: colors.green }}>.</Text>
-          </Text>
-          <Button
-            secondary
-            size="sm"
-            icon="person-circle-outline"
-            onPress={onAccount}
-          >
-            Hesabım
-          </Button>
-        </View>
+        {header}
         {!chosen ? (
           <View style={styles.body}>
             <EmptyState
@@ -605,9 +630,7 @@ export function TeacherScreen({
           </View>
         ) : (
           <>
-            <View
-              style={{ paddingHorizontal: 20, paddingTop: 14, gap: 10 }}
-            >
+            <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 10 }}>
               <Picker
                 label="Öğrenci"
                 value={chosen.id}
@@ -623,9 +646,13 @@ export function TeacherScreen({
                 value={teachingView}
                 onChange={(value) => setTeachingView(value as TeachingView)}
                 options={[
-                  { value: "assignments", label: "Ödevler" },
-                  { value: "files", label: "PDF" },
-                  { value: "videos", label: "Videolar" },
+                  {
+                    value: "assignments",
+                    label: "Ödevler",
+                    icon: "clipboard-outline",
+                  },
+                  { value: "files", label: "PDF", icon: "document-outline" },
+                  { value: "videos", label: "Videolar", icon: "videocam-outline" },
                 ]}
               />
             </View>
@@ -645,63 +672,25 @@ export function TeacherScreen({
     );
   }
 
+  const studentPackages = student
+      ? data.packages.filter((p) => p.student_id === student.id)
+      : [],
+    remaining = studentPackages.reduce((n, p) => n + p.remaining, 0),
+    lowPackages = data.packages.filter(
+      (p) =>
+        p.remaining <= 2 &&
+        active.some((s) => s.id === p.student_id) &&
+        (!p.expires_on || p.expires_on >= today),
+    );
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        {student ? (
-          <Button
-            secondary
-            size="sm"
-            icon="chevron-back"
-            onPress={() => setSelected(null)}
-          >
-            Geri
-          </Button>
-        ) : (
-          <Text style={styles.brand}>
-            derslik<Text style={{ color: colors.green }}>.</Text>
-          </Text>
-        )}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Bildirimler"
-            accessibilityState={{ selected: tab === "inbox" }}
-            onPress={() => setTab("inbox")}
-            android_ripple={ripple()}
-            hitSlop={6}
-            style={({ pressed }) => [
-              {
-                width: 44,
-                height: 44,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: radius.action,
-              },
-              tab === "inbox" && { backgroundColor: colors.greenSoft },
-              pressed && tab !== "inbox" && { backgroundColor: colors.subtle },
-            ]}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={tab === "inbox" ? colors.green : colors.muted}
-            />
-          </Pressable>
-          <Button
-            secondary
-            size="sm"
-            icon="person-circle-outline"
-            onPress={onAccount}
-          >
-            Hesabım
-          </Button>
-        </View>
-      </View>
+      {header}
       <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
+            tintColor={colors.brand}
+            colors={[colors.brand]}
             onRefresh={() => {
               setRefreshing(true);
               void load();
@@ -711,39 +700,51 @@ export function TeacherScreen({
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={{ gap: 4 }}>
-          <Text style={styles.kicker}>
-            {student ? "Öğrenci dosyası" : access.name}
-          </Text>
-          <Text style={styles.title}>{title}</Text>
-        </View>
+        {student ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <Avatar name={student.name} size={56} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Kicker>Öğrenci dosyası</Kicker>
+              <Text style={styles.title} numberOfLines={2}>
+                {student.name}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={{ gap: 6 }}>
+            <Kicker>{access.name}</Kicker>
+            <Text style={styles.title}>{title}</Text>
+          </View>
+        )}
         <ErrorText message={error} />
-        {error && (
-          <Button secondary onPress={() => void load()}>
+        {!!error && (
+          <Button
+            secondary
+            icon="refresh-outline"
+            style={{ alignSelf: "flex-start" }}
+            onPress={() => void load()}
+          >
             Yeniden dene
           </Button>
         )}
         {student ? (
           <>
-            <Text style={styles.muted}>
-              {student.subject} · {student.grade}
-              {!student.active ? " · Arşivlendi" : ""}
-            </Text>
+            <View style={[styles.row, { marginTop: -6 }]}>
+              <Text style={styles.muted}>
+                {[student.subject, student.grade].filter(Boolean).join(" · ")}
+              </Text>
+              {!student.active && <Badge>Arşivlendi</Badge>}
+            </View>
             <View style={styles.row}>
-              <View style={styles.metric}>
-                <Text style={styles.muted}>Kalan ders</Text>
-                <Text style={styles.metricValue}>
-                  {data.packages
-                    .filter((p) => p.student_id === student.id)
-                    .reduce((n, p) => n + p.remaining, 0)}
-                </Text>
-              </View>
-              <View style={styles.metric}>
-                <Text style={styles.muted}>Açık bakiye</Text>
-                <Text style={styles.metricValue}>
-                  {money(balance(student.id))}
-                </Text>
-              </View>
+              <Metric
+                label="Kalan ders"
+                value={remaining}
+                warn={remaining <= 2}
+              />
+              <Metric
+                label="Açık bakiye"
+                value={money(balance(student.id))}
+              />
             </View>
             <Button icon="library-outline" onPress={() => setLearning(true)}>
               Ödevler, videolar ve davetler
@@ -773,14 +774,14 @@ export function TeacherScreen({
                 </Button>
               ))}
             </View>
-            <Card>
-              <View style={styles.row}>
+            <Card tone="muted">
+              <View style={[styles.row, { gap: 6 }]}>
                 <Ionicons
                   name="lock-closed-outline"
-                  size={14}
-                  color={colors.green}
+                  size={13}
+                  color={colors.brand}
                 />
-                <Text style={styles.kicker}>Yalnızca benim notum</Text>
+                <Kicker>Yalnızca benim notum</Kicker>
               </View>
               <Text style={styles.text}>
                 {data.notes.find((n) => n.student_id === student.id)?.body ||
@@ -790,6 +791,7 @@ export function TeacherScreen({
                 secondary
                 size="sm"
                 icon="create-outline"
+                style={{ alignSelf: "flex-start" }}
                 onPress={() => {
                   const note = data.notes.find(
                     (n) => n.student_id === student.id,
@@ -821,21 +823,30 @@ export function TeacherScreen({
               </Button>
             </Card>
             <SectionHeading title="Ders paketleri" />
-            {data.packages
-              .filter((p) => p.student_id === student.id)
-              .map((p) => (
-                <Card key={p.id}>
-                  <Text style={styles.h2}>{p.name}</Text>
-                  <Text style={styles.text}>
-                    {p.remaining} / {p.granted} hak · {money(p.price_minor)}
-                  </Text>
-                  <Text style={styles.muted}>
-                    {p.expires_on
-                      ? `Son gün: ${p.expires_on}`
-                      : "Süre sınırı yok"}
-                  </Text>
-                </Card>
-              ))}
+            {!studentPackages.length && (
+              <Text style={styles.muted}>Henüz ders paketi yok.</Text>
+            )}
+            {studentPackages.map((p) => (
+              <Card key={p.id}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+                >
+                  <Text style={[styles.h2, { flex: 1 }]}>{p.name}</Text>
+                  <Badge
+                    tone={p.remaining <= 2 ? "warning" : "info"}
+                    icon={p.remaining <= 2 ? "alert-circle-outline" : undefined}
+                  >
+                    {p.remaining} hak
+                  </Badge>
+                </View>
+                <Text style={styles.muted}>
+                  {p.remaining} / {p.granted} hak · {money(p.price_minor)}
+                </Text>
+                <Text style={styles.caption}>
+                  {p.expires_on ? `Son gün: ${p.expires_on}` : "Süre sınırı yok"}
+                </Text>
+              </Card>
+            ))}
             <SectionHeading title="Ders geçmişi" />
             {data.lessons
               .filter((l) => l.student_id === student.id)
@@ -887,19 +898,56 @@ export function TeacherScreen({
           </>
         ) : tab === "overview" ? (
           <>
-            <Text style={styles.muted}>
+            <Text style={[styles.muted, { marginTop: -6 }]}>
               Günün planı ve öğrencilerinizin yolculuğu bir arada.
             </Text>
-            <View style={styles.row}>
-              <View style={styles.metric}>
-                <Text style={styles.muted}>Aktif öğrenci</Text>
-                <Text style={styles.metricValue}>{active.length}</Text>
+            {/* Web'deki Bugün paneli: tarih, günün sayıları ve takvim kısayolu
+                tek bir mürekkep şeritte. */}
+            <InkPanel>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 14 }}
+              >
+                <DateTile date={now} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text
+                    style={[
+                      section.sectionTitle,
+                      { fontSize: 22, lineHeight: 28, color: colors.onFeature },
+                    ]}
+                  >
+                    Bugün
+                  </Text>
+                  <Text style={[styles.muted, { color: colors.onFeatureMuted }]}>
+                    {dayLabel(now, { weekday: "long", year: "numeric" })}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.metric}>
-                <Text style={styles.muted}>Açık bakiye</Text>
-                <Text style={styles.metricValue}>{money(balance())}</Text>
-              </View>
-            </View>
+              <InkFigures
+                items={[
+                  {
+                    label: "Ders",
+                    value: todayLessons.filter((l) => l.status !== "CANCELLED")
+                      .length,
+                  },
+                  {
+                    label: "Tamamlanan",
+                    value: todayLessons.filter((l) => l.status === "COMPLETED")
+                      .length,
+                  },
+                  { label: "Aktif öğrenci", value: active.length },
+                  { label: "Bekleyen tahsilat", value: money(balance()) },
+                ]}
+              />
+              <Button
+                variant="onInk"
+                size="sm"
+                trailingIcon="arrow-forward"
+                style={{ alignSelf: "flex-start" }}
+                onPress={() => setTab("calendar")}
+              >
+                Takvime git
+              </Button>
+            </InkPanel>
             <Button icon="add" onPress={() => newLesson()}>
               Ders planla
             </Button>
@@ -919,44 +967,62 @@ export function TeacherScreen({
                 }
               />
             )}
-            <SectionHeading
-              title="Sıradaki dersler"
-              description="En yakın beş ders."
-            />
-            {upcoming.slice(0, 5).map(lessonCard)}
-            {!upcoming.length && !!active.length && (
+            {!!active.length && (
+              <SectionHeading
+                title={todayLessons.length ? "Bugünün dersleri" : "Sıradaki dersler"}
+                description={
+                  todayLessons.length ? undefined : "Bitmemiş en yakın dersler."
+                }
+              />
+            )}
+            {shown.map(lessonCard)}
+            {!shown.length && !!active.length && (
               <EmptyState
                 icon="calendar-outline"
                 title="Planlanmış ders yok"
                 description="Takvimden yeni bir ders planlayabilirsiniz."
               />
             )}
-            <SectionHeading
-              title="Azalan paketler"
-              description="İki ders hakkı veya daha azı kalanlar."
-            />
-            {data.packages
-              .filter(
-                (p) =>
-                  p.remaining <= 2 && active.some((s) => s.id === p.student_id),
-              )
-              .map((p) => (
-                <Card key={p.id}>
-                  <Text style={styles.h2}>
-                    {data.students.find((s) => s.id === p.student_id)?.name}
-                  </Text>
-                  <Text style={styles.text}>
-                    {p.name} · {p.remaining} hak
-                  </Text>
-                  <Button secondary onPress={() => newPackage(p.student_id)}>
-                    Yeni paket ekle
-                  </Button>
-                </Card>
-              ))}
+            {!!lowPackages.length && (
+              <>
+                <SectionHeading
+                  title="Azalan paketler"
+                  description="İki ders hakkı veya daha azı kalanlar."
+                />
+                <List>
+                  {lowPackages.map((p, i) => {
+                    const person = data.students.find(
+                      (s) => s.id === p.student_id,
+                    )!;
+                    return (
+                      <ListRow key={p.id} divider={i > 0}>
+                        <Avatar name={person.name} />
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text style={styles.h2} numberOfLines={1}>
+                            {person.name}
+                          </Text>
+                          <Text style={styles.caption} numberOfLines={1}>
+                            {p.name} · {p.remaining} / {p.granted} hak
+                          </Text>
+                        </View>
+                        <Button
+                          secondary
+                          size="sm"
+                          onPress={() => newPackage(p.student_id)}
+                        >
+                          Paket ekle
+                        </Button>
+                      </ListRow>
+                    );
+                  })}
+                </List>
+              </>
+            )}
           </>
         ) : tab === "students" ? (
           <>
             <Input
+              icon="search"
               accessibilityLabel="Öğrenci ara"
               value={search}
               onChangeText={setSearch}
@@ -967,48 +1033,104 @@ export function TeacherScreen({
             <Button icon="person-add-outline" onPress={() => editStudent()}>
               Öğrenci ekle
             </Button>
-            {data.students
-              .filter((s) =>
+            {(() => {
+              const found = data.students.filter((s) =>
                 `${s.name} ${s.subject}`
                   .toLocaleLowerCase("tr")
                   .includes(search.toLocaleLowerCase("tr")),
-              )
-              .map((s) => (
-                <Card key={s.id} onPress={() => setSelected(s.id)}>
-                  <View style={[styles.row, { flexWrap: "nowrap" }]}>
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={styles.h2}>{s.name}</Text>
-                      <Text style={styles.muted}>
-                        {s.subject}
-                        {s.grade ? " · " + s.grade : ""}
-                      </Text>
-                      <Text style={styles.text}>
-                        {money(balance(s.id))} açık bakiye
-                      </Text>
-                    </View>
-                    {!s.active && <Badge tone="warning">Arşiv</Badge>}
-                    <Ionicons
-                      name="chevron-forward"
-                      size={18}
-                      color={colors.faint}
-                    />
-                  </View>
-                </Card>
-              ))}
+              );
+              if (!found.length)
+                return (
+                  <EmptyState
+                    icon="people-outline"
+                    title={
+                      data.students.length
+                        ? "Eşleşen öğrenci yok"
+                        : "Henüz öğrenci yok"
+                    }
+                    description={
+                      data.students.length
+                        ? "Aramayı değiştirip yeniden deneyin."
+                        : "İlk öğrencinizi ekleyerek başlayın."
+                    }
+                  />
+                );
+              return (
+                <List>
+                  {found.map((s, i) => {
+                    const open = balance(s.id);
+                    return (
+                      <ListRow
+                        key={s.id}
+                        divider={i > 0}
+                        accessibilityLabel={s.name}
+                        onPress={() => setSelected(s.id)}
+                      >
+                        <Avatar name={s.name} />
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text style={styles.h2} numberOfLines={1}>
+                            {s.name}
+                          </Text>
+                          <Text style={styles.caption} numberOfLines={1}>
+                            {[s.subject, s.grade].filter(Boolean).join(" · ")}
+                          </Text>
+                        </View>
+                        {!s.active ? (
+                          <Badge>Arşivde</Badge>
+                        ) : open > 0 ? (
+                          <Badge tone="warning">{money(open)}</Badge>
+                        ) : null}
+                        <Ionicons
+                          name="chevron-forward"
+                          size={17}
+                          color={colors.faint}
+                        />
+                      </ListRow>
+                    );
+                  })}
+                </List>
+              );
+            })()}
           </>
         ) : tab === "calendar" ? (
           <>
             <View style={styles.field}>
               <Text style={styles.label}>Tarih</Text>
-              <Input
-                value={day}
-                onChangeText={setDay}
-                accessibilityLabel="Takvim tarihi"
-                placeholder="YYYY-AA-GG"
-                keyboardType="numbers-and-punctuation"
-                maxLength={10}
-              />
-              <Text style={styles.hint}>Biçim: YYYY-AA-GG</Text>
+              <View style={[styles.row, { flexWrap: "nowrap" }]}>
+                <IconButton
+                  icon="chevron-back"
+                  label="Önceki gün"
+                  onPress={() => {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setDay(addDays(day, -1));
+                  }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Input
+                    value={day}
+                    onChangeText={setDay}
+                    accessibilityLabel="Takvim tarihi"
+                    placeholder="YYYY-AA-GG"
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={10}
+                    style={{ textAlign: "center" }}
+                  />
+                </View>
+                <IconButton
+                  icon="chevron-forward"
+                  label="Sonraki gün"
+                  onPress={() => {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setDay(addDays(day, 1));
+                  }}
+                />
+              </View>
+              <Text style={styles.hint}>
+                {/^\d{4}-\d{2}-\d{2}$/.test(day)
+                  ? dayLabel(day + "T12:00:00+03:00", {
+                      weekday: "long",
+                      year: "numeric",
+                    })
+                  : "Biçim: YYYY-AA-GG"}
+              </Text>
             </View>
             <Button icon="add" onPress={() => newLesson()}>
               Ders planla
@@ -1027,64 +1149,112 @@ export function TeacherScreen({
           </>
         ) : tab === "payments" ? (
           <>
-            <Card tone="brand">
-              <Text style={styles.kicker}>Toplam açık bakiye</Text>
-              <Text style={styles.title}>{money(balance())}</Text>
-              <Text style={styles.muted}>
+            <InkPanel>
+              <Text style={[section.figureLabel, { color: colors.marker }]}>
+                TOPLAM AÇIK BAKİYE
+              </Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={[styles.title, { color: colors.onFeature, marginTop: -8 }]}
+              >
+                {money(balance())}
+              </Text>
+              <Text
+                style={[
+                  styles.muted,
+                  { color: colors.onFeatureMuted, marginTop: -8 },
+                ]}
+              >
                 Öğrenci tahsilatları; Derslik abonelik ücreti değildir.
               </Text>
-            </Card>
+            </InkPanel>
             <Button icon="add" onPress={() => newPayment()}>
               Tahsilat kaydet
             </Button>
-            {data.payments.map((p) => (
-              <Card key={p.id}>
-                <Text style={styles.h2}>
-                  {data.students.find((s) => s.id === p.student_id)?.name}
-                </Text>
-                <Text style={styles.title}>{money(p.amount_minor)}</Text>
-                <View style={styles.row}>
-                  <Text style={styles.muted}>
-                    {p.received_on} ·{" "}
-                    {p.method === "CASH"
-                      ? "Nakit"
-                      : p.method === "TRANSFER"
-                        ? "Havale"
-                        : "Diğer"}
-                  </Text>
-                  <Badge tone={p.voided_at ? "danger" : "success"}>
-                    {p.voided_at ? "İptal edildi" : "Kaydedildi"}
-                  </Badge>
-                </View>
-                {p.reference && <Text style={styles.text}>{p.reference}</Text>}
-                {!p.voided_at && (
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    icon="close-circle-outline"
-                    disabled={busy}
-                    onPress={() =>
-                      confirmAction(
-                        "Tahsilat kaydını iptal et",
-                        "Öğrenci bakiyesi yeniden artacak. Bankadan iade yapılmaz.",
-                        () =>
-                          mutate({
-                            action: "payment.void",
-                            id: p.id,
-                            version: p.version,
-                          }),
-                        setError,
-                      )
-                    }
-                  >
-                    Kaydı iptal et
-                  </Button>
-                )}
-              </Card>
-            ))}
+            {!data.payments.length && (
+              <EmptyState
+                icon="wallet-outline"
+                title="Henüz tahsilat yok"
+                description="Aldığınız ödemeleri kaydettikçe burada listelenir."
+              />
+            )}
+            {data.payments.map((p) => {
+              const person = data.students.find((s) => s.id === p.student_id);
+              return (
+                <Card key={p.id}>
+                  <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
+                    <Avatar name={person?.name || "?"} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.h2} numberOfLines={1}>
+                        {person?.name}
+                      </Text>
+                      <Text style={styles.caption}>
+                        {dayLabel(p.received_on + "T12:00:00+03:00", {
+                          year: "numeric",
+                        })}{" "}
+                        ·{" "}
+                        {p.method === "CASH"
+                          ? "Nakit"
+                          : p.method === "TRANSFER"
+                            ? "Havale"
+                            : "Diğer"}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 5 }}>
+                      <Text
+                        style={[
+                          styles.h2,
+                          { fontVariant: ["tabular-nums"] },
+                          !!p.voided_at && {
+                            color: colors.muted,
+                            textDecorationLine: "line-through",
+                          },
+                        ]}
+                      >
+                        {money(p.amount_minor)}
+                      </Text>
+                      <Badge
+                        tone={p.voided_at ? "neutral" : "success"}
+                        icon={p.voided_at ? undefined : "checkmark"}
+                      >
+                        {p.voided_at ? "İptal edildi" : "Kaydedildi"}
+                      </Badge>
+                    </View>
+                  </View>
+                  {!!p.reference && (
+                    <Text style={styles.muted}>{p.reference}</Text>
+                  )}
+                  {!p.voided_at && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon="close"
+                      disabled={busy}
+                      style={{ alignSelf: "flex-start" }}
+                      onPress={() =>
+                        confirmAction(
+                          "Tahsilat kaydını iptal et",
+                          "Öğrenci bakiyesi yeniden artacak. Bankadan iade yapılmaz.",
+                          () =>
+                            mutate({
+                              action: "payment.void",
+                              id: p.id,
+                              version: p.version,
+                            }),
+                          setError,
+                        )
+                      }
+                    >
+                      Kaydı iptal et
+                    </Button>
+                  )}
+                </Card>
+              );
+            })}
           </>
         ) : (
-          <Inbox workspaceId={access.id} />
+          <Inbox workspaceId={access.id} onUnread={setUnread} />
         )}
       </ScrollView>
       {tabBar}
