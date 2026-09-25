@@ -18,7 +18,7 @@ async function proxy(
       path.some((p) => !p || p === "." || p === ".." || /[\\/?#]/.test(p)) ||
       path[0] === "webhooks"
     )
-      throw new HttpError(400, "Geçersiz istek yolu.");
+      throw new HttpError(400, "web.invalidPath");
     const { client } = await serverSession();
     if (request.method !== "GET") csrf(request);
     const body = request.method === "GET" ? undefined : await readBody(request);

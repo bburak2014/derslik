@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { AppleMark, GoogleMark, MicrosoftMark } from "./brand-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "./core";
@@ -20,38 +21,48 @@ import {
   type SocialProvider,
 } from "./oauth";
 import {
+  Brand,
   Button,
-  colors,
   ErrorText,
   Field,
+  GridTexture,
   Input,
+  Kicker,
+  type Palette,
   radius,
-  styles,
   SuccessText,
+  TextLink,
+  type Typography,
+  useTheme,
 } from "./ui";
+import { t, upper, type MessageKey } from "@derslik/contracts";
+import { LanguagePicker } from "./i18n";
 
-const copy = {
+const copy: Record<
+  "signin" | "signup" | "recover" | "password",
+  { title: MessageKey; lead: MessageKey; submit: MessageKey }
+> = {
   signin: {
-    title: "Tekrar hoş geldiniz",
-    lead: "Derslerinize ve öğrencilerinize kaldığınız yerden devam edin.",
-    submit: "Giriş yap",
+    title: "auth.signinTitle",
+    lead: "mobile.authSigninLead",
+    submit: "auth.signIn",
   },
   signup: {
-    title: "Birlikte başlayalım",
-    lead: "Öğretmen, öğrenci ve veli için ortak bir çalışma alanı.",
-    submit: "Hesap oluştur",
+    title: "mobile.authSignupTitle",
+    lead: "mobile.authSignupLead",
+    submit: "auth.signUp",
   },
   recover: {
-    title: "Şifrenizi mi unuttunuz?",
-    lead: "Kayıtlı e-posta adresinize sıfırlama bağlantısı gönderelim.",
-    submit: "Sıfırlama bağlantısı gönder",
+    title: "auth.recoverTitle",
+    lead: "mobile.authRecoverLead",
+    submit: "auth.sendReset",
   },
   password: {
-    title: "Yeni şifrenizi belirleyin",
-    lead: "En az 10 karakterli, tahmin edilmesi zor bir şifre seçin.",
-    submit: "Yeni şifreyi kaydet",
+    title: "auth.passwordTitle",
+    lead: "mobile.authPasswordLead",
+    submit: "auth.savePassword",
   },
-} as const;
+};
 type Mode = keyof typeof copy;
 
 export function AuthScreen({
@@ -61,6 +72,8 @@ export function AuthScreen({
   reset?: boolean;
   onDone?: () => void;
 }) {
+  const { colors, styles, type } = useTheme();
+  const auth = useMemo(() => makeAuth(colors, type), [colors, type]);
   const [mode, setMode] = useState<Mode>(reset ? "password" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,14 +89,10 @@ export function AuthScreen({
       .then((list) => {
         if (!alive) return;
         setEnabled(list);
-        if (!list.length)
-          setProviderNotice("Diğer giriş seçenekleri henüz kullanıma açılmadı.");
+        if (!list.length) setProviderNotice(t("mobile.authProvidersSoon"));
       })
       .catch(() => {
-        if (alive)
-          setProviderNotice(
-            "Diğer giriş seçeneklerine ulaşılamadı. E-posta ile devam edebilirsiniz.",
-          );
+        if (alive) setProviderNotice(t("auth.providersUnreachable"));
       });
     return () => {
       alive = false;
@@ -104,11 +113,11 @@ export function AuthScreen({
     setError("");
     setMessage("");
     if ((mode === "signup" || mode === "password") && password.length < 10) {
-      setError("Şifre en az 10 karakter olmalı.");
+      setError(t("web.passwordTooShort"));
       return;
     }
     if (mode === "signin" && !password) {
-      setError("Şifrenizi girin.");
+      setError(t("mobile.authPasswordRequired"));
       return;
     }
     setBusy("email");
@@ -120,16 +129,14 @@ export function AuthScreen({
         return;
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-        throw new Error("Geçerli bir e-posta adresi girin.");
+        throw new Error(t("mobile.authEmailInvalid"));
       if (mode === "recover") {
         const { error } = await supabase!.auth.resetPasswordForEmail(
           email.trim(),
           { redirectTo: authRedirect("recovery") },
         );
         if (error) throw error;
-        setMessage(
-          "Şifre sıfırlama bağlantısı için e-posta kutunuzu kontrol edin.",
-        );
+        setMessage(t("mobile.authResetSent"));
       } else if (mode === "signup") {
         const { data, error } = await supabase!.auth.signUp({
           email: email.trim(),
@@ -137,17 +144,13 @@ export function AuthScreen({
           options: { emailRedirectTo: authRedirect("confirm") },
         });
         if (error) throw error;
-        if (!data.session)
-          setMessage("E-posta kutunuzdaki bağlantıyla hesabınızı doğrulayın.");
+        if (!data.session) setMessage(t("mobile.authVerifyEmail"));
       } else {
         const { error } = await supabase!.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
-        if (error)
-          throw new Error(
-            "Giriş yapılamadı. Bilgilerinizi ve e-posta doğrulamanızı kontrol edin.",
-          );
+        if (error) throw new Error(t("web.signinFailed"));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -156,12 +159,16 @@ export function AuthScreen({
     }
   }
   const text = copy[mode];
+  // Tanıtım başlığı yalnızca giriş ve kayıtta; şifre ekranlarında form daha
+  // yukarıda kalsın diye yalnızca logo görünür.
+  const intro = mode === "signin" || mode === "signup";
   return (
     <SafeAreaView
       style={[styles.screen, { backgroundColor: colors.navy }]}
       edges={["top", "bottom", "left", "right"]}
     >
       <StatusBar style="light" />
+      <GridTexture />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -172,23 +179,35 @@ export function AuthScreen({
           contentContainerStyle={auth.container}
         >
           <View style={auth.hero}>
-            <View style={auth.header}>
-              <View style={auth.brandIcon}>
-                <Text style={auth.brandLetter}>d.</Text>
+            <Brand inverse />
+            {intro && (
+              <View style={auth.story}>
+                <Text style={auth.storyLabel}>
+                  {upper(t("auth.storyLabel"))}
+                </Text>
+                <View>
+                  <Text style={auth.headline}>{t("auth.storyTitle1")}</Text>
+                  <View style={auth.mark}>
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      style={[auth.headline, { color: colors.markerInk }]}
+                    >
+                      {t("auth.storyTitle2")}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={auth.heroLead}>{t("auth.storyBody")}</Text>
               </View>
-              <Text style={auth.brand}>
-                derslik<Text style={{ color: colors.greenBorder }}>.</Text>
-              </Text>
-            </View>
-            <Text style={auth.heroLead}>
-              Dersleriniz. Öğrencileriniz. Tek bir yer.
-            </Text>
+            )}
           </View>
 
           <View style={auth.card}>
-            <Text style={styles.kicker}>Derslik hesabı</Text>
-            <Text style={auth.title}>{text.title}</Text>
-            <Text style={[styles.muted, { marginBottom: 4 }]}>{text.lead}</Text>
+            <View style={{ gap: 8 }}>
+              <Kicker>{t("auth.account")}</Kicker>
+              <Text style={auth.title}>{t(text.title)}</Text>
+              <Text style={styles.muted}>{t(text.lead)}</Text>
+            </View>
 
             {(mode === "signin" || mode === "signup") && (
               <>
@@ -199,7 +218,9 @@ export function AuthScreen({
                       <Pressable
                         key={p.id}
                         accessibilityRole="button"
-                        accessibilityLabel={`${p.name} ile devam et`}
+                        accessibilityLabel={t("auth.continueWith", {
+                          name: p.name,
+                        })}
                         accessibilityState={{ disabled: !!busy || off }}
                         disabled={!!busy || off}
                         onPress={async () => {
@@ -216,22 +237,18 @@ export function AuthScreen({
                         style={({ pressed }) => [
                           auth.social,
                           pressed && !off && auth.socialPressed,
-                          { opacity: off || busy ? 0.45 : 1 },
+                          { opacity: off || busy ? 0.5 : 1 },
                         ]}
                       >
-                        <Ionicons
-                          name={
-                            p.id === "google"
-                              ? "logo-google"
-                              : p.id === "apple"
-                                ? "logo-apple"
-                                : "logo-microsoft"
-                          }
-                          size={21}
-                          color={colors.ink}
-                        />
+                        {p.id === "google" ? (
+                          <GoogleMark size={20} />
+                        ) : p.id === "apple" ? (
+                          <AppleMark size={20} color={colors.ink} />
+                        ) : (
+                          <MicrosoftMark size={20} />
+                        )}
                         <Text style={auth.socialLabel} numberOfLines={1}>
-                          {busy === p.id ? "Açılıyor…" : p.name}
+                          {busy === p.id ? t("auth.opening") : p.name}
                         </Text>
                       </Pressable>
                     );
@@ -242,19 +259,19 @@ export function AuthScreen({
                 )}
                 <View style={auth.separator}>
                   <View style={auth.line} />
-                  <Text style={auth.separatorText}>veya e-posta ile</Text>
+                  <Text style={auth.separatorText}>{t("auth.orEmail")}</Text>
                   <View style={auth.line} />
                 </View>
               </>
             )}
 
             {mode !== "password" && (
-              <Field label="E-posta adresi">
+              <Field label={t("auth.email")}>
                 <Input
-                  accessibilityLabel="E-posta adresi"
+                  accessibilityLabel={t("auth.email")}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="ornek@eposta.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -271,18 +288,20 @@ export function AuthScreen({
 
             {mode !== "recover" && (
               <Field
-                label="Şifre"
+                label={t("auth.password")}
                 hint={
-                  mode === "signin" ? undefined : "En az 10 karakter kullanın."
+                  mode === "signin" ? undefined : t("mobile.authPasswordHint")
                 }
               >
                 <View>
                   <Input
-                    accessibilityLabel="Şifre"
+                    accessibilityLabel={t("auth.password")}
                     value={password}
                     onChangeText={setPassword}
                     placeholder={
-                      mode === "signin" ? "Şifrenizi girin" : "En az 10 karakter"
+                      mode === "signin"
+                        ? t("auth.passwordPlaceholder")
+                        : t("auth.passwordMin")
                     }
                     secureTextEntry={!visible}
                     autoCapitalize="none"
@@ -294,12 +313,12 @@ export function AuthScreen({
                     maxLength={128}
                     returnKeyType="go"
                     onSubmitEditing={() => void submit()}
-                    style={{ paddingRight: 56 }}
+                    style={{ paddingRight: 52 }}
                   />
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={
-                      visible ? "Şifreyi gizle" : "Şifreyi göster"
+                      visible ? t("auth.hidePassword") : t("auth.showPassword")
                     }
                     accessibilityState={{ selected: visible }}
                     onPress={() => setVisible(!visible)}
@@ -308,7 +327,7 @@ export function AuthScreen({
                   >
                     <Ionicons
                       name={visible ? "eye-off-outline" : "eye-outline"}
-                      size={20}
+                      size={19}
                       color={colors.muted}
                     />
                   </Pressable>
@@ -317,14 +336,14 @@ export function AuthScreen({
             )}
 
             {mode === "signin" && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={!!busy}
-                style={auth.forgot}
-                onPress={() => changeMode("recover")}
-              >
-                <Text style={auth.link}>Şifremi unuttum</Text>
-              </Pressable>
+              <View style={auth.forgot}>
+                <TextLink
+                  disabled={!!busy}
+                  onPress={() => changeMode("recover")}
+                >
+                  {t("auth.forgot")}
+                </TextLink>
+              </View>
             )}
 
             <ErrorText message={error} />
@@ -334,42 +353,38 @@ export function AuthScreen({
               loading={busy === "email"}
               disabled={!!busy}
               onPress={() => void submit()}
-              style={{ marginTop: 2 }}
+              trailingIcon={busy === "email" ? undefined : "arrow-forward"}
             >
-              {busy === "email" ? "İşleniyor…" : text.submit}
+              {busy === "email" ? t("auth.processing") : t(text.submit)}
             </Button>
 
             {mode === "recover" && (
-              <Pressable
-                accessibilityRole="button"
-                disabled={!!busy}
-                onPress={() => changeMode("signin")}
-                style={auth.backRow}
-              >
-                <Ionicons name="arrow-back" size={16} color={colors.green} />
-                <Text style={auth.link}>Girişe dön</Text>
-              </Pressable>
+              <View style={auth.backRow}>
+                <TextLink
+                  icon="arrow-back"
+                  disabled={!!busy}
+                  onPress={() => changeMode("signin")}
+                >
+                  {t("mobile.authBackToSignin")}
+                </TextLink>
+              </View>
             )}
 
             {!reset && mode !== "recover" && (
               <View style={auth.switch}>
                 <Text style={styles.muted}>
                   {mode === "signin"
-                    ? "Henüz hesabınız yok mu?"
-                    : "Zaten hesabınız var mı?"}
+                    ? t("auth.noAccount")
+                    : t("auth.haveAccount")}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
+                <TextLink
                   disabled={!!busy}
-                  style={auth.switchLink}
                   onPress={() =>
                     changeMode(mode === "signin" ? "signup" : "signin")
                   }
                 >
-                  <Text style={auth.link}>
-                    {mode === "signin" ? "Hesap oluştur" : "Giriş yap"}
-                  </Text>
-                </Pressable>
+                  {mode === "signin" ? t("auth.signUp") : t("auth.signIn")}
+                </TextLink>
               </View>
             )}
           </View>
@@ -378,11 +393,12 @@ export function AuthScreen({
             <Ionicons
               name="shield-checkmark-outline"
               size={15}
-              color={colors.greenBorder}
+              color={colors.onNavy}
             />
-            <Text style={auth.footerText}>
-              Hesabınız web ve mobilde birlikte çalışır.
-            </Text>
+            <Text style={auth.footerText}>{t("auth.footnote")}</Text>
+          </View>
+          <View style={auth.language}>
+            <LanguagePicker />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -390,119 +406,120 @@ export function AuthScreen({
   );
 }
 
-const auth = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    justifyContent: "center",
-    gap: 20,
-    padding: 18,
-    paddingBottom: 28,
-    width: "100%",
-    maxWidth: 560,
-    alignSelf: "center",
-  },
-  hero: { gap: 10, paddingHorizontal: 6, paddingTop: 8 },
-  header: { flexDirection: "row", alignItems: "center", gap: 11 },
-  brandIcon: {
-    width: 42,
-    height: 42,
-    backgroundColor: colors.green,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandLetter: {
-    color: colors.white,
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: -1.6,
-  },
-  brand: {
-    fontSize: 25,
-    fontWeight: "800",
-    letterSpacing: -1,
-    color: colors.white,
-  },
-  heroLead: { color: "#a8bfcf", fontSize: 14.5, lineHeight: 21 },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.xl,
-    padding: 22,
-    gap: 14,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "700",
-    letterSpacing: -0.7,
-  },
-  socialRow: { flexDirection: "row", gap: 8 },
-  social: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 62,
-    paddingHorizontal: 6,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.white,
-    gap: 5,
-  },
-  socialPressed: {
-    borderColor: colors.greenBorder,
-    backgroundColor: colors.greenSoft,
-  },
-  socialLabel: { fontSize: 12, fontWeight: "600", color: colors.ink },
-  separator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginVertical: 2,
-  },
-  line: { flex: 1, height: 1, backgroundColor: colors.line },
-  separatorText: { fontSize: 12.5, color: colors.muted },
-  reveal: {
-    position: "absolute",
-    right: 2,
-    top: 2,
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.sm,
-  },
-  link: { color: colors.green, fontSize: 14, fontWeight: "700" },
-  forgot: {
-    alignSelf: "flex-end",
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    marginTop: -8,
-  },
-  backRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 48,
-  },
-  switch: {
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 2,
-  },
-  switchLink: { minHeight: 48, justifyContent: "center", paddingHorizontal: 4 },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 12,
-  },
-  footerText: { textAlign: "center", color: "#a8bfcf", fontSize: 12.5 },
-});
+const makeAuth = (colors: Palette, type: Typography) =>
+  StyleSheet.create({
+    container: {
+      flexGrow: 1,
+      justifyContent: "center",
+      gap: 28,
+      padding: 18,
+      paddingTop: 28,
+      paddingBottom: 28,
+      width: "100%",
+      maxWidth: 560,
+      alignSelf: "center",
+    },
+    hero: { gap: 28, paddingHorizontal: 6 },
+    story: { gap: 14 },
+    // Web'deki .auth-story-label: fosforlu, aralıklı.
+    storyLabel: {
+      ...type.semibold,
+      fontSize: 11,
+      letterSpacing: 1.6,
+      color: colors.marker,
+    },
+    headline: {
+      ...type.heavy,
+      fontSize: 34,
+      lineHeight: 42,
+      letterSpacing: -1.2,
+      color: colors.onNavyStrong,
+    },
+    // Fosforlu kalem: web'deki .auth-story .ink-mark.
+    mark: {
+      alignSelf: "flex-start",
+      marginTop: 2,
+      paddingHorizontal: 7,
+      borderRadius: 7,
+      backgroundColor: colors.marker,
+    },
+    heroLead: {
+      ...type.regular,
+      color: colors.onNavy,
+      fontSize: 15,
+      lineHeight: 23,
+      maxWidth: 360,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.sheet,
+      borderWidth: 1,
+      borderColor: colors.line,
+      padding: 22,
+      gap: 18,
+      boxShadow: colors.shadowRaised,
+    },
+    title: {
+      ...type.heavy,
+      color: colors.ink,
+      fontSize: 27,
+      lineHeight: 33,
+      letterSpacing: -0.8,
+    },
+    socialRow: { flexDirection: "row", gap: 8 },
+    social: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 58,
+      paddingHorizontal: 6,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.lineControl,
+      backgroundColor: colors.surface,
+      boxShadow: colors.shadowXs,
+      gap: 5,
+    },
+    socialPressed: { backgroundColor: colors.sunken },
+    socialLabel: { ...type.medium, fontSize: 12.5, color: colors.ink },
+    separator: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    line: { flex: 1, height: 1, backgroundColor: colors.line },
+    separatorText: { ...type.regular, fontSize: 12.5, color: colors.muted },
+    reveal: {
+      position: "absolute",
+      right: 2,
+      top: 2,
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radius.inner,
+    },
+    forgot: { alignSelf: "flex-end", marginTop: -6 },
+    backRow: { alignItems: "center", paddingVertical: 4 },
+    switch: {
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    footer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      paddingHorizontal: 12,
+    },
+    language: { width: "100%", maxWidth: 240, alignSelf: "center" },
+    footerText: {
+      ...type.regular,
+      textAlign: "center",
+      color: colors.onNavy,
+      fontSize: 12.5,
+    },
+  });

@@ -1,6 +1,7 @@
 "use client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { t } from "@derslik/contracts";
 
 // Yüklenme göstergeleri tek yerden gelsin diye burada toplandı: sayfa ve
 // bölümler PageLoader, butonlar ve satır içi durumlar Spinner kullanır.
@@ -16,7 +17,7 @@ export function PageLoader({ compact = false }: { compact?: boolean }) {
     <div
       className={"loading-state" + (compact ? " is-compact" : "")}
       role="status"
-      aria-label="Yükleniyor"
+      aria-label={t("common.loading")}
     >
       <Spinner className="loading-spinner" />
     </div>

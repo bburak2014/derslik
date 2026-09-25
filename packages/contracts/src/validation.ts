@@ -1,18 +1,19 @@
 import { z } from "zod";
 
+// Hata iletileri çeviri anahtarıdır; API yanıtı isteğin dilinde yazar.
 const id = z.string().uuid();
 const short = z.string().trim().min(1).max(120);
 const amount = z
   .string()
   .regex(/^\d{1,10}$/)
-  .refine((x) => Number(x) > 0 && Number(x) <= 999999999, "Tutar geçersiz.");
+  .refine((x) => Number(x) > 0 && Number(x) <= 999999999, "api.invalidAmount");
 const day = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine(
     (x) =>
       !Number.isNaN(Date.parse(x)) && new Date(x).toISOString().startsWith(x),
-    "Geçerli bir tarih girin.",
+    "api.invalidDate",
   );
 const version = z.number().int().min(0);
 const fields = {
@@ -26,6 +27,7 @@ export const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("student.create"), ...fields }),
   z.object({ action: z.literal("student.update"), id, version, ...fields }),
   z.object({ action: z.literal("student.archive"), id, version }),
+  z.object({ action: z.literal("student.restore"), id, version }),
   z.object({
     action: z.literal("package.create"),
     studentId: id,

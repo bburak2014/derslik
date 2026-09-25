@@ -76,7 +76,10 @@ export class AccessService {
           )
           .min(1)
           .max(5)
-          .refine((v) => v.includes("lessons"), "Ders erişimi gerekli."),
+          .refine(
+            (v) => v.includes("lessons"),
+            "api.lessonsPermissionRequired",
+          ),
       })
       .strict()
       .parse(input);
@@ -132,25 +135,35 @@ export class AccessService {
       },
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) throw new UnauthorizedException("Oturumunuzu yenileyin.");
+    if (!response.ok) throw new UnauthorizedException("api.refreshSession");
     const user = (await response.json()) as {
       id?: string;
       email?: string;
       email_confirmed_at?: string;
     };
     if (user.id !== actor.id || !user.email_confirmed_at || !user.email)
-      throw new ForbiddenException(
-        "Daveti kabul etmek için e-posta adresinizi doğrulayın.",
-      );
+      throw new ForbiddenException("api.verifyEmailForInvite");
     const hash = createHash("sha256").update(token).digest("hex");
-    return this.db.transaction(actor, null, async (tx) => ({
-      data: (
-        await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
-          hash,
-          user.email!.toLowerCase(),
-        ])
-      ).rows[0].data,
-    }));
+    try {
+      return await this.db.transaction(actor, null, async (tx) => ({
+        data: (
+          await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
+            hash,
+            user.email!.toLowerCase(),
+          ])
+        ).rows[0].data,
+      }));
+    } catch (error) {
+      // accept_invitation raises one error for every refusal. The usual cause
+      // is being signed in with another account than the invited address, and
+      // the generic constraint message gave the invitee no hint of that.
+      if (
+        (error as { code?: string })?.code === "23514" &&
+        (error as Error).message?.includes("Invitation unavailable")
+      )
+        throw new ConflictException("api.inviteWrongAccount");
+      throw error;
+    }
   }
   links(actor: Actor, ws: string, student: string) {
     return this.db.transaction(actor, ws, async (tx) => ({
@@ -196,7 +209,7 @@ export class AccessService {
             [ws, student, c.id],
           )
         ).rows[0];
-        if (!data) throw new ConflictException("Erişim kaydı bulunamadı.");
+        if (!data) throw new ConflictException("api.accessNotFound");
         return { data };
       },
     );
@@ -239,7 +252,7 @@ export class AccessService {
       data: toDto(
         (
           await tx.query(
-            "SELECT id,workspace_id,student_id,title,body,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
+            "SELECT id,workspace_id,student_id,title,body,kind,target_id,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
             [actor.id],
           )
         ).rows,

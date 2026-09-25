@@ -1,7 +1,17 @@
 "use client";
 import { useState } from "react";
-import type { WorkspaceData } from "@derslik/contracts";
-import { LearningPanel } from "./learning-panel";
+import { compareText, t, type WorkspaceData } from "@derslik/contracts";
+import { Users } from "lucide-react";
+import { LearningPanel, type NoticeFocus } from "./learning-panel";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,33 +29,47 @@ export function TeachingHub({
   workspaceId,
   data,
   view,
+  focus,
 }: {
   workspaceId: string;
   data: WorkspaceData;
   view: TeachingView;
+  /** Bildirimden gelindiyse o öğrenci seçilir, kayıt vurgulanır. */
+  focus?: NoticeFocus | null;
 }) {
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(focus?.studentId ?? ""),
+    [appliedFocus, setAppliedFocus] = useState(focus?.at ?? 0);
+  if (focus && focus.at !== appliedFocus) {
+    setAppliedFocus(focus.at);
+    setSelected(focus.studentId);
+  }
   const students = [...data.students].sort(
     (a, b) =>
-      Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, "tr"),
+      Number(b.active) - Number(a.active) || compareText(a.name, b.name),
   );
   const student = students.find((s) => s.id === selected) || students[0];
   if (!student)
     return (
-      <div className="learning-panel learning-empty">
-        Öğrenciler bölümünden bir öğrenci ekleyin. Ödevleri, PDF dosyalarını ve
-        ders videolarını burada paylaşabilirsiniz.
-      </div>
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Users />
+          </EmptyMedia>
+          <EmptyTitle className="text-base">{t("hub.emptyTitle")}</EmptyTitle>
+          <EmptyDescription>{t("hub.emptyText")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   return (
-    <section>
-      <div className="teaching-student-bar">
-        <div className="form-field">
-          <Label htmlFor="teaching-student">Öğrenci</Label>
+    <section className="grid grid-cols-1 gap-6">
+      <Card className="flex-row flex-wrap items-end justify-between gap-4 px-5 py-4">
+        <div className="grid w-full max-w-xs gap-2">
+          <Label htmlFor="teaching-student">{t("common.student")}</Label>
           <Select value={student.id} onValueChange={setSelected}>
             <SelectTrigger
               id="teaching-student"
-              aria-label="İçerikleri gösterilecek öğrenci"
+              className="w-full"
+              aria-label={t("hub.pickStudent")}
             >
               <SelectValue />
             </SelectTrigger>
@@ -53,19 +77,26 @@ export function TeachingHub({
               {students.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name}
-                  {s.active ? "" : " · Arşivde"}
+                  {s.active ? "" : " · " + t("hub.archived")}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <span className="teaching-student-subject">{student.subject}</span>
-      </div>
+        {student.subject && (
+          <Badge variant="secondary">{student.subject}</Badge>
+        )}
+      </Card>
       <LearningPanel
         key={`${workspaceId}:${student.id}`}
         workspaceId={workspaceId}
         studentId={student.id}
         view={view}
+        focus={
+          focus?.studentId === student.id
+            ? { id: focus.itemId, at: focus.at }
+            : undefined
+        }
       />
     </section>
   );

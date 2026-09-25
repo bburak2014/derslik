@@ -4,21 +4,18 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { CONFIG, type ApiConfig } from "../config.js";
+import { apiText } from "../common/i18n.js";
 
 @Injectable()
 export class MediaProviders {
   constructor(@Inject(CONFIG) readonly config: ApiConfig) {}
   streamReady() {
     if (!this.videosConfigured())
-      throw new ServiceUnavailableException(
-        "Video hizmeti henüz yapılandırılmamış.",
-      );
+      throw new ServiceUnavailableException("api.videoServiceNotConfigured");
   }
   storageReady() {
     if (!this.attachmentsConfigured())
-      throw new ServiceUnavailableException(
-        "Dosya depolama henüz yapılandırılmamış.",
-      );
+      throw new ServiceUnavailableException("api.storageNotConfigured");
   }
   // Both of these are the single source of truth for "is this feature set up".
   // The limits endpoint used to answer the question with its own, stricter
@@ -49,28 +46,26 @@ export class MediaProviders {
         signal: AbortSignal.timeout(10000),
       },
     );
-  if (
-  !response.ok &&
-  !(init.method === "DELETE" && response.status === 404)
-) {
-  const detail = await response.json().catch(() => null) as {
-    errors?: Array<{ code?: number; message?: string }>;
-  } | null;
+    if (
+      !response.ok &&
+      !(init.method === "DELETE" && response.status === 404)
+    ) {
+      const detail = (await response.json().catch(() => null)) as {
+        errors?: Array<{ code?: number; message?: string }>;
+      } | null;
 
-  console.error("Cloudflare Stream hatası:", {
-    status: response.status,
-    errors: detail?.errors?.slice(0, 3).map((error) => ({
-      code: error.code,
-      message: String(error.message || "")
-        .replaceAll(this.config.CLOUDFLARE_STREAM_TOKEN!, "[GİZLENDİ]")
-        .slice(0, 500),
-    })),
-  });
+      console.error("Cloudflare Stream hatası:", {
+        status: response.status,
+        errors: detail?.errors?.slice(0, 3).map((error) => ({
+          code: error.code,
+          message: String(error.message || "")
+            .replaceAll(this.config.CLOUDFLARE_STREAM_TOKEN!, "[GİZLENDİ]")
+            .slice(0, 500),
+        })),
+      });
 
-  throw new ServiceUnavailableException(
-    "Video yükleme bağlantısı oluşturulamadı. API terminalini kontrol edin.",
-  );
-}
+      throw new ServiceUnavailableException("api.videoUploadLinkFailed");
+    }
     return response;
   }
   storageRoot() {
@@ -92,9 +87,7 @@ export class MediaProviders {
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok)
-      throw new ServiceUnavailableException(
-        "Dosya hizmeti işlemi tamamlayamadı. Yükleme bittikten sonra yeniden deneyin.",
-      );
+      throw new ServiceUnavailableException("api.storageOperationFailed");
     return response;
   }
   async capabilities() {
@@ -114,10 +107,8 @@ export class MediaProviders {
     return {
       files: fileReady,
       videos,
-      fileMessage: fileReady
-        ? null
-        : "Dosya yükleme şu anda kullanılamıyor. Lütfen daha sonra yeniden deneyin.",
-      videoMessage: videos ? null : "Video yükleme henüz kullanıma açılmadı.",
+      fileMessage: fileReady ? null : apiText("api.fileUploadUnavailable"),
+      videoMessage: videos ? null : apiText("api.videoUploadUnavailable"),
     };
   }
   objectPath(key: string) {
@@ -136,7 +127,7 @@ export class MediaProviders {
       url.origin !== new URL(this.storageRoot()).origin ||
       !url.searchParams.has("token")
     )
-      throw new ServiceUnavailableException("Yükleme bağlantısı geçersiz.");
+      throw new ServiceUnavailableException("api.uploadLinkInvalid");
     return url.href;
   }
   // `&download=` Supabase'e Content-Disposition: attachment verdirir. Tarayıcı

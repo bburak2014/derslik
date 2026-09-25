@@ -1,5 +1,6 @@
 import type { Command } from "../../contracts/src/validation.js";
 import type { WorkspaceData } from "../../contracts/src/types.js";
+import { getLocale, t } from "../../contracts/src/i18n/index.ts";
 
 export class ApiError extends Error {
   constructor(
@@ -24,6 +25,8 @@ export class DerslikClient {
       baseUrl: string;
       getToken: () => Promise<string | null>;
       fetch?: typeof fetch;
+      /** API iletilerinin dili; verilmezse istemcinin etkin dili. */
+      locale?: () => string;
     },
   ) {}
   async request<T>(
@@ -37,7 +40,7 @@ export class DerslikClient {
   ): Promise<T> {
     if (!path.startsWith("/v1/")) throw new Error("Unsupported API path");
     const token = await this.options.getToken();
-    if (!token) throw new ApiError(401, "Lütfen giriş yapın.");
+    if (!token) throw new ApiError(401, t("common.signInRequired"));
     const res = await (this.options.fetch || fetch)(
       this.options.baseUrl.replace(/\/$/, "") + path,
       {
@@ -47,6 +50,7 @@ export class DerslikClient {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          "Accept-Language": this.options.locale?.() || getLocale(),
           ...(init.key ? { "Idempotency-Key": init.key } : {}),
         },
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
@@ -58,7 +62,7 @@ export class DerslikClient {
     if (!res.ok)
       throw new ApiError(
         res.status,
-        payload.error?.message || "İşlem tamamlanamadı.",
+        payload.error?.message || t("common.failed"),
         payload.error?.requestId,
       );
     return payload as T;

@@ -22,14 +22,10 @@ config.watchFolders = [
 // resulting bundle delta is empty. Paths are anchored at the repository root so
 // that identically named folders inside node_modules (`dist`, `build`, …) stay
 // resolvable.
-const generated = [
-  ".api-build",
-  ".next",
-  ".vinext",
-  ".wrangler",
-  ".sites-runtime",
-  ".qodo",
-  ".openai",
+// Kökte durmaları beklenen klasörler. `dist` ve `build` yaygın paket klasör
+// adları olduğu için kökte sabitlenir; yoksa node_modules içindekiler
+// çözümlenemez hale gelirdi.
+const generatedAtRoot = [
   ".git",
   "coverage",
   "dist",
@@ -39,18 +35,47 @@ const generated = [
   "apps/mobile/dist",
 ];
 
+// Bunlar araçların kendi durum ve önbellek klasörleri; hiçbir yayımlanmış paket
+// bu adlarla klasör göndermez, bu yüzden her derinlikte engellenirler.
+// `.sites-runtime` kökte sabitliydi ve bir pnpm kurulumu onu apps/mobile
+// altında da oluşturunca izlenen ağaçta kalıp banner'ı geri getirdi.
+const generatedAnywhere = [
+  ".api-build",
+  ".next",
+  ".vinext",
+  ".wrangler",
+  ".sites-runtime",
+  ".qodo",
+  ".openai",
+  ".expo",
+];
+
 const previous = config.resolver.blockList || [];
 config.resolver.blockList = [
   ...(Array.isArray(previous) ? previous : [previous]),
-  ...generated.map(
+  ...generatedAtRoot.map(
     (folder) =>
       new RegExp("^" + escape(path.join(root, folder)) + "(?:" + sep + "|$)"),
   ),
-  // `.expo` holds Expo's own dev state, including `dev/logs/start.log`, which it
-  // appends to on every bundling event and every console line the device
-  // prints. Left watched, the app's own logs retrigger the banner in a loop.
-  // No published package ships a `.expo` folder, so this is safe at any depth.
-  new RegExp("^" + escape(root) + sep + "(?:.*" + sep + ")?\\.expo(?:" + sep + "|$)"),
+  // `.expo` içinde `dev/logs/start.log` var; Expo her paketleme olayında ve
+  // cihazın yazdığı her konsol satırında oraya ekleme yapıyor. İzlenirse
+  // uygulamanın kendi günlükleri banner'ı döngüye sokuyor. Aynı mantık diğer
+  // araç önbellekleri için de geçerli.
+  ...generatedAnywhere.map(
+    (folder) =>
+      new RegExp(
+        "^" +
+          escape(root) +
+          sep +
+          "(?:.*" +
+          sep +
+          ")?" +
+          escape(folder) +
+          "(?:" +
+          sep +
+          "|$)",
+      ),
+  ),
 ];
 
 module.exports = config;

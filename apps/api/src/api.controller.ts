@@ -86,9 +86,7 @@ export class ApiController {
   ) {
     const c = commandSchema.parse(body);
     if (c.action === "seed")
-      throw new BadRequestException(
-        "Örnek veriler bu çalışma alanında desteklenmiyor.",
-      );
+      throw new BadRequestException("api.sampleUnsupported");
     return this.mutate(req, ws, key, c.action, c);
   }
 

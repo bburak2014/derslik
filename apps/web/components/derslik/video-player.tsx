@@ -3,7 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import type { Video } from "@derslik/api-client";
 import { backend } from "@/lib/client";
+import { t } from "@derslik/contracts";
+import { MessageSquarePlus } from "lucide-react";
 import { Spinner } from "@/components/derslik/loading";
+import { FormError } from "@/components/derslik/feedback";
+import { Button } from "@/components/ui/button";
 export function VideoPlayer({
   video,
   mediaPath,
@@ -50,10 +54,9 @@ export function VideoPlayer({
           hls.loadSource(data.url);
           hls.attachMedia(el);
           hls.on(Hls.Events.ERROR, (_, event) => {
-            if (event.fatal)
-              setError("Video oynatılamadı. Kapatıp yeniden açın.");
+            if (event.fatal) setError(t("video.playFailed"));
           });
-        } else throw new Error("Bu tarayıcı video oynatmayı desteklemiyor.");
+        } else throw new Error(t("video.unsupported"));
         timer = setTimeout(
           () => void load(),
           Math.max(30000, data.expiresAt - Date.now() - 45000),
@@ -105,17 +108,14 @@ export function VideoPlayer({
       />
       {!ready && !error && (
         <p role="status" className="player-loading">
-          <Spinner /> Video açılıyor…
+          <Spinner /> {t("video.opening")}
         </p>
       )}
-      {error && (
-        <p role="alert" className="form-error">
-          {error}
-        </p>
-      )}
+      {error && <FormError>{error}</FormError>}
       {canAsk && (
-        <button
-          className="primary-button"
+        <Button
+          type="button"
+          className="justify-self-start"
           disabled={!ready}
           onClick={() => {
             ref.current?.pause();
@@ -127,8 +127,8 @@ export function VideoPlayer({
             );
           }}
         >
-          Bu saniyeye soru ekle
-        </button>
+          <MessageSquarePlus /> {t("video.askHere")}
+        </Button>
       )}
     </div>
   );

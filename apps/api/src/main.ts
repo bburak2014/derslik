@@ -10,6 +10,7 @@ import { AppModule } from "./app.module.js";
 import { loadConfig, type ApiConfig } from "./config.js";
 import { DatabaseService } from "./db/database.service.js";
 import { ApiErrorFilter } from "./common/api-error.filter.js";
+import { localeMiddleware } from "./common/i18n.js";
 
 // DATE is a calendar day, not a process-local midnight instant.
 types.setTypeParser(1082, (value) => value);
@@ -30,12 +31,18 @@ export async function createApplication(config: ApiConfig) {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
+  app.use(localeMiddleware);
   app.useBodyParser("json", { limit: "16kb" });
   app.enableCors({
     origin: (origin, callback) =>
       callback(null, !!origin && config.origins.includes(origin)),
     methods: ["GET", "POST", "PATCH", "PUT", "OPTIONS"],
-    allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
+    allowedHeaders: [
+      "Authorization",
+      "Content-Type",
+      "Idempotency-Key",
+      "Accept-Language",
+    ],
     exposedHeaders: ["X-Request-Id"],
     credentials: false,
   });

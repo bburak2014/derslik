@@ -9,22 +9,34 @@ import { configured, request, supabase, watchRefresh } from "./core";
 import { AuthScreen } from "./AuthScreen";
 import { authRoute, completeAuthLink } from "./oauth";
 import { TeacherScreen } from "./TeacherScreen";
-import { PortalScreen } from "./LearningScreen";
+import { PortalScreen, type NoticeFocus } from "./LearningScreen";
+import { t, type NoticeTarget } from "@derslik/contracts";
+import { LanguagePicker, LocaleProvider } from "./i18n";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  Avatar,
   Badge,
+  Brand,
   Button,
   Card,
-  colors,
   EmptyState,
   ErrorText,
   FormSheet,
   type FormSpec,
+  confirmAction,
+  Kicker,
   Loading,
-  styles,
+  ThemeProvider,
+  ThemeToggle,
+  useTheme,
 } from "./ui";
 
+type AccessRef = Pick<Access, "id" | "role" | "studentId">;
+const sameAccess = (a: Access, b?: AccessRef | null) =>
+  !!b && a.id === b.id && a.studentId === b.studentId && a.role === b.role;
+
 function Application() {
+  const { colors, styles } = useTheme();
   const [session, setSession] = useState<Session | null>(null),
     [boot, setBoot] = useState(true),
     [access, setAccess] = useState<Access[]>([]),
@@ -33,19 +45,35 @@ function Application() {
     [reset, setReset] = useState(false),
     [invite, setInvite] = useState<string | null>(null),
     [form, setForm] = useState<FormSpec | null>(null),
-    [switching, setSwitching] = useState(false);
-  const load = useCallback(async () => {
+    [switching, setSwitching] = useState(false),
+    // Bildirimden açılacak yer. Bildirim başka bir görünüme (ör. velinin
+    // ikinci çocuğu) aitse önce o görünüme geçilir.
+    [focus, setFocus] = useState<NoticeFocus | null>(null);
+  const openNotice = (target: NoticeTarget) => {
+    const fits = (a: Access) =>
+      a.id === target.workspaceId &&
+      (a.role === "OWNER" || a.studentId === target.studentId);
+    const next =
+      (active && fits(active) ? active : null) ||
+      access.find((a) => fits(a) && a.role === "OWNER") ||
+      access.find(fits);
+    if (!next) {
+      setError(t("conn.noticeNoAccess"));
+      return;
+    }
+    setActive(next);
+    setFocus({ ...target, at: Date.now() });
+  };
+  // `prefer` opens a given view, such as an invitation just accepted;
+  // otherwise the current view stays selected.
+  const load = useCallback(async (prefer?: AccessRef) => {
     try {
       const r = await request<{ data: Access[] }>("/access");
       setAccess(r.data);
       setActive(
         (old) =>
-          r.data.find(
-            (a) =>
-              a.id === old?.id &&
-              a.studentId === old?.studentId &&
-              a.role === old?.role,
-          ) ||
+          r.data.find((a) => sameAccess(a, prefer)) ||
+          r.data.find((a) => sameAccess(a, old)) ||
           r.data[0] ||
           null,
       );
@@ -110,10 +138,7 @@ function Application() {
         if (route && (await completeAuthLink(url)) && route === "recovery")
           setReset(true);
       } catch {
-        Alert.alert(
-          "Bağlantı açılamadı",
-          "Bağlantının süresi dolmuş olabilir. Yeniden giriş yapın veya yeni bağlantı isteyin.",
-        );
+        Alert.alert(t("mobile.linkFailedTitle"), t("mobile.linkFailedBody"));
       }
     };
     void Linking.getInitialURL().then((u) => {
@@ -140,16 +165,30 @@ function Application() {
   }
   const accountForm = () =>
     setForm({
-      title: "Davet kabul et",
-      description:
-        "Öğretmeninizin gönderdiği davet bağlantısını buraya yapıştırın.",
-      fields: [{ key: "link", label: "Davet bağlantısı", value: invite || "" }],
+      title: t("mobile.acceptInvite"),
+      description: t("mobile.pasteInvite"),
+      fields: [
+        { key: "link", label: t("mobile.inviteLink"), value: invite || "" },
+      ],
       submit: async (v) => {
         const token = v.link.match(/([a-f0-9]{64})\/?$/)?.[1];
-        if (!token) throw new Error("Geçerli davet bağlantısı girin.");
-        await request("/invitations/accept", { token });
+        if (!token) throw new Error(t("mobile.inviteInvalid"));
+        const r = await request<{
+          data: {
+            workspaceId: string;
+            role: Access["role"];
+            studentId: string;
+          };
+        }>("/invitations/accept", { token });
         setInvite(null);
-        await load();
+        // Go straight to the view just joined; an account that also teaches
+        // would otherwise stay in its own workspace.
+        await load({
+          id: r.data.workspaceId,
+          role: r.data.role,
+          studentId: r.data.studentId,
+        });
+        setSwitching(false);
       },
     });
   if (!configured)
@@ -159,15 +198,9 @@ function Application() {
         edges={["top", "bottom", "left", "right"]}
       >
         <View style={[styles.body, { flex: 1, justifyContent: "center" }]}>
-          <Text style={styles.brand}>
-            derslik<Text style={{ color: colors.green }}>.</Text>
-          </Text>
-          <Text style={styles.title}>Uygulamayı bağlayın.</Text>
-          <Text style={styles.text}>
-            Mobil uygulamanın bağlantı ayarları henüz tamamlanmamış. Kurulum
-            kılavuzundaki mobil ortam değişkenlerini ekleyip uygulamayı yeniden
-            başlatın.
-          </Text>
+          <Brand />
+          <Text style={styles.title}>{t("mobile.setupTitle")}</Text>
+          <Text style={styles.text}>{t("mobile.setupBody")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -181,31 +214,30 @@ function Application() {
         edges={["top", "bottom", "left", "right"]}
       >
         <ScrollView contentContainerStyle={styles.body}>
-          <View style={{ gap: 4 }}>
-            <Text style={styles.brand}>
-              derslik<Text style={{ color: colors.green }}>.</Text>
-            </Text>
-            <Text style={styles.title}>Çalışma alanınız</Text>
+          <Brand />
+          <View style={{ gap: 6, marginTop: 8 }}>
+            <Kicker>{t("mobile.yourAccount")}</Kicker>
+            <Text style={styles.title}>{t("mobile.yourWorkspace")}</Text>
             <View style={[styles.row, { gap: 6 }]}>
-              <Ionicons
-                name="mail-outline"
-                size={14}
-                color={colors.muted}
-              />
+              <Ionicons name="mail-outline" size={14} color={colors.muted} />
               <Text style={styles.muted}>{session.user.email}</Text>
             </View>
           </View>
           <ErrorText message={error} />
           {error && (
-            <Button secondary icon="refresh-outline" onPress={() => void load()}>
-              Yeniden dene
+            <Button
+              secondary
+              icon="refresh-outline"
+              onPress={() => void load()}
+            >
+              {t("common.retry")}
             </Button>
           )}
           {!access.length && !error && (
             <EmptyState
               icon="briefcase-outline"
-              title="Henüz bir çalışma alanınız yok"
-              description="Öğretmenseniz kendi alanınızı oluşturun, öğrenci veya veliyseniz aldığınız daveti kabul edin."
+              title={t("mobile.noWorkspace")}
+              description={t("mobile.noWorkspaceHint")}
             />
           )}
           {access.map((a) => (
@@ -213,23 +245,25 @@ function Application() {
               key={a.id + ":" + a.role + ":" + a.studentId}
               onPress={() => {
                 setActive(a);
+                setFocus(null);
                 setSwitching(false);
                 setInvite(null);
               }}
             >
-              <View style={[styles.row, { flexWrap: "nowrap" }]}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={styles.h2}>{a.name}</Text>
-                  <Text style={styles.muted}>
-                    {a.studentName || "Öğretmen hesabı"}
+              <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
+                <Avatar name={a.studentName || a.name} size={44} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={styles.h2} numberOfLines={1}>
+                    {a.name}
                   </Text>
-                  <Badge tone={a.role === "OWNER" ? "success" : "neutral"}>
-                    {a.role === "GUARDIAN"
-                      ? "Veli"
-                      : a.role === "STUDENT"
-                        ? "Öğrenci"
-                        : "Öğretmen"}
-                  </Badge>
+                  <Text style={styles.muted} numberOfLines={1}>
+                    {a.studentName || t("ws.teacherAccount")}
+                  </Text>
+                  <View style={{ marginTop: 3 }}>
+                    <Badge tone={a.role === "OWNER" ? "info" : "neutral"}>
+                      {t(`roles.${a.role}`)}
+                    </Badge>
+                  </View>
                 </View>
                 <Ionicons
                   name="chevron-forward"
@@ -244,8 +278,8 @@ function Application() {
               icon="add"
               onPress={() =>
                 setForm({
-                  title: "Öğretmen çalışma alanı",
-                  fields: [{ key: "name", label: "Çalışma alanı adı" }],
+                  title: t("mobile.teacherWorkspace"),
+                  fields: [{ key: "name", label: t("conn.workspaceName") }],
                   submit: async (v) => {
                     await request("/workspaces", { name: v.name });
                     await load();
@@ -254,18 +288,33 @@ function Application() {
                 })
               }
             >
-              Öğretmen çalışma alanı oluştur
+              {t("conn.createWorkspace")}
             </Button>
           )}
           <Button secondary icon="mail-open-outline" onPress={accountForm}>
-            Davet kabul et
+            {t("mobile.acceptInvite")}
           </Button>
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <Kicker muted>{t("common.appearance")}</Kicker>
+            <ThemeToggle />
+          </View>
+          <View style={{ gap: 8 }}>
+            <Kicker muted>{t("common.language")}</Kicker>
+            <LanguagePicker />
+          </View>
           <Button
             variant="ghost"
             icon="log-out-outline"
-            onPress={() => void signout()}
+            onPress={() =>
+              confirmAction(
+                t("ws.signOutTitle"),
+                t("portal.signOutBody"),
+                signout,
+                setError,
+              )
+            }
           >
-            Çıkış yap
+            {t("common.signOut")}
           </Button>
         </ScrollView>
         <FormSheet form={form} onClose={() => setForm(null)} />
@@ -274,16 +323,45 @@ function Application() {
   const select = () => setSwitching(true),
     key = [active.id, active.studentId, active.role].join(":");
   return active.role === "OWNER" ? (
-    <TeacherScreen key={key} access={active} onAccount={select} />
+    <TeacherScreen
+      key={key}
+      access={active}
+      onAccount={select}
+      focus={focus}
+      onNotice={openNotice}
+    />
   ) : (
-    <PortalScreen key={key} access={active} onAccount={select} />
+    <PortalScreen
+      key={key}
+      access={active}
+      onAccount={select}
+      focus={focus}
+      onNotice={openNotice}
+    />
   );
 }
+// StatusBar temayla ters çalışır: koyu zeminde açık simgeler gerekir. Sabit
+// "dark" olduğu için koyu temada üst çubuk okunmuyordu.
+function Shell() {
+  const { scheme, colors } = useTheme();
+  return (
+    <>
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+        <Application />
+      </View>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Application />
+      <ThemeProvider>
+        <LocaleProvider>
+          <Shell />
+        </LocaleProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

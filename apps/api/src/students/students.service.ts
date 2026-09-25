@@ -19,9 +19,9 @@ export async function lockStudent(
       [ws, id],
     )
   ).rows[0];
-  if (!student) throw new NotFoundException("Öğrenci bulunamadı.");
+  if (!student) throw new NotFoundException("api.studentNotFound");
   if (active && !student.active)
-    throw new ConflictException("Öğrenci arşivlenmiş.");
+    throw new ConflictException("api.studentArchived");
   return student;
 }
 
@@ -52,7 +52,7 @@ export class StudentsService {
         ).rows[0].n,
       );
       if (count >= limit)
-        throw new ConflictException("Aktif öğrenci sınırına ulaşıldı.");
+        throw new ConflictException("api.studentLimitReached");
       const student = (
         await tx.query(
           "INSERT INTO derslik.students (workspace_id,name,grade,subject,phone,email) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
@@ -61,25 +61,55 @@ export class StudentsService {
       ).rows[0];
       return { data: student };
     }
-    if (c.action === "student.update" || c.action === "student.archive") {
+    if (
+      c.action === "student.update" ||
+      c.action === "student.archive" ||
+      c.action === "student.restore"
+    ) {
       const student = await lockStudent(tx, ws, c.id);
       if (student.version !== c.version)
-        throw new ConflictException(
-          "Öğrenci kaydı değişmiş. Güncel sürümü yükleyin.",
-        );
+        throw new ConflictException("api.studentChanged");
       if (c.action === "student.archive") {
         const { rowCount } = await tx.query(
           "SELECT id FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 AND status='SCHEDULED' LIMIT 1",
           [ws, c.id],
         );
         if (rowCount)
-          throw new ConflictException(
-            "Önce planlanan dersleri tamamlayın veya iptal edin.",
-          );
+          throw new ConflictException("api.studentHasScheduledLessons");
         return {
           data: (
             await tx.query(
               "UPDATE derslik.students SET active=false,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
+              [ws, c.id],
+            )
+          ).rows[0],
+        };
+      }
+      if (c.action === "student.restore") {
+        if (student.active)
+          throw new ConflictException("api.studentAlreadyActive");
+        // Arşivden dönen öğrenci yeniden sınıra dahil olur; yoksa arşivleyip
+        // geri alarak plan sınırı aşılabilirdi.
+        const limit = (
+          await tx.query(
+            "SELECT student_limit FROM derslik.workspace_limits WHERE workspace_id=$1 FOR UPDATE",
+            [ws],
+          )
+        ).rows[0].student_limit;
+        const count = Number(
+          (
+            await tx.query(
+              "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1 AND active",
+              [ws],
+            )
+          ).rows[0].n,
+        );
+        if (count >= limit)
+          throw new ConflictException("api.studentLimitReached");
+        return {
+          data: (
+            await tx.query(
+              "UPDATE derslik.students SET active=true,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
               [ws, c.id],
             )
           ).rows[0],
@@ -103,9 +133,7 @@ export class StudentsService {
         )
       ).rows[0];
       if ((note?.version || 0) !== c.version)
-        throw new ConflictException(
-          "Not başka bir işlemde değişti. Güncel sürümü yükleyin.",
-        );
+        throw new ConflictException("api.noteChanged");
       const saved = (
         await tx.query(
           `INSERT INTO derslik.private_notes (workspace_id,student_id,body) VALUES ($1,$2,$3)
