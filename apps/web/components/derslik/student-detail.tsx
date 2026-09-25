@@ -106,8 +106,11 @@ export function StudentDetail({
   mutate,
   busy,
   workspaceId,
+  focus,
 }: {
   workspaceId?: string;
+  /** Bildirimden gelindiyse "Öğrenme" sekmesi Paylaşımlar'da açılır. */
+  focus?: import("./learning-panel").NoticeFocus | null;
   student: Student | null;
   data: WorkspaceData;
   actions: Actions;
@@ -121,11 +124,18 @@ export function StudentDetail({
     id: "",
     tab: "packages",
     invite: 0,
+    notice: 0,
   });
+  if (
+    focus &&
+    focus.studentId === student?.id &&
+    focus.at !== tabState.notice
+  )
+    setTabState({ id: focus.studentId, tab: "learning", invite: 0, notice: focus.at });
   const current =
     tabState.id === student?.id
       ? tabState
-      : { id: student?.id ?? "", tab: "packages", invite: 0 };
+      : { id: student?.id ?? "", tab: "packages", invite: 0, notice: 0 };
   const packages = data.packages.filter((p) => p.student_id === student?.id),
     lessons = data.lessons.filter((l) => l.student_id === student?.id),
     credits = data.credits.filter((c) => c.student_id === student?.id);
@@ -193,6 +203,7 @@ export function StudentDetail({
                         tab: "learning",
                         invite:
                           (prev.id === student.id ? prev.invite : 0) + 1,
+                        notice: prev.notice,
                       }))
                     }
                   >
@@ -243,7 +254,12 @@ export function StudentDetail({
             <Tabs
               value={current.tab}
               onValueChange={(v) =>
-                setTabState({ id: student.id, tab: v, invite: 0 })
+                setTabState((prev) => ({
+                  id: student.id,
+                  tab: v,
+                  invite: 0,
+                  notice: prev.notice,
+                }))
               }
               key={student.id}
               className="detail-tabs"
@@ -436,13 +452,30 @@ export function StudentDetail({
                   <LearningPanel
                     // Kısayoldan gelindiğinde panel yeniden kurulsun ki
                     // "Davetler" sekmesi ve form açılış anında gelsin.
-                    key={current.invite ? "invite-" + current.invite : "normal"}
+                    key={
+                      current.invite
+                        ? "invite-" + current.invite
+                        : focus?.at === current.notice
+                          ? "notice-" + current.notice
+                          : "normal"
+                    }
                     workspaceId={workspaceId}
                     studentId={student.id}
                     studentName={student.name}
                     studentPhone={student.phone}
-                    initialTab={current.invite ? "access" : undefined}
+                    initialTab={
+                      current.invite
+                        ? "access"
+                        : focus?.at === current.notice
+                          ? "notes"
+                          : undefined
+                    }
                     autoInvite={current.invite > 0}
+                    focus={
+                      !current.invite && focus?.at === current.notice
+                        ? { id: focus.itemId, at: focus.at }
+                        : undefined
+                    }
                   />
                 </TabsContent>
               )}

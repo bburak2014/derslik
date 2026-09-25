@@ -9,7 +9,8 @@ import { configured, request, supabase, watchRefresh } from "./core";
 import { AuthScreen } from "./AuthScreen";
 import { authRoute, completeAuthLink } from "./oauth";
 import { TeacherScreen } from "./TeacherScreen";
-import { PortalScreen } from "./LearningScreen";
+import { PortalScreen, type NoticeFocus } from "./LearningScreen";
+import type { NoticeTarget } from "@derslik/contracts";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Avatar,
@@ -43,7 +44,25 @@ function Application() {
     [reset, setReset] = useState(false),
     [invite, setInvite] = useState<string | null>(null),
     [form, setForm] = useState<FormSpec | null>(null),
-    [switching, setSwitching] = useState(false);
+    [switching, setSwitching] = useState(false),
+    // Bildirimden açılacak yer. Bildirim başka bir görünüme (ör. velinin
+    // ikinci çocuğu) aitse önce o görünüme geçilir.
+    [focus, setFocus] = useState<NoticeFocus | null>(null);
+  const openNotice = (target: NoticeTarget) => {
+    const fits = (a: Access) =>
+      a.id === target.workspaceId &&
+      (a.role === "OWNER" || a.studentId === target.studentId);
+    const next =
+      (active && fits(active) ? active : null) ||
+      access.find((a) => fits(a) && a.role === "OWNER") ||
+      access.find(fits);
+    if (!next) {
+      setError("Bu bildirimin ait olduğu alana artık erişiminiz yok.");
+      return;
+    }
+    setActive(next);
+    setFocus({ ...target, at: Date.now() });
+  };
   // `prefer` opens a given view, such as an invitation just accepted;
   // otherwise the current view stays selected.
   const load = useCallback(async (prefer?: AccessRef) => {
@@ -231,6 +250,7 @@ function Application() {
               key={a.id + ":" + a.role + ":" + a.studentId}
               onPress={() => {
                 setActive(a);
+                setFocus(null);
                 setSwitching(false);
                 setInvite(null);
               }}
@@ -308,9 +328,21 @@ function Application() {
   const select = () => setSwitching(true),
     key = [active.id, active.studentId, active.role].join(":");
   return active.role === "OWNER" ? (
-    <TeacherScreen key={key} access={active} onAccount={select} />
+    <TeacherScreen
+      key={key}
+      access={active}
+      onAccount={select}
+      focus={focus}
+      onNotice={openNotice}
+    />
   ) : (
-    <PortalScreen key={key} access={active} onAccount={select} />
+    <PortalScreen
+      key={key}
+      access={active}
+      onAccount={select}
+      focus={focus}
+      onNotice={openNotice}
+    />
   );
 }
 // StatusBar temayla ters çalışır: koyu zeminde açık simgeler gerekir. Sabit

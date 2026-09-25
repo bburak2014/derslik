@@ -44,7 +44,9 @@ import {
   LearningPanel,
   type LearningTab,
   type LearningTabInfo,
+  type NoticeFocus,
 } from "./learning-panel";
+import type { NoticeTarget } from "@derslik/contracts";
 
 type PortalRole = "STUDENT" | "GUARDIAN";
 
@@ -197,11 +199,16 @@ export function Portal({
   displayName,
   switcher,
   onSignout,
+  focus,
+  onNotice,
 }: {
   access: Access;
   displayName: string;
   switcher?: React.ReactNode;
   onSignout?: () => void;
+  /** Bildirimden açılacak yer ve bildirime tıklanınca çağrılan işlev. */
+  focus?: NoticeFocus | null;
+  onNotice?: (target: NoticeTarget) => void;
 }) {
   const role: PortalRole = access.role === "GUARDIAN" ? "GUARDIAN" : "STUDENT";
   const [tab, setTab] = useState<LearningTab>(pageFromUrl),
@@ -218,8 +225,27 @@ export function Portal({
   const page = pages[current] ?? pages.lessons!;
   function navigate(next: LearningTab) {
     setTab(next);
+    setPanelFocus(undefined);
     window.history.pushState({}, "", "/?view=" + next);
   }
+  // Bildirim bu öğrenciye aitse ilgili sekme açılır ve kayıt vurgulanır.
+  const [appliedFocus, setAppliedFocus] = useState(0),
+    [panelFocus, setPanelFocus] = useState<{ id: string | null; at: number }>();
+  if (
+    focus &&
+    focus.at !== appliedFocus &&
+    focus.workspaceId === access.id &&
+    focus.studentId === access.studentId
+  ) {
+    setAppliedFocus(focus.at);
+    setTab(focus.section);
+    setPanelFocus({ id: focus.itemId, at: focus.at });
+  }
+  // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
+  const focusedTab = panelFocus ? focus?.section : undefined;
+  useEffect(() => {
+    if (focusedTab) window.history.pushState({}, "", "/?view=" + focusedTab);
+  }, [focusedTab, appliedFocus]);
   return (
     <SidebarProvider
       style={{ "--sidebar-width": "15.5rem" } as React.CSSProperties}
@@ -310,7 +336,7 @@ export function Portal({
             <span className="crumb-current">{page.label}</span>
           </div>
           <div className="topbar-actions">
-            <AccountExtras />
+            <AccountExtras onOpen={onNotice} />
           </div>
         </header>
         <div className="page-body" id="main-content">
@@ -329,6 +355,7 @@ export function Portal({
             role={role}
             view={current}
             onTabs={setTabs}
+            focus={panelFocus}
           />
         </div>
       </main>

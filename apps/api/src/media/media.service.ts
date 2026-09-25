@@ -612,13 +612,12 @@ export class MediaService {
           ],
         );
         if (ready)
-          await notify(
-            tx,
-            mapping.workspace_id,
-            v.student_id,
-            "Ders videosu hazır",
-            v.title,
-          );
+          await notify(tx, mapping.workspace_id, v.student_id, {
+            title: "Ders videosu hazır",
+            body: v.title,
+            kind: "VIDEO",
+            targetId: v.id,
+          });
         return { received: true };
       },
     );

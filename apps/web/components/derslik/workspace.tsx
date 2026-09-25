@@ -1,6 +1,6 @@
 "use client";
 import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
-import { AccountExtras } from "./learning-panel";
+import { AccountExtras, type NoticeFocus } from "./learning-panel";
 import { ThemeToggle } from "@/components/account/theme-toggle";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
@@ -162,6 +162,8 @@ export default function Workspace({
   connected,
   onSignout,
   switcher,
+  focus,
+  onNotice,
 }: {
   displayName: string;
   connected: import("@derslik/api-client").Access;
@@ -170,6 +172,9 @@ export default function Workspace({
    *  position:fixed from the top of the viewport — anything rendered above it
    *  as a sibling is covered, taking keyboard focus out of sight with it. */
   switcher?: React.ReactNode;
+  /** Bildirimden açılacak yer ve bildirime tıklanınca çağrılan işlev. */
+  focus?: NoticeFocus | null;
+  onNotice?: (target: import("@derslik/contracts").NoticeTarget) => void;
 }) {
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
@@ -223,8 +228,36 @@ export default function Workspace({
   function navigate(v: View) {
     setView(v);
     setSearch("");
+    setHubFocus(null);
     window.history.pushState({}, "", "/?view=" + v);
   }
+  // Bildirim: ödev ve videolar kendi sayfalarında o öğrenciyle açılır;
+  // paylaşımlar öğrenci dosyasının "Öğrenme" sekmesinde. Prop değişince
+  // render sırasında uygulanır (React'in önerdiği "önceki değeri sakla" yolu).
+  const [appliedFocus, setAppliedFocus] = useState(0),
+    [hubFocus, setHubFocus] = useState<NoticeFocus | null>(null),
+    [notesFocus, setNotesFocus] = useState<NoticeFocus | null>(null);
+  if (
+    focus &&
+    focus.at !== appliedFocus &&
+    focus.workspaceId === connected.id
+  ) {
+    setAppliedFocus(focus.at);
+    if (focus.section === "notes") {
+      setNotesFocus(focus);
+      setStudentId(focus.studentId);
+    } else {
+      setView(focus.section);
+      setHubFocus(focus);
+      setSearch("");
+      setStudentId(null);
+    }
+  }
+  // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
+  const focusedView = hubFocus?.section;
+  useEffect(() => {
+    if (focusedView) window.history.pushState({}, "", "/?view=" + focusedView);
+  }, [focusedView, appliedFocus]);
   const mutate: Mutate = async (command, message) => {
     if (inFlight.current) return false;
     inFlight.current = true;
@@ -399,7 +432,9 @@ export default function Workspace({
             </span>
           </div>
           <div className="topbar-actions">
-            {connected && <AccountExtras workspaceId={connected.id} />}
+            {connected && (
+              <AccountExtras workspaceId={connected.id} onOpen={onNotice} />
+            )}
             <span className="workspace-tag">
               <span /> Yalnızca size özel
             </span>
@@ -531,6 +566,7 @@ export default function Workspace({
                   workspaceId={connected.id}
                   data={data}
                   view={view}
+                  focus={hubFocus}
                 />
               )}
               {view === "payments" && (
@@ -555,6 +591,7 @@ export default function Workspace({
         mutate={mutate}
         busy={busy}
         workspaceId={connected.id}
+        focus={notesFocus}
       />
       {modal && (
         <RecordDialog

@@ -324,7 +324,14 @@ export async function learningCases({
       });
       const inbox = (await ok("/v1/inbox", undefined, { auth: tokenStudent }))
         .data;
-      assert.ok(inbox.some((n) => n.title === "Ödev değerlendirildi"));
+      const reviewed = inbox.find((n) => n.title === "Ödev değerlendirildi");
+      // The notification names the assignment so clients can open it.
+      assert.equal(reviewed.kind, "REVIEW");
+      assert.equal(reviewed.targetId, assignment.id);
+      assert.equal(
+        reviewed.studentId,
+        submission.studentId ?? submission.student_id,
+      );
       await ok(`/v1/inbox/${inbox[0].id}/read`, {}, { auth: tokenStudent });
       assert.equal(
         (await ok(`/v1/inbox/${inbox[0].id}/read`, {}, { auth: tokenB })).data,

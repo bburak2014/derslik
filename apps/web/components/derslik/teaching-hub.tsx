@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { WorkspaceData } from "@derslik/contracts";
 import { Users } from "lucide-react";
-import { LearningPanel } from "./learning-panel";
+import { LearningPanel, type NoticeFocus } from "./learning-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -29,12 +29,20 @@ export function TeachingHub({
   workspaceId,
   data,
   view,
+  focus,
 }: {
   workspaceId: string;
   data: WorkspaceData;
   view: TeachingView;
+  /** Bildirimden gelindiyse o öğrenci seçilir, kayıt vurgulanır. */
+  focus?: NoticeFocus | null;
 }) {
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(focus?.studentId ?? ""),
+    [appliedFocus, setAppliedFocus] = useState(focus?.at ?? 0);
+  if (focus && focus.at !== appliedFocus) {
+    setAppliedFocus(focus.at);
+    setSelected(focus.studentId);
+  }
   const students = [...data.students].sort(
     (a, b) =>
       Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, "tr"),
@@ -89,6 +97,11 @@ export function TeachingHub({
         workspaceId={workspaceId}
         studentId={student.id}
         view={view}
+        focus={
+          focus?.studentId === student.id
+            ? { id: focus.itemId, at: focus.at }
+            : undefined
+        }
       />
     </section>
   );

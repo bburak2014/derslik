@@ -2557,6 +2557,16 @@
   .auth-story-label {
     color: var(--marker);
   }
+  /* Bildirimden açılan kayıt: fosforlu kalemle kısa bir işaret. */
+  [data-notice-target] {
+    scroll-margin-block: 6rem;
+    transition: box-shadow 0.4s ease;
+  }
+  [data-notice-target][data-highlight="true"] {
+    box-shadow:
+      0 0 0 2px var(--marker),
+      0 0 0 6px color-mix(in oklab, var(--marker) 28%, transparent);
+  }
 }
 
 /* ==================================================================

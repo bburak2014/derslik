@@ -54,8 +54,10 @@ import {
 import {
   LearningScreen,
   Inbox,
+  type NoticeFocus,
   type TeachingView,
 } from "./LearningScreen";
+import type { NoticeTarget } from "@derslik/contracts";
 const dateTime = (day: string, time: string) => {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
@@ -69,9 +71,14 @@ const dateTime = (day: string, time: string) => {
 export function TeacherScreen({
   access,
   onAccount,
+  focus,
+  onNotice,
 }: {
   access: Access;
   onAccount: () => void;
+  /** Bildirimden açılacak yer ve bildirime dokununca çağrılan işlev. */
+  focus?: NoticeFocus | null;
+  onNotice?: (target: NoticeTarget) => void;
 }) {
   const { colors, styles, section } = useTheme();
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
@@ -89,7 +96,27 @@ export function TeacherScreen({
     [day, setDay] = useState(dateKey()),
     [form, setForm] = useState<FormSpec | null>(null),
     [busy, setBusy] = useState(false),
-    [unread, setUnread] = useState(0);
+    [unread, setUnread] = useState(0),
+    // Bildirim: ödev ve videolar Öğretim sekmesinde o öğrenciyle, paylaşımlar
+    // öğrencinin öğrenme alanında açılır (web ile aynı kural).
+    [appliedFocus, setAppliedFocus] = useState(0),
+    [teachingFocus, setTeachingFocus] = useState<NoticeFocus | null>(null),
+    [learningFocus, setLearningFocus] = useState<NoticeFocus | null>(null);
+  if (focus && focus.at !== appliedFocus && focus.workspaceId === access.id) {
+    setAppliedFocus(focus.at);
+    if (focus.section === "notes") {
+      setSelected(focus.studentId);
+      setLearning(true);
+      setLearningFocus(focus);
+    } else {
+      setSelected(null);
+      setLearning(false);
+      setTab("teaching");
+      setTeachingView(focus.section);
+      setTeachingStudent(focus.studentId);
+      setTeachingFocus(focus);
+    }
+  }
   const inFlight = useRef(false);
   // Zildeki sayaç için bildirimler sessizce alınır (web ile aynı); hata olursa
   // zil sayaçsız kalır. Bildirimler sekmesinden çıkınca yeniden sayılır.
@@ -521,7 +548,11 @@ export function TeacherScreen({
         access={access}
         studentId={student.id}
         studentName={student.name}
-        onBack={() => setLearning(false)}
+        onBack={() => {
+          setLearning(false);
+          setLearningFocus(null);
+        }}
+        focus={learningFocus}
       />
     );
   const balance = (id?: string) =>
@@ -634,7 +665,10 @@ export function TeacherScreen({
               <Picker
                 label="Öğrenci"
                 value={chosen.id}
-                onChange={setTeachingStudent}
+                onChange={(id) => {
+                  setTeachingStudent(id);
+                  setTeachingFocus(null);
+                }}
                 options={roster.map((x) => ({
                   value: x.id,
                   label: x.name + (x.active ? "" : " · Arşivde"),
@@ -644,7 +678,10 @@ export function TeacherScreen({
               <Segmented
                 label="Bölüm"
                 value={teachingView}
-                onChange={(value) => setTeachingView(value as TeachingView)}
+                onChange={(value) => {
+                  setTeachingView(value as TeachingView);
+                  setTeachingFocus(null);
+                }}
                 options={[
                   {
                     value: "assignments",
@@ -663,6 +700,7 @@ export function TeacherScreen({
               studentName={chosen.name}
               onBack={onAccount}
               view={teachingView}
+              focus={teachingFocus}
             />
           </>
         )}
@@ -1254,7 +1292,11 @@ export function TeacherScreen({
             })}
           </>
         ) : (
-          <Inbox workspaceId={access.id} onUnread={setUnread} />
+          <Inbox
+            workspaceId={access.id}
+            onUnread={setUnread}
+            onOpen={onNotice}
+          />
         )}
       </ScrollView>
       {tabBar}

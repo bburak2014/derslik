@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { Access } from "@derslik/api-client";
+import type { NoticeTarget } from "@derslik/contracts";
+import type { NoticeFocus } from "@/components/derslik/learning-panel";
 import { ApiError } from "@derslik/api-client";
 import Workspace from "@/components/derslik/workspace";
 import { AuthForm } from "./auth-form";
@@ -35,7 +37,9 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [unauthorized, setUnauthorized] = useState(false),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    // Bildirimden açılacak yer; görünüm değişse de yeni görünüm bunu alır.
+    [focus, setFocus] = useState<NoticeFocus | null>(null);
   const reload = useCallback(async () => {
     try {
       setSession(await webRequest("/api/session"));
@@ -201,6 +205,34 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
     );
   const active = session.active,
     key = (a: Access) => `${a.id}:${a.role}:${a.studentId || ""}`;
+  // Bildirim başka bir çalışma alanına (ör. velinin ikinci çocuğu) aitse önce
+  // o görünüme geçilir, sonra ilgili sayfa açılır.
+  async function openNotice(target: NoticeTarget) {
+    const fits = (a: Access) =>
+      a.id === target.workspaceId &&
+      (a.role === "OWNER" || a.studentId === target.studentId);
+    const next = fits(active)
+      ? active
+      : session!.list.find((a) => fits(a) && a.role === "OWNER") ||
+        session!.list.find(fits);
+    if (!next) {
+      setError("Bu bildirimin ait olduğu alana artık erişiminiz yok.");
+      return;
+    }
+    if (next !== active) {
+      setBusy(true);
+      try {
+        await webRequest("/api/session", { key: key(next) });
+        await reload();
+      } catch (e) {
+        setError((e as Error).message);
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    setFocus({ ...target, at: Date.now() });
+  }
   const switcher =
     session.list.length > 1 || error ? (
       <div className="workspace-switcher">
@@ -217,6 +249,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
               disabled={busy}
               onValueChange={async (value) => {
                 setBusy(true);
+                setFocus(null);
                 try {
                   await webRequest("/api/session", { key: value });
                   await reload();
@@ -264,6 +297,8 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       connected={active}
       onSignout={() => void signout()}
       switcher={switcher}
+      focus={focus}
+      onNotice={(t) => void openNotice(t)}
     />
   ) : (
     <Portal
@@ -272,6 +307,8 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       displayName={session.user.email.split("@")[0]}
       switcher={switcher}
       onSignout={() => void signout()}
+      focus={focus}
+      onNotice={(t) => void openNotice(t)}
     />
   );
 }

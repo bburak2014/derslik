@@ -91,21 +91,44 @@ const schema = z.discriminatedUnion("action", [
   }),
 ]);
 
+/** Records a notification is about; clients map these to a screen. */
+export type NoticeKind =
+  | "ASSIGNMENT"
+  | "SUBMISSION"
+  | "REVIEW"
+  | "VIDEO"
+  | "QUESTION"
+  | "ANSWER"
+  | "SUMMARY";
+
 export async function notify(
   tx: PoolClient,
   ws: string,
   student: string,
-  title: string,
-  message: string,
-  ownerOnly = false,
+  notice: {
+    title: string;
+    body: string;
+    kind: NoticeKind;
+    /** The assignment, video or summary the notification opens. */
+    targetId: string;
+    ownerOnly?: boolean;
+  },
 ) {
   await tx.query(
-    `INSERT INTO derslik.notifications(workspace_id,user_id,student_id,title,body)
- SELECT $1,recipient,$2,$3,$4 FROM (
+    `INSERT INTO derslik.notifications(workspace_id,user_id,student_id,title,body,kind,target_id)
+ SELECT $1,recipient,$2,$3,$4,$6,$7 FROM (
   SELECT owner_id AS recipient FROM derslik.workspaces WHERE id=$1
   UNION SELECT user_id FROM derslik.portal_links WHERE workspace_id=$1 AND student_id=$2 AND revoked_at IS NULL AND NOT $5
  ) recipients WHERE recipient<>derslik.actor_id()`,
-    [ws, student, title, message, ownerOnly],
+    [
+      ws,
+      student,
+      notice.title,
+      notice.body,
+      notice.ownerOnly ?? false,
+      notice.kind,
+      notice.targetId,
+    ],
   );
 }
 
@@ -229,7 +252,12 @@ export class LearningService {
               [ws, student, c.title, c.instructions, c.dueOn],
             )
           ).rows[0];
-          await notify(tx, ws, student, "Yeni ödev", c.title);
+          await notify(tx, ws, student, {
+            title: "Yeni ödev",
+            body: c.title,
+            kind: "ASSIGNMENT",
+            targetId: data.id,
+          });
           return { data };
         }
         if (c.action === "assignment.update") {
@@ -294,16 +322,15 @@ export class LearningService {
               [ws, student, c.assignmentId, actor.id, c.body],
             )
           ).rows[0];
-          await notify(
-            tx,
-            ws,
-            student,
-            previous ? "Ödev teslimi güncellendi" : "Ödev teslim edildi",
-            previous
+          await notify(tx, ws, student, {
+            title: previous ? "Ödev teslimi güncellendi" : "Ödev teslim edildi",
+            body: previous
               ? "Öğrenci teslimini güncelledi; yeni hâlini inceleyebilirsiniz."
               : "Yeni teslimi inceleyebilirsiniz.",
-            true,
-          );
+            kind: "SUBMISSION",
+            targetId: data.assignment_id,
+            ownerOnly: true,
+          });
           return { data };
         }
         if (c.action === "assignment.review") {
@@ -317,13 +344,12 @@ export class LearningService {
             throw new ConflictException(
               "Teslim bulunamadı veya sürümü değişti.",
             );
-          await notify(
-            tx,
-            ws,
-            student,
-            "Ödev değerlendirildi",
-            "Öğretmeniniz geri bildirim ekledi.",
-          );
+          await notify(tx, ws, student, {
+            title: "Ödev değerlendirildi",
+            body: "Öğretmeniniz geri bildirim ekledi.",
+            kind: "REVIEW",
+            targetId: data.assignment_id,
+          });
           return { data };
         }
         if (c.action === "note.publish") {
@@ -354,14 +380,13 @@ export class LearningService {
                 [ws, student, c.videoId, actor.id, c.atSeconds, c.body],
               )
             ).rows[0];
-            await notify(
-              tx,
-              ws,
-              student,
-              "Videoda yeni soru",
-              "Zaman damgalı soruyu yanıtlayabilirsiniz.",
-              true,
-            );
+            await notify(tx, ws, student, {
+              title: "Videoda yeni soru",
+              body: "Zaman damgalı soruyu yanıtlayabilirsiniz.",
+              kind: "QUESTION",
+              targetId: c.videoId,
+              ownerOnly: true,
+            });
             return { data };
           }
           const data = (
@@ -381,13 +406,12 @@ export class LearningService {
           ).rows[0];
           if (!data)
             throw new ConflictException("Soru bulunamadı veya sürümü değişti.");
-          await notify(
-            tx,
-            ws,
-            student,
-            "Sorunuz yanıtlandı",
-            "Video sorunuzun yanıtını görebilirsiniz.",
-          );
+          await notify(tx, ws, student, {
+            title: "Sorunuz yanıtlandı",
+            body: "Video sorunuzun yanıtını görebilirsiniz.",
+            kind: "ANSWER",
+            targetId: data.video_id,
+          });
           return { data };
         }
         if (c.action === "summary.draft") {
@@ -422,13 +446,12 @@ export class LearningService {
         ).rows[0];
         if (!data)
           throw new ConflictException("Özet bulunamadı veya sürümü değişti.");
-        await notify(
-          tx,
-          ws,
-          student,
-          "Haftalık özetiniz hazır",
-          "Öğretmeniniz haftalık özeti paylaştı.",
-        );
+        await notify(tx, ws, student, {
+          title: "Haftalık özetiniz hazır",
+          body: "Öğretmeniniz haftalık özeti paylaştı.",
+          kind: "SUMMARY",
+          targetId: data.id,
+        });
         return { data };
       },
       portal
