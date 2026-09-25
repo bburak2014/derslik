@@ -1,17 +1,21 @@
 "use client";
 import { Subscription } from "@/components/account/subscription";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   uploadTus,
-  type Access,
   type LearningData,
   type PortalData,
   type Video,
   type Material,
 } from "@derslik/api-client";
-import { money, dayLabel, dateKey } from "@derslik/contracts";
+import {
+  money,
+  dayLabel,
+  dateKey,
+  addDays,
+  timeLabel,
+} from "@derslik/contracts";
 import { backend } from "@/lib/client";
-import { ThemeToggle } from "@/components/account/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Bell,
@@ -25,7 +29,6 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
-  LogOut,
   Mail,
   MessageSquare,
   NotebookPen,
@@ -286,6 +289,18 @@ function ConfirmDialog({
   );
 }
 
+/** Panel sekmeleri. Öğretmen sayfaları ve öğrenci/veli portalı sekmeyi
+ *  dışarıdan `view` ile seçer; o zaman panel kendi sekme şeridini çizmez. */
+export type LearningTab =
+  | "lessons"
+  | "assignments"
+  | "files"
+  | "videos"
+  | "notes"
+  | "payments"
+  | "access";
+export type LearningTabInfo = { id: LearningTab; title: string };
+
 export function LearningPanel({
   workspaceId,
   studentId,
@@ -293,6 +308,7 @@ export function LearningPanel({
   studentPhone,
   role = "OWNER",
   view,
+  onTabs,
   initialTab,
   autoInvite = false,
 }: {
@@ -301,7 +317,10 @@ export function LearningPanel({
   studentName?: string;
   studentPhone?: string;
   role?: "OWNER" | "STUDENT" | "GUARDIAN";
-  view?: "assignments" | "files" | "videos";
+  view?: LearningTab;
+  /** İzin verilen sekmeler değiştikçe çağrılır; portalın sol menüsü bunları
+   *  listeler. */
+  onTabs?: (tabs: LearningTabInfo[]) => void;
   /** Açılışta seçili gelecek sekme (öğrenci panelindeki kısayollar için). */
   initialTab?: string;
   /** Açılışta davet formu doğrudan açılsın mı. */
@@ -527,21 +546,41 @@ export function LearningPanel({
       setBusy(false);
     }
   }
-  const tabs = [
-    ...(owner
-      ? []
-      : [{ id: "lessons", title: "Dersler", permission: "lessons" }]),
-    { id: "assignments", title: "Ödevler", permission: "assignments" },
-    { id: "files", title: "PDF ve dosyalar", permission: "assignments" },
-    { id: "videos", title: "Videolar", permission: "videos" },
-    { id: "notes", title: "Paylaşımlar", permission: "notes" },
-    ...(owner
-      ? [{ id: "access", title: "Davetler", permission: "lessons" }]
-      : [{ id: "payments", title: "Paket ve bakiye", permission: "payments" }]),
-  ].filter((t) => permissions.includes(t.permission));
+  const permissionKey = permissions.join(",");
+  const tabs = useMemo(() => {
+    const allowed = permissionKey.split(",");
+    const all: (LearningTabInfo & { permission: string })[] = [
+      ...(owner
+        ? []
+        : [
+            {
+              id: "lessons" as const,
+              title: "Dersler",
+              permission: "lessons",
+            },
+          ]),
+      { id: "assignments", title: "Ödevler", permission: "assignments" },
+      { id: "files", title: "PDF ve dosyalar", permission: "assignments" },
+      { id: "videos", title: "Videolar", permission: "videos" },
+      { id: "notes", title: "Paylaşımlar", permission: "notes" },
+      ...(owner
+        ? [{ id: "access" as const, title: "Davetler", permission: "lessons" }]
+        : [
+            {
+              id: "payments" as const,
+              title: "Paket ve bakiye",
+              permission: "payments",
+            },
+          ]),
+    ];
+    return all.filter((t) => allowed.includes(t.permission));
+  }, [owner, permissionKey]);
   useEffect(() => {
     if (tabs.length && !tabs.some((t) => t.id === tab)) setTab(tabs[0].id);
-  }, [permissions.join(","), tab]);
+  }, [tabs, tab]);
+  useEffect(() => {
+    onTabs?.(tabs.map(({ id, title }) => ({ id, title })));
+  }, [onTabs, tabs]);
   if (loading)
     return (
       <div className="learning-panel">
@@ -612,48 +651,9 @@ export function LearningPanel({
           </Alert>
         )}
       {tab === "lessons" && "lessons" in data && (
-        <ItemGroup className="gap-3">
-          {data.lessons.length ? (
-            data.lessons.map((l) => (
-              <Item variant="outline" className="bg-card" key={l.id}>
-                <ItemMedia variant="icon">
-                  <CalendarDays />
-                </ItemMedia>
-                <ItemContent className="min-w-36">
-                  <ItemTitle>{l.topic}</ItemTitle>
-                  <ItemDescription>
-                    {dayLabel(l.starts_at, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    · {l.location || "Konum belirtilmedi"}
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions className="ml-auto">
-                  <ToneBadge
-                    tone={
-                      l.status === "SCHEDULED"
-                        ? "info"
-                        : l.status === "COMPLETED"
-                          ? "ok"
-                          : "muted"
-                    }
-                  >
-                    {l.status === "SCHEDULED"
-                      ? "Planlandı"
-                      : l.status === "COMPLETED"
-                        ? "Tamamlandı"
-                        : "İptal edildi"}
-                  </ToneBadge>
-                </ItemActions>
-              </Item>
-            ))
-          ) : (
-            <EmptyNote icon={CalendarDays} title="Henüz ders yok">
-              Planlanan dersleriniz burada görünecek.
-            </EmptyNote>
-          )}
-        </ItemGroup>
+        <LessonSchedule lessons={data.lessons}>
+          {view && refresh}
+        </LessonSchedule>
       )}
       {tab === "assignments" && (
         <>
@@ -1532,58 +1532,69 @@ export function LearningPanel({
         </>
       )}
       {tab === "payments" && "packages" in data && (
-        <ItemGroup className="gap-3">
-          <Card className="gap-1 py-5">
-            <CardHeader className="px-5">
-              <CardDescription>Açık bakiye</CardDescription>
-              <CardTitle className="text-2xl tabular-nums">
-                {money(
-                  data.packages.reduce((n, p) => n + Number(p.price_minor), 0) -
-                    data.payments
-                      .filter((p) => !p.voided_at)
-                      .reduce((n, p) => n + Number(p.amount_minor), 0),
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-muted-foreground px-5 text-sm">
-              Öğretmeninizin kaydettiği paket ve tahsilatlara göre.
-            </CardContent>
-          </Card>
-          {data.packages.map((p) => (
-            <Item variant="outline" className="bg-card" key={p.id}>
-              <ItemMedia variant="icon">
-                <Package />
-              </ItemMedia>
-              <ItemContent className="min-w-36">
-                <ItemTitle>{p.name}</ItemTitle>
-                <ItemDescription>
-                  {p.remaining} / {p.granted} ders hakkı ·{" "}
-                  {money(p.price_minor)}
-                </ItemDescription>
-              </ItemContent>
-            </Item>
-          ))}
-          {data.payments.map((p) => (
-            <Item variant="outline" className="bg-card" key={p.id}>
-              <ItemMedia variant="icon">
-                <Wallet />
-              </ItemMedia>
-              <ItemContent className="min-w-36">
-                <ItemTitle className="tabular-nums">
-                  {money(p.amount_minor)}
-                </ItemTitle>
-                <ItemDescription>
-                  {dayLabel(p.received_on + "T12:00:00+03:00")}
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions className="ml-auto">
-                <ToneBadge tone={p.voided_at ? "muted" : "ok"}>
-                  {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
-                </ToneBadge>
-              </ItemActions>
-            </Item>
-          ))}
-        </ItemGroup>
+        <>
+          <SectionHeading
+            title="Paket ve ödemeler"
+            description="Ders hakları, açık bakiye ve kayıtlı ödemeler."
+          >
+            {view && refresh}
+          </SectionHeading>
+          <ItemGroup className="gap-3">
+            <Card className="gap-1 py-5">
+              <CardHeader className="px-5">
+                <CardDescription>Açık bakiye</CardDescription>
+                <CardTitle className="text-2xl tabular-nums">
+                  {money(
+                    data.packages.reduce(
+                      (n, p) => n + Number(p.price_minor),
+                      0,
+                    ) -
+                      data.payments
+                        .filter((p) => !p.voided_at)
+                        .reduce((n, p) => n + Number(p.amount_minor), 0),
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground px-5 text-sm">
+                Öğretmeninizin kaydettiği paket ve tahsilatlara göre.
+              </CardContent>
+            </Card>
+            {data.packages.map((p) => (
+              <Item variant="outline" className="bg-card" key={p.id}>
+                <ItemMedia variant="icon">
+                  <Package />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle>{p.name}</ItemTitle>
+                  <ItemDescription>
+                    {p.remaining} / {p.granted} ders hakkı ·{" "}
+                    {money(p.price_minor)}
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
+            ))}
+            {data.payments.map((p) => (
+              <Item variant="outline" className="bg-card" key={p.id}>
+                <ItemMedia variant="icon">
+                  <Wallet />
+                </ItemMedia>
+                <ItemContent className="min-w-36">
+                  <ItemTitle className="tabular-nums">
+                    {money(p.amount_minor)}
+                  </ItemTitle>
+                  <ItemDescription>
+                    {dayLabel(p.received_on + "T12:00:00+03:00")}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions className="ml-auto">
+                  <ToneBadge tone={p.voided_at ? "muted" : "ok"}>
+                    {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
+                  </ToneBadge>
+                </ItemActions>
+              </Item>
+            ))}
+          </ItemGroup>
+        </>
       )}
       {tab === "access" && owner && (
         <>
@@ -1867,49 +1878,6 @@ export function LearningPanel({
     </section>
   );
 }
-export function Portal({
-  access,
-  switcher,
-  onSignout,
-}: {
-  access: Access;
-  switcher?: React.ReactNode;
-  onSignout?: () => void;
-}) {
-  return (
-    <main className="portal-page">
-      <header className="portal-header">
-        <div>
-          <p className="eyebrow">
-            {access.role === "STUDENT"
-              ? "ÖĞRENCİ ÇALIŞMA ALANI"
-              : "VELİ TAKİP ALANI"}
-          </p>
-          <h1>{access.studentName}</h1>
-          <p>Her ders, yeni bir adım.</p>
-        </div>
-        <div className="portal-account">
-          {switcher}
-          <div className="portal-account-actions">
-            <ThemeToggle />
-            <AccountExtras />
-            {onSignout && (
-              <Button type="button" variant="outline" onClick={onSignout}>
-                <LogOut /> Çıkış yap
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-      <LearningPanel
-        workspaceId={access.id}
-        studentId={access.studentId!}
-        role={access.role as "STUDENT" | "GUARDIAN"}
-      />
-    </main>
-  );
-}
-
 /** Seçimsiz "genel" seçenek. Radix Select boş değeri "seçim yok" sayıp
  *  tetikleyiciyi boş bıraktığı için ayrı bir değerle temsil ediliyor. */
 const GENERAL = "general";
@@ -1933,6 +1901,166 @@ function SectionHeading({
         <div className="flex shrink-0 items-center gap-2">{children}</div>
       )}
     </div>
+  );
+}
+
+type PortalLesson = PortalData["lessons"][number];
+
+/** Öğrenci/veli ders planı. Önce yaklaşan dersler gelir, en yakını üstte ve
+ *  fosforlu; sonra geçmiş dersler, en yenisi üstte. */
+function LessonSchedule({
+  lessons,
+  children,
+}: {
+  lessons: PortalLesson[];
+  /** Başlığın yanındaki düğmeler (yenile). */
+  children?: React.ReactNode;
+}) {
+  // Süren dersi ve "bugün/yarın" etiketini güncel tutmak için dakikada bir
+  // ilerleyen saat; öğretmen günlüğündeki ders satırlarıyla aynı yaklaşım.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const upcoming = lessons
+    .filter((l) => l.status === "SCHEDULED" && Date.parse(l.ends_at) > clock)
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const past = lessons
+    .filter((l) => !upcoming.includes(l))
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  const today = dateKey(new Date(clock)),
+    tomorrow = addDays(today, 1);
+  const day = (iso: string) => {
+    const key = dateKey(iso);
+    return key === today
+      ? "Bugün"
+      : key === tomorrow
+        ? "Yarın"
+        : dayLabel(iso, { weekday: "long" });
+  };
+  if (!lessons.length)
+    return (
+      <>
+        <SectionHeading
+          title="Ders planı"
+          description="Planlanan ve tamamlanan dersler burada listelenir."
+        >
+          {children}
+        </SectionHeading>
+        <EmptyNote icon={CalendarDays} title="Henüz ders yok">
+          Planlanan dersler burada görünecek.
+        </EmptyNote>
+      </>
+    );
+  return (
+    <>
+      <SectionHeading
+        title="Yaklaşan dersler"
+        description="En yakın ders en üstte."
+      >
+        {children}
+      </SectionHeading>
+      <ItemGroup className="gap-3">
+        {upcoming.length ? (
+          upcoming.map((l, i) => (
+            <LessonItem
+              key={l.id}
+              lesson={l}
+              day={day(l.starts_at)}
+              chip={
+                i > 0
+                  ? undefined
+                  : Date.parse(l.starts_at) <= clock
+                    ? "Şimdi"
+                    : "Sıradaki"
+              }
+            />
+          ))
+        ) : (
+          <EmptyNote icon={CalendarDays} title="Yaklaşan ders yok">
+            Yeni bir ders planlandığında burada görünecek.
+          </EmptyNote>
+        )}
+      </ItemGroup>
+      {past.length > 0 && (
+        <>
+          <SectionHeading
+            title="Geçmiş dersler"
+            description="Tamamlanan ve iptal edilen dersler, en yenisi üstte."
+          />
+          <ItemGroup className="gap-3">
+            {past.map((l) => (
+              <LessonItem key={l.id} lesson={l} day={day(l.starts_at)} status />
+            ))}
+          </ItemGroup>
+        </>
+      )}
+    </>
+  );
+}
+
+function LessonItem({
+  lesson: l,
+  day,
+  chip,
+  status = false,
+}: {
+  lesson: PortalLesson;
+  day: string;
+  /** Sıradaki ya da süren ders: kart fosforlu, yanında bu etiket. */
+  chip?: string;
+  /** Geçmiş derslerde durum rozeti; yaklaşanların hepsi zaten planlı. */
+  status?: boolean;
+}) {
+  return (
+    <Item
+      variant="outline"
+      className={chip ? "border-(--marker) bg-(--marker-soft)" : "bg-card"}
+    >
+      <ItemMedia
+        variant="icon"
+        className={
+          chip ? "border-(--marker) bg-(--marker) text-(--marker-ink)" : ""
+        }
+      >
+        <CalendarDays />
+      </ItemMedia>
+      <ItemContent className="min-w-36">
+        <ItemTitle>{l.topic}</ItemTitle>
+        {/* Ayraç önceki parçaya bağlı kalsın; dar ekranda satır "·" ile
+            başlamasın. */}
+        <ItemDescription>
+          {day}
+          {"\u00a0· "}
+          {timeLabel(l.starts_at)}–{timeLabel(l.ends_at)}
+          {"\u00a0· "}
+          {l.location || "Konum belirtilmedi"}
+        </ItemDescription>
+      </ItemContent>
+      {(chip || status) && (
+        <ItemActions className="ml-auto">
+          {chip && <span className="now-chip">{chip}</span>}
+          {status && (
+            <ToneBadge
+              tone={
+                l.status === "SCHEDULED"
+                  ? "info"
+                  : l.status === "COMPLETED"
+                    ? "ok"
+                    : "muted"
+              }
+            >
+              {l.status === "SCHEDULED"
+                ? "Planlandı"
+                : l.status === "COMPLETED"
+                  ? "Tamamlandı"
+                  : "İptal edildi"}
+            </ToneBadge>
+          )}
+        </ItemActions>
+      )}
+    </Item>
   );
 }
 

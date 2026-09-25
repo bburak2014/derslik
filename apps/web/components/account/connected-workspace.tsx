@@ -5,7 +5,7 @@ import { ApiError } from "@derslik/api-client";
 import Workspace from "@/components/derslik/workspace";
 import { AuthForm } from "./auth-form";
 import { backend, webRequest } from "@/lib/client";
-import { Portal } from "@/components/derslik/learning-panel";
+import { Portal } from "@/components/derslik/portal";
 import { PageLoader, Spinner } from "@/components/derslik/loading";
 import { FormError } from "@/components/derslik/feedback";
 import { Button } from "@/components/ui/button";
@@ -269,6 +269,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
     <Portal
       key={key(active)}
       access={active}
+      displayName={session.user.email.split("@")[0]}
       switcher={switcher}
       onSignout={() => void signout()}
     />
