@@ -1952,7 +1952,12 @@ export function Picker({
   placeholder = t("common.choose"),
 }: {
   value: string;
-  options: { value: string; label: string; hint?: string }[];
+  options: {
+    value: string;
+    label: string;
+    hint?: string;
+    icon?: React.ReactNode;
+  }[];
   onChange: (value: string) => void;
   label?: string;
   placeholder?: string;
@@ -1982,6 +1987,7 @@ export function Picker({
           pressed && styles.inputFocused,
         ]}
       >
+        {selected?.icon}
         <Text
           numberOfLines={1}
           style={[
@@ -2054,6 +2060,7 @@ export function Picker({
                       (pressed || on) && { backgroundColor: colors.sunken },
                     ]}
                   >
+                    {o.icon}
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.text, on && { color: colors.ink }]}>
                         {o.label}

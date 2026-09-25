@@ -1,5 +1,4 @@
 "use client";
-import { Languages } from "lucide-react";
 import {
   LOCALE_COOKIE,
   getLocale,
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Flag } from "./flag";
 
 // Seçim bir yıl çerezde durur; sunucu bir sonraki sayfada bu dille çizer.
 // Bütün metinler yeniden üretilsin diye sayfa yenilenir.
@@ -34,14 +34,12 @@ export function LanguageSelect({ className = "" }: { className?: string }) {
         className={cn("w-full", className)}
         aria-label={t("common.language")}
       >
-        <span className="flex items-center gap-2">
-          <Languages aria-hidden="true" />
-          <SelectValue />
-        </span>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {locales.map((locale) => (
           <SelectItem key={locale} value={locale} lang={locale}>
+            <Flag locale={locale} />
             {localeNames[locale]}
           </SelectItem>
         ))}
