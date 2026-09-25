@@ -95,11 +95,14 @@ export function PortalScreen({
   onAccount,
   focus,
   onNotice,
+  onDiscover,
 }: {
   access: Access;
   onAccount: () => void;
   focus?: NoticeFocus | null;
   onNotice?: (target: NoticeTarget) => void;
+  /** Öğretmen vitrinini açar (yalnızca öğrenci). */
+  onDiscover?: () => void;
 }) {
   return (
     <LearningScreen
@@ -109,6 +112,7 @@ export function PortalScreen({
       onBack={onAccount}
       focus={focus}
       onNotice={onNotice}
+      onDiscover={access.role === "STUDENT" ? onDiscover : undefined}
     />
   );
 }
@@ -151,6 +155,7 @@ export function LearningScreen({
   view,
   focus,
   onNotice,
+  onDiscover,
 }: {
   access: Access;
   studentId: string;
@@ -164,6 +169,7 @@ export function LearningScreen({
   focus?: NoticeFocus | null;
   /** Bildirimler sekmesinde bir bildirime dokunulunca. */
   onNotice?: (target: NoticeTarget) => void;
+  onDiscover?: () => void;
 }) {
   const { colors, styles, section } = useTheme();
   const owner = access.role === "OWNER",
@@ -221,8 +227,11 @@ export function LearningScreen({
     focus.studentId === studentId
   ) {
     setAppliedFocus(focus.at);
-    if (!view) setTab(focus.section);
-    setHighlight(focus.itemId);
+    // İstek bildirimleri vitrin ekranlarına aittir; burada dersler açık kalır.
+    if (focus.section !== "requests" && focus.section !== "myRequests") {
+      if (!view) setTab(focus.section);
+      setHighlight(focus.itemId);
+    }
   }
   useEffect(() => {
     if (!highlight) return;
@@ -566,14 +575,26 @@ export function LearningScreen({
             <Brand />
           )}
           {!owner && (
-            <Button
-              secondary
-              size="sm"
-              icon="person-circle-outline"
-              onPress={onBack}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              {t("mt.myAccount")}
-            </Button>
+              {onDiscover && (
+                <IconButton
+                  ghost
+                  icon="search-outline"
+                  label={t("nav.findTeacher")}
+                  onPress={onDiscover}
+                />
+              )}
+              <Button
+                secondary
+                size="sm"
+                icon="person-circle-outline"
+                onPress={onBack}
+              >
+                {t("mt.myAccount")}
+              </Button>
+            </View>
           )}
         </View>
       )}

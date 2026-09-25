@@ -10,6 +10,7 @@ import { AuthScreen } from "./AuthScreen";
 import { authRoute, completeAuthLink } from "./oauth";
 import { TeacherScreen } from "./TeacherScreen";
 import { PortalScreen, type NoticeFocus } from "./LearningScreen";
+import { DirectoryScreen, type DirectoryTab } from "./DirectoryScreen";
 import { t, type NoticeTarget } from "@derslik/contracts";
 import { LanguagePicker, LocaleProvider } from "./i18n";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,7 +20,6 @@ import {
   Brand,
   Button,
   Card,
-  EmptyState,
   ErrorText,
   FormSheet,
   type FormSpec,
@@ -49,8 +49,44 @@ function Application() {
     [switching, setSwitching] = useState(false),
     // Bildirimden açılacak yer. Bildirim başka bir görünüme (ör. velinin
     // ikinci çocuğu) aitse önce o görünüme geçilir.
-    [focus, setFocus] = useState<NoticeFocus | null>(null);
+    [focus, setFocus] = useState<NoticeFocus | null>(null),
+    // Öğretmen vitrini (öğretmen bul / isteklerim); açıkken tüm ekranı alır.
+    [directory, setDirectory] = useState<{
+      tab: DirectoryTab;
+      at: number;
+    } | null>(null);
+  const openDirectory = (tab: DirectoryTab = "teachers") =>
+    setDirectory({ tab, at: Date.now() });
+  // Kabul edilen istekten sonra o öğretmenin öğrenci görünümü açılır. Bağlantı
+  // yeni kurulduğu için erişim listesi önce yenilenir.
+  const openWorkspace = async (workspaceId: string) => {
+    try {
+      const r = await request<{ data: Access[] }>("/access");
+      setAccess(r.data);
+      const next = r.data.find(
+        (a) => a.id === workspaceId && a.role !== "OWNER",
+      );
+      if (!next) {
+        setError(t("conn.noticeNoAccess"));
+        return;
+      }
+      setActive(next);
+      setFocus(null);
+      setDirectory(null);
+      setSwitching(false);
+      setInvite(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
   const openNotice = (target: NoticeTarget) => {
+    // Öğrencinin ders isteği yanıtı: kabul edildiyse o öğretmenin dersleri,
+    // edilmediyse isteklerim listesi.
+    if (target.section === "myRequests") {
+      if (target.studentId) void openWorkspace(target.workspaceId);
+      else openDirectory("requests");
+      return;
+    }
     const fits = (a: Access) =>
       a.id === target.workspaceId &&
       (a.role === "OWNER" || a.studentId === target.studentId);
@@ -162,6 +198,16 @@ function Application() {
       setError((e as Error).message);
     }
   }
+  const createWorkspace = () =>
+    setForm({
+      title: t("mobile.teacherWorkspace"),
+      fields: [{ key: "name", label: t("conn.workspaceName") }],
+      submit: async (v) => {
+        await request("/workspaces", { name: v.name });
+        await load();
+        setSwitching(false);
+      },
+    });
   const accountForm = () =>
     setForm({
       title: t("mobile.acceptInvite"),
@@ -206,6 +252,19 @@ function Application() {
   if (boot) return <Loading />;
   if (!session) return <AuthScreen />;
   if (reset) return <AuthScreen reset onDone={() => setReset(false)} />;
+  if (directory)
+    return (
+      <DirectoryScreen
+        key={directory.at}
+        tab={directory.tab}
+        onBack={() => {
+          setDirectory(null);
+          if (!active) return;
+          setSwitching(true);
+        }}
+        onOpenWorkspace={(ws) => void openWorkspace(ws)}
+      />
+    );
   if (!active || switching || invite)
     return (
       <SafeAreaView
@@ -232,12 +291,43 @@ function Application() {
               {t("common.retry")}
             </Button>
           )}
+          {/* Hesabı olmayan kişi yolunu seçer: öğretmen olarak başlar ya da
+              vitrinden öğretmen arar (web'deki seçim kartı). */}
           {!access.length && !error && (
-            <EmptyState
-              icon="briefcase-outline"
-              title={t("mobile.noWorkspace")}
-              description={t("mobile.noWorkspaceHint")}
-            />
+            <View style={{ gap: 10 }}>
+              <Text style={styles.h2}>{t("dir.welcomeTitle")}</Text>
+              <Text style={styles.muted}>{t("dir.welcomeText")}</Text>
+              {[
+                {
+                  icon: "easel-outline" as const,
+                  title: t("dir.imTeacher"),
+                  text: t("dir.imTeacherText"),
+                  onPress: () => createWorkspace(),
+                },
+                {
+                  icon: "search-outline" as const,
+                  title: t("dir.imStudent"),
+                  text: t("dir.imStudentText"),
+                  onPress: () => openDirectory(),
+                },
+              ].map((c) => (
+                <Card key={c.title} onPress={c.onPress}>
+                  <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
+                    <Ionicons name={c.icon} size={24} color={colors.brand} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.h2}>{c.title}</Text>
+                      <Text style={styles.muted}>{c.text}</Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={colors.faint}
+                    />
+                  </View>
+                </Card>
+              ))}
+              <Text style={styles.caption}>{t("dir.haveInvite")}</Text>
+            </View>
           )}
           {access.map((a) => (
             <Card
@@ -272,22 +362,18 @@ function Application() {
               </View>
             </Card>
           ))}
-          {!access.some((a) => a.role === "OWNER") && (
-            <Button
-              icon="add"
-              onPress={() =>
-                setForm({
-                  title: t("mobile.teacherWorkspace"),
-                  fields: [{ key: "name", label: t("conn.workspaceName") }],
-                  submit: async (v) => {
-                    await request("/workspaces", { name: v.name });
-                    await load();
-                    setSwitching(false);
-                  },
-                })
-              }
-            >
+          {!!access.length && !access.some((a) => a.role === "OWNER") && (
+            <Button icon="add" onPress={createWorkspace}>
               {t("conn.createWorkspace")}
+            </Button>
+          )}
+          {!!access.length && (
+            <Button
+              secondary
+              icon="search-outline"
+              onPress={() => openDirectory()}
+            >
+              {t("nav.findTeacher")}
             </Button>
           )}
           <Button secondary icon="mail-open-outline" onPress={accountForm}>
@@ -336,6 +422,7 @@ function Application() {
       onAccount={select}
       focus={focus}
       onNotice={openNotice}
+      onDiscover={() => openDirectory()}
     />
   );
 }

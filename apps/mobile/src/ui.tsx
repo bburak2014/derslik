@@ -15,6 +15,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   useColorScheme,
@@ -1802,6 +1803,113 @@ export function Segmented({
   );
 }
 
+/** Çoklu seçim çipleri (web'deki ToggleGroup type="multiple"). `max` dolunca
+ *  seçili olmayanlar kapanır. */
+export function ChipGroup({
+  options,
+  value,
+  onChange,
+  label,
+  max,
+}: {
+  options: { value: string; label: string }[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  label?: string;
+  max?: number;
+}) {
+  const { colors, type } = useTheme();
+  const full = max !== undefined && value.length >= max;
+  return (
+    <View
+      accessibilityLabel={label}
+      style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+    >
+      {options.map((o) => {
+        const on = value.includes(o.value),
+          disabled = !on && full;
+        return (
+          <Pressable
+            key={o.value}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: on, disabled }}
+            disabled={disabled}
+            onPress={() =>
+              onChange(
+                on ? value.filter((v) => v !== o.value) : [...value, o.value],
+              )
+            }
+            android_ripple={ripple()}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              minHeight: 36,
+              paddingHorizontal: 12,
+              borderRadius: radius.pill,
+              borderWidth: 1,
+              borderColor: on ? colors.brandLine : colors.lineControl,
+              backgroundColor: on
+                ? colors.brandSoft
+                : pressed
+                  ? colors.sunken
+                  : colors.surface,
+              opacity: disabled ? 0.45 : 1,
+            })}
+          >
+            {on && <Ionicons name="checkmark" size={14} color={colors.brand} />}
+            <Text
+              style={{
+                ...type.medium,
+                fontSize: 13.5,
+                color: on ? colors.ink : colors.text,
+              }}
+            >
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Aç/kapa anahtarı (shadcn Switch), etiketi ve açıklamasıyla bir satır. */
+export function Toggle({
+  label,
+  hint,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  hint?: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  const { colors, styles } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.label}>{label}</Text>
+        {!!hint && <Text style={styles.hint}>{hint}</Text>}
+      </View>
+      <Switch
+        accessibilityLabel={label}
+        value={value}
+        onValueChange={onChange}
+        disabled={disabled}
+        trackColor={{ false: colors.lineControl, true: colors.brand }}
+        thumbColor={colors.surface}
+        // react-native-web açık konumda kendi rengini kullanır.
+        {...{ activeThumbColor: colors.surface }}
+        ios_backgroundColor={colors.lineControl}
+      />
+    </View>
+  );
+}
+
 /** Yatay kayan sekme şeridi (shadcn TabsList, web'deki öğrenci penceresiyle
  *  aynı). Sekme sayısı ekrana sığmadığında kaydırılır. */
 export function TabStrip({
@@ -1819,7 +1927,12 @@ export function TabStrip({
       horizontal
       showsHorizontalScrollIndicator={false}
       accessibilityRole="tablist"
-      style={{ flexGrow: 0, marginHorizontal: 20, marginTop: 14 }}
+      style={{
+        flexGrow: 0,
+        flexShrink: 0,
+        marginHorizontal: 20,
+        marginTop: 14,
+      }}
       contentContainerStyle={[
         section.segmented,
         { flexWrap: "nowrap", flexGrow: 1 },
