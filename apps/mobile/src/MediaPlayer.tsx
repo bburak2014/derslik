@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Modal, ScrollView, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import type { Video } from "@derslik/api-client";
 import { request } from "./core";
-import { Button, ErrorText, useTheme } from "./ui";
+import { Button, ErrorText, Field, Input, Kicker, useTheme } from "./ui";
 export function MediaPlayer({
   video,
   path,
@@ -20,7 +21,7 @@ export function MediaPlayer({
   onClose: () => void;
   action: (body: unknown) => Promise<void>;
 }) {
-  const { colors, styles } = useTheme();
+  const { colors, styles, section } = useTheme();
   const player = useVideoPlayer(null, (p) => {
       p.timeUpdateEventInterval = 1;
     }),
@@ -88,23 +89,41 @@ export function MediaPlayer({
   }, [video.id, path, player]);
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.screen} edges={["top", "bottom", "left", "right"]}>
+      <SafeAreaView
+        style={[styles.screen, { backgroundColor: colors.surface }]}
+        edges={["top", "bottom", "left", "right"]}
+      >
+        <View style={section.sheetHeader}>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Kicker>Ders videosu</Kicker>
+            <Text style={section.sheetTitle} numberOfLines={2}>
+              {video.title}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Kapat"
+            onPress={onClose}
+            hitSlop={8}
+            style={({ pressed }) => [
+              section.close,
+              pressed && { backgroundColor: colors.line },
+            ]}
+          >
+            <Ionicons name="close" size={20} color={colors.ink} />
+          </Pressable>
+        </View>
         <ScrollView
           contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.row}>
-            <Text style={[styles.h2, { flex: 1 }]}>{video.title}</Text>
-            <Button secondary onPress={onClose}>
-              Kapat
-            </Button>
-          </View>
           <VideoView
             player={player}
             style={{
               width: "100%",
               aspectRatio: 16 / 9,
-              borderRadius: 12,
+              borderRadius: 14,
+              overflow: "hidden",
               backgroundColor: colors.playerSurface,
             }}
             nativeControls
@@ -112,9 +131,10 @@ export function MediaPlayer({
             allowsPictureInPicture
           />
           <ErrorText message={error} />
-          {canAsk && (
+          {canAsk && at === null && (
             <Button
               secondary
+              icon="help-circle-outline"
               onPress={() => {
                 player.pause();
                 setAt(
@@ -130,43 +150,55 @@ export function MediaPlayer({
           )}
           {at !== null && (
             <>
-              <Text style={styles.label}>
-                {Math.floor(at / 60)}:{String(at % 60).padStart(2, "0")} için
-                sorunuz
-              </Text>
-              <TextInput
-                multiline
-                style={[
-                  styles.input,
-                  { height: 120, textAlignVertical: "top" },
-                ]}
-                accessibilityLabel="Video sorusu"
-                value={question}
-                onChangeText={setQuestion}
-                maxLength={5000}
-              />
-              <Button
-                disabled={busy || !question.trim()}
-                onPress={async () => {
-                  setBusy(true);
-                  try {
-                    await actionRef.current({
-                      action: "question.create",
-                      videoId: video.id,
-                      atSeconds: at,
-                      body: question,
-                    });
-                    setQuestion("");
-                    setAt(null);
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
+              <Field
+                label={`${Math.floor(at / 60)}:${String(at % 60).padStart(2, "0")} için sorunuz`}
+                hint="Öğretmeniniz yanıtladığında bildirim alırsınız."
               >
-                Soruyu gönder
-              </Button>
+                <Input
+                  multiline
+                  accessibilityLabel="Video sorusu"
+                  value={question}
+                  onChangeText={setQuestion}
+                  maxLength={5000}
+                />
+              </Field>
+              <View style={styles.row}>
+                <Button
+                  secondary
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    setAt(null);
+                    setQuestion("");
+                  }}
+                >
+                  Vazgeç
+                </Button>
+                <Button
+                  icon="paper-plane-outline"
+                  loading={busy}
+                  disabled={busy || !question.trim()}
+                  style={{ flex: 2 }}
+                  onPress={async () => {
+                    setBusy(true);
+                    try {
+                      await actionRef.current({
+                        action: "question.create",
+                        videoId: video.id,
+                        atSeconds: at,
+                        body: question,
+                      });
+                      setQuestion("");
+                      setAt(null);
+                    } catch (e) {
+                      setError((e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Soruyu gönder
+                </Button>
+              </View>
             </>
           )}
         </ScrollView>

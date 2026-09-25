@@ -78,9 +78,24 @@ export async function availableProviders(): Promise<SocialProvider[]> {
     .filter((p) => body.external?.[p.id] === true)
     .map((p) => p.id);
 }
+// Supabase refuses a redirect address whose host is a bare IP other than
+// loopback, even when it is on the allow list, and quietly sends the browser to
+// the Site URL instead (docs/guncelleme-v6.md). Expo Go started on the LAN
+// builds exactly such an address, so stop before the browser opens.
+function unreachableRedirect(redirectTo: string) {
+  const ip = /^exp:\/\/(\d{1,3}(?:\.\d{1,3}){3})[:/]/.exec(redirectTo)?.[1];
+  return !!ip && !ip.startsWith("127.");
+}
+
 export async function socialSignIn(provider: SocialProvider) {
   if (!supabase) throw new Error("Giriş bağlantısı hazır değil.");
   const redirectTo = authRedirect("callback");
+  if (unreachableRedirect(redirectTo))
+    throw new Error(
+      "Expo Go yerel ağ adresiyle açıldığı için sosyal giriş uygulamaya dönemez. " +
+        'Telefonda "pnpm mobile:tunnel", simülatör veya emülatörde ' +
+        '"pnpm mobile:localhost" ile başlatın.',
+    );
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {

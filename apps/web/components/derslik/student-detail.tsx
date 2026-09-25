@@ -41,9 +41,11 @@ import {
   StudentAvatar,
   balanceFor,
   creditsFor,
+  CreditBadge,
   LessonRows,
   Empty,
 } from "./views";
+import { ToneBadge } from "./feedback";
 import type { Actions, Mutate } from "./workspace";
 
 function NoteEditor({
@@ -150,10 +152,10 @@ export function StudentDetail({
                   </SheetDescription>
                   <div className="flex gap-2 mt-2">
                     {!!student.is_sample && (
-                      <span className="sample-label">Örnek öğrenci</span>
+                      <ToneBadge tone="warn">Örnek öğrenci</ToneBadge>
                     )}
                     {!student.active && (
-                      <span className="subtle-badge">Arşivlendi</span>
+                      <ToneBadge tone="muted">Arşivlendi</ToneBadge>
                     )}
                   </div>
                 </div>
@@ -246,13 +248,23 @@ export function StudentDetail({
               key={student.id}
               className="detail-tabs"
             >
-              <TabsList className="mx-6 mt-5 flex flex-wrap h-auto">
-                <TabsTrigger value="packages">Paketler</TabsTrigger>
-                <TabsTrigger value="lessons">Dersler</TabsTrigger>
-                <TabsTrigger value="notes">Özel not</TabsTrigger>
-                <TabsTrigger value="history">Hareketler</TabsTrigger>
+              {/* Dar ekranda sekmeler alt satıra kırılmak yerine yana kayar;
+                  paneldeki diğer sekme şeritleriyle aynı davranış. */}
+              <TabsList className="mx-6 mt-5 max-w-[calc(100%-3rem)] shrink-0 justify-start overflow-x-auto">
+                <TabsTrigger value="packages" className="flex-none">
+                  Paketler
+                </TabsTrigger>
+                <TabsTrigger value="lessons" className="flex-none">
+                  Dersler
+                </TabsTrigger>
+                <TabsTrigger value="notes" className="flex-none">
+                  Özel not
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex-none">
+                  Hareketler
+                </TabsTrigger>
                 {workspaceId && (
-                  <TabsTrigger value="learning">
+                  <TabsTrigger value="learning" className="flex-none">
                     Ödev, PDF, video ve erişim
                   </TabsTrigger>
                 )}
@@ -283,18 +295,14 @@ export function StudentDetail({
                 {packages.length ? (
                   packages.map((p) => (
                     <div className="package-card" key={p.id}>
-                      <div className="flex justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3>{p.name}</h3>
                           <p>
                             {money(p.price_minor)} · {p.granted} ders
                           </p>
                         </div>
-                        <span
-                          className={`credit-pill ${p.remaining <= 2 ? "low" : ""}`}
-                        >
-                          {p.remaining} hak
-                        </span>
+                        <CreditBadge count={p.remaining} unit="hak" />
                       </div>
                       <Progress
                         value={(p.remaining / p.granted) * 100}
@@ -424,7 +432,7 @@ export function StudentDetail({
                 )}
               </TabsContent>
               {workspaceId && (
-                <TabsContent value="learning">
+                <TabsContent value="learning" className="detail-tab-content">
                   <LearningPanel
                     // Kısayoldan gelindiğinde panel yeniden kurulsun ki
                     // "Davetler" sekmesi ve form açılış anında gelsin.

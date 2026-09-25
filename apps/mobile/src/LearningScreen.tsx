@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Linking,
@@ -13,7 +7,6 @@ import {
   RefreshControl,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -31,20 +24,34 @@ import {
   type PortalData,
   type Video,
 } from "@derslik/api-client";
-import { dateKey, dayLabel, money } from "@derslik/contracts";
+import { dateKey, dayLabel, money, timeLabel } from "@derslik/contracts";
 import { request } from "./core";
 import {
+  Avatar,
   Badge,
+  type BadgeTone,
+  Brand,
   Button,
   Card,
   confirmAction,
+  DateTile,
+  EmptyState,
   ErrorText,
   FormSheet,
   type FormSpec,
-  type Palette,
   IconButton,
+  type IconName,
+  InkFigures,
+  InkPanel,
+  Kicker,
+  LessonStatus,
+  List,
+  ListRow,
   Loading,
-  radius,
+  Meter,
+  SectionHeading,
+  TabStrip,
+  TextLink,
   useTheme,
 } from "./ui";
 import { setStringAsync } from "expo-clipboard";
@@ -124,8 +131,7 @@ export function LearningScreen({
    *  ekranın kendi başlığı ve sekme şeridi çizilmez. */
   view?: TeachingView;
 }) {
-  const { colors, styles } = useTheme();
-  const pill = useMemo(() => makePill(colors), [colors]);
+  const { colors, styles, section } = useTheme();
   const owner = access.role === "OWNER",
     student = access.role === "STUDENT";
   const [capabilities, setCapabilities] = useState<{
@@ -425,75 +431,70 @@ export function LearningScreen({
     );
   }
   if (loading) return <Loading />;
+  const assignmentState = (
+    a: LearningData["assignments"][number],
+    sub?: LearningData["submissions"][number],
+  ): [BadgeTone, string] =>
+    a.status === "CANCELLED"
+      ? ["neutral", "İptal edildi"]
+      : a.status === "COMPLETED"
+        ? ["success", "Tamamlandı"]
+        : sub
+          ? sub.status === "REVIEWED"
+            ? ["success", "Değerlendirildi"]
+            : ["info", "Teslim edildi"]
+          : a.due_on && a.due_on < dateKey()
+            ? ["danger", "Gecikti"]
+            : ["warning", "Teslim bekleniyor"];
   return (
     <SafeAreaView
       style={styles.screen}
       edges={view ? ["left", "right"] : ["top", "left", "right"]}
     >
       {!view && (
-      <View style={styles.header}>
-        {owner ? (
-          <Button secondary size="sm" icon="chevron-back" onPress={onBack}>
-            Geri
-          </Button>
-        ) : (
-          <Text style={styles.brand}>
-            derslik<Text style={{ color: colors.green }}>.</Text>
-          </Text>
-        )}
-        {!owner && (
-          <Button
-            secondary
-            size="sm"
-            icon="person-circle-outline"
-            onPress={onBack}
-          >
-            Hesabım
-          </Button>
-        )}
-      </View>
+        <View style={styles.header}>
+          {owner ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon="chevron-back"
+              onPress={onBack}
+              style={{ marginLeft: -10 }}
+            >
+              Öğrenci dosyası
+            </Button>
+          ) : (
+            <Brand />
+          )}
+          {!owner && (
+            <Button
+              secondary
+              size="sm"
+              icon="person-circle-outline"
+              onPress={onBack}
+            >
+              Hesabım
+            </Button>
+          )}
+        </View>
       )}
       {!view && (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={{
-          paddingHorizontal: 18,
-          paddingVertical: 12,
-          gap: 8,
-        }}
-      >
-        {tabs.map((t) => {
-          const on = tab === t.id;
-          return (
-            <Pressable
-              key={t.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
-              onPress={() => {
-                setTab(t.id);
-                if (t.id === "access") void loadLinks();
-              }}
-              style={({ pressed }) => [
-                pill.chip,
-                on && pill.chipOn,
-                pressed && !on && { backgroundColor: colors.subtle },
-              ]}
-            >
-              <Text style={[pill.chipText, on && pill.chipTextOn]}>
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        <TabStrip
+          tabs={tabs}
+          value={tab}
+          onChange={(id) => {
+            setTab(id);
+            if (id === "access") void loadLinks();
+          }}
+        />
       )}
       <ScrollView
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
+            tintColor={colors.brand}
+            colors={[colors.brand]}
             onRefresh={() => {
               setRefreshing(true);
               void reload();
@@ -506,20 +507,30 @@ export function LearningScreen({
         ]}
       >
         {!view && (
-        <View style={{ gap: 4 }}>
-          <Text style={styles.kicker}>
-            {owner
-              ? "Öğrenci dosyası"
-              : student
-                ? "Öğrenci çalışma alanı"
-                : "Veli takip alanı"}
-          </Text>
-          <Text style={styles.title}>{studentName}</Text>
-        </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <Avatar name={studentName} size={52} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Kicker>
+                {owner
+                  ? "Öğrenme alanı"
+                  : student
+                    ? "Öğrenci çalışma alanı"
+                    : "Veli takip alanı"}
+              </Kicker>
+              <Text style={styles.title} numberOfLines={2}>
+                {studentName}
+              </Text>
+            </View>
+          </View>
         )}
         <ErrorText message={error} />
-        {error && (
-          <Button secondary onPress={() => void reload()}>
+        {!!error && (
+          <Button
+            secondary
+            icon="refresh-outline"
+            style={{ alignSelf: "flex-start" }}
+            onPress={() => void reload()}
+          >
             Yenile
           </Button>
         )}
@@ -528,16 +539,29 @@ export function LearningScreen({
             (["assignments", "files"].includes(tab) &&
               !capabilities?.files)) && (
             <Card tone="muted">
-              <Text style={styles.h2}>
-                {tab === "videos"
-                  ? "Video yükleme hazır değil"
-                  : "Dosya yükleme hazır değil"}
-              </Text>
+              <View style={[styles.row, { gap: 8 }]}>
+                <Ionicons
+                  name="cloud-offline-outline"
+                  size={18}
+                  color={colors.muted}
+                />
+                <Text style={styles.h2}>
+                  {tab === "videos"
+                    ? "Video yükleme hazır değil"
+                    : "Dosya yükleme hazır değil"}
+                </Text>
+              </View>
               <Text style={styles.muted}>
                 Yükleme hizmetine şu anda erişilemiyor. Hizmet
                 etkinleştirildiğinde tekrar kontrol edin.
               </Text>
-              <Button secondary onPress={() => void reload()}>
+              <Button
+                secondary
+                size="sm"
+                icon="refresh-outline"
+                style={{ alignSelf: "flex-start" }}
+                onPress={() => void reload()}
+              >
                 Tekrar kontrol et
               </Button>
             </Card>
@@ -545,27 +569,52 @@ export function LearningScreen({
         {tab === "lessons" && (
           <>
             {!data.lessons.length && (
-              <Text style={styles.muted}>Henüz planlanmış ders yok.</Text>
+              <EmptyState
+                icon="calendar-outline"
+                title="Henüz ders yok"
+                description="Planlanan dersleriniz burada görünecek."
+              />
             )}
             {data.lessons.map((l) => (
               <Card key={l.id}>
-                <Text style={styles.kicker}>
-                  {l.status === "COMPLETED"
-                    ? "TAMAMLANDI"
-                    : l.status === "CANCELLED"
-                      ? "İPTAL"
-                      : "PLANLANDI"}
-                </Text>
-                <Text style={styles.h2}>{l.topic}</Text>
-                <Text style={styles.text}>
-                  {dayLabel(l.starts_at, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
-                <Text style={styles.muted}>
-                  {l.location || "Konum belirtilmedi"}
-                </Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <DateTile date={l.starts_at} />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "flex-start",
+                        gap: 8,
+                      }}
+                    >
+                      <Text style={[styles.h2, { flex: 1 }]} numberOfLines={2}>
+                        {l.topic}
+                      </Text>
+                      <LessonStatus status={l.status} />
+                    </View>
+                    <View style={[styles.row, { gap: 5 }]}>
+                      <Ionicons
+                        name="time-outline"
+                        size={14}
+                        color={colors.faint}
+                      />
+                      <Text style={styles.caption}>
+                        {dayLabel(l.starts_at, { weekday: "long" })} ·{" "}
+                        {timeLabel(l.starts_at)}–{timeLabel(l.ends_at)}
+                      </Text>
+                    </View>
+                    <View style={[styles.row, { gap: 5 }]}>
+                      <Ionicons
+                        name="location-outline"
+                        size={14}
+                        color={colors.faint}
+                      />
+                      <Text style={styles.caption}>
+                        {l.location || "Konum belirtilmedi"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </Card>
             ))}
           </>
@@ -574,6 +623,7 @@ export function LearningScreen({
           <>
             {owner && (
               <Button
+                icon="add"
                 onPress={() =>
                   formAction(
                     "Yeni ödev",
@@ -596,59 +646,63 @@ export function LearningScreen({
                   )
                 }
               >
-                + Ödev ver
+                Ödev ver
               </Button>
             )}
             {!data.assignments.length && (
-              <Text style={styles.muted}>Henüz ödev yok.</Text>
+              <EmptyState
+                icon="clipboard-outline"
+                title="Henüz ödev yok"
+                description="Verilen ödevler, teslimler ve geri bildirimler burada görünecek."
+              />
             )}
             {data.assignments.map((a) => {
               const sub = data.submissions.find(
                 (s) => s.assignment_id === a.id,
               );
+              const [tone, state] = assignmentState(a, sub);
               return (
                 <Card key={a.id}>
-                  <Badge
-                    tone={
-                      a.status === "CANCELLED"
-                        ? "danger"
-                        : a.status === "COMPLETED" ||
-                            sub?.status === "REVIEWED"
-                          ? "success"
-                          : sub
-                            ? "neutral"
-                            : "warning"
-                    }
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "flex-start",
+                      gap: 8,
+                    }}
                   >
-                    {a.status === "CANCELLED"
-                      ? "İptal edildi"
-                      : a.status === "COMPLETED"
-                        ? "Tamamlandı"
-                        : sub
-                          ? sub.status === "REVIEWED"
-                            ? "Değerlendirildi"
-                            : "Teslim edildi"
-                          : "Teslim bekleniyor"}
-                  </Badge>
-                  <Text style={styles.h2}>{a.title}</Text>
-                  <Text style={styles.muted}>
-                    Son teslim: {a.due_on || "Belirtilmedi"}
-                  </Text>
-                  <Text style={styles.text}>{a.instructions}</Text>
+                    <Text style={[styles.h2, { flex: 1 }]}>{a.title}</Text>
+                    <Badge tone={tone} dot>
+                      {state}
+                    </Badge>
+                  </View>
+                  <View style={[styles.row, { gap: 5, marginTop: -4 }]}>
+                    <Ionicons
+                      name="flag-outline"
+                      size={14}
+                      color={colors.faint}
+                    />
+                    <Text style={styles.caption}>
+                      {a.due_on
+                        ? "Son teslim " + dayLabel(a.due_on + "T12:00:00+03:00")
+                        : "Son teslim tarihi yok"}
+                    </Text>
+                  </View>
+                  {!!a.instructions && (
+                    <Text style={styles.text}>{a.instructions}</Text>
+                  )}
                   {sub && (
-                    <>
-                      <View style={styles.divider} />
+                    <View style={section.quote}>
                       <Text style={styles.label}>Öğrenci teslimi</Text>
                       <Text style={styles.text}>{sub.body}</Text>
                       {!!sub.feedback && (
                         <>
-                          <Text style={styles.label}>
+                          <Text style={[styles.label, { marginTop: 6 }]}>
                             Öğretmen geri bildirimi
                           </Text>
                           <Text style={styles.text}>{sub.feedback}</Text>
                         </>
                       )}
-                    </>
+                    </View>
                   )}
                   {data.materials
                     .filter((m) => m.assignment_id === a.id)
@@ -656,6 +710,10 @@ export function LearningScreen({
                       <Button
                         key={m.id}
                         secondary
+                        size="sm"
+                        icon="document-attach-outline"
+                        trailingIcon="open-outline"
+                        style={{ alignSelf: "flex-start", maxWidth: "100%" }}
                         disabled={m.status !== "READY" || m.delete_requested}
                         onPress={async () => {
                           try {
@@ -668,115 +726,129 @@ export function LearningScreen({
                           }
                         }}
                       >
-                        ↗ {m.name}
+                        {m.name}
                         {m.status !== "READY" ? " (yükleniyor)" : ""}
                       </Button>
                     ))}
-                  {owner && (
-                    <Button
-                      secondary
-                      onPress={() =>
-                        formAction(
-                          "Ödevi düzenle",
-                          [
-                            { key: "title", label: "Başlık", value: a.title },
-                            {
-                              key: "instructions",
-                              label: "Yönerge",
-                              value: a.instructions,
-                              multiline: true,
-                              required: false,
-                            },
-                            {
-                              key: "dueOn",
-                              label: "Son teslim (YYYY-AA-GG)",
-                              value: a.due_on || "",
-                              required: false,
-                            },
-                            {
-                              key: "status",
-                              label: "Durum",
-                              value: a.status,
-                              options: [
-                                { value: "OPEN", label: "Devam ediyor" },
-                                { value: "COMPLETED", label: "Tamamlandı" },
-                                { value: "CANCELLED", label: "İptal edildi" },
-                              ],
-                            },
-                          ],
-                          (v) => ({
-                            action: "assignment.update",
-                            assignmentId: a.id,
-                            version: a.version,
-                            ...v,
-                          }),
-                        )
-                      }
-                    >
-                      Düzenle / durum
-                    </Button>
-                  )}
-                  {student &&
-                    a.status === "OPEN" &&
-                    sub?.status !== "REVIEWED" && (
+                  <View style={styles.row}>
+                    {owner && (
                       <Button
+                        secondary
+                        size="sm"
+                        icon="create-outline"
+                        style={{ flexGrow: 1 }}
                         onPress={() =>
                           formAction(
-                            "Ödevi teslim et",
+                            "Ödevi düzenle",
                             [
+                              { key: "title", label: "Başlık", value: a.title },
                               {
-                                key: "body",
-                                label: "Çözümünüz / açıklamanız",
+                                key: "instructions",
+                                label: "Yönerge",
+                                value: a.instructions,
                                 multiline: true,
-                                value: sub?.body,
+                                required: false,
+                              },
+                              {
+                                key: "dueOn",
+                                label: "Son teslim (YYYY-AA-GG)",
+                                value: a.due_on || "",
+                                required: false,
+                              },
+                              {
+                                key: "status",
+                                label: "Durum",
+                                value: a.status,
+                                options: [
+                                  { value: "OPEN", label: "Devam ediyor" },
+                                  { value: "COMPLETED", label: "Tamamlandı" },
+                                  { value: "CANCELLED", label: "İptal edildi" },
+                                ],
                               },
                             ],
                             (v) => ({
-                              action: "assignment.submit",
+                              action: "assignment.update",
                               assignmentId: a.id,
-                              body: v.body,
-                              version: sub?.version || 0,
+                              version: a.version,
+                              ...v,
                             }),
                           )
                         }
                       >
-                        {sub ? "Teslimi düzenle" : "Teslim et"}
+                        Düzenle
                       </Button>
                     )}
-                  {owner && sub && (
-                    <Button
-                      onPress={() =>
-                        formAction(
-                          "Ödevi değerlendir",
-                          [
-                            {
-                              key: "feedback",
-                              label: "Geri bildirim",
-                              multiline: true,
-                              value: sub.feedback,
-                            },
-                          ],
-                          (v) => ({
-                            action: "assignment.review",
-                            submissionId: sub.id,
-                            feedback: v.feedback,
-                            version: sub.version,
-                          }),
-                        )
-                      }
-                    >
-                      Geri bildirim yaz
-                    </Button>
-                  )}
-                  {(owner || (student && a.status === "OPEN")) && (
-                    <Button
-                      secondary
-                      disabled={busy || !capabilities?.files}
-                      onPress={() => void attach(a.id)}
-                    >
-                      {busy ? "Yükleniyor…" : "Dosya ekle (PDF / fotoğraf)"}
-                    </Button>
-                  )}
+                    {student &&
+                      a.status === "OPEN" &&
+                      sub?.status !== "REVIEWED" && (
+                        <Button
+                          size="sm"
+                          icon="paper-plane-outline"
+                          style={{ flexGrow: 1 }}
+                          onPress={() =>
+                            formAction(
+                              "Ödevi teslim et",
+                              [
+                                {
+                                  key: "body",
+                                  label: "Çözümünüz / açıklamanız",
+                                  multiline: true,
+                                  value: sub?.body,
+                                },
+                              ],
+                              (v) => ({
+                                action: "assignment.submit",
+                                assignmentId: a.id,
+                                body: v.body,
+                                version: sub?.version || 0,
+                              }),
+                            )
+                          }
+                        >
+                          {sub ? "Teslimi düzenle" : "Teslim et"}
+                        </Button>
+                      )}
+                    {owner && sub && (
+                      <Button
+                        size="sm"
+                        icon="chatbubble-ellipses-outline"
+                        style={{ flexGrow: 1 }}
+                        onPress={() =>
+                          formAction(
+                            "Ödevi değerlendir",
+                            [
+                              {
+                                key: "feedback",
+                                label: "Geri bildirim",
+                                multiline: true,
+                                value: sub.feedback,
+                              },
+                            ],
+                            (v) => ({
+                              action: "assignment.review",
+                              submissionId: sub.id,
+                              feedback: v.feedback,
+                              version: sub.version,
+                            }),
+                          )
+                        }
+                      >
+                        Geri bildirim yaz
+                      </Button>
+                    )}
+                    {(owner || (student && a.status === "OPEN")) && (
+                      <Button
+                        secondary
+                        size="sm"
+                        icon="attach-outline"
+                        style={{ flexGrow: 1 }}
+                        disabled={busy || !capabilities?.files}
+                        onPress={() => void attach(a.id)}
+                      >
+                        {busy ? "Yükleniyor…" : "Dosya ekle"}
+                      </Button>
+                    )}
+                  </View>
                 </Card>
               );
             })}
@@ -786,244 +858,321 @@ export function LearningScreen({
           <>
             {owner && (
               <Button
+                icon="cloud-upload-outline"
                 disabled={busy || !capabilities?.files}
                 onPress={() => void attach(null)}
               >
-                {busy ? "Yükleniyor…" : "+ PDF / materyal yükle"}
+                {busy ? "Yükleniyor…" : "PDF / materyal yükle"}
               </Button>
             )}
-            <Text style={styles.muted}>
+            <Text style={styles.caption}>
               PDF, JPG, PNG veya WebP · en fazla 10 MB. Ödev ekleri de burada
               görünür.
             </Text>
             {!data.materials.length && (
-              <Text style={styles.muted}>Henüz dosya yok.</Text>
+              <EmptyState
+                icon="document-text-outline"
+                title="Henüz dosya yok"
+                description="Eklenen PDF ve materyaller burada görünecek."
+              />
             )}
-            {data.materials.map((file) => (
-              <Card key={file.id}>
-                <Text style={styles.h2}>{file.name}</Text>
-                <Text style={styles.muted}>
-                  {file.assignment_id
-                    ? data.assignments.find((a) => a.id === file.assignment_id)
-                        ?.title
-                    : "Genel ders materyali"}
-                </Text>
-                {file.status === "READY" && !file.delete_requested ? (
-                  <View style={styles.row}>
-                    <IconButton
-                      icon="eye-outline"
-                      label="Önizle"
-                      onPress={async () => {
-                        try {
-                          // inline=1: bağlantı indirme yerine görüntülenmek
-                          // üzere imzalanır.
-                          const r = await request(
-                            media + `/files/${file.id}/download?inline=1`,
-                          );
-                          // Görsel yerel olarak, PDF pdf.js ile çizilir;
-                          // ikisi de uygulamadan çıkmadan açılır.
-                          setPreview({
-                            name: file.name,
-                            url: r.data.url,
-                            kind: isImageName(file.name) ? "image" : "pdf",
-                          });
-                        } catch (e) {
-                          setError((e as Error).message);
+            {!!data.materials.length && (
+              <List>
+                {data.materials.map((file, i) => {
+                  const ready = file.status === "READY" && !file.delete_requested;
+                  return (
+                    <ListRow key={file.id} divider={i > 0}>
+                      <FileIcon
+                        icon={
+                          isImageName(file.name)
+                            ? "image-outline"
+                            : "document-text-outline"
                         }
-                      }}
-                    />
-                    <IconButton
-                      icon="download-outline"
-                      label="Dosyayı indir"
-                      onPress={async () => {
-                        try {
-                          const r = await request(
-                            media + `/files/${file.id}/download`,
-                          );
-                          await Linking.openURL(r.data.url);
-                        } catch (e) {
-                          setError((e as Error).message);
-                        }
-                      }}
-                    />
-                    {owner && (
-                      <IconButton
-                        danger
-                        icon="trash-outline"
-                        label="Dosyayı sil"
-                        disabled={busy}
-                        onPress={() => removeFile(file)}
                       />
-                    )}
-                  </View>
-                ) : (
-                  <View style={styles.row}>
-                    <Text style={[styles.caption, { flex: 1 }]}>
-                      {file.delete_requested
-                        ? "Silme bekliyor"
-                        : "Yükleme tamamlanmadı"}
-                    </Text>
-                    {owner && (
-                      <IconButton
-                        danger
-                        icon="trash-outline"
-                        label={
-                          file.delete_requested
-                            ? "Silmeyi yeniden dene"
-                            : "Dosyayı sil"
-                        }
-                        disabled={busy}
-                        onPress={() => removeFile(file)}
-                      />
-                    )}
-                  </View>
-                )}
-              </Card>
-            ))}
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={styles.label} numberOfLines={2}>
+                          {file.name}
+                        </Text>
+                        <Text style={styles.caption} numberOfLines={1}>
+                          {!ready
+                            ? file.delete_requested
+                              ? "Silme bekliyor"
+                              : "Yükleme tamamlanmadı"
+                            : file.assignment_id
+                              ? data.assignments.find(
+                                  (a) => a.id === file.assignment_id,
+                                )?.title
+                              : "Genel ders materyali"}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        {ready && (
+                          <IconButton
+                            icon="eye-outline"
+                            label="Önizle"
+                            onPress={async () => {
+                              try {
+                                // inline=1: bağlantı indirme yerine
+                                // görüntülenmek üzere imzalanır.
+                                const r = await request(
+                                  media + `/files/${file.id}/download?inline=1`,
+                                );
+                                // Görsel yerel olarak, PDF pdf.js ile çizilir;
+                                // ikisi de uygulamadan çıkmadan açılır.
+                                setPreview({
+                                  name: file.name,
+                                  url: r.data.url,
+                                  kind: isImageName(file.name) ? "image" : "pdf",
+                                });
+                              } catch (e) {
+                                setError((e as Error).message);
+                              }
+                            }}
+                          />
+                        )}
+                        {ready && (
+                          <IconButton
+                            icon="download-outline"
+                            label="Dosyayı indir"
+                            onPress={async () => {
+                              try {
+                                const r = await request(
+                                  media + `/files/${file.id}/download`,
+                                );
+                                await Linking.openURL(r.data.url);
+                              } catch (e) {
+                                setError((e as Error).message);
+                              }
+                            }}
+                          />
+                        )}
+                        {owner && (
+                          <IconButton
+                            danger
+                            icon="trash-outline"
+                            label={
+                              file.delete_requested
+                                ? "Silmeyi yeniden dene"
+                                : "Dosyayı sil"
+                            }
+                            disabled={busy}
+                            onPress={() => removeFile(file)}
+                          />
+                        )}
+                      </View>
+                    </ListRow>
+                  );
+                })}
+              </List>
+            )}
           </>
         )}
         {tab === "videos" && (
           <>
             {owner && (
               <Button
+                icon="videocam-outline"
                 disabled={busy || !capabilities?.videos}
                 onPress={() => void chooseVideo()}
               >
-                + Ders videosu yükle
+                Ders videosu yükle
               </Button>
             )}
             {progress !== null && (
-              <Text accessibilityRole="alert" style={styles.muted}>
-                Yükleme: %{Math.round(progress * 100)}
-              </Text>
+              <Card>
+                <Meter
+                  label="Video yükleniyor"
+                  used={Math.round(progress * 100)}
+                  limit={100}
+                  unit="%"
+                />
+              </Card>
             )}
             {upload && !busy && (
-              <Button secondary onPress={() => void sendVideo(upload)}>
+              <Button
+                secondary
+                icon="play-forward-outline"
+                onPress={() => void sendVideo(upload)}
+              >
                 Yüklemeye devam et
               </Button>
             )}
             {!data.videos.length && (
-              <Text style={styles.muted}>Henüz ders videosu yok.</Text>
+              <EmptyState
+                icon="videocam-outline"
+                title="Henüz video yok"
+                description="Hazır olduğunda ders videoları burada görünecek."
+              />
             )}
-            {data.videos.map((v) => (
-              <Card key={v.id}>
-                <Text style={styles.h2}>{v.title}</Text>
-                <Badge
-                  tone={
-                    v.delete_requested || v.status === "FAILED"
-                      ? "danger"
-                      : v.status === "READY"
-                        ? "success"
-                        : "warning"
-                  }
-                >
-                  {v.delete_requested
-                    ? "Silme bekliyor"
-                    : v.status === "READY"
-                      ? `${Math.ceil((v.duration_seconds || 0) / 60)} dakika`
-                      : v.status === "FAILED"
-                        ? "Yüklenemedi"
-                        : "Hazırlanıyor"}
-                </Badge>
-                <View style={styles.row}>
-                  {v.status === "READY" && !v.delete_requested && (
-                    <IconButton
-                      icon="play-outline"
-                      label="Videoyu izle"
+            {data.videos.map((v) => {
+              const ready = v.status === "READY" && !v.delete_requested;
+              return (
+                <Card key={v.id}>
+                  <View style={[styles.row, { flexWrap: "nowrap", gap: 12 }]}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${v.title} videosunu izle`}
+                      disabled={!ready}
                       onPress={() => setVideo(v)}
-                    />
-                  )}
-                  {owner && (
-                    <>
-                      <IconButton
-                        icon="refresh-outline"
-                        label="Durumu yenile"
-                        disabled={busy}
-                        onPress={async () => {
-                          try {
-                            await request(media + `/videos/${v.id}/refresh`, {});
-                            await reload();
-                          } catch (e) {
-                            setError((e as Error).message);
-                          }
-                        }}
+                      style={({ pressed }) => [
+                        section.videoThumb,
+                        pressed && { opacity: 0.85 },
+                      ]}
+                    >
+                      <Ionicons
+                        name={ready ? "play" : "hourglass-outline"}
+                        size={20}
+                        color={colors.onFeature}
                       />
-                      <IconButton
-                        danger
-                        icon="trash-outline"
-                        label="Videoyu sil"
-                        disabled={busy}
-                        onPress={() =>
-                          confirmAction(
-                            "Videoyu sil",
-                            "Öğrenci bu videoyu artık izleyemeyecek.",
-                            async () => {
+                    </Pressable>
+                    <View style={{ flex: 1, gap: 5 }}>
+                      <Text style={styles.h2} numberOfLines={2}>
+                        {v.title}
+                      </Text>
+                      <Badge
+                        tone={
+                          v.delete_requested || v.status === "FAILED"
+                            ? "danger"
+                            : v.status === "READY"
+                              ? "success"
+                              : "warning"
+                        }
+                        icon={
+                          v.status === "READY" && !v.delete_requested
+                            ? "time-outline"
+                            : undefined
+                        }
+                        dot={!(v.status === "READY" && !v.delete_requested)}
+                      >
+                        {v.delete_requested
+                          ? "Silme bekliyor"
+                          : v.status === "READY"
+                            ? `${Math.ceil((v.duration_seconds || 0) / 60)} dakika`
+                            : v.status === "FAILED"
+                              ? "Yüklenemedi"
+                              : "Hazırlanıyor"}
+                      </Badge>
+                    </View>
+                  </View>
+                  <View style={styles.row}>
+                    {ready && (
+                      <Button
+                        size="sm"
+                        icon="play-outline"
+                        style={{ flexGrow: 1 }}
+                        onPress={() => setVideo(v)}
+                      >
+                        Videoyu izle
+                      </Button>
+                    )}
+                    {owner && (
+                      <>
+                        <IconButton
+                          icon="refresh-outline"
+                          label="Durumu yenile"
+                          disabled={busy}
+                          onPress={async () => {
+                            try {
                               await request(
-                                media + `/videos/${v.id}/delete`,
+                                media + `/videos/${v.id}/refresh`,
                                 {},
                               );
                               await reload();
-                            },
-                            setError,
-                          )
-                        }
-                      />
-                    </>
-                  )}
-                </View>
-                {data.questions
-                  .filter((q) => q.video_id === v.id)
-                  .map((q) => (
-                    <View key={q.id} style={{ gap: 10, paddingTop: 16 }}>
-                      <View style={styles.divider} />
-                      <Text style={styles.label}>
-                        {Math.floor(q.at_seconds / 60)}:
-                        {String(q.at_seconds % 60).padStart(2, "0")} · Soru
-                      </Text>
-                      <Text style={styles.text}>{q.body}</Text>
-                      {!!q.answer && (
-                        <Text style={styles.text}>
-                          Yanıt: {q.answer} {q.resolved ? "✓" : ""}
-                        </Text>
-                      )}
-                      {owner && (
-                        <Button
-                          secondary
+                            } catch (e) {
+                              setError((e as Error).message);
+                            }
+                          }}
+                        />
+                        <IconButton
+                          danger
+                          icon="trash-outline"
+                          label="Videoyu sil"
+                          disabled={busy}
                           onPress={() =>
-                            formAction(
-                              "Soruyu yanıtla",
-                              [
-                                {
-                                  key: "answer",
-                                  label: "Yanıt",
-                                  value: q.answer,
-                                  multiline: true,
-                                },
-                              ],
-                              (v) => ({
-                                action: "question.answer",
-                                questionId: q.id,
-                                answer: v.answer,
-                                resolved: true,
-                                version: q.version,
-                              }),
+                            confirmAction(
+                              "Videoyu sil",
+                              "Öğrenci bu videoyu artık izleyemeyecek.",
+                              async () => {
+                                await request(
+                                  media + `/videos/${v.id}/delete`,
+                                  {},
+                                );
+                                await reload();
+                              },
+                              setError,
                             )
                           }
-                        >
-                          Yanıtla
-                        </Button>
-                      )}
-                    </View>
-                  ))}
-              </Card>
-            ))}
+                        />
+                      </>
+                    )}
+                  </View>
+                  {data.questions
+                    .filter((q) => q.video_id === v.id)
+                    .map((q) => (
+                      <View key={q.id} style={section.quote}>
+                        <View style={[styles.row, { gap: 6 }]}>
+                          <Ionicons
+                            name="help-circle-outline"
+                            size={15}
+                            color={colors.brand}
+                          />
+                          <Text style={styles.label}>
+                            {Math.floor(q.at_seconds / 60)}:
+                            {String(q.at_seconds % 60).padStart(2, "0")} · Soru
+                          </Text>
+                          {q.resolved && (
+                            <Badge tone="success" icon="checkmark">
+                              Yanıtlandı
+                            </Badge>
+                          )}
+                        </View>
+                        <Text style={styles.text}>{q.body}</Text>
+                        {!!q.answer && (
+                          <Text style={styles.muted}>Yanıt: {q.answer}</Text>
+                        )}
+                        {owner && (
+                          <View style={{ alignSelf: "flex-start" }}>
+                            <TextLink
+                              icon="arrow-undo-outline"
+                              onPress={() =>
+                                formAction(
+                                  "Soruyu yanıtla",
+                                  [
+                                    {
+                                      key: "answer",
+                                      label: "Yanıt",
+                                      value: q.answer,
+                                      multiline: true,
+                                    },
+                                  ],
+                                  (v) => ({
+                                    action: "question.answer",
+                                    questionId: q.id,
+                                    answer: v.answer,
+                                    resolved: true,
+                                    version: q.version,
+                                  }),
+                                )
+                              }
+                            >
+                              Yanıtla
+                            </TextLink>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                </Card>
+              );
+            })}
           </>
         )}
         {tab === "notes" && (
           <>
             {owner && (
-              <>
+              <View style={styles.row}>
                 <Button
+                  icon="create-outline"
+                  style={{ flexGrow: 1 }}
                   onPress={() =>
                     formAction(
                       "Not paylaş",
@@ -1047,6 +1196,8 @@ export function LearningScreen({
                 </Button>
                 <Button
                   secondary
+                  icon="sparkles-outline"
+                  style={{ flexGrow: 1 }}
                   onPress={() =>
                     formAction(
                       "Haftalık özet hazırla",
@@ -1061,21 +1212,26 @@ export function LearningScreen({
                     )
                   }
                 >
-                  Özet taslağı hazırla
+                  Özet taslağı
                 </Button>
-              </>
+              </View>
             )}
             {data.summaries.map((s) => (
               <Card key={s.id}>
-                <Text style={styles.kicker}>
-                  HAFTALIK ÖZET ·{" "}
-                  {s.status === "DRAFT" ? "TASLAK" : "PAYLAŞILDI"}
-                </Text>
+                <View style={[styles.row, { justifyContent: "space-between" }]}>
+                  <Kicker>Haftalık özet</Kicker>
+                  <Badge tone={s.status === "DRAFT" ? "warning" : "success"} dot>
+                    {s.status === "DRAFT" ? "Taslak" : "Paylaşıldı"}
+                  </Badge>
+                </View>
                 <Text style={styles.h2}>{s.week_on} haftası</Text>
                 <Text style={styles.text}>{s.body}</Text>
                 {owner && (
                   <Button
                     secondary
+                    size="sm"
+                    icon={s.status === "DRAFT" ? "checkmark-done" : "create-outline"}
+                    style={{ alignSelf: "flex-start" }}
                     onPress={() =>
                       formAction(
                         "Özeti incele ve paylaş",
@@ -1105,51 +1261,109 @@ export function LearningScreen({
             ))}
             {data.notes.map((n) => (
               <Card key={n.id}>
-                <Text style={styles.kicker}>
-                  {n.audience === "BOTH" ? "ÖĞRENCİ VE VELİ" : "ÖĞRENCİ"}
-                </Text>
+                <View style={[styles.row, { justifyContent: "space-between" }]}>
+                  <Kicker>
+                    {n.audience === "BOTH" ? "Öğrenci ve veli" : "Öğrenci"}
+                  </Kicker>
+                  <Text style={styles.caption}>{dayLabel(n.created_at)}</Text>
+                </View>
                 <Text style={styles.text}>{n.body}</Text>
-                <Text style={styles.muted}>{dayLabel(n.created_at)}</Text>
               </Card>
             ))}
             {!data.notes.length && !data.summaries.length && (
-              <Text style={styles.muted}>Henüz paylaşılmış not yok.</Text>
+              <EmptyState
+                icon="reader-outline"
+                title="Henüz paylaşım yok"
+                description="Paylaşılan notlar ve haftalık özetler burada görünecek."
+              />
             )}
           </>
         )}
         {tab === "payments" && "packages" in data && (
           <>
-            <Card>
-              <Text style={styles.muted}>Açık bakiye</Text>
-              <Text style={styles.title}>
-                {money(
-                  data.packages.reduce((n, p) => n + Number(p.price_minor), 0) -
-                    data.payments
-                      .filter((p) => !p.voided_at)
-                      .reduce((n, p) => n + Number(p.amount_minor), 0),
-                )}
-              </Text>
-              <Text style={styles.muted}>
+            <InkPanel>
+              <InkFigures
+                items={[
+                  {
+                    label: "Açık bakiye",
+                    value: money(
+                      data.packages.reduce(
+                        (n, p) => n + Number(p.price_minor),
+                        0,
+                      ) -
+                        data.payments
+                          .filter((p) => !p.voided_at)
+                          .reduce((n, p) => n + Number(p.amount_minor), 0),
+                    ),
+                  },
+                  {
+                    label: "Kalan ders",
+                    value: data.packages.reduce((n, p) => n + p.remaining, 0),
+                  },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.muted,
+                  { color: colors.onFeatureMuted, marginTop: -4 },
+                ]}
+              >
                 Öğretmenin kaydettiği paketler ve tahsilatlar.
               </Text>
-            </Card>
+            </InkPanel>
+            {!!data.packages.length && (
+              <SectionHeading title="Ders paketleri" />
+            )}
             {data.packages.map((p) => (
               <Card key={p.id}>
-                <Text style={styles.h2}>{p.name}</Text>
-                <Text style={styles.text}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+                >
+                  <Text style={[styles.h2, { flex: 1 }]}>{p.name}</Text>
+                  <Badge
+                    tone={p.remaining <= 2 ? "warning" : "info"}
+                    icon={p.remaining <= 2 ? "alert-circle-outline" : undefined}
+                  >
+                    {p.remaining} hak
+                  </Badge>
+                </View>
+                <Text style={styles.muted}>
                   {p.remaining} / {p.granted} hak · {money(p.price_minor)}
                 </Text>
               </Card>
             ))}
-            {data.payments.map((p) => (
-              <Card key={p.id}>
-                <Text style={styles.h2}>{money(p.amount_minor)}</Text>
-                <Text style={styles.muted}>
-                  {p.received_on} ·{" "}
-                  {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
-                </Text>
-              </Card>
-            ))}
+            {!!data.payments.length && <SectionHeading title="Tahsilatlar" />}
+            {!!data.payments.length && (
+              <List>
+                {data.payments.map((p, i) => (
+                  <ListRow key={p.id} divider={i > 0}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text
+                        style={[
+                          styles.h2,
+                          { fontVariant: ["tabular-nums"] },
+                          !!p.voided_at && {
+                            color: colors.muted,
+                            textDecorationLine: "line-through",
+                          },
+                        ]}
+                      >
+                        {money(p.amount_minor)}
+                      </Text>
+                      <Text style={styles.caption}>
+                        {dayLabel(p.received_on + "T12:00:00+03:00")}
+                      </Text>
+                    </View>
+                    <Badge
+                      tone={p.voided_at ? "neutral" : "success"}
+                      icon={p.voided_at ? undefined : "checkmark"}
+                    >
+                      {p.voided_at ? "İptal edildi" : "Tahsil edildi"}
+                    </Badge>
+                  </ListRow>
+                ))}
+              </List>
+            )}
           </>
         )}
         {tab === "access" && owner && (
@@ -1159,6 +1373,7 @@ export function LearningScreen({
               kabul edebilir.
             </Text>
             <Button
+              icon="person-add-outline"
               onPress={() =>
                 setForm({
                   title: "Davet oluştur",
@@ -1218,7 +1433,17 @@ export function LearningScreen({
               Davet bağlantısı oluştur
             </Button>
             {invite && (
-              <Card>
+              <Card tone="brand">
+                <View style={[styles.row, { gap: 6 }]}>
+                  <Ionicons
+                    name={invite.emailed ? "mail-outline" : "link-outline"}
+                    size={16}
+                    color={colors.brand}
+                  />
+                  <Text style={styles.label}>
+                    {invite.emailed ? "Davet gönderildi" : "Davet bağlantısı hazır"}
+                  </Text>
+                </View>
                 <Text style={styles.muted}>
                   {invite.emailed
                     ? `Davet ${invite.email} adresine e-posta ile gönderildi. Ulaşmadıysa bağlantıyı kendiniz iletebilirsiniz.`
@@ -1231,7 +1456,7 @@ export function LearningScreen({
                   <Button
                     secondary
                     size="sm"
-                    icon="copy-outline"
+                    icon={copied ? "checkmark" : "copy-outline"}
                     onPress={async () => {
                       await setStringAsync(invite.url);
                       setCopied(true);
@@ -1242,6 +1467,7 @@ export function LearningScreen({
                   <Button
                     secondary
                     size="sm"
+                    icon="share-outline"
                     onPress={() =>
                       void Share.share({
                         message: `Derslik davetiniz (7 gün geçerli): ${invite.url}`,
@@ -1253,69 +1479,99 @@ export function LearningScreen({
                 </View>
               </Card>
             )}
-            {links?.data?.map((l: any) => (
-              <Card key={l.id}>
-                <Text style={styles.h2}>
-                  {l.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
-                </Text>
-                <Text style={styles.muted}>
-                  {l.revokedAt ? "Kaldırıldı" : "Etkin"}
-                </Text>
-                {!l.revokedAt && (
-                  <Button
-                    secondary
-                    onPress={() =>
-                      confirmAction(
-                        "Erişimi kaldır",
-                        "Bu hesap öğrenci bilgilerini artık göremeyecek.",
-                        async () => {
-                          await request(
-                            `/workspaces/${access.id}/students/${studentId}/access/revoke`,
-                            { id: l.id, kind: "link" },
-                          );
-                          await loadLinks();
-                        },
-                        setError,
-                      )
-                    }
-                  >
-                    Erişimi kaldır
-                  </Button>
-                )}
-              </Card>
-            ))}
-            {links?.invitations?.map((i: any) => (
-              <Card key={i.id}>
-                <Text style={styles.h2}>{i.email}</Text>
-                <Text style={styles.muted}>
-                  {i.acceptedAt
-                    ? "Kabul edildi"
-                    : i.revokedAt
-                      ? "İptal edildi"
-                      : new Date(i.expiresAt) < new Date()
-                        ? "Süresi doldu"
-                        : "Davet bekliyor"}
-                </Text>
-                {!i.acceptedAt && !i.revokedAt && (
-                  <Button
-                    secondary
-                    onPress={async () => {
-                      try {
-                        await request(
-                          `/workspaces/${access.id}/students/${studentId}/access/revoke`,
-                          { id: i.id, kind: "invitation" },
-                        );
-                        await loadLinks();
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }}
-                  >
-                    Daveti iptal et
-                  </Button>
-                )}
-              </Card>
-            ))}
+            {!!links && !links.data?.length && !links.invitations?.length && (
+              <EmptyState
+                icon="person-add-outline"
+                title="Henüz davet yok"
+                description="Öğrenci veya veliyi davet ettiğinizde burada görünür."
+              />
+            )}
+            {!!(links?.data?.length || links?.invitations?.length) && (
+              <List>
+                {links?.data?.map((l: any, i: number) => (
+                  <ListRow key={l.id} divider={i > 0}>
+                    <FileIcon
+                      icon={l.role === "STUDENT" ? "school-outline" : "people-outline"}
+                    />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={styles.label}>
+                        {l.role === "STUDENT" ? "Öğrenci erişimi" : "Veli erişimi"}
+                      </Text>
+                      <Badge tone={l.revokedAt ? "neutral" : "success"} dot>
+                        {l.revokedAt ? "Kaldırıldı" : "Etkin"}
+                      </Badge>
+                    </View>
+                    {!l.revokedAt && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onPress={() =>
+                          confirmAction(
+                            "Erişimi kaldır",
+                            "Bu hesap öğrenci bilgilerini artık göremeyecek.",
+                            async () => {
+                              await request(
+                                `/workspaces/${access.id}/students/${studentId}/access/revoke`,
+                                { id: l.id, kind: "link" },
+                              );
+                              await loadLinks();
+                            },
+                            setError,
+                          )
+                        }
+                      >
+                        Kaldır
+                      </Button>
+                    )}
+                  </ListRow>
+                ))}
+                {links?.invitations?.map((inv: any, i: number) => {
+                  const expired = new Date(inv.expiresAt) < new Date();
+                  const [tone, state]: [BadgeTone, string] = inv.acceptedAt
+                    ? ["success", "Kabul edildi"]
+                    : inv.revokedAt
+                      ? ["neutral", "İptal edildi"]
+                      : expired
+                        ? ["neutral", "Süresi doldu"]
+                        : ["warning", "Davet bekliyor"];
+                  return (
+                    <ListRow
+                      key={inv.id}
+                      divider={i > 0 || !!links?.data?.length}
+                    >
+                      <FileIcon icon="mail-outline" />
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={styles.label} numberOfLines={1}>
+                          {inv.email}
+                        </Text>
+                        <Badge tone={tone} dot>
+                          {state}
+                        </Badge>
+                      </View>
+                      {!inv.acceptedAt && !inv.revokedAt && (
+                        <Button
+                          secondary
+                          size="sm"
+                          onPress={async () => {
+                            try {
+                              await request(
+                                `/workspaces/${access.id}/students/${studentId}/access/revoke`,
+                                { id: inv.id, kind: "invitation" },
+                              );
+                              await loadLinks();
+                            } catch (e) {
+                              setError((e as Error).message);
+                            }
+                          }}
+                        >
+                          İptal et
+                        </Button>
+                      )}
+                    </ListRow>
+                  );
+                })}
+              </List>
+            )}
           </>
         )}
         {tab === "inbox" && (
@@ -1335,20 +1591,23 @@ export function LearningScreen({
         transparent
         onRequestClose={() => setPreview(null)}
       >
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)" }}>
+        <View style={{ flex: 1, backgroundColor: colors.scrim }}>
           <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 10,
-                paddingHorizontal: 14,
+                paddingHorizontal: 16,
                 paddingVertical: 8,
               }}
             >
               <Text
                 numberOfLines={1}
-                style={{ flex: 1, color: "#ffffff", fontSize: 14 }}
+                style={[
+                  styles.label,
+                  { flex: 1, color: colors.onNavyStrong },
+                ]}
               >
                 {preview?.name}
               </Text>
@@ -1357,14 +1616,18 @@ export function LearningScreen({
                 accessibilityLabel="Kapat"
                 onPress={() => setPreview(null)}
                 hitSlop={10}
-                style={{
+                style={({ pressed }) => ({
                   width: 44,
                   height: 44,
+                  borderRadius: 22,
                   alignItems: "center",
                   justifyContent: "center",
-                }}
+                  backgroundColor: pressed
+                    ? "rgba(255,255,255,0.18)"
+                    : "rgba(255,255,255,0.1)",
+                })}
               >
-                <Ionicons name="close" size={24} color="#ffffff" />
+                <Ionicons name="close" size={22} color={colors.onNavyStrong} />
               </Pressable>
             </View>
             {preview && (
@@ -1395,93 +1658,214 @@ export function LearningScreen({
     </SafeAreaView>
   );
 }
-export function Inbox({ workspaceId }: { workspaceId?: string }) {
-  const { styles } = useTheme();
-  const [rows, setRows] = useState<any[]>([]),
-    [limits, setLimits] = useState<any>(null),
-    [error, setError] = useState("");
-  useEffect(() => {
-    void (async () => {
-      try {
-        setRows((await request("/inbox")).data);
-        if (workspaceId)
-          setLimits(
-            (await request(`/workspaces/${workspaceId}/settings/limits`)).data,
-          );
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    })();
-  }, [workspaceId]);
+
+/** Dosya, erişim ve davet satırlarının başındaki simge karosu. */
+function FileIcon({ icon }: { icon: IconName }) {
+  const { colors, section } = useTheme();
   return (
-    <>
-      <ErrorText message={error} />
-      {limits && (
-        <Card>
-          <Text style={styles.h2}>
-            {limits.limits.plan === "PRO" ? "Pro plan" : "Pilot plan"}
-          </Text>
-          <Text style={styles.text}>
-            {limits.used.students} / {limits.limits.studentLimit} aktif öğrenci
-          </Text>
-          <Text style={styles.text}>
-            {Math.ceil(Number(limits.used.videoSeconds) / 60)} /{" "}
-            {Math.floor(limits.limits.videoSeconds / 60)} dakika video
-          </Text>
-          <Text style={styles.text}>
-            {(Number(limits.used.materialBytes) / 1024 ** 2).toFixed(1)} /{" "}
-            {Math.floor(Number(limits.limits.materialBytes) / 1024 ** 2)} MB
-            dosya
-          </Text>
-        </Card>
-      )}
-      {!rows.length && <Text style={styles.muted}>Henüz bildirim yok.</Text>}
-      {rows.map((n) => (
-        <Card key={n.id}>
-          <Text style={styles.h2}>{n.title}</Text>
-          <Text style={styles.text}>{n.body}</Text>
-          {!n.readAt && (
-            <Button
-              secondary
-              onPress={async () => {
-                try {
-                  await request(`/inbox/${n.id}/read`, {});
-                  setRows((old) =>
-                    old.map((x) =>
-                      x.id === n.id
-                        ? { ...x, readAt: new Date().toISOString() }
-                        : x,
-                    ),
-                  );
-                } catch (e) {
-                  setError((e as Error).message);
-                }
-              }}
-            >
-              Okundu olarak işaretle
-            </Button>
-          )}
-        </Card>
-      ))}
-    </>
+    <View style={section.fileIcon}>
+      <Ionicons name={icon} size={19} color={colors.brand} />
+    </View>
   );
 }
 
-const makePill = (colors: Palette) =>
-  StyleSheet.create({
-  chip: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.white,
-  },
-  chipOn: {
-    backgroundColor: colors.green,
-    borderColor: colors.green,
-  },
-  chipText: { fontSize: 14, fontWeight: "600", color: colors.body },
-  chipTextOn: { color: colors.white, fontWeight: "700" },
-  });
+type Notice = {
+  id: string;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
+/** Bildirim başlıkları sunucuda sabit metinler; simge başlıktan seçiliyor
+ *  (web ile aynı eşleme). */
+function noticeIcon(title: string): IconName {
+  const t = title.toLocaleLowerCase("tr");
+  if (t.includes("soru")) return "chatbubble-outline";
+  if (t.includes("video")) return "videocam-outline";
+  if (t.includes("özet")) return "sparkles-outline";
+  if (t.includes("ödev")) return "clipboard-outline";
+  return "notifications-outline";
+}
+
+function ago(iso: string, now: number) {
+  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
+  if (minutes < 1) return "Az önce";
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "Dün";
+  if (days < 7) return `${days} gün önce`;
+  return dayLabel(iso);
+}
+
+/** Bildirimler ve (öğretmende) plan kullanımı: web'deki bildirim penceresinin
+ *  mobil karşılığı. */
+export function Inbox({
+  workspaceId,
+  onUnread,
+}: {
+  workspaceId?: string;
+  onUnread?: (count: number) => void;
+}) {
+  const { colors, styles, section } = useTheme();
+  const [rows, setRows] = useState<Notice[] | null>(null),
+    [limits, setLimits] = useState<any>(null),
+    [error, setError] = useState(""),
+    [now, setNow] = useState(0);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [inbox, usage] = await Promise.all([
+          request<{ data: Notice[] }>("/inbox"),
+          workspaceId
+            ? request(`/workspaces/${workspaceId}/settings/limits`)
+            : Promise.resolve(null),
+        ]);
+        setRows(inbox.data);
+        setNow(Date.now());
+        if (usage) setLimits(usage.data);
+      } catch (e) {
+        setError((e as Error).message);
+        setRows((old) => old ?? []);
+      }
+    })();
+  }, [workspaceId]);
+  const unread = (rows || []).filter((n) => !n.readAt);
+  const unreadCount = rows ? unread.length : null;
+  useEffect(() => {
+    if (unreadCount !== null) onUnread?.(unreadCount);
+  }, [unreadCount, onUnread]);
+  async function markRead(ids: string[]) {
+    try {
+      await Promise.all(ids.map((id) => request(`/inbox/${id}/read`, {})));
+      const at = new Date().toISOString();
+      setRows((old) =>
+        (old || []).map((n) => (ids.includes(n.id) ? { ...n, readAt: at } : n)),
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return (
+    <>
+      <ErrorText message={error} />
+      {rows && (
+        <SectionHeading
+          title="Son bildirimler"
+          description={
+            unread.length ? `${unread.length} okunmamış` : "Hepsi okundu"
+          }
+          action={
+            unread.length ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon="checkmark-done"
+                onPress={() => void markRead(unread.map((n) => n.id))}
+              >
+                Tümü okundu
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+      {rows && !rows.length && (
+        <EmptyState
+          icon="notifications-off-outline"
+          title="Yeni bildirim yok"
+          description="Teslimler, yeni videolar ve geri bildirimler burada görünecek."
+        />
+      )}
+      {!!rows?.length && (
+        <List>
+          {rows.map((n, i) => (
+            <View
+              key={n.id}
+              style={[
+                section.notice,
+                i > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
+                !n.readAt && { backgroundColor: colors.infoSoft },
+              ]}
+            >
+              <View
+                style={[
+                  section.noticeIcon,
+                  n.readAt
+                    ? { backgroundColor: colors.sunken }
+                    : { backgroundColor: colors.brandSoft },
+                ]}
+              >
+                <Ionicons
+                  name={noticeIcon(n.title)}
+                  size={16}
+                  color={n.readAt ? colors.muted : colors.brand}
+                />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <View style={[styles.row, { flexWrap: "nowrap", alignItems: "flex-start" }]}>
+                  <Text
+                    style={[
+                      n.readAt ? styles.text : styles.label,
+                      { flex: 1, fontSize: 14.5 },
+                    ]}
+                  >
+                    {n.title}
+                  </Text>
+                  {!n.readAt && (
+                    <View
+                      accessibilityLabel="Okunmadı"
+                      style={section.unreadDot}
+                    />
+                  )}
+                </View>
+                <Text style={styles.muted}>{n.body}</Text>
+                <View style={[styles.row, { gap: 14, marginTop: 4 }]}>
+                  <Text style={styles.caption}>{ago(n.createdAt, now)}</Text>
+                  {!n.readAt && (
+                    <TextLink onPress={() => void markRead([n.id])}>
+                      Okundu say
+                    </TextLink>
+                  )}
+                </View>
+              </View>
+            </View>
+          ))}
+        </List>
+      )}
+      {limits && (
+        <>
+          <SectionHeading
+            title="Kullanım ve plan"
+            description="Plan sınırlarına göre kullanımınız."
+            action={
+              <Badge tone="info">
+                {limits.limits.plan === "PRO" ? "Pro plan" : "Pilot plan"}
+              </Badge>
+            }
+          />
+          <Card style={{ gap: 18 }}>
+            <Meter
+              label="Aktif öğrenci"
+              used={Number(limits.used.students)}
+              limit={Number(limits.limits.studentLimit)}
+            />
+            <Meter
+              label="Video"
+              used={Math.ceil(Number(limits.used.videoSeconds) / 60)}
+              limit={Math.floor(Number(limits.limits.videoSeconds) / 60)}
+              unit="dk"
+            />
+            <Meter
+              label="Dosya alanı"
+              used={Math.round(Number(limits.used.materialBytes) / 1024 ** 2)}
+              limit={Math.floor(Number(limits.limits.materialBytes) / 1024 ** 2)}
+              unit="MB"
+            />
+          </Card>
+        </>
+      )}
+    </>
+  );
+}

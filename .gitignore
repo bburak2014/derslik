@@ -152,7 +152,6 @@ vite.config.ts.timestamp-*
 # Framework ve dağıtım çıktıları
 /.vinext/
 /.wrangler/
-/.sites-runtime/
 .sites-runtime/
 next-env.d.ts
 .vercel

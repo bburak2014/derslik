@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Bricolage_Grotesque, Onest } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 
 // Self-hosted by next/font, so the Content-Security-Policy stays at
 // `font-src 'self'` with no external font origin.
-const inter = Inter({
+const onest = Onest({
   subsets: ["latin", "latin-ext"], // latin-ext carries ğ İ ı ş
   display: "swap",
   variable: "--font-derslik",
 });
+// Başlıklar için karakterli yüz; gövde metni Onest'te kalır.
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  variable: "--font-derslik-display",
+});
+const fonts = `${onest.variable} ${bricolage.variable}`;
 
 export const metadata: Metadata = {
   title: "Derslik · Öğretmen çalışma alanı",
@@ -27,10 +34,7 @@ export default async function RootLayout({
   const choice = (await cookies()).get("derslik-theme")?.value;
   const theme = choice === "dark" || choice === "light" ? choice : undefined;
   return (
-    <html
-      lang="tr"
-      className={theme ? `${inter.variable} ${theme}` : inter.variable}
-    >
+    <html lang="tr" className={theme ? `${fonts} ${theme}` : fonts}>
       <body className="antialiased">{children}</body>
     </html>
   );

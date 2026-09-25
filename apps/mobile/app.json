@@ -5,7 +5,7 @@
     "version": "0.3.0",
     "orientation": "portrait",
     "scheme": "derslik",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.derslik.app"
@@ -15,7 +15,7 @@
       "permissions": [],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#0f7a62"
+        "backgroundColor": "#141c4d"
       }
     },
     "plugins": [

@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import { Button, useTheme } from "./ui";
+import { Button, EmptyState, useTheme } from "./ui";
 
 // Android'in tarayıcısında yerleşik PDF görüntüleyici yok; bağlantıyı açmak
 // indirme istemine düşüyordu. Burada PDF, pdf.js ile canvas'a çizilerek
@@ -12,14 +12,14 @@ import { Button, useTheme } from "./ui";
 // çekiliyor; CDN'den yalnızca kitaplık geliyor, dosya üçüncü tarafa gitmiyor.
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 
-function buildHtml(url: string, background: string) {
+function buildHtml(url: string, background: string, muted: string) {
   return `<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=4">
 <style>
   html,body{margin:0;padding:0;background:${background};}
   canvas{display:block;width:100%;margin:0 0 10px;}
-  #err{display:none;padding:24px;font:15px -apple-system,Roboto,sans-serif;color:#8698a9;text-align:center;}
+  #err{display:none;padding:24px;font:15px -apple-system,Roboto,sans-serif;color:${muted};text-align:center;}
 </style></head>
 <body>
 <div id="pages"></div>
@@ -80,42 +80,56 @@ export function PdfViewer({
   url: string;
   onClose: () => void;
 }) {
-  const { colors, styles } = useTheme();
+  const { colors, styles, section } = useTheme();
   const [failed, setFailed] = useState(false);
-  const html = useMemo(() => buildHtml(url, colors.cream), [url, colors.cream]);
+  const html = useMemo(
+    () => buildHtml(url, colors.canvas, colors.muted),
+    [url, colors.canvas, colors.muted],
+  );
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={[styles.screen, { flex: 1 }]} edges={["top"]}>
-        <View style={styles.header}>
-          <Text numberOfLines={1} style={[styles.h2, { flex: 1 }]}>
+        <View style={section.sheetHeader}>
+          <View style={section.fileIcon}>
+            <Ionicons
+              name="document-text-outline"
+              size={19}
+              color={colors.brand}
+            />
+          </View>
+          <Text numberOfLines={1} style={[section.sheetTitle, { flex: 1 }]}>
             {name}
           </Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Kapat"
             onPress={onClose}
-            hitSlop={10}
-            style={{
-              width: 44,
-              height: 44,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            hitSlop={8}
+            style={({ pressed }) => [
+              section.close,
+              pressed && { backgroundColor: colors.line },
+            ]}
           >
-            <Ionicons name="close" size={22} color={colors.muted} />
+            <Ionicons name="close" size={20} color={colors.ink} />
           </Pressable>
         </View>
         {failed ? (
           <View style={[styles.body, { gap: 14 }]}>
-            <Text style={styles.muted}>
-              Bu dosya uygulama içinde açılamadı. Tarayıcıda deneyebilirsiniz.
-            </Text>
-            <Button
-              secondary
-              onPress={() => void WebBrowser.openBrowserAsync(url)}
-            >
-              Tarayıcıda aç
-            </Button>
+            <EmptyState
+              icon="document-text-outline"
+              title="Önizleme açılamadı"
+              description="Bu dosya uygulama içinde açılamadı. Tarayıcıda deneyebilirsiniz."
+              action={
+                <Button
+                  secondary
+                  size="sm"
+                  icon="open-outline"
+                  onPress={() => void WebBrowser.openBrowserAsync(url)}
+                >
+                  Tarayıcıda aç
+                </Button>
+              }
+            />
           </View>
         ) : (
           <WebView
@@ -125,7 +139,7 @@ export function PdfViewer({
             onMessage={(event) => {
               if (event.nativeEvent.data.startsWith("error:")) setFailed(true);
             }}
-            style={{ flex: 1, backgroundColor: colors.cream }}
+            style={{ flex: 1, backgroundColor: colors.canvas }}
           />
         )}
       </SafeAreaView>

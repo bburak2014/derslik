@@ -374,9 +374,15 @@ export default function Workspace({
               <small>Öğretmen hesabı</small>
             </div>
           </div>
-          <button className="signout" onClick={() => setSignoutOpen(true)}>
-            <LogOut size={14} /> Çıkış yap
-          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="signout justify-start"
+            onClick={() => setSignoutOpen(true)}
+          >
+            <LogOut /> Çıkış yap
+          </Button>
         </SidebarFooter>
       </Sidebar>
       <main className="workspace">
@@ -497,7 +503,7 @@ export default function Workspace({
               {view === "students" && (
                 <>
                   <div className="search-row">
-                    <InputGroup className="search-field">
+                    <InputGroup className="bg-card">
                       <InputGroupAddon>
                         <Search size={17} />
                       </InputGroupAddon>
@@ -508,7 +514,9 @@ export default function Workspace({
                         onChange={(e) => setSearch(e.target.value)}
                       />
                     </InputGroup>
-                    <span>{data.students.length} öğrenci kaydı</span>
+                    <span className="shrink-0 whitespace-nowrap">
+                      {data.students.length} öğrenci kaydı
+                    </span>
                   </div>
                   <StudentsView
                     data={data}

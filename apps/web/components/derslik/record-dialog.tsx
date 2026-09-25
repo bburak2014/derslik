@@ -32,6 +32,8 @@ import {
 import type { Command } from "@/lib/domain/validation";
 import type { Mutate } from "./workspace";
 import { balanceFor } from "./views";
+import { FormError } from "./feedback";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export type ModalState =
   | { type: "student"; student?: Student }
@@ -50,10 +52,10 @@ function Field({
   hint?: string;
 }) {
   return (
-    <div className="form-field">
+    <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
       {children}
-      {hint && <small>{hint}</small>}
+      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
   );
 }
@@ -72,7 +74,7 @@ function Choice({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={id} className="w-full h-11">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -277,23 +279,28 @@ export function RecordDialog({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="record-dialog max-h-[90dvh] overflow-y-auto sm:max-w-[540px]">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[540px]">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="record-form">
+        <form onSubmit={submit} className="grid gap-4">
           {noStudents ? (
-            <div className="form-notice">
-              <Info size={20} />
-              <p>Önce bir öğrenci ekleyerek başlayın.</p>
-              <Button
-                type="button"
-                onClick={() => onSwitch({ type: "student" })}
-              >
-                <Plus /> Öğrenci ekle
-              </Button>
-            </div>
+            <Alert>
+              <Info />
+              <AlertTitle>Henüz öğrenci yok</AlertTitle>
+              <AlertDescription>
+                <p>Önce bir öğrenci ekleyerek başlayın.</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => onSwitch({ type: "student" })}
+                >
+                  <Plus /> Öğrenci ekle
+                </Button>
+              </AlertDescription>
+            </Alert>
           ) : (
             <>
               {needsStudent && (
@@ -323,7 +330,7 @@ export function RecordDialog({
                       maxLength={120}
                     />
                   </Field>
-                  <div className="form-grid">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Ders" id="subject">
                       <Input
                         id="subject"
@@ -383,7 +390,7 @@ export function RecordDialog({
                       maxLength={120}
                     />
                   </Field>
-                  <div className="form-grid">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Ders hakkı" id="granted">
                       <Input
                         id="granted"
@@ -419,13 +426,13 @@ export function RecordDialog({
                       onChange={(e) => setExpires(e.target.value)}
                     />
                   </Field>
-                  <div className="inline-info">
-                    <Info size={16} />
-                    <p>
+                  <Alert>
+                    <Info />
+                    <AlertDescription>
                       Paket ücreti açık bakiyeye eklenir. Aldığınız ödemeyi
                       ayrıca “Tahsilat ekle” ile kaydedin.
-                    </p>
-                  </div>
+                    </AlertDescription>
+                  </Alert>
                 </>
               )}
               {(modal.type === "lesson" || modal.type === "reschedule") && (
@@ -444,22 +451,26 @@ export function RecordDialog({
                       </Field>
                       <Field label="Bağlı ders paketi" id="lesson-package">
                         {noPackage ? (
-                          <div className="inline-info flex-wrap">
-                            <p>
-                              Bu öğrenci için uygun tarihli, hakkı kalan bir
-                              paket bulunamadı.
-                            </p>
-                            <Button
-                              size="sm"
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                onSwitch({ type: "package", studentId })
-                              }
-                            >
-                              <Plus /> Paket ekle
-                            </Button>
-                          </div>
+                          <Alert>
+                            <Info />
+                            <AlertDescription>
+                              <p>
+                                Bu öğrenci için uygun tarihli, hakkı kalan bir
+                                paket bulunamadı.
+                              </p>
+                              <Button
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                                className="mt-2"
+                                onClick={() =>
+                                  onSwitch({ type: "package", studentId })
+                                }
+                              >
+                                <Plus /> Paket ekle
+                              </Button>
+                            </AlertDescription>
+                          </Alert>
                         ) : (
                           <Choice
                             id="lesson-package"
@@ -474,7 +485,7 @@ export function RecordDialog({
                       </Field>
                     </>
                   )}
-                  <div className="form-grid">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Ders tarihi" id="date">
                       <Input
                         id="date"
@@ -494,7 +505,7 @@ export function RecordDialog({
                       />
                     </Field>
                   </div>
-                  <div className="form-grid">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Süre (dakika)" id="duration">
                       <Input
                         id="duration"
@@ -533,18 +544,22 @@ export function RecordDialog({
                       />
                     </Field>
                   )}
-                  <p className="field-footnote">
+                  <p className="text-muted-foreground text-xs">
                     Tüm saatler Türkiye saatiyle (İstanbul) kaydedilir.
                   </p>
                 </>
               )}
               {modal.type === "payment" && (
                 <>
-                  <div className="balance-notice">
-                    <span>Öğrencinin açık bakiyesi</span>
-                    <strong>{money(balanceFor(data, studentId))}</strong>
+                  <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm">
+                    <span className="text-muted-foreground">
+                      Öğrencinin açık bakiyesi
+                    </span>
+                    <strong className="font-semibold tabular-nums">
+                      {money(balanceFor(data, studentId))}
+                    </strong>
                   </div>
-                  <div className="form-grid">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Alınan tutar (TL)" id="amount">
                       <Input
                         id="amount"
@@ -590,7 +605,7 @@ export function RecordDialog({
                       placeholder="Örn. Eylül paketi ilk ödeme"
                     />
                   </Field>
-                  <p className="field-footnote">
+                  <p className="text-muted-foreground text-xs">
                     Bu işlem ödeme kaydı oluşturur. Öğrenciden otomatik para
                     çekilmez.
                   </p>
@@ -598,11 +613,7 @@ export function RecordDialog({
               )}
             </>
           )}
-          {error && (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          )}
+          {error && <FormError>{error}</FormError>}
           <DialogFooter>
             <Button
               type="button"
