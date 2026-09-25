@@ -92,6 +92,16 @@ export const dateKey = (date: Date | string = new Date()) =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(date));
+// The API rule (learning.service assignment.submit): a student may hand in or
+// edit an open assignment until its due date, Istanbul calendar day included.
+// After that only a first, late hand-in is accepted.
+export const canEditSubmission = (
+  assignment: { status: string; due_on: string | null },
+  submitted: boolean,
+  today = dateKey(),
+) =>
+  assignment.status === "OPEN" &&
+  (!submitted || !assignment.due_on || assignment.due_on >= today);
 export const timeLabel = (date: string) =>
   new Intl.DateTimeFormat("tr-TR", {
     timeZone: "Europe/Istanbul",
