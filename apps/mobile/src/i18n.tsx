@@ -9,6 +9,7 @@ import { I18nManager, View } from "react-native";
 import { getItemAsync, setItemAsync } from "expo-secure-store";
 import {
   fallbackLocale,
+  localeFlags,
   localeNames,
   locales,
   matchLocale,
@@ -16,6 +17,7 @@ import {
   t,
   type Locale,
 } from "@derslik/contracts";
+import Svg, { Path } from "react-native-svg";
 import { Picker, useTheme } from "./ui";
 
 const LOCALE_KEY = "derslik.locale";
@@ -81,13 +83,46 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 }
 
 /** Dil seçimi; her dil kendi adıyla listelenir. */
+/** Dilin bayrağı (web ile aynı SVG yolları). */
+export function Flag({ locale }: { locale: Locale }) {
+  const { colors } = useTheme();
+  const flag = localeFlags[locale];
+  return (
+    <View
+      style={{
+        width: 21,
+        height: 14,
+        borderRadius: 2,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: colors.line,
+      }}
+    >
+      <Svg
+        width="100%"
+        height="100%"
+        viewBox={flag.viewBox}
+        preserveAspectRatio="xMidYMid slice"
+      >
+        {flag.shapes.map((shape, i) => (
+          <Path key={i} d={shape.d} fill={shape.fill} />
+        ))}
+      </Svg>
+    </View>
+  );
+}
+
 export function LanguagePicker() {
   const { locale, change } = useContext(LocaleContext);
   return (
     <Picker
       label={t("common.language")}
       value={locale}
-      options={locales.map((l) => ({ value: l, label: localeNames[l] }))}
+      options={locales.map((l) => ({
+        value: l,
+        label: localeNames[l],
+        icon: <Flag locale={l} />,
+      }))}
       onChange={(value) => {
         const next = matchLocale(value);
         if (next && next !== locale) change(next);

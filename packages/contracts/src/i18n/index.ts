@@ -16,6 +16,7 @@ import { zh } from "./zh.ts";
 import { ja } from "./ja.ts";
 
 export * from "./core.ts";
+export * from "./flags.ts";
 
 type Shape<T> = {
   [K in keyof T]: T[K] extends string
