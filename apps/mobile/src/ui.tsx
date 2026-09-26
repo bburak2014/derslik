@@ -1981,6 +1981,8 @@ export type Field = {
   secure?: boolean;
   hint?: string;
   placeholder?: string;
+  /** Varsayılan: çok satırlıda 5000, parolada 128, diğerlerinde 200. */
+  maxLength?: number;
   options?: { value: string; label: string }[];
 };
 export type FormSpec = {
@@ -2357,7 +2359,9 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
                     f.keyboard === "email-address" ? "none" : "sentences"
                   }
                   autoCorrect={f.keyboard !== "email-address"}
-                  maxLength={f.multiline ? 5000 : f.secure ? 128 : 200}
+                  maxLength={
+                    f.maxLength ?? (f.multiline ? 5000 : f.secure ? 128 : 200)
+                  }
                 />
               )}
             </Field>

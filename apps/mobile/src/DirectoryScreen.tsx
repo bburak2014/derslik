@@ -13,12 +13,14 @@ import * as ImagePicker from "expo-image-picker";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import type { TeacherPage } from "@derslik/api-client";
 import {
+  DECISION_NOTE_MAX,
   intlLocale,
   lessonModes,
   PHOTO_MAX_BYTES,
   PHOTO_SIZE,
   photoPath,
   priceCurrencies,
+  REQUEST_EXPIRY_DAYS,
   t,
   teacherLevels,
   teacherSorts,
@@ -94,6 +96,7 @@ const statusTone: Record<RequestStatus, BadgeTone> = {
   ACCEPTED: "success",
   DECLINED: "danger",
   CANCELLED: "neutral",
+  EXPIRED: "neutral",
 };
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   return (
@@ -189,9 +192,12 @@ function Price({ teacher }: { teacher: PublicTeacher }) {
 function TeacherCard({
   teacher,
   onPress,
+  onRequest,
 }: {
   teacher: PublicTeacher;
   onPress: () => void;
+  /** "İstek gönder": profil, istek formu açık açılır. */
+  onRequest: () => void;
 }) {
   const { styles } = useTheme();
   return (
@@ -230,7 +236,21 @@ function TeacherCard({
           </Badge>
         ))}
       </View>
-      <Price teacher={teacher} />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <View style={{ flexShrink: 1 }}>
+          <Price teacher={teacher} />
+        </View>
+        <Button size="sm" icon="paper-plane-outline" onPress={onRequest}>
+          {t("dir.requestShort")}
+        </Button>
+      </View>
     </Card>
   );
 }
@@ -255,7 +275,13 @@ export function DirectoryScreen({
 }) {
   const { styles } = useTheme();
   const [tab, setTab] = useState<DirectoryTab>(initialTab),
-    [teacher, setTeacher] = useState<string | null>(initialTeacher);
+    [teacher, setTeacher] = useState<string | null>(initialTeacher),
+    // Karttaki "İstek gönder"den gelindiyse profil istek formu açık açılır.
+    [openRequest, setOpenRequest] = useState(false);
+  const open = (id: string, request = false) => {
+    setOpenRequest(request);
+    setTeacher(id);
+  };
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -296,12 +322,13 @@ export function DirectoryScreen({
           key={teacher}
           id={teacher}
           onOpenWorkspace={onOpenWorkspace}
+          openRequest={openRequest}
         />
       ) : tab === "teachers" ? (
-        <TeacherList onOpen={setTeacher} />
+        <TeacherList onOpen={open} />
       ) : (
         <MyRequests
-          onOpen={setTeacher}
+          onOpen={open}
           onBrowse={() => setTab("teachers")}
           onOpenWorkspace={onOpenWorkspace}
         />
@@ -310,7 +337,11 @@ export function DirectoryScreen({
   );
 }
 
-function TeacherList({ onOpen }: { onOpen: (id: string) => void }) {
+function TeacherList({
+  onOpen,
+}: {
+  onOpen: (id: string, request?: boolean) => void;
+}) {
   const { styles } = useTheme();
   const [filter, setFilter] = useState<TeacherFilter>({}),
     [query, setQuery] = useState(""),
@@ -493,7 +524,12 @@ function TeacherList({ onOpen }: { onOpen: (id: string) => void }) {
         />
       ) : (
         rows.map((x) => (
-          <TeacherCard key={x.id} teacher={x} onPress={() => onOpen(x.id)} />
+          <TeacherCard
+            key={x.id}
+            teacher={x}
+            onPress={() => onOpen(x.id)}
+            onRequest={() => onOpen(x.id, true)}
+          />
         ))
       )}
       {page && rows.length < page.total && (
@@ -509,12 +545,26 @@ function TeacherList({ onOpen }: { onOpen: (id: string) => void }) {
   );
 }
 
+/** Öğretmenin reddederken yazdığı not; öğrencinin gördüğü haliyle. */
+function TeacherNote({ note }: { note: string }) {
+  const { styles } = useTheme();
+  return (
+    <View style={{ gap: 4 }}>
+      <Kicker muted>{t("dir.teacherNote")}</Kicker>
+      <Text style={styles.text}>{note}</Text>
+    </View>
+  );
+}
+
 function TeacherProfile({
   id,
   onOpenWorkspace,
+  openRequest = false,
 }: {
   id: string;
   onOpenWorkspace: (workspaceId: string) => void;
+  /** Karttaki "İstek gönder"den gelindi: gönderilebiliyorsa form açık başlar. */
+  openRequest?: boolean;
 }) {
   const { colors, styles } = useTheme();
   const [teacher, setTeacher] = useState<PublicTeacher | null>(null),
@@ -524,7 +574,8 @@ function TeacherProfile({
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [form, setForm] = useState<FormSpec | null>(null),
-    [refreshing, setRefreshing] = useState(false);
+    [refreshing, setRefreshing] = useState(false),
+    [autoOpened, setAutoOpened] = useState(!openRequest);
   async function load() {
     try {
       const [profile, rel] = await Promise.all([
@@ -602,6 +653,21 @@ function TeacherProfile({
         await load();
       },
     });
+  const canRequest =
+    !!relation &&
+    !relation.isOwn &&
+    !relation.isStudent &&
+    request?.status !== "PENDING" &&
+    !relation.retryAfter;
+  // Karttan gelindiyse form bir kez açılır; gönderilemiyorsa kutu nedenini söyler.
+  if (!autoOpened && relation) {
+    setAutoOpened(true);
+    if (canRequest) sendForm();
+  }
+  const note =
+    request?.status === "DECLINED" && request.decisionNote ? (
+      <TeacherNote note={request.decisionNote} />
+    ) : null;
   let action: React.ReactNode;
   if (!relation) action = null;
   else if (relation.isOwn)
@@ -629,6 +695,9 @@ function TeacherProfile({
             {t("dir.pendingState")}
           </Text>
         </View>
+        <Text style={styles.caption}>
+          {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
+        </Text>
         <Button
           secondary
           loading={busy}
@@ -651,15 +720,26 @@ function TeacherProfile({
     );
   else if (relation.retryAfter)
     action = (
-      <Text style={styles.muted}>
-        {t("dir.declinedState", { date: shortDate(relation.retryAfter) })}
-      </Text>
+      <>
+        <Text style={styles.muted}>
+          {t("dir.declinedState", { date: shortDate(relation.retryAfter) })}
+        </Text>
+        {note}
+      </>
     );
   else
     action = (
-      <Button icon="paper-plane-outline" onPress={sendForm}>
-        {t("dir.sendRequest")}
-      </Button>
+      <>
+        {request?.status === "EXPIRED" && (
+          <Text style={styles.muted}>
+            {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
+          </Text>
+        )}
+        {note}
+        <Button icon="paper-plane-outline" onPress={sendForm}>
+          {t("dir.sendRequest")}
+        </Button>
+      </>
     );
   const facts: [string, string[]][] = [
     [t("dir.subjects"), teacher.subjects.map(subjectName)],
@@ -982,6 +1062,19 @@ function MyRequests({
               </View>
             </View>
             <RequestStatusBadge status={r.status} />
+            {r.status === "DECLINED" && !!r.decisionNote && (
+              <TeacherNote note={r.decisionNote} />
+            )}
+            {r.status === "PENDING" && (
+              <Text style={styles.caption}>
+                {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
+              </Text>
+            )}
+            {r.status === "EXPIRED" && (
+              <Text style={styles.muted}>
+                {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
+              </Text>
+            )}
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {r.status === "ACCEPTED" && (
                 <Button
@@ -1051,7 +1144,8 @@ export function ShowcaseView({
     [tab, setTab] = useState<ShowcaseTab>("requests"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [refreshing, setRefreshing] = useState(false);
+    [refreshing, setRefreshing] = useState(false),
+    [form, setForm] = useState<FormSpec | null>(null);
   async function load() {
     try {
       const r = (await client.showcase(workspaceId)).data;
@@ -1071,29 +1165,48 @@ export function ShowcaseView({
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when a notice opens the showcase again.
   }, [workspaceId, focus]);
-  const decide = (r: LessonRequest, decision: "accept" | "decline") =>
-    confirmAction(
-      decision === "accept"
-        ? t("dir.acceptTitle", { name: r.studentName })
-        : t("dir.declineTitle"),
-      decision === "accept" ? t("dir.acceptBody") : t("dir.declineBody"),
-      async () => {
+  // Reddederken öğrenciye isteğe bağlı kısa not yazılabilir.
+  const decline = (r: LessonRequest) =>
+    setForm({
+      title: t("dir.declineTitle"),
+      description: t("dir.declineBody"),
+      submit_label: t("dir.decline"),
+      fields: [
+        {
+          key: "note",
+          label: t("dir.declineNoteLabel"),
+          placeholder: t("dir.declineNotePlaceholder"),
+          multiline: true,
+          required: false,
+          maxLength: DECISION_NOTE_MAX,
+        },
+      ],
+      submit: async (v) => {
         setNotice("");
-        const res = await client.decideLessonRequest(
-          workspaceId,
-          r.id,
-          decision,
-        );
-        setNotice(
-          decision === "accept"
-            ? t("dir.accepted", { name: r.studentName })
-            : t("dir.declined"),
-        );
+        await client.decideLessonRequest(workspaceId, r.id, "decline", v.note);
+        setNotice(t("dir.declined"));
         await load();
-        if (decision === "accept") onAccepted(res.data.studentId);
       },
-      setError,
-    );
+    });
+  const decide = (r: LessonRequest, decision: "accept" | "decline") =>
+    decision === "decline"
+      ? decline(r)
+      : confirmAction(
+          t("dir.acceptTitle", { name: r.studentName }),
+          t("dir.acceptBody"),
+          async () => {
+            setNotice("");
+            const res = await client.decideLessonRequest(
+              workspaceId,
+              r.id,
+              "accept",
+            );
+            setNotice(t("dir.accepted", { name: r.studentName }));
+            await load();
+            onAccepted(res.data.studentId);
+          },
+          setError,
+        );
   const pending = data?.requests.filter((r) => r.status === "PENDING") ?? [],
     earlier = data?.requests.filter((r) => r.status !== "PENDING") ?? [];
   return (
@@ -1207,6 +1320,7 @@ export function ShowcaseView({
           </>
         )}
       </ScrollView>
+      <FormSheet form={form} onClose={() => setForm(null)} />
     </>
   );
 }
@@ -1247,6 +1361,11 @@ function RequestCard({
         {!!r.email && <Text style={styles.text}>{r.email}</Text>}
         {!!r.phone && <Text style={styles.text}>{r.phone}</Text>}
       </View>
+      {r.status === "DECLINED" && !!r.decisionNote && (
+        <Text style={styles.muted}>
+          {t("dir.yourNote")}: {r.decisionNote}
+        </Text>
+      )}
       {r.status === "PENDING" && (
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Button
