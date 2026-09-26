@@ -174,3 +174,7 @@ apps/mobile/ios/
 !apps/api/.env.example
 !apps/web/.env.example
 !apps/mobile/.env.example
+
+# Kod kalitesi analiz çıktıları (pnpm quality:sonar, pnpm quality:dup)
+.scannerwork
+reports/

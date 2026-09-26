@@ -1,0 +1,22 @@
+{
+  "minTokens": 50,
+  "minLines": 5,
+  "maxSize": "2mb",
+  "maxLines": 100000,
+  "format": ["typescript", "tsx", "javascript", "css"],
+  "path": ["apps", "packages", "scripts"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/.api-build/**",
+    "**/dist/**",
+    "**/drizzle/**",
+    "**/android/**",
+    "**/components/ui/**",
+    "**/vendor/**",
+    "**/i18n/**"
+  ],
+  "reporters": ["console", "html"],
+  "output": "reports/jscpd",
+  "gitignore": true
+}
