@@ -400,17 +400,20 @@ export function TeacherDirectory({
   /** Oturum varsa kartlar, istek gönderilemeyen öğretmende durumu gösterir. */
   signedIn?: boolean;
 }) {
-  const [relations, setRelations] = useState<TeacherRelations | null>(null);
+  const [relations, setRelations] = useState<TeacherRelations | null>(null),
+    // Karttaki "İstek gönder": form listede açılır, profile gidilmez.
+    [requestFor, setRequestFor] = useState<PublicTeacher | null>(null),
+    [sent, setSent] = useState("");
+  const loadRelations = useCallback(
+    () =>
+      backend<{ data: TeacherRelations }>("/teacher-relations")
+        .then((r) => setRelations(r.data))
+        .catch(() => undefined),
+    [],
+  );
   useEffect(() => {
-    if (!signedIn) return;
-    let alive = true;
-    backend<{ data: TeacherRelations }>("/teacher-relations")
-      .then((r) => alive && setRelations(r.data))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [signedIn]);
+    if (signedIn) void loadRelations();
+  }, [signedIn, loadRelations]);
   const [filters, setFilters] = useState<Filters>({ sort: "recommended" }),
     [search, setSearch] = useState(""),
     [page, setPage] = useState<TeacherPage | null>(null),
@@ -640,6 +643,7 @@ export function TeacherDirectory({
         </div>
       </Card>
       {error && <FormError>{error}</FormError>}
+      {sent && <FormSuccess>{sent}</FormSuccess>}
       {page && (
         <p className="text-muted-foreground -mb-2 text-sm" aria-live="polite">
           {t("dir.resultCount", { count: page.total })}
@@ -664,13 +668,30 @@ export function TeacherDirectory({
               teacher={teacher}
               href={hrefFor?.(teacher.id)}
               onOpen={() => onOpen?.(teacher.id)}
-              requestHref={hrefFor?.(teacher.id, true)}
-              onRequest={() => onOpen?.(teacher.id, true)}
+              // Oturum yoksa profil sayfası girişe yönlendirir.
+              requestHref={signedIn ? undefined : hrefFor?.(teacher.id, true)}
+              onRequest={() => {
+                if (!signedIn) return onOpen?.(teacher.id, true);
+                setSent("");
+                setRequestFor(teacher);
+              }}
               state={cardState(relations, teacher.id)}
             />
           ))
         )}
       </div>
+      {requestFor && (
+        <RequestDialog
+          key={requestFor.id}
+          teacher={requestFor}
+          open
+          onOpenChange={(open) => !open && setRequestFor(null)}
+          onSent={() => {
+            setSent(t("dir.sent"));
+            void loadRelations();
+          }}
+        />
+      )}
       {page && !items.length && !error && (
         <Empty className="border">
           <EmptyHeader>
