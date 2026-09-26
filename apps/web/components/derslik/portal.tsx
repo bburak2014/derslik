@@ -273,6 +273,7 @@ export function Portal({
   onNotice,
   onOpenWorkspace,
   onStartTeaching,
+  teacherAccount = false,
 }: {
   access: Access | null;
   displayName: string;
@@ -285,10 +286,14 @@ export function Portal({
   onOpenWorkspace?: (workspaceId: string) => void;
   /** Öğretmene bağlı olmayan hesap kendi çalışma alanını açabilir. */
   onStartTeaching?: () => void;
+  /** Hesabın kendi öğretmen çalışma alanı var: öğretmen istek gönderemez,
+   *  "Öğretmen bul" ve "İsteklerim" gösterilmez. */
+  teacherAccount?: boolean;
 }) {
   const role: PortalRole = access?.role === "GUARDIAN" ? "GUARDIAN" : "STUDENT";
   // Veli hesabı adına ders isteği gönderilmez; vitrin yalnızca öğrencide.
-  const canDiscover = role === "STUDENT";
+  // Öğretmen hesabı da istek gönderemez (bir e-posta ya öğretmen ya öğrenci).
+  const canDiscover = role === "STUDENT" && !teacherAccount;
   const fallback: PortalPage = access ? "lessons" : "teachers";
   const [tab, setTab] = useState<PortalPage>(() => pageFromUrl(fallback)),
     [teacher, setTeacher] = useState<string | null>(teacherFromUrl),
