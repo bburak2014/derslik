@@ -24,9 +24,43 @@ import {
   shortName,
   teacherFilterSchema,
   teacherProfileSchema,
+  lessonModes,
+  teacherLevels,
+  teacherSubjects,
+  teachingLanguages,
 } from "../../../../packages/contracts/src/directory.js";
+import {
+  locales,
+  translate,
+  type MessageKey,
+} from "../../../../packages/contracts/src/i18n/index.js";
 
 const uuid = z.string().uuid();
+
+// Arama: Türkçe büyük/küçük harf farkı (İ/I/ı) gözetilmez.
+const fold = (text: string) =>
+  text.normalize("NFC").toLocaleLowerCase("tr").replace(/ı/g, "i");
+const FOLD_SQL = (column: string) =>
+  `translate(lower(translate(${column},'İIÇĞÖŞÜ','iiçğöşü')),'ı','i')`;
+// Branş, seviye, ders şekli ve dil sabit anahtarlarla saklanır; arama kutusuna
+// yazılan ad (yedi dilin herhangisinde, ör. "matematik", "math") anahtara
+// çevrilir.
+const SEARCHABLE = (
+  [
+    ["subjects", "dir.subject", teacherSubjects],
+    ["levels", "dir.level", teacherLevels],
+    ["lesson_modes", "dir.mode", lessonModes],
+    ["languages", "dir.lang", teachingLanguages],
+  ] as const
+).map(([column, prefix, keys]) => ({
+  column,
+  names: keys.map((key) => ({
+    key,
+    labels: locales.map((l) =>
+      fold(translate(l, `${prefix}.${key}` as MessageKey)),
+    ),
+  })),
+}));
 const REQUEST_COLUMNS =
   "id,workspace_id,student_name,subject,level,phone,email,message,status,student_id,created_at,decided_at";
 const PROFILE_COLUMNS =
@@ -80,11 +114,30 @@ export class DirectoryService {
       values.push(value);
       where.push(sql.replaceAll("$?", "$" + values.length));
     };
-    if (f.q)
+    // Her kelime ad, başlık, tanıtım, şehir ya da branş/seviye/ders
+    // şekli/dil adlarından birinde geçmeli ("matematik izmir").
+    for (const word of (f.q ?? "").split(/\s+/).filter(Boolean).slice(0, 6)) {
+      const folded = fold(word);
       add(
-        "(display_name ILIKE $? OR headline ILIKE $? OR bio ILIKE $?)",
-        "%" + f.q.replace(/[\\%_]/g, (c) => "\\" + c) + "%",
+        "(" +
+          ["display_name", "headline", "bio", "city"]
+            .map((c) => `${FOLD_SQL(c)} LIKE $?`)
+            .join(" OR ") +
+          ")",
+        "%" + folded.replace(/[\\%_]/g, (c) => "\\" + c) + "%",
       );
+      for (const group of SEARCHABLE) {
+        const keys = group.names
+          .filter((n) => n.labels.some((label) => label.includes(folded)))
+          .map((n) => n.key);
+        if (!keys.length) continue;
+        values.push(keys);
+        where[where.length - 1] = where[where.length - 1].replace(
+          /\)$/,
+          ` OR ${group.column} && $${values.length}::text[])`,
+        );
+      }
+    }
     if (f.subject) add("$? = ANY(subjects)", f.subject);
     if (f.level) add("$? = ANY(levels)", f.level);
     if (f.mode) add("$? = ANY(lesson_modes)", f.mode);

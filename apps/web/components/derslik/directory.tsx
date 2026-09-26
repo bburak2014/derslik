@@ -555,13 +555,22 @@ export function TeacherDirectory({
         )}
       </Card>
       {error && <FormError>{error}</FormError>}
-      {!loading && page && (
+      {page && (
         <p className="text-muted-foreground -mb-2 text-sm" aria-live="polite">
           {t("dir.resultCount", { count: page.total })}
         </p>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {loading ? (
+      {/* Arama ve filtre değişince eski sonuçlar yenileri gelene kadar yerinde
+          kalır; iskelet yalnızca ilk yüklemede çizilir (kartlar gidip
+          gelmesin). */}
+      <div
+        aria-busy={loading}
+        className={
+          "grid gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-3" +
+          (loading && page ? " opacity-60" : "")
+        }
+      >
+        {loading && !page ? (
           <CardSkeletons />
         ) : (
           items.map((teacher) => (
@@ -574,7 +583,7 @@ export function TeacherDirectory({
           ))
         )}
       </div>
-      {!loading && !items.length && !error && (
+      {page && !items.length && !error && (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
