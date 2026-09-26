@@ -33,3 +33,9 @@ export async function webRequest<T = unknown>(
 }
 export const backend = <T = unknown>(path: string, body?: unknown) =>
   webRequest<T>("/api/backend" + path, body);
+
+/** Formdaki metin alanının değeri; alan yoksa ya da dosyaysa boş metin. */
+export function formText(form: FormData, name: string) {
+  const value = form.get(name);
+  return typeof value === "string" ? value : "";
+}

@@ -1,4 +1,5 @@
 import { isMessageKey, t, translate, type MessageKey } from "./i18n/index.ts";
+import { dayLabel } from "./types.ts";
 
 /** Bildirimin ilgili olduğu kayıt. Sunucu her bildirime türünü ve kaydın
  *  kimliğini yazar; web ve mobil aynı kuralla ilgili sayfayı açar. */
@@ -114,4 +115,59 @@ export function noticeTarget(n: Notice): NoticeTarget | null {
     section,
     itemId: n.kind ? n.targetId : null,
   };
+}
+
+/** Bildirim simgesinin türü; web lucide, mobil Ionicons simgesiyle çizer.
+ *  Türü yazılmamış eski bildirimlerde sunucunun sabit Türkçe başlığına bakılır. */
+export type NoticeIcon =
+  "question" | "video" | "summary" | "assignment" | "other";
+
+export function noticeIcon(n: Pick<Notice, "kind" | "title">): NoticeIcon {
+  if (n.kind === "QUESTION" || n.kind === "ANSWER") return "question";
+  if (n.kind === "VIDEO") return "video";
+  if (n.kind === "SUMMARY") return "summary";
+  if (n.kind) return "assignment";
+  const title = n.title.toLocaleLowerCase("tr");
+  if (title.includes("soru")) return "question";
+  if (title.includes("video")) return "video";
+  if (title.includes("özet")) return "summary";
+  if (title.includes("ödev")) return "assignment";
+  return "other";
+}
+
+/** "5 dk önce", "dün"; bir haftadan eskiyse tarih. */
+export function timeAgo(iso: string, now: number) {
+  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
+  if (minutes < 1) return t("time.justNow");
+  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return t("time.hoursAgo", { count: hours });
+  const days = Math.round(hours / 24);
+  if (days === 1) return t("time.yesterday");
+  if (days < 7) return t("time.daysAgo", { count: days });
+  return dayLabel(iso);
+}
+
+type NoticeAccess = {
+  id: string;
+  role: "OWNER" | "STUDENT" | "GUARDIAN";
+  studentId?: string;
+};
+
+/** Öğrencinin istek yanıtı dışındaki bildirimler için hangi görünümün
+ *  açılacağı: şu an açık olan uyuyorsa o, yoksa öğretmen görünümü, yoksa o
+ *  öğrencinin görünümü. Gelen ders istekleri yalnızca öğretmende açılır. */
+export function noticeAccess<A extends NoticeAccess>(
+  target: NoticeTarget,
+  list: A[],
+  current: A | null,
+): A | null {
+  const fits = (a: A) =>
+    a.id === target.workspaceId &&
+    (a.role === "OWNER" ||
+      (target.section !== "requests" && a.studentId === target.studentId));
+  if (current && fits(current)) return current;
+  return (
+    list.find((a) => fits(a) && a.role === "OWNER") ?? list.find(fits) ?? null
+  );
 }

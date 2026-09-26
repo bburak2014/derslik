@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import { Button, EmptyState, useTheme } from "./ui";
+import { Button, CloseButton, EmptyState, useTheme } from "./ui";
 import { t } from "@derslik/contracts";
 
 // Android'in tarayıcısında yerleşik PDF görüntüleyici yok; bağlantıyı açmak
@@ -101,18 +101,7 @@ export function PdfViewer({
           <Text numberOfLines={1} style={[section.sheetTitle, { flex: 1 }]}>
             {name}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("common.close")}
-            onPress={onClose}
-            hitSlop={8}
-            style={({ pressed }) => [
-              section.close,
-              pressed && { backgroundColor: colors.line },
-            ]}
-          >
-            <Ionicons name="close" size={20} color={colors.ink} />
-          </Pressable>
+          <CloseButton onPress={onClose} />
         </View>
         {failed ? (
           <View style={[styles.body, { gap: 14 }]}>

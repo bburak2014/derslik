@@ -5,10 +5,8 @@ import type { Access, PortalData } from "@derslik/api-client";
 import {
   BookOpen,
   CalendarDays,
-  ChevronRight,
   ClipboardList,
   FileText,
-  LogOut,
   NotebookPen,
   Send,
   UserRoundSearch,
@@ -16,19 +14,16 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { ThemeToggle } from "@/components/account/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -55,7 +50,7 @@ import {
   type MessageKey,
   type NoticeTarget,
 } from "@derslik/contracts";
-import { LanguageSelect } from "@/components/i18n/language-select";
+import { SidebarAccount, Topbar } from "./shell";
 import { backend } from "@/lib/client";
 import { MyRequests, TeacherDirectory, TeacherProfileView } from "./directory";
 
@@ -489,21 +484,16 @@ export function Portal({
             </div>
           )}
         </SidebarContent>
-        <SidebarFooter className="p-6 gap-4">
-          <ThemeToggle />
-          <LanguageSelect />
-          {switcher}
-          <div className="profile">
-            <span className="avatar">{upper(displayName.charAt(0))}</span>
-            <div>
-              <strong title={displayName}>{displayName}</strong>
-              <small>
-                {role === "STUDENT"
-                  ? t("portal.studentAccount")
-                  : t("portal.guardianAccount")}
-              </small>
-            </div>
-          </div>
+        <SidebarAccount
+          displayName={displayName}
+          role={
+            role === "STUDENT"
+              ? t("portal.studentAccount")
+              : t("portal.guardianAccount")
+          }
+          switcher={switcher}
+          onSignout={onSignout && (() => setSignoutOpen(true))}
+        >
           {onStartTeaching && (
             <Button
               type="button"
@@ -515,36 +505,15 @@ export function Portal({
               <BookOpen /> {t("dir.startTeaching")}
             </Button>
           )}
-          {onSignout && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="signout justify-start"
-              onClick={() => setSignoutOpen(true)}
-            >
-              <LogOut /> {t("common.signOut")}
-            </Button>
-          )}
-        </SidebarFooter>
+        </SidebarAccount>
       </Sidebar>
       <main className="workspace">
-        <a href="#main-content" className="skip-link">
-          {t("common.skipToContent")}
-        </a>
-        <header className="topbar">
-          <div className="topbar-crumbs">
-            <SidebarTrigger aria-label={t("common.toggleMenu")} />
-            <span className="crumb-root">
-              {access?.studentName ?? t("dir.studentArea")}
-            </span>
-            <ChevronRight size={13} className="crumb-sep" />
-            <span className="crumb-current">{t(heading.label)}</span>
-          </div>
-          <div className="topbar-actions">
-            <AccountExtras onOpen={onNotice} />
-          </div>
-        </header>
+        <Topbar
+          root={access?.studentName ?? t("dir.studentArea")}
+          current={t(heading.label)}
+        >
+          <AccountExtras onOpen={onNotice} />
+        </Topbar>
         <div className="page-body" id="main-content">
           <div className="page-heading">
             <div>

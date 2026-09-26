@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { I18nManager, View } from "react-native";
@@ -73,10 +74,14 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setState(next);
     void setItemAsync(LOCALE_KEY, next).catch(() => {});
   }, []);
-  if (!locale)
+  const value = useMemo(
+    () => (locale ? { locale, change } : null),
+    [locale, change],
+  );
+  if (!value)
     return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
   return (
-    <LocaleContext.Provider value={{ locale, change }}>
+    <LocaleContext.Provider value={value}>
       <React.Fragment key={locale}>{children}</React.Fragment>
     </LocaleContext.Provider>
   );

@@ -46,8 +46,10 @@ import {
   dayLabel,
   intlLocale,
   lower,
+  money,
   t,
   upper,
+  type LessonPackage,
 } from "@derslik/contracts";
 
 const THEME_KEY = "derslik.theme";
@@ -1275,6 +1277,67 @@ export function Card({
   );
 }
 
+/** Alt sayfa ve seçicilerin kapat düğmesi. */
+export function CloseButton({
+  onPress,
+  disabled,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  const { colors, section } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t("common.close")}
+      disabled={disabled}
+      onPress={onPress}
+      android_ripple={ripple()}
+      hitSlop={8}
+      style={({ pressed }) => [
+        section.close,
+        pressed && { backgroundColor: colors.line },
+      ]}
+    >
+      <Ionicons name="close" size={20} color={colors.ink} />
+    </Pressable>
+  );
+}
+
+/** Ders paketi kartı: kalan hak rozeti, toplam ve ücret. Öğretmen görünümü
+ *  altına son kullanım tarihini ekler. */
+export function PackageCard({
+  pack,
+  children,
+}: {
+  pack: Pick<LessonPackage, "name" | "remaining" | "granted" | "price_minor">;
+  children?: React.ReactNode;
+}) {
+  const { styles } = useTheme();
+  const low = pack.remaining <= 2;
+  return (
+    <Card>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+        <Text style={[styles.h2, { flex: 1 }]}>{pack.name}</Text>
+        <Badge
+          tone={low ? "warning" : "info"}
+          icon={low ? "alert-circle-outline" : undefined}
+        >
+          {t("common.creditCount", { count: pack.remaining })}
+        </Badge>
+      </View>
+      <Text style={styles.muted}>
+        {t("mt.creditsOf", {
+          remaining: pack.remaining,
+          granted: pack.granted,
+        })}{" "}
+        · {money(pack.price_minor)}
+      </Text>
+      {children}
+    </Card>
+  );
+}
+
 export function SectionHeading({
   title,
   description,
@@ -2183,18 +2246,7 @@ export function Picker({
               <Text style={section.sheetTitle}>
                 {label ?? t("common.choose")}
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("common.close")}
-                onPress={() => setOpen(false)}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  section.close,
-                  pressed && { backgroundColor: colors.line },
-                ]}
-              >
-                <Ionicons name="close" size={20} color={colors.ink} />
-              </Pressable>
+              <CloseButton onPress={() => setOpen(false)} />
             </View>
             {options.length > 7 && (
               <Input
@@ -2353,20 +2405,7 @@ function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
             </Text>
           )}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("common.close")}
-          disabled={busy}
-          onPress={onClose}
-          android_ripple={ripple()}
-          hitSlop={8}
-          style={({ pressed }) => [
-            section.close,
-            pressed && { backgroundColor: colors.line },
-          ]}
-        >
-          <Ionicons name="close" size={20} color={colors.ink} />
-        </Pressable>
+        <CloseButton onPress={onClose} disabled={busy} />
       </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}

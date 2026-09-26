@@ -7,13 +7,11 @@ import {
   Check,
   ArrowUpRight,
   ArrowRight,
-  Clock3,
   MapPin,
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
   Plus,
-  BookOpen,
   CircleCheck,
   Undo2,
   CalendarClock,
@@ -42,7 +40,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ToneBadge } from "./feedback";
 import {
@@ -322,9 +319,6 @@ export function Overview({
     next = data.lessons.filter(
       (l) => l.status === "SCHEDULED" && l.ends_at >= new Date().toISOString(),
     );
-  const collected = data.payments
-    .filter((p) => !p.voided_at && p.received_on.startsWith(today.slice(0, 7)))
-    .reduce((sum, p) => sum + Number(p.amount_minor), 0);
   const outstanding = data.students.reduce(
       (sum, s) => sum + balanceFor(data, s.id),
       0,

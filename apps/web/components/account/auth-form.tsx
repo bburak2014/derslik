@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { webRequest } from "@/lib/client";
+import { formText, webRequest } from "@/lib/client";
 import { t, upper } from "@derslik/contracts";
 import { LanguageSelect } from "@/components/i18n/language-select";
 const social = [
@@ -216,7 +216,7 @@ export function AuthForm({
                   `/api/auth/${mode}`,
                   {
                     ...(mode !== "password"
-                      ? { email: String(f.get("email")).trim() }
+                      ? { email: formText(f, "email").trim() }
                       : {}),
                     ...(mode !== "recover"
                       ? { password: f.get("password") }

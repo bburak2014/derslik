@@ -44,7 +44,9 @@
     "storage:setup": "node --env-file=.env.api apps/api/scripts/setup-storage.mjs",
     "mobile:clear": "node scripts/sync-env.mjs && pnpm --filter @derslik/mobile start --clear",
     "services:check": "node scripts/check-services.mjs",
-    "test:media": "pnpm api:build && node --test tests/media-config.test.mjs"
+    "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
+    "quality:sonar": "node scripts/sonar.mjs",
+    "quality:dup": "npx -y jscpd@4"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
