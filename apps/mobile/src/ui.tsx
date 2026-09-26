@@ -481,6 +481,20 @@ const makeSection = (colors: Palette, type: Typography) =>
       alignItems: "center",
       gap: 10,
     },
+    pillTrigger: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      minHeight: 36,
+      paddingHorizontal: 12,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.lineControl,
+      backgroundColor: colors.surface,
+    },
+    pillText: {
+      fontSize: 13.5,
+    },
     pickerBackdrop: {
       flex: 1,
       justifyContent: "flex-end",
@@ -2063,6 +2077,7 @@ export function Picker({
   onChange,
   label,
   placeholder = t("common.choose"),
+  pill,
 }: {
   value: string;
   options: {
@@ -2074,8 +2089,11 @@ export function Picker({
   onChange: (value: string) => void;
   label?: string;
   placeholder?: string;
+  /** Filtre hapı: "Etiket: seçim" yazan yuvarlak düğme; boş değer dışında
+   *  bir seçim yapılınca marka tonuna geçer. */
+  pill?: { icon: IconName };
 }) {
-  const { colors, styles, section } = useTheme();
+  const { colors, styles, section, type } = useTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const selected = options.find((o) => o.value === value);
@@ -2083,6 +2101,7 @@ export function Picker({
   const shown = needle
     ? options.filter((o) => lower(o.label).includes(needle))
     : options;
+  const on = !!pill && !!value;
   return (
     <>
       <Pressable
@@ -2094,24 +2113,60 @@ export function Picker({
           setOpen(true);
         }}
         android_ripple={ripple()}
-        style={({ pressed }) => [
-          styles.input,
-          section.pickerTrigger,
-          pressed && styles.inputFocused,
-        ]}
+        style={({ pressed }) =>
+          pill
+            ? [
+                section.pillTrigger,
+                on && {
+                  borderColor: colors.brandLine,
+                  backgroundColor: colors.brandSoft,
+                },
+                pressed && !on && { backgroundColor: colors.sunken },
+              ]
+            : [
+                styles.input,
+                section.pickerTrigger,
+                pressed && styles.inputFocused,
+              ]
+        }
       >
-        {selected?.icon}
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.text,
-            { flex: 1, color: colors.ink },
-            !selected && { color: colors.muted },
-          ]}
-        >
-          {selected?.label ?? placeholder}
-        </Text>
-        <Ionicons name="chevron-down" size={17} color={colors.muted} />
+        {pill ? (
+          <>
+            <Ionicons
+              name={pill.icon}
+              size={15}
+              color={on ? colors.brand : colors.muted}
+            />
+            <Text numberOfLines={1} style={[type.medium, section.pillText]}>
+              {!!label && (
+                <Text style={{ color: colors.muted }}>{label}: </Text>
+              )}
+              <Text style={{ color: on ? colors.brand : colors.ink }}>
+                {selected?.label ?? placeholder}
+              </Text>
+            </Text>
+            <Ionicons
+              name="chevron-down"
+              size={14}
+              color={on ? colors.brand : colors.muted}
+            />
+          </>
+        ) : (
+          <>
+            {selected?.icon}
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.text,
+                { flex: 1, color: colors.ink },
+                !selected && { color: colors.muted },
+              ]}
+            >
+              {selected?.label ?? placeholder}
+            </Text>
+            <Ionicons name="chevron-down" size={17} color={colors.muted} />
+          </>
+        )}
       </Pressable>
       <Modal
         visible={open}
