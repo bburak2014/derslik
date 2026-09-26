@@ -2644,13 +2644,6 @@
     background: var(--marker);
     color: var(--marker-ink);
   }
-  .filter-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--marker);
-    box-shadow: 0 0 0 1px var(--marker-ink);
-  }
   .choice-card {
     display: grid;
     gap: 4px;
