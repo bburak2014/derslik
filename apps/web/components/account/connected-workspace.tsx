@@ -434,6 +434,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       onSignout={() => void signout()}
       focus={focus}
       onNotice={(target) => void openNotice(target)}
+      teacherAccount={session.list.some((a) => a.role === "OWNER")}
     />
   );
 }

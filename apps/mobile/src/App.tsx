@@ -41,6 +41,10 @@ function Application() {
     // Without a Supabase client there is no session to restore.
     [boot, setBoot] = useState(supabase !== null),
     [access, setAccess] = useState<Access[]>([]),
+    // Erişim listesinin hangi hesap için yüklendiği. Google ile girişten hemen
+    // sonra liste henüz boşken "Nasıl devam etmek istersiniz?" seçimi bir an
+    // görünüp kayboluyordu; liste o hesap için gelene kadar yükleniyor gösterilir.
+    [loadedFor, setLoadedFor] = useState<string | null>(null),
     [active, setActive] = useState<Access | null>(null),
     [error, setError] = useState(""),
     [reset, setReset] = useState(false),
@@ -187,8 +191,9 @@ function Application() {
     };
   }, []);
   useEffect(() => {
+    const uid = session?.user.id;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
-    if (session) void load();
+    if (uid) void load().then(() => setLoadedFor(uid));
   }, [session?.user.id, load]);
   async function signout() {
     try {
@@ -249,8 +254,12 @@ function Application() {
         </View>
       </SafeAreaView>
     );
+  // Öğretmen hesabı (kendi çalışma alanı olan) öğrenci tarafındaki "Öğretmen
+  // bul"u görmez: bir e-posta ya öğretmen ya öğrencidir, öğretmen istek atamaz.
+  const teacherAccount = access.some((a) => a.role === "OWNER");
   if (boot) return <Loading />;
   if (!session) return <AuthScreen />;
+  if (loadedFor !== session.user.id) return <Loading />;
   if (reset) return <AuthScreen reset onDone={() => setReset(false)} />;
   if (directory)
     return (
@@ -367,7 +376,7 @@ function Application() {
               {t("conn.createWorkspace")}
             </Button>
           )}
-          {!!access.length && (
+          {!!access.length && !teacherAccount && (
             <Button
               secondary
               icon="search-outline"
@@ -422,7 +431,7 @@ function Application() {
       onAccount={select}
       focus={focus}
       onNotice={openNotice}
-      onDiscover={() => openDirectory()}
+      onDiscover={teacherAccount ? undefined : () => openDirectory()}
     />
   );
 }

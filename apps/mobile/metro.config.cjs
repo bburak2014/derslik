@@ -33,6 +33,13 @@ const generatedAtRoot = [
   "apps/web/.next",
   "apps/api/dist",
   "apps/mobile/dist",
+  // Yerel Android/iOS projesi. Metro buradan hiçbir şey paketlemez; ama
+  // emülatörde `expo run:android` ile çalışırken Gradle `app/build`,
+  // `.gradle` ve `.cxx` altına sürekli yazar ve her yazma banner'ı açar.
+  "apps/mobile/android",
+  "apps/mobile/ios",
+  // Babel, ESLint ve Next gibi araçların ortak önbelleği.
+  "node_modules/.cache",
 ];
 
 // Bunlar araçların kendi durum ve önbellek klasörleri; hiçbir yayımlanmış paket
@@ -48,6 +55,8 @@ const generatedAnywhere = [
   ".qodo",
   ".openai",
   ".expo",
+  ".gradle",
+  ".cxx",
 ];
 
 const previous = config.resolver.blockList || [];
