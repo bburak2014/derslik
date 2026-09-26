@@ -1,8 +1,7 @@
 import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { money } from "@derslik/contracts";
+import { money, lower, t } from "@derslik/contracts";
 import { Avatar, Badge, Button, EmptyState, Input, List, ListRow } from "../ui";
-import { lower, t } from "@derslik/contracts";
 import { type TeacherCtx } from "./use-teacher-screen";
 
 export function StudentList({ ctx }: { ctx: TeacherCtx }) {

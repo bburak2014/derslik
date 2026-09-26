@@ -1,7 +1,6 @@
 import { Text, View } from "react-native";
-import { addDays, dateKey, dayLabel } from "@derslik/contracts";
+import { addDays, dateKey, dayLabel, t } from "@derslik/contracts";
 import { Button, EmptyState, IconButton, Input } from "../ui";
-import { t } from "@derslik/contracts";
 import { type TeacherCtx } from "./use-teacher-screen";
 
 export function CalendarSection({ ctx }: { ctx: TeacherCtx }) {

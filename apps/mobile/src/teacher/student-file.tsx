@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { money } from "@derslik/contracts";
+import { money, t, type MessageKey } from "@derslik/contracts";
 import {
   Badge,
   Button,
@@ -11,7 +11,6 @@ import {
   PackageCard,
   SectionHeading,
 } from "../ui";
-import { t, type MessageKey } from "@derslik/contracts";
 import { type TeacherCtx } from "./use-teacher-screen";
 
 export function StudentFile({ ctx }: { ctx: TeacherCtx }) {

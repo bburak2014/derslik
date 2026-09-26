@@ -11,6 +11,8 @@ import {
   type Student,
   type Lesson,
   type Command,
+  t,
+  type NoticeTarget,
 } from "@derslik/contracts";
 import { client, request } from "../core";
 import {
@@ -27,7 +29,6 @@ import {
   useTheme,
 } from "../ui";
 import { type NoticeFocus, type TeachingView } from "../LearningScreen";
-import { t, type NoticeTarget } from "@derslik/contracts";
 
 export const dateTime = (day: string, time: string) => {
   if (

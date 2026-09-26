@@ -1,5 +1,5 @@
 import { Text, View } from "react-native";
-import { dayLabel, money } from "@derslik/contracts";
+import { dayLabel, money, t, upper } from "@derslik/contracts";
 import {
   Avatar,
   Badge,
@@ -9,7 +9,6 @@ import {
   EmptyState,
   InkPanel,
 } from "../ui";
-import { t, upper } from "@derslik/contracts";
 import { type TeacherCtx } from "./use-teacher-screen";
 
 export function PaymentsSection({ ctx }: { ctx: TeacherCtx }) {

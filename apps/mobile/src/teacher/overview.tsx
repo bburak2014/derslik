@@ -1,5 +1,5 @@
 import { Text, View } from "react-native";
-import { dayLabel, money } from "@derslik/contracts";
+import { dayLabel, money, t } from "@derslik/contracts";
 import {
   Avatar,
   Button,
@@ -11,7 +11,6 @@ import {
   ListRow,
   SectionHeading,
 } from "../ui";
-import { t } from "@derslik/contracts";
 import { type TeacherCtx } from "./use-teacher-screen";
 
 export function Overview({ ctx }: { ctx: TeacherCtx }) {
