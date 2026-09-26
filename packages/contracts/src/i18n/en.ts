@@ -1236,6 +1236,8 @@ export const en: Messages = {
     declineBody:
       "The student is notified and can't send you another request for 7 days.",
     declineTitle: "Decline this request?",
+    cardOwn: "Your profile",
+    cardStudent: "You're a student",
     declineNoteLabel: "Note to the student (optional)",
     declineNotePlaceholder: "E.g. My schedule is full this term.",
     expiredState:

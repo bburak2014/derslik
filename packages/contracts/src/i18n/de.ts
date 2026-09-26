@@ -1290,6 +1290,8 @@ export const de: Messages = {
     declineBody:
       "Der Schüler wird benachrichtigt und kann 7 Tage lang keine neue Anfrage senden.",
     declineTitle: "Anfrage ablehnen?",
+    cardOwn: "Ihr Profil",
+    cardStudent: "Sie sind Schüler/in",
     declineNoteLabel: "Notiz an die Schülerin/den Schüler (optional)",
     declineNotePlaceholder:
       "Z. B. Mein Stundenplan ist in diesem Halbjahr voll.",

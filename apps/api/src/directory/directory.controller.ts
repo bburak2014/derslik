@@ -52,6 +52,9 @@ export class PublicDirectoryController {
 @UseGuards(AuthGuard)
 export class DirectoryController {
   constructor(private readonly directory: DirectoryService) {}
+  @Get("teacher-relations") relations(@Req() req: ActorRequest) {
+    return this.directory.relations(req.actor);
+  }
   @Get("teacher-relations/:id") relation(
     @Req() req: ActorRequest,
     @Param("id") id: string,

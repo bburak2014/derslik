@@ -1190,6 +1190,8 @@ export const ja: Messages = {
     decline: "辞退",
     declineBody: "生徒に通知され、7日間は再度リクエストできません。",
     declineTitle: "このリクエストを辞退しますか？",
+    cardOwn: "あなたのプロフィール",
+    cardStudent: "受講中",
     declineNoteLabel: "生徒へのメモ（任意）",
     declineNotePlaceholder: "例：今学期は予定が埋まっています。",
     expiredState:

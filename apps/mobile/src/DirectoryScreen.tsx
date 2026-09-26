@@ -37,6 +37,7 @@ import {
   type TeacherFilter,
   type TeacherProfileInput,
   type TeacherRelation,
+  type TeacherRelations,
 } from "@derslik/contracts";
 import { client, configuration } from "./core";
 import {
@@ -190,15 +191,33 @@ function Price({ teacher }: { teacher: PublicTeacher }) {
   );
 }
 
+/** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
+type CardState = "own" | "student" | "pending" | "cooling" | null;
+const cardState = (r: TeacherRelations | null, id: string): CardState =>
+  !r
+    ? null
+    : r.own.includes(id)
+      ? "own"
+      : r.students.includes(id)
+        ? "student"
+        : r.pending.includes(id)
+          ? "pending"
+          : r.cooling.includes(id)
+            ? "cooling"
+            : null;
+
 function TeacherCard({
   teacher,
   onPress,
   onRequest,
+  state = null,
 }: {
   teacher: PublicTeacher;
   onPress: () => void;
   /** "İstek gönder": profil, istek formu açık açılır. */
   onRequest: () => void;
+  /** İstek gönderilemiyorsa düğme yerine bu durum görünür. */
+  state?: CardState;
 }) {
   const { styles } = useTheme();
   return (
@@ -248,9 +267,19 @@ function TeacherCard({
         <View style={{ flexShrink: 1 }}>
           <Price teacher={teacher} />
         </View>
-        <Button size="sm" icon="paper-plane-outline" onPress={onRequest}>
-          {t("dir.requestShort")}
-        </Button>
+        {state === "pending" ? (
+          <RequestStatusBadge status="PENDING" />
+        ) : state === "cooling" ? (
+          <RequestStatusBadge status="DECLINED" />
+        ) : state ? (
+          <Badge tone={state === "student" ? "success" : "neutral"} dot>
+            {t(state === "student" ? "dir.cardStudent" : "dir.cardOwn")}
+          </Badge>
+        ) : (
+          <Button size="sm" icon="paper-plane-outline" onPress={onRequest}>
+            {t("dir.requestShort")}
+          </Button>
+        )}
       </View>
     </Card>
   );
@@ -350,10 +379,17 @@ function TeacherList({
     [rows, setRows] = useState<PublicTeacher[]>([]),
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [relations, setRelations] = useState<TeacherRelations | null>(null);
   const key = JSON.stringify(filter);
   async function load(next: number) {
     setLoading(true);
+    // İlişkiler ilk sayfayla (ve yenilemeyle) tazelenir; hata listeyi durdurmaz.
+    if (next === 1)
+      client
+        .teacherRelations()
+        .then((r) => setRelations(r.data))
+        .catch(() => undefined);
     try {
       const r = await client.teachers({ ...filter, page: next });
       setPage(r);
@@ -533,6 +569,7 @@ function TeacherList({
             teacher={x}
             onPress={() => onOpen(x.id)}
             onRequest={() => onOpen(x.id, true)}
+            state={cardState(relations, x.id)}
           />
         ))
       )}
