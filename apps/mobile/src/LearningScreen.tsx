@@ -212,7 +212,9 @@ export function LearningScreen({
     [progress, setProgress] = useState<number | null>(null),
     [links, setLinks] = useState<StudentAccessList | null>(null);
   const inFlight = useRef(false),
-    fileReservations = useRef(new Map<string, string>());
+    fileReservations = useRef(
+      new Map<string, { id: string; uploadUrl?: string | null }>(),
+    );
   // Bildirim hedefi: kartların kaydırma içindeki yeri onLayout ile tutulur;
   // hedef kart yerleşince (ya da zaten yerindeyse) oraya kaydırılır.
   const scroller = useRef<ScrollView>(null),
@@ -375,11 +377,10 @@ export function LearningScreen({
       if (bytes.byteLength > 10 * 1024 ** 2)
         throw new Error(t("ml.fileTooLarge"));
       const fingerprint = [assignmentId, asset.name, bytes.byteLength].join(
-          ":",
-        ),
-        reserved = fileReservations.current.get(fingerprint);
-      let id = reserved;
-      if (!id) {
+        ":",
+      );
+      let upload = fileReservations.current.get(fingerprint);
+      if (!upload) {
         const r = await request<{ data: FileReservation }>(media + "/files", {
           assignmentId,
           purpose: owner
@@ -391,21 +392,24 @@ export function LearningScreen({
           mimeType: asset.mimeType || "application/octet-stream",
           sizeBytes: bytes.byteLength,
         });
-        id = r.data.id;
-        fileReservations.current.set(fingerprint, id!);
-        if (r.data.uploadUrl) {
-          const sent = await expoFetch(r.data.uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": asset.mimeType || "application/octet-stream",
-              "x-upsert": "false",
-            },
-            body: bytes,
-          });
-          if (!sent.ok && sent.status !== 409) {
-            fileReservations.current.delete(fingerprint);
-            throw new Error(t("learn.uploadFailed"));
-          }
+        upload = { id: r.data.id, uploadUrl: r.data.uploadUrl };
+        fileReservations.current.set(fingerprint, upload);
+      }
+      const id = upload.id;
+      // Dosya her denemede yeniden gönderilir: önceki deneme ağ hatasıyla
+      // yarıda kaldıysa ayrılan yer boştur. Zaten yüklenmişse 409 döner.
+      if (upload.uploadUrl) {
+        const sent = await expoFetch(upload.uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": asset.mimeType || "application/octet-stream",
+            "x-upsert": "false",
+          },
+          body: bytes,
+        });
+        if (!sent.ok && sent.status !== 409) {
+          fileReservations.current.delete(fingerprint);
+          throw new Error(t("learn.uploadFailed"));
         }
       }
       try {

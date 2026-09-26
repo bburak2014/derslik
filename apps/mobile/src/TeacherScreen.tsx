@@ -400,7 +400,8 @@ export function TeacherScreen({
     });
   }
   function newPayment(id?: string) {
-    if (!active.length) {
+    // Arşivdeki öğrenciden de tahsilat alınır (web'deki gibi).
+    if (!data.students.length) {
       editStudent();
       return;
     }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
 import { toDto } from "../common/command.service.js";
+import { lockAccountRole } from "../common/account-role.js";
 
 @Injectable()
 export class WorkspacesService {
@@ -30,6 +31,7 @@ export class WorkspacesService {
         [actor.id],
       );
       // Bir e-posta ya öğretmen ya öğrencidir: öğrenci hesabı çalışma alanı açamaz.
+      await lockAccountRole(tx, actor.id);
       const roles = (
         await tx.query(
           "SELECT derslik.is_student_account($1) AS student, derslik.is_teacher_account($1) AS teacher",

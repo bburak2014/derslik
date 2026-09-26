@@ -170,7 +170,9 @@ export function AuthForm({
                             "/api/auth/oauth",
                             {
                               provider: p.id,
-                              next: location.pathname,
+                              // Vitrinden gelen (?teacher=...) girişten sonra
+                              // seçtiği öğretmene döner.
+                              next: location.pathname + location.search,
                             },
                           );
                           location.assign(r.url);

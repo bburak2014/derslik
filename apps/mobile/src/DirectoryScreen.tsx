@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   Pressable,
@@ -439,8 +439,12 @@ function TeacherList({
     // Karttaki "İstek gönder": form listede açılır, profile gidilmez.
     [form, setForm] = useState<FormSpec | null>(null),
     [notice, setNotice] = useState("");
-  const key = JSON.stringify(filter);
+  const key = JSON.stringify(filter),
+    // Filtre hızla değişince eski istek geç dönebilir; yalnızca son isteğin
+    // yanıtı listeye yazılır.
+    latest = useRef(0);
   async function load(next: number) {
+    const call = ++latest.current;
     setLoading(true);
     // İlişkiler ilk sayfayla (ve yenilemeyle) tazelenir; hata listeyi durdurmaz.
     if (next === 1)
@@ -450,14 +454,17 @@ function TeacherList({
         .catch(() => undefined);
     try {
       const r = await client.teachers({ ...filter, page: next });
+      if (call !== latest.current) return;
       setPage(r);
       setRows((old) => (next === 1 ? r.data : [...old, ...r.data]));
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      if (call === latest.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (call === latest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }
   useEffect(() => {

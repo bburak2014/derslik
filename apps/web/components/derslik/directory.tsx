@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -448,8 +448,12 @@ export function TeacherDirectory({
     },
     [filters],
   );
+  // Filtre değişince devam eden "daha fazla" isteğinin yanıtı yeni listeye
+  // eklenmez; yalnızca son isteğin yanıtı yazılır.
+  const latest = useRef(0);
   useEffect(() => {
     let alive = true;
+    latest.current++;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleme göstergesi istekten önce açılır.
     setLoading(true);
     load(1)
@@ -467,13 +471,15 @@ export function TeacherDirectory({
   }, [load]);
   async function loadMore() {
     if (!page) return;
+    const call = ++latest.current;
     setMore(true);
     try {
       const r = await load(page.page + 1);
+      if (call !== latest.current) return;
       setPage(r);
       setItems((old) => [...old, ...r.data]);
     } catch (e) {
-      setError((e as Error).message);
+      if (call === latest.current) setError((e as Error).message);
     } finally {
       setMore(false);
     }

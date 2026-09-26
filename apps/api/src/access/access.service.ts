@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { Actor } from "../auth/auth.guard.js";
 import { CONFIG, type ApiConfig } from "../config.js";
 import { DatabaseService } from "../db/database.service.js";
+import { lockAccountRole } from "../common/account-role.js";
 import { CommandService, toDto } from "../common/command.service.js";
 import { MediaProviders } from "../media/providers.js";
 import { MailService } from "./mail.js";
@@ -148,6 +149,7 @@ export class AccessService {
       return await this.db.transaction(actor, null, async (tx) => {
         // Bir e-posta ya öğretmen ya öğrencidir: öğretmen hesabı öğrenci
         // davetini kabul edemez (veli daveti serbest).
+        await lockAccountRole(tx, actor.id);
         const check = (
           await tx.query(
             "SELECT derslik.invitation_role($1,$2) AS role, derslik.is_teacher_account($3) AS teacher",
