@@ -24,6 +24,7 @@ import {
   type PublicTeacher,
   type Showcase,
   type TeacherProfileInput,
+  DECISION_NOTE_MAX,
 } from "@derslik/contracts";
 import { backend, webRequest } from "@/lib/client";
 import { Badge } from "@/components/ui/badge";
@@ -247,6 +248,12 @@ function RequestCard({
           </Button>
         </div>
       )}
+      {request.status === "DECLINED" && request.decisionNote && (
+        <p className="text-muted-foreground text-sm whitespace-pre-line">
+          <span className="font-medium">{t("dir.yourNote")}:</span>{" "}
+          {request.decisionNote}
+        </p>
+      )}
       {request.status === "ACCEPTED" && request.studentId && (
         <div className="border-t pt-3">
           <Button
@@ -290,7 +297,8 @@ export function ShowcaseView({
       kind: "accept" | "decline";
     } | null>(null),
     [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
+    [notice, setNotice] = useState(""),
+    [note, setNote] = useState("");
   const reload = useCallback(async () => {
     try {
       const r = await backend<{ data: Showcase }>(
@@ -344,7 +352,7 @@ export function ShowcaseView({
     try {
       await backend(
         `/workspaces/${workspaceId}/requests/${decision.request.id}/${decision.kind}`,
-        {},
+        decision.kind === "decline" ? { note } : {},
       );
       setNotice(
         decision.kind === "accept"
@@ -369,6 +377,7 @@ export function ShowcaseView({
       onDecide={(kind) => {
         setNotice("");
         setError("");
+        setNote("");
         setDecision({ request: r, kind });
       }}
       onOpenStudent={onOpenStudent}
@@ -485,6 +494,19 @@ export function ShowcaseView({
                 : t("dir.declineBody")}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {decision?.kind === "decline" && (
+            <div className="grid gap-2">
+              <Label htmlFor="decline-note">{t("dir.declineNoteLabel")}</Label>
+              <Textarea
+                id="decline-note"
+                value={note}
+                maxLength={DECISION_NOTE_MAX}
+                rows={3}
+                placeholder={t("dir.declineNotePlaceholder")}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>
               {t("common.cancel")}

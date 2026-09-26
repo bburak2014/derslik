@@ -532,9 +532,13 @@ export async function directoryCases({ t, admin, request, ok, token }) {
       assert.equal(notice.title, "notice.requestExpired");
       assert.equal(notice.kind, "REQUEST_DECISION");
       assert.equal(
-        (await ok(`/v1/workspaces/${ws}/requests/${sent.data.id}/accept`, {}, {
-          auth: tokenTeacher,
-        }).catch((e) => e)) instanceof Error,
+        (await ok(
+          `/v1/workspaces/${ws}/requests/${sent.data.id}/accept`,
+          {},
+          {
+            auth: tokenTeacher,
+          },
+        ).catch((e) => e)) instanceof Error,
         true,
       );
       mine = await ok("/v1/requests", undefined, { auth: tokenWaiter });
