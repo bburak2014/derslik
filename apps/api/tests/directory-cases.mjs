@@ -327,6 +327,11 @@ export async function directoryCases({ t, admin, request, ok, token }) {
         auth: tokenStudent,
       });
       assert.equal(relation.data.isStudent, true);
+      assert.deepEqual(
+        (await ok("/v1/teacher-relations", undefined, { auth: tokenStudent }))
+          .data.students,
+        [ws],
+      );
       assert.equal(relation.data.canReview, true);
       assert.equal(
         (
@@ -427,6 +432,16 @@ export async function directoryCases({ t, admin, request, ok, token }) {
         auth: tokenDeclined,
       });
       assert.ok(relation.data.retryAfter);
+      // Liste kartları için toplu ilişki: reddedilen öğrenci bekleme süresinde.
+      const all = await ok("/v1/teacher-relations", undefined, {
+        auth: tokenDeclined,
+      });
+      assert.deepEqual(all.data.cooling, [ws]);
+      assert.deepEqual(all.data.pending, []);
+      const mineAsTeacher = await ok("/v1/teacher-relations", undefined, {
+        auth: tokenTeacher,
+      });
+      assert.deepEqual(mineAsTeacher.data.own, [ws]);
 
       const pending = await ok(
         `/v1/teacher-relations/${ws}/requests`,

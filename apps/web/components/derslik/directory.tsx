@@ -32,6 +32,7 @@ import {
   type RequestStatus,
   type TeacherFilter,
   type TeacherRelation,
+  type TeacherRelations,
   REQUEST_EXPIRY_DAYS,
 } from "@derslik/contracts";
 import { teacherQuery, type TeacherPage } from "@derslik/api-client";
@@ -240,16 +241,47 @@ export const shortDate = (iso: string) =>
 type Filters = Required<Pick<TeacherFilter, "sort">> &
   Omit<TeacherFilter, "sort" | "page">;
 
+/** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
+export type CardState = "own" | "student" | "pending" | "cooling" | null;
+export const cardState = (
+  relations: TeacherRelations | null,
+  id: string,
+): CardState =>
+  !relations
+    ? null
+    : relations.own.includes(id)
+      ? "own"
+      : relations.students.includes(id)
+        ? "student"
+        : relations.pending.includes(id)
+          ? "pending"
+          : relations.cooling.includes(id)
+            ? "cooling"
+            : null;
+
+function CardStateBadge({ state }: { state: Exclude<CardState, null> }) {
+  if (state === "pending") return <RequestStatusBadge status="PENDING" />;
+  if (state === "cooling") return <RequestStatusBadge status="DECLINED" />;
+  return (
+    <ToneBadge tone={state === "student" ? "ok" : "muted"}>
+      {t(state === "student" ? "dir.cardStudent" : "dir.cardOwn")}
+    </ToneBadge>
+  );
+}
+
 export function TeacherCard({
   teacher,
   onOpen,
   href,
   onRequest,
   requestHref,
+  state = null,
 }: {
   teacher: PublicTeacher;
   onOpen?: () => void;
   href?: string;
+  /** İstek gönderilemiyorsa düğme yerine bu durum görünür. */
+  state?: CardState;
   /** Kartın altındaki "İstek gönder": profili istek penceresi açık açar. */
   onRequest?: () => void;
   requestHref?: string;
@@ -311,7 +343,9 @@ export function TeacherCard({
       <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
         <Price teacher={teacher} />
         {/* Kartın tamamı profile gider; düğme onun üstünde ayrı tıklanır. */}
-        {requestHref ? (
+        {state ? (
+          <CardStateBadge state={state} />
+        ) : requestHref ? (
           <Button asChild size="sm" className="relative z-10">
             <a href={requestHref}>
               <Send /> {t("dir.requestShort")}
@@ -357,12 +391,26 @@ function CardSkeletons() {
 export function TeacherDirectory({
   onOpen,
   hrefFor,
+  signedIn = false,
 }: {
   /** `request` doluysa profil, istek penceresi açık gelir. */
   onOpen?: (id: string, request?: boolean) => void;
   /** Herkese açık sayfada kartlar bağlantıdır (yeni sekmede açılabilir). */
   hrefFor?: (id: string, request?: boolean) => string;
+  /** Oturum varsa kartlar, istek gönderilemeyen öğretmende durumu gösterir. */
+  signedIn?: boolean;
 }) {
+  const [relations, setRelations] = useState<TeacherRelations | null>(null);
+  useEffect(() => {
+    if (!signedIn) return;
+    let alive = true;
+    backend<{ data: TeacherRelations }>("/teacher-relations")
+      .then((r) => alive && setRelations(r.data))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [signedIn]);
   const [filters, setFilters] = useState<Filters>({ sort: "recommended" }),
     [search, setSearch] = useState(""),
     [page, setPage] = useState<TeacherPage | null>(null),
@@ -618,6 +666,7 @@ export function TeacherDirectory({
               onOpen={() => onOpen?.(teacher.id)}
               requestHref={hrefFor?.(teacher.id, true)}
               onRequest={() => onOpen?.(teacher.id, true)}
+              state={cardState(relations, teacher.id)}
             />
           ))
         )}

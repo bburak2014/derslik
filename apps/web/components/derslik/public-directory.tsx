@@ -66,6 +66,7 @@ export function PublicDirectory({ teacherId }: { teacherId?: string }) {
           )
         ) : (
           <TeacherDirectory
+            signedIn={!!signedIn}
             hrefFor={(id, request) =>
               `/teachers/${id}` + (request ? "?request=1" : "")
             }
