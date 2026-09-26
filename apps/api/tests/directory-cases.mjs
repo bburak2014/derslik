@@ -630,6 +630,65 @@ export async function directoryCases({ t, admin, request, ok, token }) {
       assert.equal(again.data.status, "PENDING");
     },
   );
+
+  await t.test(
+    "accepting a request after an invitation reuses the invited student",
+    async () => {
+      await admin.query(
+        "UPDATE derslik.workspace_limits SET student_limit=50 WHERE workspace_id=$1",
+        [ws],
+      );
+      const invited = randomUUID();
+      const tokenInvited = await token(invited);
+      const sent = await ok(
+        `/v1/teacher-relations/${ws}/requests`,
+        { ...requestBody, studentName: "Zeynep Ak" },
+        { auth: tokenInvited },
+      );
+      // İstek beklerken öğrenci davetle bağlanır: davet kabulü kaydın
+      // user_id'sini doldurmaz, bağlantıyı portal_links'e yazar.
+      const record = (
+        await admin.query(
+          "INSERT INTO derslik.students(workspace_id,name,grade,subject,phone,email) VALUES($1,'Zeynep Ak','','Matematik','','') RETURNING id",
+          [ws],
+        )
+      ).rows[0].id;
+      await admin.query(
+        "INSERT INTO derslik.users(id) VALUES($1) ON CONFLICT DO NOTHING",
+        [invited],
+      );
+      await admin.query(
+        "INSERT INTO derslik.portal_links(workspace_id,student_id,user_id,role,permissions) VALUES($1,$2,$3,'STUDENT',ARRAY['lessons'])",
+        [ws, record, invited],
+      );
+      const count = async () =>
+        Number(
+          (
+            await admin.query(
+              "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1",
+              [ws],
+            )
+          ).rows[0].n,
+        );
+      const before = await count();
+      const accepted = await ok(
+        `/v1/workspaces/${ws}/requests/${sent.data.id}/accept`,
+        {},
+        { auth: tokenTeacher },
+      );
+      assert.equal(accepted.data.studentId, record);
+      assert.equal(await count(), before);
+      // Öğretmenin seçtiği izinler korunur.
+      const links = (
+        await admin.query(
+          "SELECT permissions FROM derslik.portal_links WHERE workspace_id=$1 AND user_id=$2",
+          [ws, invited],
+        )
+      ).rows;
+      assert.equal(links.length, 1);
+      assert.deepEqual(links[0].permissions, ["lessons"]);
+    },
+  );
 }
 
 async function fetchPhoto(request, ws, auth) {

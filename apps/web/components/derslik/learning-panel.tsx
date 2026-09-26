@@ -1242,8 +1242,9 @@ export function LearningPanel({
                         uploadSession.current = null;
                         await reload();
                       } catch (e) {
-                        setError((e as Error).message);
+                        // Yenileme hatayı temizler; mesaj ondan sonra yazılır.
                         await reload();
+                        setError((e as Error).message);
                       } finally {
                         setBusy(false);
                       }

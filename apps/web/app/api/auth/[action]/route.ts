@@ -7,6 +7,7 @@ import {
   readBody,
 } from "@/lib/server/session";
 import { cookies } from "next/headers";
+import { safeAuthNext } from "@/lib/server/auth-next";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
 const credentials = z.object({
@@ -30,10 +31,7 @@ export async function POST(
         })
         .safeParse(body);
       if (!input.success) throw new HttpError(400, "web.providerInvalid");
-      const next =
-        input.data.next && /^\/invite\/[a-f0-9]{64}\/?$/.test(input.data.next)
-          ? input.data.next
-          : "/";
+      const next = safeAuthNext(input.data.next);
       const { data, error } = await auth.auth.signInWithOAuth({
         provider: input.data.provider,
         options: {

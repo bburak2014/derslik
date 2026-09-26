@@ -13,6 +13,7 @@ import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
 import { toDto } from "../common/command.service.js";
 import { apiText } from "../common/i18n.js";
+import { lockAccountRole } from "../common/account-role.js";
 import {
   DECLINE_COOLDOWN_DAYS,
   PHOTO_MAX_BYTES,
@@ -142,7 +143,9 @@ export class DirectoryService {
     if (f.subject) add("$? = ANY(subjects)", f.subject);
     if (f.level) add("$? = ANY(levels)", f.level);
     if (f.mode) add("$? = ANY(lesson_modes)", f.mode);
-    if (f.city) add("lower(city) = lower($?)", f.city.normalize("NFC"));
+    // lower() veritabanının yerel ayarına bağlı: C yerelinde "İzmir"i
+    // küçültmez. Arama kutusundaki gibi Türkçe katlama kullanılır.
+    if (f.city) add(`${FOLD_SQL("city")} = $?`, fold(f.city));
     if (f.maxPrice !== undefined)
       add("hourly_price IS NOT NULL AND hourly_price <= $?", f.maxPrice);
     const filter = where.length ? "WHERE " + where.join(" AND ") : "";
@@ -542,11 +545,18 @@ export class DirectoryService {
         throw new ConflictException("api.requestDecided");
       let result: Record<string, unknown>;
       if (decision === "accept") {
-        const requester = (
+        // İsteyen aynı anda çalışma alanı açıyorsa ikisi sıraya girer.
+        const requesterId = (
           await tx.query(
-            "SELECT derslik.is_teacher_account(user_id) AS teacher FROM derslik.lesson_requests WHERE id=$1",
+            "SELECT user_id FROM derslik.lesson_requests WHERE id=$1",
             [request],
           )
+        ).rows[0].user_id as string;
+        await lockAccountRole(tx, requesterId);
+        const requester = (
+          await tx.query("SELECT derslik.is_teacher_account($1) AS teacher", [
+            requesterId,
+          ])
         ).rows[0];
         if (requester.teacher)
           throw new ConflictException("api.requesterIsTeacher");

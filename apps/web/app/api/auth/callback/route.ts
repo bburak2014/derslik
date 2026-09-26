@@ -1,5 +1,6 @@
 import { authClient } from "@/lib/server/session";
 import { cookies } from "next/headers";
+import { safeAuthNext } from "@/lib/server/auth-next";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const jar = await cookies();
@@ -10,9 +11,7 @@ export async function GET(request: Request) {
     next =
       url.searchParams.get("next") === "/reset-password"
         ? "/reset-password"
-        : /^\/invite\/[a-f0-9]{64}\/?$/.test(savedNext)
-          ? savedNext
-          : "/";
+        : safeAuthNext(savedNext);
   if (code) {
     try {
       const auth = await authClient();

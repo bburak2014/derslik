@@ -430,6 +430,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
       access={active}
       displayName={session.user.email.split("@")[0]}
       switcher={switcher}
+      onOpenWorkspace={(id) => void openWorkspace(id)}
       onSignout={() => void signout()}
       focus={focus}
       onNotice={(target) => void openNotice(target)}
