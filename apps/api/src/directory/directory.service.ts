@@ -27,7 +27,6 @@ import {
   lessonModes,
   teacherLevels,
   teacherSubjects,
-  teachingLanguages,
 } from "../../../../packages/contracts/src/directory.js";
 import {
   locales,
@@ -42,7 +41,7 @@ const fold = (text: string) =>
   text.normalize("NFC").toLocaleLowerCase("tr").replace(/ı/g, "i");
 const FOLD_SQL = (column: string) =>
   `translate(lower(translate(${column},'İIÇĞÖŞÜ','iiçğöşü')),'ı','i')`;
-// Branş, seviye, ders şekli ve dil sabit anahtarlarla saklanır; arama kutusuna
+// Branş, seviye ve ders şekli sabit anahtarlarla saklanır; arama kutusuna
 // yazılan ad (yedi dilin herhangisinde, ör. "matematik", "math") anahtara
 // çevrilir.
 const SEARCHABLE = (
@@ -50,7 +49,6 @@ const SEARCHABLE = (
     ["subjects", "dir.subject", teacherSubjects],
     ["levels", "dir.level", teacherLevels],
     ["lesson_modes", "dir.mode", lessonModes],
-    ["languages", "dir.lang", teachingLanguages],
   ] as const
 ).map(([column, prefix, keys]) => ({
   column,
@@ -115,7 +113,9 @@ export class DirectoryService {
       where.push(sql.replaceAll("$?", "$" + values.length));
     };
     // Her kelime ad, başlık, tanıtım, şehir ya da branş/seviye/ders
-    // şekli/dil adlarından birinde geçmeli ("matematik izmir").
+    // şekli adlarından birinde geçmeli ("matematik izmir"). Konuşulan diller
+    // aranmaz: "ingilizce" yazan İngilizce branşını arar, İngilizce bilen
+    // matematik öğretmenini değil.
     for (const word of (f.q ?? "").split(/\s+/).filter(Boolean).slice(0, 6)) {
       const folded = fold(word);
       add(
