@@ -125,7 +125,9 @@ function emptyProfile(fallbackName: string): TeacherProfileInput {
     currency: "TRY",
     languages: ["tr"],
     experienceYears: null,
-    published: false,
+    // Yeni profil ilk kayıtta yayına girer (kullanıcı kararı: öğretmen
+    // açınca hemen yayında). Gizlemek isteyen anahtarı kapatır.
+    published: true,
   };
 }
 
