@@ -482,8 +482,9 @@ function TeacherList({ onOpen }: { onOpen: (id: string) => void }) {
           {t("dir.resultCount", { count: page.total })}
         </Text>
       )}
-      {loading && !rows.length ? (
-        <Loading />
+      {/* Arama değişince eski sonuçlar yenisi gelene kadar kalır. */}
+      {!page ? (
+        !error && <Loading />
       ) : !rows.length && !error ? (
         <EmptyState
           icon="search-outline"
