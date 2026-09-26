@@ -12,6 +12,7 @@ import type {
   TeacherProfile,
   TeacherProfileInput,
   TeacherRelation,
+  TeacherRelations,
 } from "../../contracts/src/directory.ts";
 import { getLocale, t } from "../../contracts/src/i18n/index.ts";
 
@@ -124,6 +125,9 @@ export class DerslikClient {
       `/v1/teachers/${encodeURIComponent(id)}`,
       { optionalAuth: true },
     );
+  }
+  teacherRelations() {
+    return this.request<{ data: TeacherRelations }>("/v1/teacher-relations");
   }
   teacherRelation(id: string) {
     return this.request<{ data: TeacherRelation }>(

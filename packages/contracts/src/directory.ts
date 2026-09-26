@@ -235,6 +235,13 @@ export type TeacherRelation = {
   /** Reddedildiyse yeniden istek gönderilebilecek an. */
   retryAfter: string | null;
 };
+/** Liste kartları: giriş yapan kişinin öğretmenlerle ilişkisi (öğretmen id'leri). */
+export type TeacherRelations = {
+  own: string[];
+  students: string[];
+  pending: string[];
+  cooling: string[];
+};
 export type Showcase = {
   profile: TeacherProfile | null;
   requests: LessonRequest[];

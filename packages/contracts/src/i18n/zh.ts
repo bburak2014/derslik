@@ -1119,6 +1119,8 @@ export const zh: Messages = {
     decline: "拒绝",
     declineBody: "学生会收到通知，7 天内不能再次向你申请。",
     declineTitle: "拒绝该申请？",
+    cardOwn: "你的主页",
+    cardStudent: "你已是其学生",
     declineNoteLabel: "给学生的备注（可选）",
     declineNotePlaceholder: "例如：本学期我的时间已排满。",
     expiredState:

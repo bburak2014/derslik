@@ -209,6 +209,28 @@ export class DirectoryService {
 
   // --- Öğrenci -----------------------------------------------------------
 
+  /** Liste kartları için: giriş yapan kişinin vitrindeki öğretmenlerle
+   *  ilişkisi. Kart, istek gönderilemeyecek öğretmende düğme yerine
+   *  durumu gösterir. */
+  relations(actor: Actor) {
+    return this.db.transaction(actor, null, async (tx) => {
+      await expireRequests(tx);
+      const row = (
+        await tx.query(
+          `SELECT
+            ARRAY(SELECT p.id FROM derslik.public_teachers() p
+              JOIN derslik.workspaces w ON w.id=p.id WHERE w.owner_id=$1) AS own,
+            ARRAY(SELECT p.id FROM derslik.public_teachers() p WHERE derslik.is_linked_student(p.id)) AS students,
+            ARRAY(SELECT workspace_id FROM derslik.lesson_requests WHERE user_id=$1 AND status='PENDING') AS pending,
+            ARRAY(SELECT workspace_id FROM derslik.lesson_requests WHERE user_id=$1 AND status='DECLINED'
+              AND decided_at > now() - make_interval(days => $2)) AS cooling`,
+          [actor.id, DECLINE_COOLDOWN_DAYS],
+        )
+      ).rows[0];
+      return { data: toDto(row) };
+    });
+  }
+
   relation(actor: Actor, id: string) {
     const ws = uuid.parse(id);
     return this.db.transaction(actor, null, async (tx) => {

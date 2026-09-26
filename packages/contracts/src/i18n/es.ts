@@ -1258,6 +1258,8 @@ export const es: Messages = {
     declineBody:
       "El alumno recibe un aviso y no podrá enviarte otra solicitud durante 7 días.",
     declineTitle: "¿Rechazar esta solicitud?",
+    cardOwn: "Tu perfil",
+    cardStudent: "Ya eres su alumno",
     declineNoteLabel: "Nota para el alumno (opcional)",
     declineNotePlaceholder: "P. ej., Mi horario está completo este trimestre.",
     expiredState:

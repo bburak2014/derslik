@@ -1277,6 +1277,8 @@ export const fr: Messages = {
     declineBody:
       "L'élève est prévenu et ne pourra pas vous écrire à nouveau pendant 7 jours.",
     declineTitle: "Refuser cette demande ?",
+    cardOwn: "Votre profil",
+    cardStudent: "Vous êtes son élève",
     declineNoteLabel: "Note à l'élève (facultatif)",
     declineNotePlaceholder: "Ex. Mon emploi du temps est complet ce trimestre.",
     expiredState:

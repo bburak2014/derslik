@@ -1214,6 +1214,8 @@ export const tr = {
     declineBody:
       "Öğrenciye bildirim gider ve 7 gün boyunca size yeniden istek gönderemez.",
     declineTitle: "İstek reddedilsin mi?",
+    cardOwn: "Sizin profiliniz",
+    cardStudent: "Öğrencisisiniz",
     declineNoteLabel: "Öğrenciye not (isteğe bağlı)",
     declineNotePlaceholder: "Örn. Bu dönem programım dolu.",
     expiredState:

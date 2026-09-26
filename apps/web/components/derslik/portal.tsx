@@ -377,6 +377,7 @@ export function Portal({
       />
     ) : (
       <TeacherDirectory
+        signedIn
         onOpen={(id, request) => navigate("teachers", id, request)}
       />
     );
