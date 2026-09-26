@@ -48,6 +48,7 @@ import {
   Loading,
   Metric,
   Picker,
+  PackageCard,
   SectionHeading,
   Segmented,
   useTheme,
@@ -955,35 +956,13 @@ export function TeacherScreen({
               <Text style={styles.muted}>{t("detail.noPackages")}</Text>
             )}
             {studentPackages.map((p) => (
-              <Card key={p.id}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 8,
-                  }}
-                >
-                  <Text style={[styles.h2, { flex: 1 }]}>{p.name}</Text>
-                  <Badge
-                    tone={p.remaining <= 2 ? "warning" : "info"}
-                    icon={p.remaining <= 2 ? "alert-circle-outline" : undefined}
-                  >
-                    {t("common.creditCount", { count: p.remaining })}
-                  </Badge>
-                </View>
-                <Text style={styles.muted}>
-                  {t("mt.creditsOf", {
-                    remaining: p.remaining,
-                    granted: p.granted,
-                  })}{" "}
-                  · {money(p.price_minor)}
-                </Text>
+              <PackageCard key={p.id} pack={p}>
                 <Text style={styles.caption}>
                   {p.expires_on
                     ? t("detail.lastDay", { date: p.expires_on })
                     : t("detail.noExpiry")}
                 </Text>
-              </Card>
+              </PackageCard>
             ))}
             <SectionHeading title={t("detail.lessonHistory")} />
             {data.lessons

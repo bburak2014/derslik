@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Generated output: the compiled API, framework builds and Expo state.
     ".api-build/**",
+    // Kod kalitesi analiz çıktıları (pnpm quality:sonar, pnpm quality:dup).
+    "reports/**",
+    ".scannerwork/**",
     "dist/**",
     "**/.next/**",
     ".vinext/**",

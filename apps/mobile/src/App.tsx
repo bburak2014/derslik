@@ -11,7 +11,7 @@ import { authRoute, completeAuthLink } from "./oauth";
 import { TeacherScreen } from "./TeacherScreen";
 import { PortalScreen, type NoticeFocus } from "./LearningScreen";
 import { DirectoryScreen, type DirectoryTab } from "./DirectoryScreen";
-import { t, type NoticeTarget } from "@derslik/contracts";
+import { noticeAccess, t, type NoticeTarget } from "@derslik/contracts";
 import { LanguagePicker, LocaleProvider } from "./i18n";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -91,13 +91,7 @@ function Application() {
       else openDirectory("requests");
       return;
     }
-    const fits = (a: Access) =>
-      a.id === target.workspaceId &&
-      (a.role === "OWNER" || a.studentId === target.studentId);
-    const next =
-      (active && fits(active) ? active : null) ||
-      access.find((a) => fits(a) && a.role === "OWNER") ||
-      access.find(fits);
+    const next = noticeAccess(target, access, active);
     if (!next) {
       setError(t("conn.noticeNoAccess"));
       return;
@@ -291,7 +285,7 @@ function Application() {
             </View>
           </View>
           <ErrorText message={error} />
-          {error && (
+          {!!error && (
             <Button
               secondary
               icon="refresh-outline"

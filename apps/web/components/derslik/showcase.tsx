@@ -14,7 +14,12 @@ import {
 import {
   PHOTO_MAX_BYTES,
   PHOTO_SIZE,
+  langName,
   lessonModes,
+  levelName,
+  modeName,
+  shortDate,
+  subjectName,
   priceCurrencies,
   t,
   teacherLevels,
@@ -69,11 +74,6 @@ import {
   Stars,
   TeacherCard,
   TeacherPhoto,
-  langName,
-  levelName,
-  modeName,
-  shortDate,
-  subjectName,
 } from "./directory";
 
 type Tab = "requests" | "profile" | "reviews";

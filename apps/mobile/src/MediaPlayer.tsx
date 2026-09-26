@@ -1,12 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import type { Video, VideoPlayback } from "@derslik/api-client";
 import { request } from "./core";
 import { t } from "@derslik/contracts";
-import { Button, ErrorText, Field, Input, Kicker, useTheme } from "./ui";
+import {
+  Button,
+  CloseButton,
+  ErrorText,
+  Field,
+  Input,
+  Kicker,
+  useTheme,
+} from "./ui";
 export function MediaPlayer({
   video,
   path,
@@ -104,18 +111,7 @@ export function MediaPlayer({
               {video.title}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("common.close")}
-            onPress={onClose}
-            hitSlop={8}
-            style={({ pressed }) => [
-              section.close,
-              pressed && { backgroundColor: colors.line },
-            ]}
-          >
-            <Ionicons name="close" size={20} color={colors.ink} />
-          </Pressable>
+          <CloseButton onPress={onClose} />
         </View>
         <ScrollView
           contentContainerStyle={styles.body}

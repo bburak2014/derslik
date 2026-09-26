@@ -10,11 +10,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import type { TeacherPage } from "@derslik/api-client";
 import {
+  cardState,
   DECISION_NOTE_MAX,
-  intlLocale,
+  langName,
+  levelName,
+  modeName,
+  priceText,
+  shortDate,
+  subjectName,
   lessonModes,
   PHOTO_MAX_BYTES,
   PHOTO_SIZE,
@@ -36,6 +42,7 @@ import {
   type Showcase,
   type TeacherFilter,
   type TeacherProfileInput,
+  type CardState,
   type TeacherRelation,
   type TeacherRelations,
 } from "@derslik/contracts";
@@ -71,24 +78,6 @@ import {
 // profilini düzenler ve gelen istekleri yanıtlar.
 
 const label = (key: string) => t(key as MessageKey);
-export const subjectName = (s: string) => label(`dir.subject.${s}`);
-export const levelName = (s: string) => label(`dir.level.${s}`);
-const modeName = (s: string) => label(`dir.mode.${s}`);
-const langName = (s: string) => label(`dir.lang.${s}`);
-const shortDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(intlLocale(), {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-function priceText(p: { hourlyPrice: number | null; currency: string }) {
-  if (p.hourlyPrice === null) return null;
-  return new Intl.NumberFormat(intlLocale(), {
-    style: "currency",
-    currency: p.currency,
-    maximumFractionDigits: 0,
-  }).format(p.hourlyPrice);
-}
 const photoUri = (id: string, version: number | null) => {
   const path = photoPath(id, version);
   return path ? configuration.api.replace(/\/$/, "") + path : null;
@@ -191,23 +180,6 @@ function Price({ teacher }: { teacher: PublicTeacher }) {
   );
 }
 
-/** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
-type CardState = "own" | "teacher" | "student" | "pending" | "cooling" | null;
-const cardState = (r: TeacherRelations | null, id: string): CardState =>
-  !r
-    ? null
-    : r.own.includes(id)
-      ? "own"
-      : r.teacherAccount
-        ? "teacher"
-        : r.students.includes(id)
-          ? "student"
-          : r.pending.includes(id)
-            ? "pending"
-            : r.cooling.includes(id)
-              ? "cooling"
-              : null;
-
 function TeacherCard({
   teacher,
   onPress,
@@ -219,7 +191,7 @@ function TeacherCard({
   /** "İstek gönder": profil, istek formu açık açılır. */
   onRequest: () => void;
   /** İstek gönderilemiyorsa düğme yerine bu durum görünür. */
-  state?: CardState;
+  state?: CardState | null;
 }) {
   const { styles } = useTheme();
   return (
@@ -1481,21 +1453,20 @@ async function pickPhoto() {
   const asset = picked.canceled ? null : picked.assets[0];
   if (!asset) return null;
   const side = Math.min(asset.width, asset.height);
-  const result = await manipulateAsync(
-    asset.uri,
-    [
-      {
-        crop: {
-          originX: Math.floor((asset.width - side) / 2),
-          originY: Math.floor((asset.height - side) / 2),
-          width: side,
-          height: side,
-        },
-      },
-      { resize: { width: PHOTO_SIZE, height: PHOTO_SIZE } },
-    ],
-    { compress: 0.82, format: SaveFormat.JPEG, base64: true },
-  );
+  const context = ImageManipulator.manipulate(asset.uri)
+    .crop({
+      originX: Math.floor((asset.width - side) / 2),
+      originY: Math.floor((asset.height - side) / 2),
+      width: side,
+      height: side,
+    })
+    .resize({ width: PHOTO_SIZE, height: PHOTO_SIZE });
+  const image = await context.renderAsync();
+  const result = await image.saveAsync({
+    compress: 0.82,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
   if (!result.base64 || (result.base64.length * 3) / 4 > PHOTO_MAX_BYTES)
     throw new Error(t("dir.photoInvalid"));
   return result.base64;

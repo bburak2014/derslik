@@ -131,7 +131,7 @@ export function AuthScreen({
         onDone?.();
         return;
       }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email.trim()))
         throw new Error(t("mobile.authEmailInvalid"));
       if (mode === "recover") {
         const { error } = await supabase!.auth.resetPasswordForEmail(

@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { Access } from "@derslik/api-client";
-import { t, upper, type NoticeTarget } from "@derslik/contracts";
+import { noticeAccess, t, upper, type NoticeTarget } from "@derslik/contracts";
 import type { NoticeFocus } from "@/components/derslik/learning-panel";
 import { ApiError } from "@derslik/api-client";
 import Workspace from "@/components/derslik/workspace";
 import { AuthForm } from "./auth-form";
-import { backend, webRequest } from "@/lib/client";
+import { backend, formText, webRequest } from "@/lib/client";
 import { Portal } from "@/components/derslik/portal";
 import { PageLoader, Spinner } from "@/components/derslik/loading";
 import { FormError } from "@/components/derslik/feedback";
@@ -219,14 +219,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
         return;
       }
     } else {
-      const fits = (a: Access) =>
-        a.id === target.workspaceId &&
-        (a.role === "OWNER" ||
-          (target.section !== "requests" && a.studentId === target.studentId));
-      next =
-        current && fits(current)
-          ? current
-          : list.find((a) => fits(a) && a.role === "OWNER") || list.find(fits);
+      next = noticeAccess(target, list, current);
     }
     if (!next) {
       setError(t("conn.noticeNoAccess"));
@@ -320,9 +313,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
                 e.preventDefault();
                 setBusy(true);
                 try {
-                  const name = String(
-                    new FormData(e.currentTarget).get("name"),
-                  );
+                  const name = formText(new FormData(e.currentTarget), "name");
                   await backend("/workspaces", { name });
                   await reload();
                 } catch (e) {

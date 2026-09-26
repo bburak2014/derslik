@@ -16,6 +16,10 @@ import {
 import {
   money,
   dayLabel,
+  isImageName,
+  noticeIcon,
+  timeAgo,
+  type NoticeIcon,
   dateKey,
   addDays,
   timeLabel,
@@ -29,7 +33,7 @@ import {
   type StudentAccessList,
   type WorkspaceLimits,
 } from "@derslik/contracts";
-import { backend } from "@/lib/client";
+import { backend, formText } from "@/lib/client";
 import { Button } from "@/components/ui/button";
 import {
   Bell,
@@ -1041,7 +1045,7 @@ export function LearningPanel({
                       e.preventDefault();
                       const values = new FormData(e.currentTarget),
                         file = values.get("file") as File,
-                        target = String(values.get("assignmentId") || "");
+                        target = formText(values, "assignmentId");
                       if (file?.size)
                         await attach(
                           target === GENERAL ? null : target || null,
@@ -1192,7 +1196,7 @@ export function LearningPanel({
                       if (!capabilities?.videos) return;
                       const f = new FormData(e.currentTarget),
                         file = f.get("file") as File,
-                        lesson = String(f.get("lessonId") || "");
+                        lesson = formText(f, "lessonId");
                       if (!file?.size) return;
                       setBusy(true);
                       setError("");
@@ -2334,10 +2338,6 @@ function whatsappInviteUrl(phone: string, name: string, invite: string) {
   return `https://wa.me/${whatsappNumber(phone)}?text=${encodeURIComponent(text)}`;
 }
 
-function isImageName(name: string) {
-  return /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
-}
-
 // Yükleme formu okunabilir genişlikte kalınca sağda geniş bir boşluk kalıyordu.
 // Oraya dekor yerine işin kendisine ait bilgi konuyor: akışın adımları, kabul
 // edilen dosya kuralları ve öğrencinin sonunda ne göreceği.
@@ -2393,32 +2393,13 @@ function UploadAside({ kind }: { kind: "files" | "videos" }) {
   );
 }
 
-/** Simge bildirimin türünden seçilir; türü yazılmamış eski bildirimlerde
- *  sunucunun sabit Türkçe başlığından. */
-function noticeIcon(n: Notice) {
-  if (n.kind === "QUESTION" || n.kind === "ANSWER") return <MessageSquare />;
-  if (n.kind === "VIDEO") return <VideoIcon />;
-  if (n.kind === "SUMMARY") return <Sparkles />;
-  if (n.kind) return <ClipboardList />;
-  const title = n.title.toLocaleLowerCase("tr");
-  if (title.includes("soru")) return <MessageSquare />;
-  if (title.includes("video")) return <VideoIcon />;
-  if (title.includes("özet")) return <Sparkles />;
-  if (title.includes("ödev")) return <ClipboardList />;
-  return <Bell />;
-}
-
-function ago(iso: string, now: number) {
-  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
-  if (minutes < 1) return t("time.justNow");
-  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return t("time.hoursAgo", { count: hours });
-  const days = Math.round(hours / 24);
-  if (days === 1) return t("time.yesterday");
-  if (days < 7) return t("time.daysAgo", { count: days });
-  return dayLabel(iso);
-}
+const noticeIcons: Record<NoticeIcon, React.ReactNode> = {
+  question: <MessageSquare />,
+  video: <VideoIcon />,
+  summary: <Sparkles />,
+  assignment: <ClipboardList />,
+  other: <Bell />,
+};
 
 function UsageMeter({
   label,
@@ -2560,7 +2541,7 @@ export function AccountExtras({
                   : "bg-primary/10 text-primary")
               }
             >
-              {noticeIcon(n)}
+              {noticeIcons[noticeIcon(n)]}
             </span>
             <div className="grid min-w-0 flex-1 gap-0.5">
               <div className="flex items-start justify-between gap-3">
@@ -2595,7 +2576,7 @@ export function AccountExtras({
               </p>
               <div className="flex items-center gap-3 pt-1">
                 <span className="text-muted-foreground text-xs">
-                  {ago(n.createdAt, now)}
+                  {timeAgo(n.createdAt, now)}
                 </span>
                 {!n.readAt && (
                   <Button

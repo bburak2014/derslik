@@ -33,6 +33,10 @@ import {
   canEditSubmission,
   dateKey,
   dayLabel,
+  isImageName,
+  noticeIcon,
+  timeAgo,
+  type NoticeIcon,
   money,
   noticeTarget,
   noticeText,
@@ -68,6 +72,7 @@ import {
   Loading,
   Meter,
   SectionHeading,
+  PackageCard,
   TabStrip,
   TextLink,
   useTheme,
@@ -141,10 +146,6 @@ async function readFileBytes(uri: string) {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
-}
-
-function isImageName(name: string) {
-  return /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
 }
 
 export function LearningScreen({
@@ -1489,30 +1490,7 @@ export function LearningScreen({
               <SectionHeading title={t("mt.packages")} />
             )}
             {data.packages.map((p) => (
-              <Card key={p.id}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 8,
-                  }}
-                >
-                  <Text style={[styles.h2, { flex: 1 }]}>{p.name}</Text>
-                  <Badge
-                    tone={p.remaining <= 2 ? "warning" : "info"}
-                    icon={p.remaining <= 2 ? "alert-circle-outline" : undefined}
-                  >
-                    {t("common.creditCount", { count: p.remaining })}
-                  </Badge>
-                </View>
-                <Text style={styles.muted}>
-                  {t("mt.creditsOf", {
-                    remaining: p.remaining,
-                    granted: p.granted,
-                  })}{" "}
-                  · {money(p.price_minor)}
-                </Text>
-              </Card>
+              <PackageCard key={p.id} pack={p} />
             ))}
             {!!data.payments.length && (
               <SectionHeading title={t("nav.payments")} />
@@ -1856,32 +1834,13 @@ function FileIcon({ icon }: { icon: IconName }) {
   );
 }
 
-/** Bildirim simgesi türden seçilir (web ile aynı eşleme); türü olmayan eski
- *  kayıtlarda sunucunun Türkçe başlığına bakılır. */
-function noticeIcon(n: Notice): IconName {
-  if (n.kind === "QUESTION" || n.kind === "ANSWER") return "chatbubble-outline";
-  if (n.kind === "VIDEO") return "videocam-outline";
-  if (n.kind === "SUMMARY") return "sparkles-outline";
-  if (n.kind) return "clipboard-outline";
-  const title = n.title.toLocaleLowerCase("tr");
-  if (title.includes("soru")) return "chatbubble-outline";
-  if (title.includes("video")) return "videocam-outline";
-  if (title.includes("özet")) return "sparkles-outline";
-  if (title.includes("ödev")) return "clipboard-outline";
-  return "notifications-outline";
-}
-
-function ago(iso: string, now: number) {
-  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
-  if (minutes < 1) return t("time.justNow");
-  if (minutes < 60) return t("time.minutesAgo", { count: minutes });
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return t("time.hoursAgo", { count: hours });
-  const days = Math.round(hours / 24);
-  if (days === 1) return t("time.yesterday");
-  if (days < 7) return t("time.daysAgo", { count: days });
-  return dayLabel(iso);
-}
+const noticeIcons: Record<NoticeIcon, IconName> = {
+  question: "chatbubble-outline",
+  video: "videocam-outline",
+  summary: "sparkles-outline",
+  assignment: "clipboard-outline",
+  other: "notifications-outline",
+};
 
 /** Bildirimler ve (öğretmende) plan kullanımı: web'deki bildirim penceresinin
  *  mobil karşılığı. */
@@ -1999,7 +1958,7 @@ export function Inbox({
                   ]}
                 >
                   <Ionicons
-                    name={noticeIcon(n)}
+                    name={noticeIcons[noticeIcon(n)]}
                     size={16}
                     color={n.readAt ? colors.muted : colors.brand}
                   />
@@ -2028,7 +1987,9 @@ export function Inbox({
                   </View>
                   <Text style={styles.muted}>{noticeText(n.body)}</Text>
                   <View style={[styles.row, { gap: 14, marginTop: 4 }]}>
-                    <Text style={styles.caption}>{ago(n.createdAt, now)}</Text>
+                    <Text style={styles.caption}>
+                      {timeAgo(n.createdAt, now)}
+                    </Text>
                     {!n.readAt && (
                       <TextLink onPress={() => void markRead([n.id])}>
                         {t("inbox.markRead")}

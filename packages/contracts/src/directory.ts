@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { intlLocale, t, type MessageKey } from "./i18n/index.ts";
 
 // Öğretmen vitrini: öğretmenler kendilerini listeler, öğrenciler seçip ders
 // isteği gönderir. Branş ve seviye serbest metin değil sabit anahtarlardır;
@@ -264,3 +265,44 @@ export function shortName(name: string) {
 
 export const photoPath = (id: string, version: number | null) =>
   version ? `/v1/teachers/${id}/photo?v=${version}` : null;
+
+// --- Web ve mobilin ortak görüntü kuralları ----------------------------------
+
+export const subjectName = (s: string) => t(`dir.subject.${s}` as MessageKey);
+export const levelName = (s: string) => t(`dir.level.${s}` as MessageKey);
+export const modeName = (s: string) => t(`dir.mode.${s}` as MessageKey);
+export const langName = (s: string) => t(`dir.lang.${s}` as MessageKey);
+
+/** Saatlik ücret, okuyanın dilinde ve kuruşsuz; ücret yazılmadıysa null. */
+export function priceText(p: { hourlyPrice: number | null; currency: string }) {
+  if (p.hourlyPrice === null) return null;
+  return new Intl.NumberFormat(intlLocale(), {
+    style: "currency",
+    currency: p.currency,
+    maximumFractionDigits: 0,
+  }).format(p.hourlyPrice);
+}
+
+/** "26 Eylül 2026": yorum ve istek tarihleri. */
+export const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(intlLocale(), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+/** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
+export type CardState = "own" | "teacher" | "student" | "pending" | "cooling";
+
+export function cardState(
+  relations: TeacherRelations | null,
+  id: string,
+): CardState | null {
+  if (!relations) return null;
+  if (relations.own.includes(id)) return "own";
+  if (relations.teacherAccount) return "teacher";
+  if (relations.students.includes(id)) return "student";
+  if (relations.pending.includes(id)) return "pending";
+  if (relations.cooling.includes(id)) return "cooling";
+  return null;
+}

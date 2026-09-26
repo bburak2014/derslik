@@ -40,7 +40,8 @@ function encodeBase64(input: string) {
       c = input.charCodeAt(i + 2);
     if (a > 255 || b > 255 || c > 255)
       throw new Error("btoa: yalnızca latin1 karakterler kodlanabilir.");
-    const chunk = (a << 16) | ((Number.isNaN(b) ? 0 : b) << 8) | (Number.isNaN(c) ? 0 : c);
+    const chunk =
+      (a << 16) | ((Number.isNaN(b) ? 0 : b) << 8) | (Number.isNaN(c) ? 0 : c);
     output +=
       ALPHABET[(chunk >> 18) & 63] +
       ALPHABET[(chunk >> 12) & 63] +
@@ -51,7 +52,10 @@ function encodeBase64(input: string) {
 }
 
 function decodeBase64(input: string) {
-  const clean = input.replace(/[\t\n\f\r ]+/g, "").replace(/=+$/, "");
+  const compact = input.replace(/[\t\n\f\r ]+/g, "");
+  let end = compact.length;
+  while (end > 0 && compact[end - 1] === "=") end--;
+  const clean = compact.slice(0, end);
   let output = "";
   let bits = 0;
   let value = 0;

@@ -18,7 +18,14 @@ import {
   X,
 } from "lucide-react";
 import {
+  cardState,
   intlLocale,
+  langName,
+  levelName,
+  modeName,
+  priceText,
+  shortDate,
+  subjectName,
   t,
   teacherLevels,
   priceSteps,
@@ -32,6 +39,7 @@ import {
   type RequestStatus,
   type TeacherFilter,
   type TeacherRelation,
+  type CardState,
   type TeacherRelations,
   REQUEST_EXPIRY_DAYS,
 } from "@derslik/contracts";
@@ -172,15 +180,6 @@ function Rating({ teacher }: { teacher: PublicTeacher }) {
   );
 }
 
-export function priceText(p: { hourlyPrice: number | null; currency: string }) {
-  if (p.hourlyPrice === null) return null;
-  return new Intl.NumberFormat(intlLocale(), {
-    style: "currency",
-    currency: p.currency,
-    maximumFractionDigits: 0,
-  }).format(p.hourlyPrice);
-}
-
 function Price({
   teacher,
   large,
@@ -209,11 +208,6 @@ function Price({
   );
 }
 
-const subjectName = (s: string) => t(`dir.subject.${s}` as MessageKey);
-const levelName = (s: string) => t(`dir.level.${s}` as MessageKey);
-const modeName = (s: string) => t(`dir.mode.${s}` as MessageKey);
-const langName = (s: string) => t(`dir.lang.${s}` as MessageKey);
-
 const statusTone: Record<RequestStatus, Tone> = {
   PENDING: "warn",
   ACCEPTED: "ok",
@@ -229,40 +223,12 @@ export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   );
 }
 
-export const shortDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(intlLocale(), {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
 // --- Liste ------------------------------------------------------------------
 
 type Filters = Required<Pick<TeacherFilter, "sort">> &
   Omit<TeacherFilter, "sort" | "page">;
 
-/** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
-export type CardState =
-  "own" | "teacher" | "student" | "pending" | "cooling" | null;
-export const cardState = (
-  relations: TeacherRelations | null,
-  id: string,
-): CardState =>
-  !relations
-    ? null
-    : relations.own.includes(id)
-      ? "own"
-      : relations.teacherAccount
-        ? "teacher"
-        : relations.students.includes(id)
-          ? "student"
-          : relations.pending.includes(id)
-            ? "pending"
-            : relations.cooling.includes(id)
-              ? "cooling"
-              : null;
-
-function CardStateBadge({ state }: { state: Exclude<CardState, null> }) {
+function CardStateBadge({ state }: { state: CardState }) {
   // Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz.
   if (state === "teacher") return null;
   if (state === "pending") return <RequestStatusBadge status="PENDING" />;
@@ -286,7 +252,7 @@ export function TeacherCard({
   onOpen?: () => void;
   href?: string;
   /** İstek gönderilemiyorsa düğme yerine bu durum görünür. */
-  state?: CardState;
+  state?: CardState | null;
   /** Kartın altındaki "İstek gönder": profili istek penceresi açık açar. */
   onRequest?: () => void;
   requestHref?: string;
@@ -1588,5 +1554,3 @@ export function MyRequests({
     </section>
   );
 }
-
-export { subjectName, levelName, modeName, langName };

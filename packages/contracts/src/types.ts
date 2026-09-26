@@ -151,6 +151,9 @@ export const dayLabel = (
     month: "long",
     ...options,
   }).format(new Date(date));
+/** Önizlemesi gösterilebilen resim dosyası mı (ada göre). */
+export const isImageName = (name: string) =>
+  /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
 export function addDays(date: string, days: number) {
   const d = new Date(date + "T12:00:00+03:00");
   d.setUTCDate(d.getUTCDate() + days);

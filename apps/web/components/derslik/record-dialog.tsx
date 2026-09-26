@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import { Info, Plus } from "lucide-react";
 import { Spinner } from "@/components/derslik/loading";
 import {
@@ -195,7 +195,7 @@ export function RecordDialog({
   const needsStudent = modal.type !== "student" && modal.type !== "reschedule";
   const noStudents = needsStudent && activeStudents.length === 0;
   const noPackage = modal.type === "lesson" && !selectedPackage && !noStudents;
-  async function submit(e: FormEvent) {
+  async function submit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
     setError("");

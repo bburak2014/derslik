@@ -1,8 +1,6 @@
 "use client";
 import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras, type NoticeFocus } from "./learning-panel";
-import { ThemeToggle } from "@/components/account/theme-toggle";
-import { LanguageSelect } from "@/components/i18n/language-select";
 import { t, upper, type MessageKey } from "@derslik/contracts";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
@@ -13,16 +11,15 @@ import {
   Wallet,
   Plus,
   Search,
-  LogOut,
   RefreshCw,
   FlaskConical,
-  ChevronRight,
   FileText,
   Video,
   ClipboardList,
   Store,
 } from "lucide-react";
 import { ShowcaseView } from "./showcase";
+import { SidebarAccount, Topbar } from "./shell";
 import { backend } from "@/lib/client";
 import type { Showcase } from "@derslik/contracts";
 import { Button } from "@/components/ui/button";
@@ -37,11 +34,9 @@ import {
   SidebarProvider,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -429,59 +424,34 @@ export default function Workspace({
             <span>{t("ws.noteFocus")}</span>
           </div>
         </SidebarContent>
-        <SidebarFooter className="p-6 gap-4">
-          <ThemeToggle />
-          <LanguageSelect />
-          {switcher}
-          <div className="profile">
-            <span className="avatar">{upper(displayName.charAt(0))}</span>
-            <div>
-              <strong title={displayName}>{displayName}</strong>
-              <small>{t("ws.teacherAccount")}</small>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="signout justify-start"
-            onClick={() => setSignoutOpen(true)}
-          >
-            <LogOut /> {t("common.signOut")}
-          </Button>
-        </SidebarFooter>
+        <SidebarAccount
+          displayName={displayName}
+          role={t("ws.teacherAccount")}
+          switcher={switcher}
+          onSignout={() => setSignoutOpen(true)}
+        />
       </Sidebar>
       <main className="workspace">
-        <a href="#main-content" className="skip-link">
-          {t("common.skipToContent")}
-        </a>
-        <header className="topbar">
-          <div className="topbar-crumbs">
-            <SidebarTrigger aria-label={t("common.toggleMenu")} />
-            <span className="crumb-root">{t("ws.myWorkspace")}</span>
-            <ChevronRight size={13} className="crumb-sep" />
-            <span className="crumb-current">
-              {t(navigation.find((n) => n.id === view)!.label)}
-            </span>
-          </div>
-          <div className="topbar-actions">
-            {connected && (
-              <AccountExtras workspaceId={connected.id} onOpen={onNotice} />
-            )}
-            <span className="workspace-tag">
-              <span /> {t("ws.privateToYou")}
-            </span>
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label={t("ws.refresh")}
-              onClick={() => void reload()}
-              disabled={busy || loading}
-            >
-              <RefreshCw size={17} className={loading ? "animate-spin" : ""} />
-            </Button>
-          </div>
-        </header>
+        <Topbar
+          root={t("ws.myWorkspace")}
+          current={t(navigation.find((n) => n.id === view)!.label)}
+        >
+          {connected && (
+            <AccountExtras workspaceId={connected.id} onOpen={onNotice} />
+          )}
+          <span className="workspace-tag">
+            <span /> {t("ws.privateToYou")}
+          </span>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("ws.refresh")}
+            onClick={() => void reload()}
+            disabled={busy || loading}
+          >
+            <RefreshCw size={17} className={loading ? "animate-spin" : ""} />
+          </Button>
+        </Topbar>
         <div className="page-body" id="main-content">
           <div className="page-heading">
             <div>
