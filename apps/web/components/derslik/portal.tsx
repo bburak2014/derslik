@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { Access } from "@derslik/api-client";
+import type { Access, PortalData } from "@derslik/api-client";
 import {
   BookOpen,
   CalendarDays,
@@ -44,6 +44,7 @@ import {
 import {
   AccountExtras,
   LearningPanel,
+  learningTabs,
   type LearningTab,
   type LearningTabInfo,
   type NoticeFocus,
@@ -55,6 +56,7 @@ import {
   type NoticeTarget,
 } from "@derslik/contracts";
 import { LanguageSelect } from "@/components/i18n/language-select";
+import { backend } from "@/lib/client";
 import { MyRequests, TeacherDirectory, TeacherProfileView } from "./directory";
 
 type PortalRole = "STUDENT" | "GUARDIAN";
@@ -364,6 +366,22 @@ export function Portal({
   useEffect(() => {
     if (focusedTab) window.history.pushState({}, "", "/?view=" + focusedTab);
   }, [focusedTab, appliedFocus]);
+  // Sol menüdeki sekmeleri LearningPanel bildirir; ama öğrenci doğrudan
+  // "Öğretmen bul" / "İsteklerim" sayfasında açarsa panel hiç yüklenmez ve
+  // menü iskelet olarak kalırdı. O durumda izinler burada ayrıca alınır.
+  const needsTabs = !!access && isDiscover(current) && !tabs.length;
+  useEffect(() => {
+    if (!needsTabs || !access?.studentId) return;
+    let live = true;
+    backend<PortalData>(`/portal/${access.id}/${access.studentId}`)
+      .then((data) => {
+        if (live) setTabs(learningTabs(data.permissions || []));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [needsTabs, access?.id, access?.studentId]);
   let content: React.ReactNode;
   if (current === "teachers")
     content = teacher ? (

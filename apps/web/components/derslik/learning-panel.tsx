@@ -318,6 +318,51 @@ export type LearningTabInfo = { id: LearningTab; title: string };
 /** Bildirimden açılan yer; `at` aynı bildirime yeniden tıklanınca değişir. */
 export type NoticeFocus = NoticeTarget & { at: number };
 
+/** İzinlerden sekme listesi. Portal da sol menüyü panel açık olmadan
+ *  (ör. "Öğretmen bul" sayfasında) bununla kurar. */
+export function learningTabs(
+  permissions: string[],
+  owner = false,
+): LearningTabInfo[] {
+  const all: (LearningTabInfo & { permission: string })[] = [
+    ...(owner
+      ? []
+      : [
+          {
+            id: "lessons" as const,
+            title: t("nav.lessons"),
+            permission: "lessons",
+          },
+        ]),
+    {
+      id: "assignments",
+      title: t("nav.assignments"),
+      permission: "assignments",
+    },
+    { id: "files", title: t("nav.files"), permission: "assignments" },
+    { id: "videos", title: t("learn.tabVideos"), permission: "videos" },
+    { id: "notes", title: t("nav.notes"), permission: "notes" },
+    ...(owner
+      ? [
+          {
+            id: "access" as const,
+            title: t("learn.tabAccess"),
+            permission: "lessons",
+          },
+        ]
+      : [
+          {
+            id: "payments" as const,
+            title: t("nav.balance"),
+            permission: "payments",
+          },
+        ]),
+  ];
+  return all
+    .filter((x) => permissions.includes(x.permission))
+    .map(({ id, title }) => ({ id, title }));
+}
+
 export function LearningPanel({
   workspaceId,
   studentId,
@@ -596,50 +641,16 @@ export function LearningPanel({
     }
   }
   const permissionKey = permissions.join(",");
-  const tabs = useMemo(() => {
-    const allowed = permissionKey.split(",");
-    const all: (LearningTabInfo & { permission: string })[] = [
-      ...(owner
-        ? []
-        : [
-            {
-              id: "lessons" as const,
-              title: t("nav.lessons"),
-              permission: "lessons",
-            },
-          ]),
-      {
-        id: "assignments",
-        title: t("nav.assignments"),
-        permission: "assignments",
-      },
-      { id: "files", title: t("nav.files"), permission: "assignments" },
-      { id: "videos", title: t("learn.tabVideos"), permission: "videos" },
-      { id: "notes", title: t("nav.notes"), permission: "notes" },
-      ...(owner
-        ? [
-            {
-              id: "access" as const,
-              title: t("learn.tabAccess"),
-              permission: "lessons",
-            },
-          ]
-        : [
-            {
-              id: "payments" as const,
-              title: t("nav.balance"),
-              permission: "payments",
-            },
-          ]),
-    ];
-    return all.filter((x) => allowed.includes(x.permission));
-  }, [owner, permissionKey]);
+  const tabs = useMemo(
+    () => learningTabs(permissionKey.split(","), owner),
+    [owner, permissionKey],
+  );
   // Fall back to the first permitted tab when the selected one is not allowed.
   const tab = tabs.some((x) => x.id === selectedTab)
     ? selectedTab
     : (tabs[0]?.id ?? selectedTab);
   useEffect(() => {
-    onTabs?.(tabs.map(({ id, title }) => ({ id, title })));
+    onTabs?.(tabs);
   }, [onTabs, tabs]);
   if (loading)
     return (
