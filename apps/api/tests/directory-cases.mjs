@@ -129,14 +129,15 @@ export async function directoryCases({ t, admin, request, ok, token }) {
       assert.equal(await find("maxPrice=800&sort=price"), true);
       assert.equal(await find("q=deniz"), true);
       assert.equal(await find("q=%25"), false);
-      // Arama branş, seviye, şehir ve dil adlarında da eşleşir (her dilde).
+      // Arama branş, seviye ve şehir adlarında da eşleşir (her dilde).
       assert.equal(await find("q=matematik"), true);
       assert.equal(await find("q=Fizik"), true);
       assert.equal(await find("q=physics"), true);
       assert.equal(await find("q=İZMİR"), true);
       assert.equal(await find("q=izmir%20matematik"), true);
       assert.equal(await find("q=lise"), true);
-      assert.equal(await find("q=ingilizce"), true);
+      // Konuştuğu dil (en) branş sayılmaz.
+      assert.equal(await find("q=ingilizce"), false);
       assert.equal(await find("q=kimya"), false);
       assert.equal(await find("q=izmir%20kimya"), false);
       assert.equal(
