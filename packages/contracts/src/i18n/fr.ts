@@ -850,6 +850,7 @@ export const fr: Messages = {
     requestAccepted: "Votre demande de cours a été acceptée",
     requestDeclined: "Votre demande de cours a été refusée",
     requestNew: "Nouvelle demande de cours",
+    requestExpired: "Votre demande de cours a expiré",
     answered: "Votre question a reçu une réponse",
     answeredBody:
       "Vous pouvez consulter la réponse à votre question sur la vidéo.",
@@ -1276,6 +1277,15 @@ export const fr: Messages = {
     declineBody:
       "L'élève est prévenu et ne pourra pas vous écrire à nouveau pendant 7 jours.",
     declineTitle: "Refuser cette demande ?",
+    declineNoteLabel: "Note à l'élève (facultatif)",
+    declineNotePlaceholder: "Ex. Mon emploi du temps est complet ce trimestre.",
+    expiredState:
+      "L'enseignant n'a pas répondu sous {days} jours, votre demande a donc expiré. Vous pouvez la renvoyer.",
+    expiryHint:
+      "Sans réponse de l'enseignant sous {days} jours, la demande expire automatiquement.",
+    requestShort: "Envoyer une demande",
+    teacherNote: "Note de l'enseignant",
+    yourNote: "Votre note",
     declined: "Demande refusée.",
     declinedState:
       "Votre demande a été refusée. Vous pourrez en envoyer une nouvelle après le {date}.",
@@ -1439,6 +1449,7 @@ export const fr: Messages = {
     status: {
       ACCEPTED: "Acceptée",
       CANCELLED: "Retirée",
+      EXPIRED: "Expirée",
       DECLINED: "Refusée",
       PENDING: "En attente",
     },

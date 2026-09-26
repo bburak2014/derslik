@@ -827,6 +827,7 @@ export const en: Messages = {
     requestAccepted: "Your lesson request was accepted",
     requestDeclined: "Your lesson request was declined",
     requestNew: "New lesson request",
+    requestExpired: "Your lesson request expired",
     answered: "Your question was answered",
     answeredBody: "You can now see the answer to your video question.",
     assignmentNew: "New assignment",
@@ -1235,6 +1236,15 @@ export const en: Messages = {
     declineBody:
       "The student is notified and can't send you another request for 7 days.",
     declineTitle: "Decline this request?",
+    declineNoteLabel: "Note to the student (optional)",
+    declineNotePlaceholder: "E.g. My schedule is full this term.",
+    expiredState:
+      "The teacher didn't answer within {days} days, so your request expired. You can send it again.",
+    expiryHint:
+      "If the teacher doesn't answer within {days} days, the request expires on its own.",
+    requestShort: "Send request",
+    teacherNote: "Teacher's note",
+    yourNote: "Your note",
     declined: "Request declined.",
     declinedState:
       "Your request was declined. You can send a new one after {date}.",
@@ -1396,6 +1406,7 @@ export const en: Messages = {
     status: {
       ACCEPTED: "Accepted",
       CANCELLED: "Withdrawn",
+      EXPIRED: "Expired",
       DECLINED: "Declined",
       PENDING: "Waiting for reply",
     },

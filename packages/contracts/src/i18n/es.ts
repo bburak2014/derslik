@@ -841,6 +841,7 @@ export const es: Messages = {
     requestAccepted: "Tu solicitud de clase fue aceptada",
     requestDeclined: "Tu solicitud de clase fue rechazada",
     requestNew: "Nueva solicitud de clase",
+    requestExpired: "Tu solicitud de clase ha caducado",
     answered: "Han respondido a tu pregunta",
     answeredBody: "Ya puedes ver la respuesta a tu pregunta sobre el vídeo.",
     assignmentNew: "Nueva tarea",
@@ -1257,6 +1258,15 @@ export const es: Messages = {
     declineBody:
       "El alumno recibe un aviso y no podrá enviarte otra solicitud durante 7 días.",
     declineTitle: "¿Rechazar esta solicitud?",
+    declineNoteLabel: "Nota para el alumno (opcional)",
+    declineNotePlaceholder: "P. ej., Mi horario está completo este trimestre.",
+    expiredState:
+      "El profesor no respondió en {days} días, así que tu solicitud caducó. Puedes enviarla de nuevo.",
+    expiryHint:
+      "Si el profesor no responde en {days} días, la solicitud caduca sola.",
+    requestShort: "Enviar solicitud",
+    teacherNote: "Nota del profesor",
+    yourNote: "Tu nota",
     declined: "Solicitud rechazada.",
     declinedState:
       "Tu solicitud fue rechazada. Podrás enviar otra después del {date}.",
@@ -1419,6 +1429,7 @@ export const es: Messages = {
     status: {
       ACCEPTED: "Aceptada",
       CANCELLED: "Retirada",
+      EXPIRED: "Caducada",
       DECLINED: "Rechazada",
       PENDING: "Pendiente",
     },

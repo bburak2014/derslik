@@ -248,16 +248,20 @@ export class AccessService {
     });
   }
   inbox(actor: Actor) {
-    return this.db.transaction(actor, null, async (tx) => ({
-      data: toDto(
-        (
-          await tx.query(
-            "SELECT id,workspace_id,student_id,title,body,kind,target_id,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
-            [actor.id],
-          )
-        ).rows,
-      ),
-    }));
+    return this.db.transaction(actor, null, async (tx) => {
+      // Süresi dolan ders istekleri önce kapanır; öğrencinin bildirimi hemen düşer.
+      await tx.query("SELECT derslik.expire_requests()");
+      return {
+        data: toDto(
+          (
+            await tx.query(
+              "SELECT id,workspace_id,student_id,title,body,kind,target_id,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
+              [actor.id],
+            )
+          ).rows,
+        ),
+      };
+    });
   }
   readNotification(actor: Actor, id: string) {
     return this.db.transaction(actor, null, async (tx) => ({

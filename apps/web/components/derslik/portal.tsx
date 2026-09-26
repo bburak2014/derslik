@@ -292,7 +292,9 @@ export function Portal({
     [teacher, setTeacher] = useState<string | null>(teacherFromUrl),
     [tabs, setTabs] = useState<LearningTabInfo[]>([]),
     [signoutOpen, setSignoutOpen] = useState(false),
-    [requestFocus, setRequestFocus] = useState<string | null>(null);
+    [requestFocus, setRequestFocus] = useState<string | null>(null),
+    // Karttaki "İstek gönder": profil istek penceresi açık açılır.
+    [openRequest, setOpenRequest] = useState(false);
   useEffect(() => {
     const sync = () => {
       setTab(pageFromUrl(fallback));
@@ -317,9 +319,14 @@ export function Portal({
         label: (pages[current] ?? pages.lessons!).label,
         subtitle: (pages[current] ?? pages.lessons!).subtitle[role],
       };
-  function navigate(next: PortalPage, teacherId: string | null = null) {
+  function navigate(
+    next: PortalPage,
+    teacherId: string | null = null,
+    request = false,
+  ) {
     setTab(next);
     setTeacher(teacherId);
+    setOpenRequest(request);
     setPanelFocus(undefined);
     setRequestFocus(null);
     window.history.pushState(
@@ -366,9 +373,12 @@ export function Portal({
         signedIn
         onBack={() => navigate("teachers")}
         onOpenLessons={onOpenWorkspace}
+        openRequest={openRequest}
       />
     ) : (
-      <TeacherDirectory onOpen={(id) => navigate("teachers", id)} />
+      <TeacherDirectory
+        onOpen={(id, request) => navigate("teachers", id, request)}
+      />
     );
   else if (current === "requests")
     content = (

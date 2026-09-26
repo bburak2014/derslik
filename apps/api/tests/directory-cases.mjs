@@ -7,12 +7,14 @@ export async function directoryCases({ t, admin, request, ok, token }) {
     other = randomUUID(),
     student = randomUUID(),
     declined = randomUUID(),
-    canceller = randomUUID();
+    canceller = randomUUID(),
+    waiter = randomUUID();
   const tokenTeacher = await token(teacher, { email: "teacher@example.test" }),
     tokenOther = await token(other),
     tokenStudent = await token(student, { email: "ayse@example.test" }),
     tokenDeclined = await token(declined),
-    tokenCanceller = await token(canceller);
+    tokenCanceller = await token(canceller),
+    tokenWaiter = await token(waiter);
   let ws, requestId;
   const profile = {
     displayName: "Deniz Hoca",
@@ -400,12 +402,21 @@ export async function directoryCases({ t, admin, request, ok, token }) {
           auth: tokenDeclined,
         },
       );
+      const longNote = await request(
+        `/v1/workspaces/${ws}/requests/${sent.data.id}/decline`,
+        { method: "POST", body: { note: "x".repeat(301) }, auth: tokenTeacher },
+      );
+      assert.equal(longNote.status, 400);
       const declinedRequest = await ok(
         `/v1/workspaces/${ws}/requests/${sent.data.id}/decline`,
-        {},
+        { note: "  Bu dönem doluyum.  " },
         { auth: tokenTeacher },
       );
       assert.equal(declinedRequest.data.status, "DECLINED");
+      assert.equal(declinedRequest.data.decisionNote, "Bu dönem doluyum.");
+      // Not öğrencinin istek listesinde görünür.
+      const mine = await ok("/v1/requests", undefined, { auth: tokenDeclined });
+      assert.equal(mine.data[0].decisionNote, "Bu dönem doluyum.");
       const again = await request(`/v1/teacher-relations/${ws}/requests`, {
         method: "POST",
         body: requestBody,
@@ -481,6 +492,68 @@ export async function directoryCases({ t, admin, request, ok, token }) {
       );
       assert.equal((await fetchPhoto(request, ws, null)).status, 404);
       assert.equal((await fetchPhoto(request, ws, tokenTeacher)).status, 200);
+      await ok(
+        `/v1/workspaces/${ws}/showcase`,
+        { ...profile, published: true },
+        { auth: tokenTeacher, method: "PUT" },
+      );
+    },
+  );
+
+  await t.test(
+    "unanswered requests expire after 7 days and can be sent again",
+    async () => {
+      const sent = await ok(
+        `/v1/teacher-relations/${ws}/requests`,
+        { ...requestBody, studentName: "Ece Su" },
+        { auth: tokenWaiter },
+      );
+      // 6 gün: hâlâ bekliyor.
+      await admin.query(
+        "UPDATE derslik.lesson_requests SET created_at=now()-interval '6 days' WHERE id=$1",
+        [sent.data.id],
+      );
+      let mine = await ok("/v1/requests", undefined, { auth: tokenWaiter });
+      assert.equal(mine.data[0].status, "PENDING");
+      await admin.query(
+        "UPDATE derslik.lesson_requests SET created_at=now()-interval '8 days' WHERE id=$1",
+        [sent.data.id],
+      );
+      // Öğretmenin kutusu açılınca da düşer; öğrenciye bildirim gider.
+      const box = await ok(`/v1/workspaces/${ws}/showcase`, undefined, {
+        auth: tokenTeacher,
+      });
+      assert.equal(
+        box.data.requests.find((r) => r.id === sent.data.id).status,
+        "EXPIRED",
+      );
+      const inbox = await ok("/v1/inbox", undefined, { auth: tokenWaiter });
+      const notice = inbox.data.find((n) => n.targetId === sent.data.id);
+      assert.equal(notice.title, "notice.requestExpired");
+      assert.equal(notice.kind, "REQUEST_DECISION");
+      assert.equal(
+        (await ok(
+          `/v1/workspaces/${ws}/requests/${sent.data.id}/accept`,
+          {},
+          {
+            auth: tokenTeacher,
+          },
+        ).catch((e) => e)) instanceof Error,
+        true,
+      );
+      mine = await ok("/v1/requests", undefined, { auth: tokenWaiter });
+      assert.equal(mine.data[0].status, "EXPIRED");
+      const relation = await ok(`/v1/teacher-relations/${ws}`, undefined, {
+        auth: tokenWaiter,
+      });
+      assert.equal(relation.data.retryAfter, null);
+      // Süresi dolan istek bekleme süresi doğurmaz; hemen yeniden gönderilir.
+      const again = await ok(
+        `/v1/teacher-relations/${ws}/requests`,
+        { ...requestBody, studentName: "Ece Su" },
+        { auth: tokenWaiter },
+      );
+      assert.equal(again.data.status, "PENDING");
     },
   );
 }

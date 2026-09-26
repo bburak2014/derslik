@@ -857,6 +857,7 @@ export const de: Messages = {
     requestAccepted: "Ihre Unterrichtsanfrage wurde angenommen",
     requestDeclined: "Ihre Unterrichtsanfrage wurde abgelehnt",
     requestNew: "Neue Unterrichtsanfrage",
+    requestExpired: "Ihre Unterrichtsanfrage ist abgelaufen",
     answered: "Ihre Frage wurde beantwortet",
     answeredBody:
       "Sie können jetzt die Antwort auf Ihre Frage zum Video lesen.",
@@ -1289,6 +1290,16 @@ export const de: Messages = {
     declineBody:
       "Der Schüler wird benachrichtigt und kann 7 Tage lang keine neue Anfrage senden.",
     declineTitle: "Anfrage ablehnen?",
+    declineNoteLabel: "Notiz an die Schülerin/den Schüler (optional)",
+    declineNotePlaceholder:
+      "Z. B. Mein Stundenplan ist in diesem Halbjahr voll.",
+    expiredState:
+      "Die Lehrkraft hat nicht innerhalb von {days} Tagen geantwortet, daher ist Ihre Anfrage abgelaufen. Sie können sie erneut senden.",
+    expiryHint:
+      "Antwortet die Lehrkraft nicht innerhalb von {days} Tagen, läuft die Anfrage automatisch ab.",
+    requestShort: "Anfrage senden",
+    teacherNote: "Notiz der Lehrkraft",
+    yourNote: "Ihre Notiz",
     declined: "Anfrage abgelehnt.",
     declinedState:
       "Ihre Anfrage wurde abgelehnt. Ab {date} können Sie eine neue senden.",
@@ -1452,6 +1463,7 @@ export const de: Messages = {
     status: {
       ACCEPTED: "Angenommen",
       CANCELLED: "Zurückgezogen",
+      EXPIRED: "Abgelaufen",
       DECLINED: "Abgelehnt",
       PENDING: "Wartet auf Antwort",
     },

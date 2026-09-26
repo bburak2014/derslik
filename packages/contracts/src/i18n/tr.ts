@@ -809,6 +809,7 @@ export const tr = {
     requestAccepted: "Ders isteğiniz kabul edildi",
     requestDeclined: "Ders isteğiniz kabul edilmedi",
     requestNew: "Yeni ders isteği",
+    requestExpired: "Ders isteğinizin süresi doldu",
     answered: "Sorunuz yanıtlandı",
     answeredBody: "Video sorunuzun yanıtını görebilirsiniz.",
     assignmentNew: "Yeni ödev",
@@ -1213,6 +1214,15 @@ export const tr = {
     declineBody:
       "Öğrenciye bildirim gider ve 7 gün boyunca size yeniden istek gönderemez.",
     declineTitle: "İstek reddedilsin mi?",
+    declineNoteLabel: "Öğrenciye not (isteğe bağlı)",
+    declineNotePlaceholder: "Örn. Bu dönem programım dolu.",
+    expiredState:
+      "Öğretmen {days} gün içinde yanıt vermediği için isteğinizin süresi doldu. Yeniden gönderebilirsiniz.",
+    expiryHint:
+      "Öğretmen {days} gün içinde yanıt vermezse istek kendiliğinden düşer.",
+    requestShort: "İstek gönder",
+    teacherNote: "Öğretmenin notu",
+    yourNote: "Notunuz",
     declined: "İstek reddedildi.",
     declinedState:
       "İsteğiniz kabul edilmedi. {date} tarihinden sonra yeniden istek gönderebilirsiniz.",
@@ -1374,6 +1384,7 @@ export const tr = {
     status: {
       ACCEPTED: "Kabul edildi",
       CANCELLED: "Geri çekildi",
+      EXPIRED: "Süresi doldu",
       DECLINED: "Kabul edilmedi",
       PENDING: "Yanıt bekliyor",
     },

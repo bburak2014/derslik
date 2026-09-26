@@ -118,12 +118,14 @@ export class DirectoryController {
     @Param("ws") ws: string,
     @Param("id") id: string,
     @Param("decision") decision: string,
+    @Body() body: unknown,
   ) {
     return this.directory.decide(
       req.actor,
       uuid.parse(ws),
       id,
       z.enum(["accept", "decline"]).parse(decision),
+      body,
     );
   }
 }

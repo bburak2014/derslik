@@ -19,6 +19,7 @@ import {
   REQUESTS_PER_DAY,
   TEACHERS_PER_PAGE,
   lessonRequestSchema,
+  requestDecisionSchema,
   photoSchema,
   reviewSchema,
   shortName,
@@ -60,7 +61,7 @@ const SEARCHABLE = (
   })),
 }));
 const REQUEST_COLUMNS =
-  "id,workspace_id,student_name,subject,level,phone,email,message,status,student_id,created_at,decided_at";
+  "id,workspace_id,student_name,subject,level,phone,email,message,status,decision_note,student_id,created_at,decided_at";
 const PROFILE_COLUMNS =
   "display_name,headline,bio,subjects,levels,lesson_modes,city,hourly_price,currency,languages,experience_years,CASE WHEN photo IS NULL THEN NULL ELSE photo_version END AS photo_version,published,published_at";
 
@@ -211,6 +212,7 @@ export class DirectoryService {
   relation(actor: Actor, id: string) {
     const ws = uuid.parse(id);
     return this.db.transaction(actor, null, async (tx) => {
+      await expireRequests(tx);
       const flags = (
         await tx.query(
           `SELECT EXISTS(SELECT 1 FROM derslik.workspaces WHERE id=$1 AND owner_id=$2) AS own,
@@ -263,6 +265,7 @@ export class DirectoryService {
       await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         "request:" + actor.id,
       ]);
+      await expireRequests(tx);
       const state = (
         await tx.query(
           `SELECT derslik.is_listed($1) AS listed,
@@ -313,6 +316,7 @@ export class DirectoryService {
 
   myRequests(actor: Actor) {
     return this.db.transaction(actor, null, async (tx) => {
+      await expireRequests(tx);
       const rows = (
         await tx.query(
           `SELECT ${REQUEST_COLUMNS.split(",")
@@ -381,6 +385,7 @@ export class DirectoryService {
 
   showcase(actor: Actor, ws: string) {
     return this.db.transaction(actor, ws, async (tx) => {
+      await expireRequests(tx);
       const profile = (
         await tx.query(
           `SELECT ${PROFILE_COLUMNS} FROM derslik.teacher_profiles WHERE workspace_id=$1`,
@@ -487,9 +492,17 @@ export class DirectoryService {
     });
   }
 
-  decide(actor: Actor, ws: string, id: string, decision: "accept" | "decline") {
+  decide(
+    actor: Actor,
+    ws: string,
+    id: string,
+    decision: "accept" | "decline",
+    input: unknown = {},
+  ) {
     const request = uuid.parse(id);
+    const { note } = requestDecisionSchema.parse(input ?? {});
     return this.db.transaction(actor, ws, async (tx) => {
+      await expireRequests(tx);
       const row = (
         await tx.query(
           `SELECT ${REQUEST_COLUMNS} FROM derslik.lesson_requests WHERE workspace_id=$1 AND id=$2`,
@@ -523,9 +536,9 @@ export class DirectoryService {
       } else {
         const declined = (
           await tx.query(
-            `UPDATE derslik.lesson_requests SET status='DECLINED',decided_at=now()
+            `UPDATE derslik.lesson_requests SET status='DECLINED',decision_note=$3,decided_at=now()
              WHERE workspace_id=$1 AND id=$2 AND status='PENDING' RETURNING id`,
-            [ws, request],
+            [ws, request, note],
           )
         ).rows[0];
         if (!declined) throw new ConflictException("api.requestDecided");
@@ -570,4 +583,11 @@ export class DirectoryService {
       [ws, actor.id, action, resource, JSON.stringify(metadata)],
     );
   }
+}
+
+/** 7 gün yanıtsız kalan bekleyen istekleri kapatır (oturumdaki kişinin
+ *  gönderdikleri ve aldıkları). Zamanlayıcı olmadığı için istekleri okuyan
+ *  her uç önce bunu çağırır. */
+export async function expireRequests(tx: PoolClient) {
+  await tx.query("SELECT derslik.expire_requests()");
 }

@@ -183,10 +183,15 @@ export class DerslikClient {
       { method: "POST", body: {} },
     );
   }
-  decideLessonRequest(ws: string, id: string, decision: "accept" | "decline") {
+  decideLessonRequest(
+    ws: string,
+    id: string,
+    decision: "accept" | "decline",
+    note = "",
+  ) {
     return this.request<{ data: LessonRequest }>(
       `/v1/workspaces/${encodeURIComponent(ws)}/requests/${encodeURIComponent(id)}/${decision}`,
-      { method: "POST", body: {} },
+      { method: "POST", body: decision === "decline" ? { note } : {} },
     );
   }
 }

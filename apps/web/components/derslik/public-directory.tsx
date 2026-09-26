@@ -59,10 +59,17 @@ export function PublicDirectory({ teacherId }: { teacherId?: string }) {
               backHref="/teachers"
               onOpenLessons={() => location.assign("/?view=requests")}
               onEditProfile={() => location.assign("/?view=showcase")}
+              openRequest={
+                new URLSearchParams(location.search).get("request") === "1"
+              }
             />
           )
         ) : (
-          <TeacherDirectory hrefFor={(id) => `/teachers/${id}`} />
+          <TeacherDirectory
+            hrefFor={(id, request) =>
+              `/teachers/${id}` + (request ? "?request=1" : "")
+            }
+          />
         )}
       </main>
     </div>

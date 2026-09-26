@@ -797,6 +797,7 @@ export const ja: Messages = {
     requestAccepted: "レッスンリクエストが承認されました",
     requestDeclined: "レッスンリクエストは辞退されました",
     requestNew: "新しいレッスンリクエスト",
+    requestExpired: "レッスンリクエストの期限が切れました",
     answered: "質問に回答がありました",
     answeredBody: "動画への質問の回答を確認できます。",
     assignmentNew: "新しい課題",
@@ -1189,6 +1190,15 @@ export const ja: Messages = {
     decline: "辞退",
     declineBody: "生徒に通知され、7日間は再度リクエストできません。",
     declineTitle: "このリクエストを辞退しますか？",
+    declineNoteLabel: "生徒へのメモ（任意）",
+    declineNotePlaceholder: "例：今学期は予定が埋まっています。",
+    expiredState:
+      "講師が {days} 日以内に返答しなかったため、リクエストの期限が切れました。もう一度送れます。",
+    expiryHint:
+      "講師が {days} 日以内に返答しない場合、リクエストは自動的に期限切れになります。",
+    requestShort: "リクエストを送る",
+    teacherNote: "講師からのメモ",
+    yourNote: "あなたのメモ",
     declined: "リクエストを辞退しました。",
     declinedState:
       "リクエストは辞退されました。{date} 以降に再度送信できます。",
@@ -1346,6 +1356,7 @@ export const ja: Messages = {
     status: {
       ACCEPTED: "承認済み",
       CANCELLED: "取り下げ",
+      EXPIRED: "期限切れ",
       DECLINED: "辞退",
       PENDING: "返答待ち",
     },

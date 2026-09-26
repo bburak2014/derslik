@@ -32,6 +32,7 @@ import {
   type RequestStatus,
   type TeacherFilter,
   type TeacherRelation,
+  REQUEST_EXPIRY_DAYS,
 } from "@derslik/contracts";
 import { teacherQuery, type TeacherPage } from "@derslik/api-client";
 import { backend, webRequest } from "@/lib/client";
@@ -217,6 +218,7 @@ const statusTone: Record<RequestStatus, Tone> = {
   ACCEPTED: "ok",
   DECLINED: "danger",
   CANCELLED: "muted",
+  EXPIRED: "muted",
 };
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   return (
@@ -242,12 +244,16 @@ export function TeacherCard({
   teacher,
   onOpen,
   href,
+  onRequest,
+  requestHref,
 }: {
   teacher: PublicTeacher;
   onOpen?: () => void;
   href?: string;
+  /** Kartın altındaki "İstek gönder": profili istek penceresi açık açar. */
+  onRequest?: () => void;
+  requestHref?: string;
 }) {
-  const open = t("dir.viewTeacher");
   return (
     <Card className="teacher-card relative gap-4 p-5">
       <div className="flex items-start gap-4">
@@ -304,9 +310,23 @@ export function TeacherCard({
       </div>
       <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
         <Price teacher={teacher} />
-        <span className="text-primary text-sm font-medium" aria-hidden="true">
-          {open} →
-        </span>
+        {/* Kartın tamamı profile gider; düğme onun üstünde ayrı tıklanır. */}
+        {requestHref ? (
+          <Button asChild size="sm" className="relative z-10">
+            <a href={requestHref}>
+              <Send /> {t("dir.requestShort")}
+            </a>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            className="relative z-10"
+            onClick={onRequest ?? onOpen}
+          >
+            <Send /> {t("dir.requestShort")}
+          </Button>
+        )}
       </div>
     </Card>
   );
@@ -338,9 +358,10 @@ export function TeacherDirectory({
   onOpen,
   hrefFor,
 }: {
-  onOpen?: (id: string) => void;
+  /** `request` doluysa profil, istek penceresi açık gelir. */
+  onOpen?: (id: string, request?: boolean) => void;
   /** Herkese açık sayfada kartlar bağlantıdır (yeni sekmede açılabilir). */
-  hrefFor?: (id: string) => string;
+  hrefFor?: (id: string, request?: boolean) => string;
 }) {
   const [filters, setFilters] = useState<Filters>({ sort: "recommended" }),
     [search, setSearch] = useState(""),
@@ -595,6 +616,8 @@ export function TeacherDirectory({
               teacher={teacher}
               href={hrefFor?.(teacher.id)}
               onOpen={() => onOpen?.(teacher.id)}
+              requestHref={hrefFor?.(teacher.id, true)}
+              onRequest={() => onOpen?.(teacher.id, true)}
             />
           ))
         )}
@@ -919,6 +942,18 @@ function RequestDialog({
   );
 }
 
+/** Öğretmenin reddederken yazdığı not; öğrencinin gördüğü haliyle. */
+function TeacherNote({ note }: { note: string }) {
+  return (
+    <div className="bg-muted/60 grid gap-1 rounded-lg px-3 py-2.5 text-sm">
+      <span className="text-muted-foreground text-xs font-medium">
+        {t("dir.teacherNote")}
+      </span>
+      <p className="whitespace-pre-line">{note}</p>
+    </div>
+  );
+}
+
 function ActionPanel({
   teacher,
   relation,
@@ -927,6 +962,7 @@ function ActionPanel({
   onOpenLessons,
   onEditProfile,
   signInHref,
+  openRequest = false,
 }: {
   teacher: PublicTeacher;
   relation: TeacherRelation | null;
@@ -935,12 +971,25 @@ function ActionPanel({
   onOpenLessons?: (workspaceId: string) => void;
   onEditProfile?: () => void;
   signInHref: string;
+  /** Karttaki "İstek gönder"den gelindi: istek gönderilebiliyorsa pencere açık başlar. */
+  openRequest?: boolean;
 }) {
-  const [dialog, setDialog] = useState(false),
+  const [dialog, setDialog] = useState(openRequest),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const request = relation?.request;
+  // İstek penceresi yalnızca istek gönderilebilecek durumda açılır.
+  const canRequest =
+    !!relation &&
+    !relation.isOwn &&
+    !relation.isStudent &&
+    request?.status !== "PENDING" &&
+    !relation.retryAfter;
+  const note =
+    request?.status === "DECLINED" && request.decisionNote ? (
+      <TeacherNote note={request.decisionNote} />
+    ) : null;
   let body: React.ReactNode;
   if (!signedIn)
     body = (
@@ -982,6 +1031,9 @@ function ActionPanel({
           <Clock3 size={17} className="text-(--warn)" />
           {t("dir.pendingState")}
         </p>
+        <p className="text-muted-foreground text-sm">
+          {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
+        </p>
         <Button
           type="button"
           variant="outline"
@@ -1006,26 +1058,37 @@ function ActionPanel({
     );
   else if (relation.retryAfter)
     body = (
-      <p className="text-muted-foreground text-sm">
-        {t("dir.declinedState", { date: shortDate(relation.retryAfter) })}
-      </p>
+      <>
+        <p className="text-muted-foreground text-sm">
+          {t("dir.declinedState", { date: shortDate(relation.retryAfter) })}
+        </p>
+        {note}
+      </>
     );
   else
     body = (
-      <Button
-        type="button"
-        size="lg"
-        className="w-full"
-        onClick={() => {
-          setNotice("");
-          setDialog(true);
-        }}
-      >
-        <Send /> {t("dir.sendRequest")}
-      </Button>
+      <>
+        {request?.status === "EXPIRED" && (
+          <p className="text-muted-foreground text-sm">
+            {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
+          </p>
+        )}
+        {note}
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          onClick={() => {
+            setNotice("");
+            setDialog(true);
+          }}
+        >
+          <Send /> {t("dir.sendRequest")}
+        </Button>
+      </>
     );
   return (
-    <Card className="grid gap-4 p-5 lg:sticky lg:top-6">
+    <Card className="grid gap-4 p-5">
       <Price teacher={teacher} large />
       {body}
       {error && <FormError>{error}</FormError>}
@@ -1034,7 +1097,7 @@ function ActionPanel({
         <RequestDialog
           key={String(dialog)}
           teacher={teacher}
-          open={dialog}
+          open={dialog && canRequest}
           onOpenChange={setDialog}
           onSent={() => {
             setNotice(t("dir.sent"));
@@ -1113,6 +1176,7 @@ export function TeacherProfileView({
   backHref,
   onOpenLessons,
   onEditProfile,
+  openRequest,
 }: {
   id: string;
   signedIn: boolean;
@@ -1120,6 +1184,8 @@ export function TeacherProfileView({
   backHref?: string;
   onOpenLessons?: (workspaceId: string) => void;
   onEditProfile?: () => void;
+  /** Karttaki "İstek gönder"den gelindiyse istek penceresi açık başlar. */
+  openRequest?: boolean;
 }) {
   const [teacher, setTeacher] = useState<PublicTeacher | null>(null),
     [reviews, setReviews] = useState<PublicReview[]>([]),
@@ -1258,15 +1324,19 @@ export function TeacherProfileView({
             <ReviewList reviews={reviews} />
           </Card>
         </div>
-        <ActionPanel
-          teacher={teacher}
-          relation={relation}
-          signedIn={signedIn}
-          onChanged={() => void reload()}
-          onOpenLessons={onOpenLessons}
-          onEditProfile={onEditProfile}
-          signInHref={`/?teacher=${teacher.id}`}
-        />
+        {/* Dar ekranda fiyat ve istek düğmesi en üstte; uzun tanıtımın altında kaybolmaz. */}
+        <div className="order-first lg:sticky lg:top-6 lg:order-none">
+          <ActionPanel
+            teacher={teacher}
+            relation={relation}
+            signedIn={signedIn}
+            onChanged={() => void reload()}
+            onOpenLessons={onOpenLessons}
+            onEditProfile={onEditProfile}
+            signInHref={`/?teacher=${teacher.id}`}
+            openRequest={openRequest}
+          />
+        </div>
       </div>
       {error && <FormError>{error}</FormError>}
     </section>
@@ -1367,6 +1437,19 @@ export function MyRequests({
               {r.message && <p className="line-clamp-2 text-sm">{r.message}</p>}
             </div>
           </div>
+          {r.status === "DECLINED" && r.decisionNote && (
+            <TeacherNote note={r.decisionNote} />
+          )}
+          {r.status === "PENDING" && (
+            <p className="text-muted-foreground text-sm">
+              {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
+            </p>
+          )}
+          {r.status === "EXPIRED" && (
+            <p className="text-muted-foreground text-sm">
+              {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2 border-t pt-3">
             {r.status === "ACCEPTED" && onOpenLessons && (
               <Button
