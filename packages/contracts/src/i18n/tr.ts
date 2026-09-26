@@ -15,6 +15,12 @@ export const tr = {
     requestDecided: "Bu istek zaten yanıtlanmış veya geri çekilmiş.",
     requestNotFound: "İstek bulunamadı.",
     requestOwn: "Kendinize ders isteği gönderemezsiniz.",
+    accountIsStudent:
+      "Bu hesap bir öğrenci hesabı. Öğretmen olarak başlamak için başka bir e-postayla kayıt olun.",
+    accountIsTeacher:
+      "Bu hesap bir öğretmen hesabı. Öğrenci olarak katılmak için başka bir e-postayla giriş yapın.",
+    requesterIsTeacher:
+      "Bu kişi artık öğretmen hesabı kullanıyor, öğrenci olarak eklenemez.",
     requestPending:
       "Bu öğretmene gönderdiğiniz bir istek zaten yanıt bekliyor.",
     reviewNotAllowed:
@@ -1214,6 +1220,8 @@ export const tr = {
     declineBody:
       "Öğrenciye bildirim gider ve 7 gün boyunca size yeniden istek gönderemez.",
     declineTitle: "İstek reddedilsin mi?",
+    teacherAccountNote:
+      "Öğretmen hesabıyla ders isteği gönderilemez. Öğrenci olarak istek göndermek için başka bir e-postayla giriş yapın.",
     cardOwn: "Sizin profiliniz",
     cardStudent: "Öğrencisisiniz",
     declineNoteLabel: "Öğrenciye not (isteğe bağlı)",

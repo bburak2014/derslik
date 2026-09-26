@@ -242,7 +242,8 @@ type Filters = Required<Pick<TeacherFilter, "sort">> &
   Omit<TeacherFilter, "sort" | "page">;
 
 /** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
-export type CardState = "own" | "student" | "pending" | "cooling" | null;
+export type CardState =
+  "own" | "teacher" | "student" | "pending" | "cooling" | null;
 export const cardState = (
   relations: TeacherRelations | null,
   id: string,
@@ -251,15 +252,19 @@ export const cardState = (
     ? null
     : relations.own.includes(id)
       ? "own"
-      : relations.students.includes(id)
-        ? "student"
-        : relations.pending.includes(id)
-          ? "pending"
-          : relations.cooling.includes(id)
-            ? "cooling"
-            : null;
+      : relations.teacherAccount
+        ? "teacher"
+        : relations.students.includes(id)
+          ? "student"
+          : relations.pending.includes(id)
+            ? "pending"
+            : relations.cooling.includes(id)
+              ? "cooling"
+              : null;
 
 function CardStateBadge({ state }: { state: Exclude<CardState, null> }) {
+  // Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz.
+  if (state === "teacher") return null;
   if (state === "pending") return <RequestStatusBadge status="PENDING" />;
   if (state === "cooling") return <RequestStatusBadge status="DECLINED" />;
   return (
@@ -643,6 +648,11 @@ export function TeacherDirectory({
         </div>
       </Card>
       {error && <FormError>{error}</FormError>}
+      {relations?.teacherAccount && (
+        <p className="text-muted-foreground text-sm">
+          {t("dir.teacherAccountNote")}
+        </p>
+      )}
       {sent && <FormSuccess>{sent}</FormSuccess>}
       {page && (
         <p className="text-muted-foreground -mb-2 text-sm" aria-live="polite">
@@ -1053,6 +1063,7 @@ function ActionPanel({
   const canRequest =
     !!relation &&
     !relation.isOwn &&
+    !relation.isTeacherAccount &&
     !relation.isStudent &&
     request?.status !== "PENDING" &&
     !relation.retryAfter;
@@ -1080,6 +1091,12 @@ function ActionPanel({
           </Button>
         )}
       </>
+    );
+  else if (relation.isTeacherAccount)
+    body = (
+      <p className="text-muted-foreground text-sm">
+        {t("dir.teacherAccountNote")}
+      </p>
     );
   else if (relation.isStudent)
     body = (

@@ -516,6 +516,65 @@ export async function directoryCases({ t, admin, request, ok, token }) {
   );
 
   await t.test(
+    "one email is either a teacher or a student, never both",
+    async () => {
+      // Öğretmen hesabı ders isteği gönderemez.
+      const otherTeacher = randomUUID();
+      const tokenOtherTeacher = await token(otherTeacher);
+      await ok("/v1/workspaces", { name: "Ece" }, { auth: tokenOtherTeacher });
+      const blocked = await request(`/v1/teacher-relations/${ws}/requests`, {
+        method: "POST",
+        body: requestBody,
+        auth: tokenOtherTeacher,
+      });
+      assert.equal(blocked.status, 409);
+      assert.match(blocked.body.error.message, /öğretmen hesabı/);
+      assert.equal(
+        (
+          await ok("/v1/teacher-relations", undefined, {
+            auth: tokenOtherTeacher,
+          })
+        ).data.teacherAccount,
+        true,
+      );
+      assert.equal(
+        (
+          await ok(`/v1/teacher-relations/${ws}`, undefined, {
+            auth: tokenOtherTeacher,
+          })
+        ).data.isTeacherAccount,
+        true,
+      );
+      // Öğretmene bağlı öğrenci hesabı çalışma alanı açamaz.
+      assert.equal(
+        (
+          await request("/v1/workspaces", {
+            method: "POST",
+            body: { name: "Ayşe" },
+            auth: tokenStudent,
+          })
+        ).status,
+        409,
+      );
+      // İstek bekliyorken öğretmen olan kişi öğrenci olarak kabul edilemez.
+      const switcher = randomUUID();
+      const tokenSwitcher = await token(switcher);
+      const sent = await ok(
+        `/v1/teacher-relations/${ws}/requests`,
+        { ...requestBody, studentName: "Mert Can" },
+        { auth: tokenSwitcher },
+      );
+      await ok("/v1/workspaces", { name: "Mert" }, { auth: tokenSwitcher });
+      const accept = await request(
+        `/v1/workspaces/${ws}/requests/${sent.data.id}/accept`,
+        { method: "POST", body: {}, auth: tokenTeacher },
+      );
+      assert.equal(accept.status, 409);
+      assert.match(accept.body.error.message, /artık öğretmen hesabı/);
+    },
+  );
+
+  await t.test(
     "unanswered requests expire after 7 days and can be sent again",
     async () => {
       const sent = await ok(

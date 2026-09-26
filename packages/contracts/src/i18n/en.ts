@@ -17,6 +17,12 @@ export const en: Messages = {
     requestDecided: "This request has already been answered or withdrawn.",
     requestNotFound: "Request not found.",
     requestOwn: "You can't send a lesson request to yourself.",
+    accountIsStudent:
+      "This is a student account. To start teaching, sign up with a different email.",
+    accountIsTeacher:
+      "This is a teacher account. To join as a student, sign in with a different email.",
+    requesterIsTeacher:
+      "This person now uses a teacher account and can't be added as a student.",
     requestPending:
       "You already have a request waiting for this teacher's answer.",
     reviewNotAllowed: "Only this teacher's students can leave a review.",
@@ -1236,6 +1242,8 @@ export const en: Messages = {
     declineBody:
       "The student is notified and can't send you another request for 7 days.",
     declineTitle: "Decline this request?",
+    teacherAccountNote:
+      "Teacher accounts can't send lesson requests. To send one as a student, sign in with a different email.",
     cardOwn: "Your profile",
     cardStudent: "You're a student",
     declineNoteLabel: "Note to the student (optional)",

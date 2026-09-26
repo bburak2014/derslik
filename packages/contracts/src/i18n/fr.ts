@@ -17,6 +17,12 @@ export const fr: Messages = {
     requestDecided: "Cette demande a déjà reçu une réponse ou a été retirée.",
     requestNotFound: "Demande introuvable.",
     requestOwn: "Vous ne pouvez pas vous envoyer une demande de cours.",
+    accountIsStudent:
+      "Ce compte est un compte élève. Pour enseigner, inscrivez-vous avec une autre adresse e-mail.",
+    accountIsTeacher:
+      "Ce compte est un compte enseignant. Pour rejoindre en tant qu'élève, connectez-vous avec une autre adresse e-mail.",
+    requesterIsTeacher:
+      "Cette personne utilise désormais un compte enseignant et ne peut pas être ajoutée comme élève.",
     requestPending: "Une demande à cet enseignant attend déjà une réponse.",
     reviewNotAllowed:
       "Seuls les élèves de cet enseignant peuvent laisser un avis.",
@@ -1277,6 +1283,8 @@ export const fr: Messages = {
     declineBody:
       "L'élève est prévenu et ne pourra pas vous écrire à nouveau pendant 7 jours.",
     declineTitle: "Refuser cette demande ?",
+    teacherAccountNote:
+      "Un compte enseignant ne peut pas envoyer de demande de cours. Pour en envoyer une en tant qu'élève, connectez-vous avec une autre adresse e-mail.",
     cardOwn: "Votre profil",
     cardStudent: "Vous êtes son élève",
     declineNoteLabel: "Note à l'élève (facultatif)",

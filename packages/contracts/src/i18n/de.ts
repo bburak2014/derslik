@@ -18,6 +18,12 @@ export const de: Messages = {
       "Diese Anfrage wurde bereits beantwortet oder zurückgezogen.",
     requestNotFound: "Anfrage nicht gefunden.",
     requestOwn: "Sie können sich selbst keine Unterrichtsanfrage senden.",
+    accountIsStudent:
+      "Dies ist ein Schülerkonto. Um zu unterrichten, registrieren Sie sich mit einer anderen E-Mail-Adresse.",
+    accountIsTeacher:
+      "Dies ist ein Lehrkraftkonto. Um als Schüler/in beizutreten, melden Sie sich mit einer anderen E-Mail-Adresse an.",
+    requesterIsTeacher:
+      "Diese Person nutzt jetzt ein Lehrkraftkonto und kann nicht als Schüler/in hinzugefügt werden.",
     requestPending:
       "Eine Anfrage an diese Lehrkraft wartet bereits auf Antwort.",
     reviewNotAllowed:
@@ -1290,6 +1296,8 @@ export const de: Messages = {
     declineBody:
       "Der Schüler wird benachrichtigt und kann 7 Tage lang keine neue Anfrage senden.",
     declineTitle: "Anfrage ablehnen?",
+    teacherAccountNote:
+      "Mit einem Lehrkraftkonto können keine Unterrichtsanfragen gesendet werden. Melden Sie sich dafür mit einer anderen E-Mail-Adresse an.",
     cardOwn: "Ihr Profil",
     cardStudent: "Sie sind Schüler/in",
     declineNoteLabel: "Notiz an die Schülerin/den Schüler (optional)",

@@ -229,6 +229,8 @@ export type MyLessonRequest = LessonRequest & {
 export type TeacherRelation = {
   isOwn: boolean;
   isStudent: boolean;
+  /** Öğretmen hesabı ders isteği gönderemez (bir e-posta tek rol). */
+  isTeacherAccount: boolean;
   request: LessonRequest | null;
   canReview: boolean;
   review: PublicReview | null;
@@ -241,6 +243,8 @@ export type TeacherRelations = {
   students: string[];
   pending: string[];
   cooling: string[];
+  /** Öğretmen hesabı ders isteği gönderemez (bir e-posta tek rol). */
+  teacherAccount: boolean;
 };
 export type Showcase = {
   profile: TeacherProfile | null;

@@ -192,19 +192,21 @@ function Price({ teacher }: { teacher: PublicTeacher }) {
 }
 
 /** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
-type CardState = "own" | "student" | "pending" | "cooling" | null;
+type CardState = "own" | "teacher" | "student" | "pending" | "cooling" | null;
 const cardState = (r: TeacherRelations | null, id: string): CardState =>
   !r
     ? null
     : r.own.includes(id)
       ? "own"
-      : r.students.includes(id)
-        ? "student"
-        : r.pending.includes(id)
-          ? "pending"
-          : r.cooling.includes(id)
-            ? "cooling"
-            : null;
+      : r.teacherAccount
+        ? "teacher"
+        : r.students.includes(id)
+          ? "student"
+          : r.pending.includes(id)
+            ? "pending"
+            : r.cooling.includes(id)
+              ? "cooling"
+              : null;
 
 function TeacherCard({
   teacher,
@@ -267,7 +269,8 @@ function TeacherCard({
         <View style={{ flexShrink: 1 }}>
           <Price teacher={teacher} />
         </View>
-        {state === "pending" ? (
+        {/* Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz. */}
+        {state === "teacher" ? null : state === "pending" ? (
           <RequestStatusBadge status="PENDING" />
         ) : state === "cooling" ? (
           <RequestStatusBadge status="DECLINED" />
@@ -603,6 +606,9 @@ function TeacherList({
         />
       </ScrollView>
       <ErrorText message={error} />
+      {relations?.teacherAccount && (
+        <Text style={styles.muted}>{t("dir.teacherAccountNote")}</Text>
+      )}
       <SuccessText message={notice} />
       {page && (
         <Text style={styles.muted}>
@@ -722,6 +728,7 @@ function TeacherProfile({
   const canRequest =
     !!relation &&
     !relation.isOwn &&
+    !relation.isTeacherAccount &&
     !relation.isStudent &&
     request?.status !== "PENDING" &&
     !relation.retryAfter;
@@ -738,6 +745,8 @@ function TeacherProfile({
   if (!relation) action = null;
   else if (relation.isOwn)
     action = <Text style={styles.muted}>{t("dir.ownProfile")}</Text>;
+  else if (relation.isTeacherAccount)
+    action = <Text style={styles.muted}>{t("dir.teacherAccountNote")}</Text>;
   else if (relation.isStudent)
     action = (
       <>

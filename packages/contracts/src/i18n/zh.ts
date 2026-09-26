@@ -15,6 +15,9 @@ export const zh: Messages = {
     requestDecided: "该申请已被处理或已撤回。",
     requestNotFound: "未找到该申请。",
     requestOwn: "不能向自己发送上课申请。",
+    accountIsStudent: "这是学生账号。如需开始教学，请使用其他邮箱注册。",
+    accountIsTeacher: "这是老师账号。如需以学生身份加入，请使用其他邮箱登录。",
+    requesterIsTeacher: "此人现在使用的是老师账号，无法添加为学生。",
     requestPending: "你已向这位老师发送过申请，正在等待回复。",
     reviewNotAllowed: "只有这位老师的学生可以评价。",
     teacherNotFound: "未找到该老师，或其已不再展示。",
@@ -1119,6 +1122,8 @@ export const zh: Messages = {
     decline: "拒绝",
     declineBody: "学生会收到通知，7 天内不能再次向你申请。",
     declineTitle: "拒绝该申请？",
+    teacherAccountNote:
+      "老师账号不能发送上课申请。如需以学生身份发送，请使用其他邮箱登录。",
     cardOwn: "你的主页",
     cardStudent: "你已是其学生",
     declineNoteLabel: "给学生的备注（可选）",
