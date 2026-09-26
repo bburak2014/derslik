@@ -20,6 +20,7 @@ import {
   PHOTO_SIZE,
   photoPath,
   priceCurrencies,
+  priceSteps,
   REQUEST_EXPIRY_DAYS,
   t,
   teacherLevels,
@@ -345,8 +346,6 @@ function TeacherList({
   const { styles } = useTheme();
   const [filter, setFilter] = useState<TeacherFilter>({}),
     [query, setQuery] = useState(""),
-    [price, setPrice] = useState(""),
-    [open, setOpen] = useState(false),
     [page, setPage] = useState<TeacherPage | null>(null),
     [rows, setRows] = useState<PublicTeacher[]>([]),
     [loading, setLoading] = useState(true),
@@ -372,29 +371,24 @@ function TeacherList({
     void load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the filter changes.
   }, [key]);
-  // Arama ve ücret yazarken her tuşta istek atılmaz; yarım saniye beklenir.
+  // Arama yazarken her tuşta istek atılmaz; yarım saniye beklenir.
   useEffect(() => {
     const timer = setTimeout(() => {
-      const q = query.trim() || undefined,
-        maxPrice = /^\d+$/.test(price.trim()) ? Number(price) : undefined;
-      setFilter((f) =>
-        f.q === q && f.maxPrice === maxPrice ? f : { ...f, q, maxPrice },
-      );
+      const q = query.trim() || undefined;
+      setFilter((f) => (f.q === q ? f : { ...f, q }));
     }, 500);
     return () => clearTimeout(timer);
-  }, [query, price]);
+  }, [query]);
   const set = (patch: Partial<TeacherFilter>) =>
     setFilter((f) => ({ ...f, ...patch }));
   const any = (value: string) => value || undefined;
-  const active =
-    [
-      filter.subject,
-      filter.level,
-      filter.mode,
-      filter.city,
-      filter.maxPrice,
-    ].filter((v) => v !== undefined).length +
-    (filter.sort && filter.sort !== "recommended" ? 1 : 0);
+  const active = [
+    filter.subject,
+    filter.level,
+    filter.mode,
+    filter.city,
+    filter.maxPrice,
+  ].some((v) => v !== undefined);
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
@@ -421,92 +415,102 @@ function TeacherList({
         autoCorrect={false}
         returnKeyType="search"
       />
-      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-        <Button
-          secondary
-          size="sm"
-          icon="options-outline"
-          onPress={() => setOpen(!open)}
-        >
-          {active ? `${t("dir.filters")} (${active})` : t("dir.filters")}
-        </Button>
-        {active > 0 && (
+      {/* Web'deki gibi: her filtre tek dokunuşla açılan bir hap; satır yana
+          kayar, seçili haplar marka tonunda görünür. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ marginHorizontal: -20 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
+      >
+        {active && (
           <Button
             variant="ghost"
             size="sm"
             icon="close"
-            onPress={() => {
-              setPrice("");
-              setFilter((f) => ({ q: f.q }));
-            }}
+            onPress={() => setFilter((f) => ({ q: f.q, sort: f.sort }))}
           >
             {t("dir.clearFilters")}
           </Button>
         )}
-      </View>
-      {open && (
-        <Card tone="muted">
-          <Picker
-            label={t("dir.subjectLabel")}
-            value={filter.subject || ""}
-            onChange={(v) =>
-              set({ subject: any(v) as TeacherFilter["subject"] })
-            }
-            options={[
-              { value: "", label: t("dir.allSubjects") },
-              ...teacherSubjects.map((s) => ({
-                value: s,
-                label: subjectName(s),
-              })),
-            ]}
-          />
-          <Picker
-            label={t("dir.levelLabel")}
-            value={filter.level || ""}
-            onChange={(v) => set({ level: any(v) as TeacherFilter["level"] })}
-            options={[
-              { value: "", label: t("dir.allLevels") },
-              ...teacherLevels.map((s) => ({ value: s, label: levelName(s) })),
-            ]}
-          />
-          <Segmented
-            label={t("dir.lessonModes")}
-            value={filter.mode || ""}
-            onChange={(v) => set({ mode: any(v) as TeacherFilter["mode"] })}
-            options={[
-              { value: "", label: t("common.all") },
-              ...lessonModes.map((m) => ({ value: m, label: modeName(m) })),
-            ]}
-          />
-          {!!page?.cities.length && (
-            <Picker
-              label={t("dir.city")}
-              value={filter.city || ""}
-              onChange={(v) => set({ city: any(v) })}
-              options={[
-                { value: "", label: t("dir.anyCity") },
-                ...page.cities.map((c) => ({ value: c, label: c })),
-              ]}
-            />
-          )}
-          <Field label={t("dir.maxPrice")} required={false}>
-            <Input
-              value={price}
-              onChangeText={(v) => setPrice(v.replace(/\D/g, ""))}
-              keyboardType="number-pad"
-            />
-          </Field>
-          <Picker
-            label={t("dir.sortLabel")}
-            value={filter.sort || "recommended"}
-            onChange={(v) => set({ sort: v as TeacherFilter["sort"] })}
-            options={teacherSorts.map((s) => ({
+        <Picker
+          pill={{ icon: "book-outline" }}
+          label={t("dir.subjectLabel")}
+          value={filter.subject || ""}
+          onChange={(v) => set({ subject: any(v) as TeacherFilter["subject"] })}
+          options={[
+            { value: "", label: t("dir.allSubjects") },
+            ...teacherSubjects.map((s) => ({
               value: s,
-              label: label(`dir.sort.${s}`),
-            }))}
+              label: subjectName(s),
+            })),
+          ]}
+        />
+        <Picker
+          pill={{ icon: "school-outline" }}
+          label={t("dir.levelLabel")}
+          value={filter.level || ""}
+          onChange={(v) => set({ level: any(v) as TeacherFilter["level"] })}
+          options={[
+            { value: "", label: t("dir.allLevels") },
+            ...teacherLevels.map((s) => ({ value: s, label: levelName(s) })),
+          ]}
+        />
+        <Picker
+          pill={{ icon: "desktop-outline" }}
+          label={t("dir.lessonModes")}
+          value={filter.mode || ""}
+          onChange={(v) => {
+            const mode = any(v) as TeacherFilter["mode"];
+            // Yalnız online derslerde şehir anlamsız.
+            set(mode === "ONLINE" ? { mode, city: undefined } : { mode });
+          }}
+          options={[
+            { value: "", label: t("dir.anyMode") },
+            ...lessonModes.map((m) => ({ value: m, label: modeName(m) })),
+          ]}
+        />
+        {filter.mode !== "ONLINE" && !!page?.cities.length && (
+          <Picker
+            pill={{ icon: "location-outline" }}
+            label={t("dir.city")}
+            value={filter.city || ""}
+            onChange={(v) => set({ city: any(v) })}
+            options={[
+              { value: "", label: t("dir.anyCity") },
+              ...page.cities.map((c) => ({ value: c, label: c })),
+            ]}
           />
-        </Card>
-      )}
+        )}
+        <Picker
+          pill={{ icon: "wallet-outline" }}
+          label={t("dir.hourlyPrice")}
+          value={filter.maxPrice ? String(filter.maxPrice) : ""}
+          onChange={(v) => set({ maxPrice: v ? Number(v) : undefined })}
+          options={[
+            { value: "", label: t("common.all") },
+            ...priceSteps.map((n) => ({
+              value: String(n),
+              label: "≤ " + priceText({ hourlyPrice: n, currency: "TRY" }),
+            })),
+          ]}
+        />
+        <Picker
+          pill={{ icon: "swap-vertical-outline" }}
+          label={t("dir.sortLabel")}
+          value={
+            filter.sort && filter.sort !== "recommended" ? filter.sort : ""
+          }
+          onChange={(v) =>
+            set({ sort: (v || undefined) as TeacherFilter["sort"] })
+          }
+          options={teacherSorts.map((s) => ({
+            value: s === "recommended" ? "" : s,
+            label: label(`dir.sort.${s}`),
+          }))}
+        />
+      </ScrollView>
       <ErrorText message={error} />
       {page && (
         <Text style={styles.muted}>

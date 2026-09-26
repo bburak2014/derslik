@@ -60,6 +60,9 @@ export type TeachingLanguage = (typeof teachingLanguages)[number];
 export const teacherSorts = ["recommended", "price", "rating", "new"] as const;
 export type TeacherSort = (typeof teacherSorts)[number];
 
+/** Ücret filtresinin hazır üst sınırları (TL/saat); web ve mobil ortak. */
+export const priceSteps = [300, 500, 750, 1000, 1500, 2000] as const;
+
 export const requestStatuses = [
   "PENDING",
   "ACCEPTED",

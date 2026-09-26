@@ -10,16 +10,18 @@ import {
   MonitorPlay,
   Search,
   Send,
-  SlidersHorizontal,
+  ArrowUpDown,
+  BookOpen,
+  Wallet,
   Star,
   UserRoundSearch,
   X,
 } from "lucide-react";
 import {
   intlLocale,
-  lessonModes,
   t,
   teacherLevels,
+  priceSteps,
   teacherSorts,
   teacherSubjects,
   type LessonRequestInput,
@@ -56,6 +58,7 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Input } from "@/components/ui/input";
@@ -75,6 +78,9 @@ import { Spinner } from "./loading";
 // --- Küçük parçalar (web vitrini, öğrenci ve öğretmen ekranları ortak) ------
 
 const ANY = "__any";
+// Filtre hapı: yuvarlak, seçim yapılınca marka tonunda.
+const PILL =
+  "bg-background h-9 rounded-full data-[active]:border-(--brand-line) data-[active]:bg-(--brand-soft) data-[active]:text-(--brand) data-[active]:[&_svg]:text-(--brand)";
 const tint = ["sage", "peach", "lavender", "blue"];
 
 /** Öğretmen fotoğrafı; yoksa adın baş harfleri (öğrenci avatarıyla aynı renk
@@ -363,8 +369,7 @@ export function TeacherDirectory({
     [items, setItems] = useState<PublicTeacher[]>([]),
     [loading, setLoading] = useState(true),
     [more, setMore] = useState(false),
-    [error, setError] = useState(""),
-    [showFilters, setShowFilters] = useState(false);
+    [error, setError] = useState("");
   // Arama kutusu yazarken her tuşta istek atmasın.
   useEffect(() => {
     const id = setTimeout(
@@ -425,41 +430,47 @@ export function TeacherDirectory({
     !!filters.mode ||
     !!filters.city ||
     filters.maxPrice !== undefined;
-  const select = (
-    id: string,
+  // Filtre hapı: etiket tetikleyicinin içinde durur ("Ders: Matematik"), seçim
+  // yapılınca hap marka tonuna geçer. Satır sarılır, hiçbir alan diğerine
+  // taşmaz.
+  const pill = (
+    icon: React.ReactNode,
     label: string,
     value: string | undefined,
     anyLabel: string,
     options: { value: string; label: string }[],
     onChange: (v: string | undefined) => void,
   ) => (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Select
-        value={value ?? ANY}
-        onValueChange={(v) => onChange(v === ANY ? undefined : v)}
+    <Select
+      value={value ?? ANY}
+      onValueChange={(v) => onChange(v === ANY ? undefined : v)}
+    >
+      <SelectTrigger
+        aria-label={label}
+        data-active={value ? "" : undefined}
+        className={PILL + " shrink-0"}
       >
-        <SelectTrigger id={id} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>{anyLabel}</SelectItem>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+        {icon}
+        <span className="text-muted-foreground">{label}:</span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent position="popper" align="start">
+        <SelectItem value={ANY}>{anyLabel}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
   return (
     <section className="grid grid-cols-1 gap-6">
-      <Card className="gap-4 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <InputGroup className="min-w-0 flex-1 basis-64">
+      <Card className="gap-0 p-0">
+        <div className="flex flex-wrap items-center gap-3 p-4 sm:p-5">
+          <InputGroup className="h-11 min-w-0 flex-1 basis-40">
             <InputGroupAddon>
-              <Search size={17} />
+              <Search size={18} />
             </InputGroupAddon>
             <InputGroupInput
               aria-label={t("dir.searchPlaceholder")}
@@ -468,18 +479,30 @@ export function TeacherDirectory({
               maxLength={80}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label={t("dir.clearFilters")}
+                  onClick={() => setSearch("")}
+                >
+                  <X />
+                </InputGroupButton>
+              </InputGroupAddon>
+            )}
           </InputGroup>
           <Select
             value={filters.sort}
             onValueChange={(v) => set({ sort: v as Filters["sort"] })}
           >
             <SelectTrigger
-              className="w-auto min-w-44"
+              className="h-11! w-auto max-sm:w-11 max-sm:justify-center max-sm:[&>svg:last-child]:hidden sm:min-w-44"
               aria-label={t("dir.sortLabel")}
             >
-              <SelectValue />
+              <ArrowUpDown />
+              <SelectValue className="max-sm:sr-only" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper" align="end">
               {teacherSorts.map((s) => (
                 <SelectItem key={s} value={s}>
                   {t(`dir.sort.${s}` as MessageKey)}
@@ -487,93 +510,86 @@ export function TeacherDirectory({
               ))}
             </SelectContent>
           </Select>
-          <Button
-            type="button"
-            variant={showFilters || active ? "secondary" : "outline"}
-            aria-expanded={showFilters}
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            <SlidersHorizontal /> {t("dir.filters")}
-            {active && <span className="filter-dot" aria-hidden="true" />}
-          </Button>
         </div>
-        {showFilters && (
-          <div className="grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-5">
-            {select(
-              "dir-subject",
-              t("dir.subjectLabel"),
-              filters.subject,
-              t("dir.allSubjects"),
-              teacherSubjects.map((s) => ({ value: s, label: subjectName(s) })),
-              (v) => set({ subject: v as Filters["subject"] }),
-            )}
-            {select(
-              "dir-level",
-              t("dir.levelLabel"),
-              filters.level,
-              t("dir.allLevels"),
-              teacherLevels.map((s) => ({ value: s, label: levelName(s) })),
-              (v) => set({ level: v as Filters["level"] }),
-            )}
-            {select(
-              "dir-mode",
-              t("dir.lessonModes"),
-              filters.mode,
-              t("dir.anyMode"),
-              lessonModes.map((s) => ({ value: s, label: modeName(s) })),
-              (v) =>
-                set({
-                  mode: v as Filters["mode"],
-                  city: v === "ONLINE" ? undefined : filters.city,
-                }),
-            )}
-            {select(
-              "dir-city",
+        <div
+          role="group"
+          aria-label={t("dir.filters")}
+          className="bg-muted/40 flex items-center gap-2 overflow-x-auto border-t px-4 py-3 sm:flex-wrap sm:px-5"
+        >
+          {pill(
+            <BookOpen />,
+            t("dir.subjectLabel"),
+            filters.subject,
+            t("dir.allSubjects"),
+            teacherSubjects.map((s) => ({ value: s, label: subjectName(s) })),
+            (v) => set({ subject: v as Filters["subject"] }),
+          )}
+          {pill(
+            <GraduationCap />,
+            t("dir.levelLabel"),
+            filters.level,
+            t("dir.allLevels"),
+            teacherLevels.map((s) => ({ value: s, label: levelName(s) })),
+            (v) => set({ level: v as Filters["level"] }),
+          )}
+          {pill(
+            <MonitorPlay />,
+            t("dir.lessonModes"),
+            filters.mode,
+            t("dir.anyMode"),
+            (["ONLINE", "IN_PERSON"] as const).map((m) => ({
+              value: m,
+              label: modeName(m),
+            })),
+            (v) =>
+              set({
+                mode: v as Filters["mode"],
+                city: v === "ONLINE" ? undefined : filters.city,
+              }),
+          )}
+          {filters.mode !== "ONLINE" &&
+            !!page?.cities.length &&
+            pill(
+              <MapPin />,
               t("dir.city"),
               filters.city,
               t("dir.anyCity"),
-              (page?.cities ?? []).map((c) => ({ value: c, label: c })),
+              page.cities.map((c) => ({ value: c, label: c })),
               (v) => set({ city: v }),
             )}
-            <div className="grid gap-2">
-              <Label htmlFor="dir-price">{t("dir.maxPrice")}</Label>
-              <Input
-                id="dir-price"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={50}
-                value={filters.maxPrice ?? ""}
-                onChange={(e) =>
-                  set({
-                    maxPrice:
-                      e.target.value === ""
-                        ? undefined
-                        : Math.max(0, Math.floor(Number(e.target.value))),
-                  })
-                }
-              />
-            </div>
-            {active && (
-              <Button
-                type="button"
-                variant="link"
-                className="justify-start px-0 sm:col-span-2 lg:col-span-5"
-                onClick={() =>
-                  set({
-                    subject: undefined,
-                    level: undefined,
-                    mode: undefined,
-                    city: undefined,
-                    maxPrice: undefined,
-                  })
-                }
-              >
-                <X /> {t("dir.clearFilters")}
-              </Button>
-            )}
-          </div>
-        )}
+          {pill(
+            <Wallet />,
+            t("dir.hourlyPrice"),
+            filters.maxPrice === undefined
+              ? undefined
+              : String(filters.maxPrice),
+            t("common.all"),
+            priceSteps.map((n) => ({
+              value: String(n),
+              label: "≤ " + priceText({ hourlyPrice: n, currency: "TRY" }),
+            })),
+            (v) => set({ maxPrice: v === undefined ? undefined : Number(v) }),
+          )}
+          {active && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground shrink-0 rounded-full"
+              onClick={() =>
+                set({
+                  subject: undefined,
+                  level: undefined,
+                  mode: undefined,
+                  city: undefined,
+                  maxPrice: undefined,
+                })
+              }
+            >
+              <X /> {t("dir.clearFilters")}
+            </Button>
+          )}
+        </div>
       </Card>
       {error && <FormError>{error}</FormError>}
       {page && (
