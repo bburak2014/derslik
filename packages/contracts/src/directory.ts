@@ -65,6 +65,7 @@ export const requestStatuses = [
   "ACCEPTED",
   "DECLINED",
   "CANCELLED",
+  "EXPIRED",
 ] as const;
 export type RequestStatus = (typeof requestStatuses)[number];
 
@@ -75,6 +76,11 @@ export const PHOTO_SIZE = 400;
 export const REQUESTS_PER_DAY = 10;
 /** Reddedilen istekten sonra aynı öğretmene yeniden istek için bekleme. */
 export const DECLINE_COOLDOWN_DAYS = 7;
+/** Öğretmen bu kadar gün yanıt vermezse istek kendiliğinden düşer (EXPIRED).
+ *  Değer apps/api/drizzle/0007 içindeki expire_requests ile aynı olmalı. */
+export const REQUEST_EXPIRY_DAYS = 7;
+/** Öğretmenin reddederken yazabileceği notun uzunluğu. */
+export const DECISION_NOTE_MAX = 300;
 
 const text = (max: number) => z.string().trim().max(max);
 const unique = <T extends z.ZodTypeAny>(item: T, max: number) =>
@@ -136,6 +142,12 @@ export const lessonRequestSchema = z
   })
   .strict();
 export type LessonRequestInput = z.input<typeof lessonRequestSchema>;
+
+/** Kabul/red gövdesi. Not yalnızca reddederken kaydedilir ve öğrenciye görünür. */
+export const requestDecisionSchema = z
+  .object({ note: text(DECISION_NOTE_MAX).default("") })
+  .strict();
+export type RequestDecisionInput = z.input<typeof requestDecisionSchema>;
 
 export const reviewSchema = z
   .object({
@@ -199,6 +211,8 @@ export type LessonRequest = {
   email: string;
   message: string;
   status: RequestStatus;
+  /** Öğretmenin reddederken yazdığı isteğe bağlı not. */
+  decisionNote: string;
   studentId: string | null;
   createdAt: string;
   decidedAt: string | null;
