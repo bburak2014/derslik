@@ -223,7 +223,8 @@ export class DirectoryService {
             ARRAY(SELECT p.id FROM derslik.public_teachers() p WHERE derslik.is_linked_student(p.id)) AS students,
             ARRAY(SELECT workspace_id FROM derslik.lesson_requests WHERE user_id=$1 AND status='PENDING') AS pending,
             ARRAY(SELECT workspace_id FROM derslik.lesson_requests WHERE user_id=$1 AND status='DECLINED'
-              AND decided_at > now() - make_interval(days => $2)) AS cooling`,
+              AND decided_at > now() - make_interval(days => $2)) AS cooling,
+            derslik.is_teacher_account($1) AS teacher_account`,
           [actor.id, DECLINE_COOLDOWN_DAYS],
         )
       ).rows[0];
@@ -239,6 +240,7 @@ export class DirectoryService {
         await tx.query(
           `SELECT EXISTS(SELECT 1 FROM derslik.workspaces WHERE id=$1 AND owner_id=$2) AS own,
             derslik.is_linked_student($1) AS student,
+            derslik.is_teacher_account($2) AS teacher_account,
             derslik.review_author($1) IS NOT NULL AS can_review`,
           [ws, actor.id],
         )
@@ -265,6 +267,7 @@ export class DirectoryService {
         data: toDto({
           is_own: flags.own,
           is_student: flags.student,
+          is_teacher_account: flags.teacher_account,
           can_review: flags.can_review,
           request: request ?? null,
           review: review ?? null,
@@ -293,6 +296,7 @@ export class DirectoryService {
           `SELECT derslik.is_listed($1) AS listed,
             EXISTS(SELECT 1 FROM derslik.workspaces WHERE id=$1 AND owner_id=$2) AS own,
             derslik.is_linked_student($1) AS student,
+            derslik.is_teacher_account($2) AS teacher,
             EXISTS(SELECT 1 FROM derslik.lesson_requests WHERE workspace_id=$1 AND user_id=$2 AND status='PENDING') AS pending,
             EXISTS(SELECT 1 FROM derslik.lesson_requests WHERE workspace_id=$1 AND user_id=$2 AND status='DECLINED'
               AND decided_at > now() - make_interval(days => $3)) AS cooling,
@@ -302,6 +306,8 @@ export class DirectoryService {
       ).rows[0];
       if (!state.listed) throw new NotFoundException("api.teacherNotFound");
       if (state.own) throw new ConflictException("api.requestOwn");
+      // Bir e-posta ya öğretmen ya öğrencidir.
+      if (state.teacher) throw new ConflictException("api.accountIsTeacher");
       if (state.student)
         throw new ConflictException("api.requestAlreadyStudent");
       if (state.pending) throw new ConflictException("api.requestPending");
@@ -536,6 +542,14 @@ export class DirectoryService {
         throw new ConflictException("api.requestDecided");
       let result: Record<string, unknown>;
       if (decision === "accept") {
+        const requester = (
+          await tx.query(
+            "SELECT derslik.is_teacher_account(user_id) AS teacher FROM derslik.lesson_requests WHERE id=$1",
+            [request],
+          )
+        ).rows[0];
+        if (requester.teacher)
+          throw new ConflictException("api.requesterIsTeacher");
         const label = /^[a-z]+$/.test(row.subject)
           ? apiText(`dir.subject.${row.subject}` as never)
           : row.subject;

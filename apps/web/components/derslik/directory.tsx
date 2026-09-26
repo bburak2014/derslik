@@ -242,7 +242,8 @@ type Filters = Required<Pick<TeacherFilter, "sort">> &
   Omit<TeacherFilter, "sort" | "page">;
 
 /** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
-export type CardState = "own" | "student" | "pending" | "cooling" | null;
+export type CardState =
+  "own" | "teacher" | "student" | "pending" | "cooling" | null;
 export const cardState = (
   relations: TeacherRelations | null,
   id: string,
@@ -251,15 +252,19 @@ export const cardState = (
     ? null
     : relations.own.includes(id)
       ? "own"
-      : relations.students.includes(id)
-        ? "student"
-        : relations.pending.includes(id)
-          ? "pending"
-          : relations.cooling.includes(id)
-            ? "cooling"
-            : null;
+      : relations.teacherAccount
+        ? "teacher"
+        : relations.students.includes(id)
+          ? "student"
+          : relations.pending.includes(id)
+            ? "pending"
+            : relations.cooling.includes(id)
+              ? "cooling"
+              : null;
 
 function CardStateBadge({ state }: { state: Exclude<CardState, null> }) {
+  // Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz.
+  if (state === "teacher") return null;
   if (state === "pending") return <RequestStatusBadge status="PENDING" />;
   if (state === "cooling") return <RequestStatusBadge status="DECLINED" />;
   return (
@@ -400,17 +405,20 @@ export function TeacherDirectory({
   /** Oturum varsa kartlar, istek gönderilemeyen öğretmende durumu gösterir. */
   signedIn?: boolean;
 }) {
-  const [relations, setRelations] = useState<TeacherRelations | null>(null);
+  const [relations, setRelations] = useState<TeacherRelations | null>(null),
+    // Karttaki "İstek gönder": form listede açılır, profile gidilmez.
+    [requestFor, setRequestFor] = useState<PublicTeacher | null>(null),
+    [sent, setSent] = useState("");
+  const loadRelations = useCallback(
+    () =>
+      backend<{ data: TeacherRelations }>("/teacher-relations")
+        .then((r) => setRelations(r.data))
+        .catch(() => undefined),
+    [],
+  );
   useEffect(() => {
-    if (!signedIn) return;
-    let alive = true;
-    backend<{ data: TeacherRelations }>("/teacher-relations")
-      .then((r) => alive && setRelations(r.data))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [signedIn]);
+    if (signedIn) void loadRelations();
+  }, [signedIn, loadRelations]);
   const [filters, setFilters] = useState<Filters>({ sort: "recommended" }),
     [search, setSearch] = useState(""),
     [page, setPage] = useState<TeacherPage | null>(null),
@@ -640,6 +648,12 @@ export function TeacherDirectory({
         </div>
       </Card>
       {error && <FormError>{error}</FormError>}
+      {relations?.teacherAccount && (
+        <p className="text-muted-foreground text-sm">
+          {t("dir.teacherAccountNote")}
+        </p>
+      )}
+      {sent && <FormSuccess>{sent}</FormSuccess>}
       {page && (
         <p className="text-muted-foreground -mb-2 text-sm" aria-live="polite">
           {t("dir.resultCount", { count: page.total })}
@@ -664,13 +678,30 @@ export function TeacherDirectory({
               teacher={teacher}
               href={hrefFor?.(teacher.id)}
               onOpen={() => onOpen?.(teacher.id)}
-              requestHref={hrefFor?.(teacher.id, true)}
-              onRequest={() => onOpen?.(teacher.id, true)}
+              // Oturum yoksa profil sayfası girişe yönlendirir.
+              requestHref={signedIn ? undefined : hrefFor?.(teacher.id, true)}
+              onRequest={() => {
+                if (!signedIn) return onOpen?.(teacher.id, true);
+                setSent("");
+                setRequestFor(teacher);
+              }}
               state={cardState(relations, teacher.id)}
             />
           ))
         )}
       </div>
+      {requestFor && (
+        <RequestDialog
+          key={requestFor.id}
+          teacher={requestFor}
+          open
+          onOpenChange={(open) => !open && setRequestFor(null)}
+          onSent={() => {
+            setSent(t("dir.sent"));
+            void loadRelations();
+          }}
+        />
+      )}
       {page && !items.length && !error && (
         <Empty className="border">
           <EmptyHeader>
@@ -1032,6 +1063,7 @@ function ActionPanel({
   const canRequest =
     !!relation &&
     !relation.isOwn &&
+    !relation.isTeacherAccount &&
     !relation.isStudent &&
     request?.status !== "PENDING" &&
     !relation.retryAfter;
@@ -1059,6 +1091,12 @@ function ActionPanel({
           </Button>
         )}
       </>
+    );
+  else if (relation.isTeacherAccount)
+    body = (
+      <p className="text-muted-foreground text-sm">
+        {t("dir.teacherAccountNote")}
+      </p>
     );
   else if (relation.isStudent)
     body = (

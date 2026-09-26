@@ -17,6 +17,12 @@ export const ja: Messages = {
     requestDecided: "このリクエストはすでに回答済みか取り下げられています。",
     requestNotFound: "リクエストが見つかりません。",
     requestOwn: "自分自身にはレッスンリクエストを送れません。",
+    accountIsStudent:
+      "これは生徒アカウントです。講師として始めるには、別のメールアドレスで登録してください。",
+    accountIsTeacher:
+      "これは講師アカウントです。生徒として参加するには、別のメールアドレスでログインしてください。",
+    requesterIsTeacher:
+      "この方は現在講師アカウントを使っているため、生徒として追加できません。",
     requestPending: "この講師へのリクエストはすでに返答待ちです。",
     reviewNotAllowed: "この講師の生徒だけがレビューできます。",
     teacherNotFound: "講師が見つからないか、掲載が終了しています。",
@@ -1190,6 +1196,8 @@ export const ja: Messages = {
     decline: "辞退",
     declineBody: "生徒に通知され、7日間は再度リクエストできません。",
     declineTitle: "このリクエストを辞退しますか？",
+    teacherAccountNote:
+      "講師アカウントではレッスンリクエストを送れません。生徒として送るには、別のメールアドレスでログインしてください。",
     cardOwn: "あなたのプロフィール",
     cardStudent: "受講中",
     declineNoteLabel: "生徒へのメモ（任意）",

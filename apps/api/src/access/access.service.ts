@@ -145,14 +145,26 @@ export class AccessService {
       throw new ForbiddenException("api.verifyEmailForInvite");
     const hash = createHash("sha256").update(token).digest("hex");
     try {
-      return await this.db.transaction(actor, null, async (tx) => ({
-        data: (
-          await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
-            hash,
-            user.email!.toLowerCase(),
-          ])
-        ).rows[0].data,
-      }));
+      return await this.db.transaction(actor, null, async (tx) => {
+        // Bir e-posta ya öğretmen ya öğrencidir: öğretmen hesabı öğrenci
+        // davetini kabul edemez (veli daveti serbest).
+        const check = (
+          await tx.query(
+            "SELECT derslik.invitation_role($1,$2) AS role, derslik.is_teacher_account($3) AS teacher",
+            [hash, user.email!.toLowerCase(), actor.id],
+          )
+        ).rows[0];
+        if (check.role === "STUDENT" && check.teacher)
+          throw new ConflictException("api.accountIsTeacher");
+        return {
+          data: (
+            await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
+              hash,
+              user.email!.toLowerCase(),
+            ])
+          ).rows[0].data,
+        };
+      });
     } catch (error) {
       // accept_invitation raises one error for every refusal. The usual cause
       // is being signed in with another account than the invited address, and

@@ -192,19 +192,21 @@ function Price({ teacher }: { teacher: PublicTeacher }) {
 }
 
 /** Giriş yapan kişi bu öğretmene neden istek gönderemez; null: gönderebilir. */
-type CardState = "own" | "student" | "pending" | "cooling" | null;
+type CardState = "own" | "teacher" | "student" | "pending" | "cooling" | null;
 const cardState = (r: TeacherRelations | null, id: string): CardState =>
   !r
     ? null
     : r.own.includes(id)
       ? "own"
-      : r.students.includes(id)
-        ? "student"
-        : r.pending.includes(id)
-          ? "pending"
-          : r.cooling.includes(id)
-            ? "cooling"
-            : null;
+      : r.teacherAccount
+        ? "teacher"
+        : r.students.includes(id)
+          ? "student"
+          : r.pending.includes(id)
+            ? "pending"
+            : r.cooling.includes(id)
+              ? "cooling"
+              : null;
 
 function TeacherCard({
   teacher,
@@ -267,7 +269,8 @@ function TeacherCard({
         <View style={{ flexShrink: 1 }}>
           <Price teacher={teacher} />
         </View>
-        {state === "pending" ? (
+        {/* Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz. */}
+        {state === "teacher" ? null : state === "pending" ? (
           <RequestStatusBadge status="PENDING" />
         ) : state === "cooling" ? (
           <RequestStatusBadge status="DECLINED" />
@@ -367,6 +370,58 @@ export function DirectoryScreen({
   );
 }
 
+/** Ders isteği formu; hem profil sayfası hem liste kartı kullanır. */
+function requestForm(
+  teacher: PublicTeacher,
+  onSent: () => Promise<void>,
+): FormSpec {
+  return {
+    title: t("dir.requestTitle"),
+    description: t("dir.requestText", { name: teacher.displayName }),
+    submit_label: t("dir.send"),
+    fields: [
+      { key: "studentName", label: t("dir.studentName") },
+      {
+        key: "subject",
+        label: t("dir.subjectLabel"),
+        options: teacher.subjects.map((s) => ({
+          value: s,
+          label: subjectName(s),
+        })),
+      },
+      {
+        key: "level",
+        label: t("dir.levelLabel"),
+        required: false,
+        options: [
+          { value: "", label: t("dir.noLevel") },
+          ...(teacher.levels.length ? teacher.levels : teacherLevels).map(
+            (s) => ({ value: s, label: levelName(s) }),
+          ),
+        ],
+      },
+      { key: "phone", label: t("mt.phone"), required: false },
+      {
+        key: "message",
+        label: t("dir.message"),
+        placeholder: t("dir.messagePlaceholder"),
+        multiline: true,
+        required: false,
+      },
+    ],
+    submit: async (v) => {
+      await client.sendLessonRequest(teacher.id, {
+        studentName: v.studentName,
+        subject: v.subject as PublicTeacher["subjects"][number],
+        level: v.level as PublicTeacher["levels"][number] | "",
+        phone: v.phone,
+        message: v.message,
+      });
+      await onSent();
+    },
+  };
+}
+
 function TeacherList({
   onOpen,
 }: {
@@ -380,7 +435,10 @@ function TeacherList({
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
-    [relations, setRelations] = useState<TeacherRelations | null>(null);
+    [relations, setRelations] = useState<TeacherRelations | null>(null),
+    // Karttaki "İstek gönder": form listede açılır, profile gidilmez.
+    [form, setForm] = useState<FormSpec | null>(null),
+    [notice, setNotice] = useState("");
   const key = JSON.stringify(filter);
   async function load(next: number) {
     setLoading(true);
@@ -548,6 +606,10 @@ function TeacherList({
         />
       </ScrollView>
       <ErrorText message={error} />
+      {relations?.teacherAccount && (
+        <Text style={styles.muted}>{t("dir.teacherAccountNote")}</Text>
+      )}
+      <SuccessText message={notice} />
       {page && (
         <Text style={styles.muted}>
           {t("dir.resultCount", { count: page.total })}
@@ -568,7 +630,15 @@ function TeacherList({
             key={x.id}
             teacher={x}
             onPress={() => onOpen(x.id)}
-            onRequest={() => onOpen(x.id, true)}
+            onRequest={() => {
+              setNotice("");
+              setForm(
+                requestForm(x, async () => {
+                  setNotice(t("dir.sent"));
+                  setRelations((await client.teacherRelations()).data);
+                }),
+              );
+            }}
             state={cardState(relations, x.id)}
           />
         ))
@@ -582,6 +652,7 @@ function TeacherList({
           {t("dir.loadMore")}
         </Button>
       )}
+      <FormSheet form={form} onClose={() => setForm(null)} />
     </ScrollView>
   );
 }
@@ -648,55 +719,16 @@ function TeacherProfile({
     );
   const request = relation?.request;
   const sendForm = () =>
-    setForm({
-      title: t("dir.requestTitle"),
-      description: t("dir.requestText", { name: teacher.displayName }),
-      submit_label: t("dir.send"),
-      fields: [
-        { key: "studentName", label: t("dir.studentName") },
-        {
-          key: "subject",
-          label: t("dir.subjectLabel"),
-          options: teacher.subjects.map((s) => ({
-            value: s,
-            label: subjectName(s),
-          })),
-        },
-        {
-          key: "level",
-          label: t("dir.levelLabel"),
-          required: false,
-          options: [
-            { value: "", label: t("dir.noLevel") },
-            ...(teacher.levels.length ? teacher.levels : teacherLevels).map(
-              (s) => ({ value: s, label: levelName(s) }),
-            ),
-          ],
-        },
-        { key: "phone", label: t("mt.phone"), required: false },
-        {
-          key: "message",
-          label: t("dir.message"),
-          placeholder: t("dir.messagePlaceholder"),
-          multiline: true,
-          required: false,
-        },
-      ],
-      submit: async (v) => {
-        await client.sendLessonRequest(id, {
-          studentName: v.studentName,
-          subject: v.subject as PublicTeacher["subjects"][number],
-          level: v.level as PublicTeacher["levels"][number] | "",
-          phone: v.phone,
-          message: v.message,
-        });
+    setForm(
+      requestForm(teacher, async () => {
         setNotice(t("dir.sent"));
         await load();
-      },
-    });
+      }),
+    );
   const canRequest =
     !!relation &&
     !relation.isOwn &&
+    !relation.isTeacherAccount &&
     !relation.isStudent &&
     request?.status !== "PENDING" &&
     !relation.retryAfter;
@@ -713,6 +745,8 @@ function TeacherProfile({
   if (!relation) action = null;
   else if (relation.isOwn)
     action = <Text style={styles.muted}>{t("dir.ownProfile")}</Text>;
+  else if (relation.isTeacherAccount)
+    action = <Text style={styles.muted}>{t("dir.teacherAccountNote")}</Text>;
   else if (relation.isStudent)
     action = (
       <>

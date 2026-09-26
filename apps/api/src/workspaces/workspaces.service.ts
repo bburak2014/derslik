@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { z } from "zod";
 import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
@@ -29,6 +29,15 @@ export class WorkspacesService {
         "INSERT INTO derslik.users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING",
         [actor.id],
       );
+      // Bir e-posta ya öğretmen ya öğrencidir: öğrenci hesabı çalışma alanı açamaz.
+      const roles = (
+        await tx.query(
+          "SELECT derslik.is_student_account($1) AS student, derslik.is_teacher_account($1) AS teacher",
+          [actor.id],
+        )
+      ).rows[0];
+      if (roles.student && !roles.teacher)
+        throw new ConflictException("api.accountIsStudent");
       const workspace = (
         await tx.query(
           "INSERT INTO derslik.workspaces (owner_id,name) VALUES ($1,$2) ON CONFLICT (owner_id) DO UPDATE SET owner_id=EXCLUDED.owner_id RETURNING id,name,timezone,created_at",

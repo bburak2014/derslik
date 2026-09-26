@@ -17,6 +17,12 @@ export const es: Messages = {
     requestDecided: "Esta solicitud ya fue respondida o retirada.",
     requestNotFound: "Solicitud no encontrada.",
     requestOwn: "No puedes enviarte una solicitud de clase a ti mismo.",
+    accountIsStudent:
+      "Esta es una cuenta de alumno. Para empezar a enseñar, regístrate con otro correo.",
+    accountIsTeacher:
+      "Esta es una cuenta de profesor. Para unirte como alumno, inicia sesión con otro correo.",
+    requesterIsTeacher:
+      "Esta persona ahora usa una cuenta de profesor y no se puede añadir como alumno.",
     requestPending: "Ya tienes una solicitud pendiente con este profesor.",
     reviewNotAllowed:
       "Solo los alumnos de este profesor pueden dejar una reseña.",
@@ -1258,6 +1264,8 @@ export const es: Messages = {
     declineBody:
       "El alumno recibe un aviso y no podrá enviarte otra solicitud durante 7 días.",
     declineTitle: "¿Rechazar esta solicitud?",
+    teacherAccountNote:
+      "Las cuentas de profesor no pueden enviar solicitudes de clase. Para enviar una como alumno, inicia sesión con otro correo.",
     cardOwn: "Tu perfil",
     cardStudent: "Ya eres su alumno",
     declineNoteLabel: "Nota para el alumno (opcional)",
