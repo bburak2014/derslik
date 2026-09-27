@@ -1,6 +1,7 @@
 import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
+import { accessCases } from "./access-cases.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -789,6 +790,18 @@ test(
         sessionBody,
       });
       await directoryCases({ t, admin, request, ok, token, verifiedUsers });
+      await accessCases({
+        t,
+        app,
+        admin,
+        request,
+        ws,
+        wsB,
+        student,
+        tokenB,
+        tokenStudent,
+        actorA,
+      });
     } finally {
       if (app) await app.close();
       if (jwksServer) await new Promise((resolve) => jwksServer.close(resolve));

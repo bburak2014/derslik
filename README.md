@@ -64,3 +64,7 @@ Bu v5 paketindeki mimari tek backend’e geçirildi. **Mevcut canlı Site hâlâ
 Eski veriler için [geçiş kılavuzu ve ön kontrol](docs/veri-gecisi.md) hazır. Kökteki değişmemiş `drizzle/` ve `.openai/hosting.json`, mevcut yayının veri geçmişini korur; yeni uygulama bu bağlamaları kullanmaz. `build` / `site:build` Sites için web paketi üretir; `build:local` API ve Next üretim derlemelerini üretir.
 
 Gerçek Supabase/Stream/abonelik hesapları bağlanmadı. APK/IPA ve mağaza yayını bu paketin içinde değildir. Mobil JavaScript/Hermes export ile cihaz veya mağaza testi aynı şey değildir. Güncel kontroller: [doğrulama kaydı](docs/validation-v5.md).
+
+## Güvenlik taramaları
+
+Semgrep, Trivy, ZAP ve MobSF komutları ile kapsam notları [güvenlik taraması rehberinde](docs/guvenlik-taramasi.md) bulunur. İlk kontrol için `pnpm security:status` çalıştırın.
