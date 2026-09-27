@@ -164,6 +164,7 @@ apps/mobile/ios/
 # Yerel araç durumu
 /.agents/
 /.codex/
+/opencode.json
 /outputs/
 /work/
 
