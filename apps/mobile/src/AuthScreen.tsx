@@ -37,6 +37,7 @@ import {
 } from "./ui";
 import { t, upper, type MessageKey } from "@derslik/contracts";
 import { LanguagePicker } from "./i18n";
+import { captchaEnabled, Turnstile } from "./Turnstile";
 
 const copy: Record<
   "signin" | "signup" | "recover" | "password",
@@ -84,6 +85,10 @@ export function AuthScreen({
   const [message, setMessage] = useState("");
   const [enabled, setEnabled] = useState<SocialProvider[]>([]);
   const [providerNotice, setProviderNotice] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaRound, setCaptchaRound] = useState(0);
+  // Şifre ekranı zaten açık bir oturumda çalışır; CAPTCHA istemez.
+  const captcha = captchaEnabled && mode !== "password";
   useEffect(() => {
     let alive = true;
     availableProviders()
@@ -123,6 +128,11 @@ export function AuthScreen({
       setError(t("mobile.authPasswordRequired"));
       return;
     }
+    if (captcha && !captchaToken) {
+      setError(t("auth.captchaRequired"));
+      return;
+    }
+    const captchaOptions = captcha ? { captchaToken } : {};
     setBusy("email");
     try {
       if (mode === "password") {
@@ -136,7 +146,7 @@ export function AuthScreen({
       if (mode === "recover") {
         const { error } = await supabase!.auth.resetPasswordForEmail(
           email.trim(),
-          { redirectTo: authRedirect("recovery") },
+          { ...captchaOptions, redirectTo: authRedirect("recovery") },
         );
         if (error) throw error;
         setMessage(t("mobile.authResetSent"));
@@ -144,7 +154,10 @@ export function AuthScreen({
         const { data, error } = await supabase!.auth.signUp({
           email: email.trim(),
           password,
-          options: { emailRedirectTo: authRedirect("confirm") },
+          options: {
+            ...captchaOptions,
+            emailRedirectTo: authRedirect("confirm"),
+          },
         });
         if (error) throw error;
         if (!data.session) setMessage(t("mobile.authVerifyEmail"));
@@ -152,13 +165,30 @@ export function AuthScreen({
         const { error } = await supabase!.auth.signInWithPassword({
           email: email.trim(),
           password,
+          options: captchaOptions,
         });
-        if (error) throw new Error(t("web.signinFailed"));
+        if (error)
+          throw new Error(
+            t(
+              error.code === "captcha_failed"
+                ? "auth.captchaFailed"
+                : "web.signinFailed",
+            ),
+          );
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(
+        (e as { code?: string }).code === "captcha_failed"
+          ? t("auth.captchaFailed")
+          : (e as Error).message,
+      );
     } finally {
       setBusy(null);
+      // Belirteç tek kullanımlık; sonraki deneme yenisini alır.
+      if (captcha) {
+        setCaptchaToken("");
+        setCaptchaRound((n) => n + 1);
+      }
     }
   }
   const text = copy[mode];
@@ -349,6 +379,13 @@ export function AuthScreen({
               </View>
             )}
 
+            {captcha && (
+              <Turnstile
+                round={captchaRound}
+                onToken={setCaptchaToken}
+                onError={() => setError(t("auth.captchaFailed"))}
+              />
+            )}
             <ErrorText message={error} />
             <SuccessText message={message} />
 

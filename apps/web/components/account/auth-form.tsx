@@ -25,6 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import { formText, webRequest } from "@/lib/client";
 import { t, upper } from "@derslik/contracts";
 import { LanguageSelect } from "@/components/i18n/language-select";
+import { Turnstile } from "./turnstile";
 const social = [
   { id: "google", name: "Google", icon: <GoogleIcon /> },
   { id: "apple", name: "Apple", icon: <AppleIcon /> },
@@ -45,12 +46,18 @@ export function AuthForm({
   const [enabled, setEnabled] = useState<string[]>([]);
   const [providerError, setProviderError] = useState(false);
   const [providersLoaded, setProvidersLoaded] = useState(false);
+  const [captchaKey, setCaptchaKey] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaRound, setCaptchaRound] = useState(0);
   useEffect(() => {
     let alive = true;
-    webRequest<{ providers: string[] }>("/api/auth/providers")
+    webRequest<{ providers: string[]; captchaSiteKey?: string }>(
+      "/api/auth/providers",
+    )
       .then((r) => {
         if (alive) {
           setEnabled(r.providers);
+          setCaptchaKey(r.captchaSiteKey ?? "");
           setProvidersLoaded(true);
         }
       })
@@ -73,6 +80,8 @@ export function AuthForm({
     setMessage("");
     setVisible(false);
   };
+  // Şifre ekranı zaten açık bir oturumda çalışır; CAPTCHA istemez.
+  const captcha = !!captchaKey && mode !== "password";
   return (
     <main className="auth-page">
       <aside className="auth-story">
@@ -207,6 +216,10 @@ export function AuthForm({
             onSubmit={async (e) => {
               e.preventDefault();
               if (busy) return;
+              if (captcha && !captchaToken) {
+                setError(t("auth.captchaRequired"));
+                return;
+              }
               setBusy("email");
               setError("");
               setMessage("");
@@ -225,6 +238,7 @@ export function AuthForm({
                     ...(mode === "signup"
                       ? { next: location.pathname + location.search }
                       : {}),
+                    ...(captcha ? { captchaToken } : {}),
                   },
                 );
                 if (mode === "recover" || r.confirmationRequired)
@@ -234,6 +248,8 @@ export function AuthForm({
                 setError((e as Error).message);
               } finally {
                 setBusy(null);
+                // Belirteç tek kullanımlık; sonraki deneme yenisini alır.
+                if (captcha) setCaptchaRound((n) => n + 1);
               }
             }}
           >
@@ -303,6 +319,14 @@ export function AuthForm({
                   </InputGroupAddon>
                 </InputGroup>
               </div>
+            )}
+            {captcha && (
+              <Turnstile
+                siteKey={captchaKey}
+                round={captchaRound}
+                onToken={setCaptchaToken}
+                onError={() => setError(t("auth.captchaFailed"))}
+              />
             )}
             {error && <FormError>{error}</FormError>}
             {message && <FormSuccess>{message}</FormSuccess>}

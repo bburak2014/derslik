@@ -153,6 +153,8 @@ export const zh: Messages = {
     processing: "正在处理…",
     providerSoon: "此登录方式暂未开放。",
     providersSoon: "其他登录方式暂未开放，请使用邮箱继续。",
+    captchaRequired: "请先完成安全验证再继续。",
+    captchaFailed: "安全验证失败。请刷新页面后重试。",
     providersUnreachable: "无法连接其他登录方式，您可以使用邮箱继续。",
     recoverText: "我们来帮您安全地找回账号。",
     recoverTitle: "忘记密码了？",

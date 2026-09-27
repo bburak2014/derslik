@@ -187,6 +187,9 @@ export const ja: Messages = {
     providerSoon: "このログイン方法はまだご利用いただけません。",
     providersSoon:
       "その他のログイン方法はまだご利用いただけません。メールで続行してください。",
+    captchaRequired: "続行する前にセキュリティ確認を完了してください。",
+    captchaFailed:
+      "セキュリティ確認に失敗しました。ページを再読み込みしてもう一度お試しください。",
     providersUnreachable:
       "その他のログイン方法に接続できませんでした。メールで続行できます。",
     recoverText: "安全にアカウントへ戻れるようお手伝いします。",

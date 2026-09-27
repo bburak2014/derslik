@@ -70,6 +70,13 @@ test(
         let body = "";
         for await (const c of req) body += c;
         const credentials = JSON.parse(body);
+        // CAPTCHA açık bir Supabase gibi: belirteç yoksa ya da geçersizse red.
+        if (credentials.gotrue_meta_security?.captcha_token !== "ok-token")
+          return reply(400, {
+            code: 400,
+            error_code: "captcha_failed",
+            msg: "captcha protection: request disallowed",
+          });
         if (
           credentials.email !== user.email ||
           credentials.password !== "test-password-only"
@@ -156,6 +163,8 @@ test(
           DERSLIK_HOSTING: "sites",
           // Testteki istemci, önündeki vekil gibi davranıp başlığı yazar.
           CLIENT_IP_HEADER: "x-forwarded-for",
+          // Cloudflare'in her zaman geçen test site anahtarı.
+          TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
         },
         stdio: ["ignore", "pipe", "pipe"],
       },
@@ -199,6 +208,7 @@ test(
       assert.equal((await call("/api/session")).status, 401);
       assert.deepEqual(await (await call("/api/auth/providers")).json(), {
         providers: ["google", "azure"],
+        captchaSiteKey: "1x00000000000000000000AA",
       });
       assert.equal(
         (await call("/api/auth/oauth", { provider: "github" })).status,
@@ -234,7 +244,36 @@ test(
           .getSetCookie()
           .some((c) => c.includes("code-verifier") && /HttpOnly/i.test(c)),
       );
-      const body = { email: user.email, password: "test-password-only" };
+      const body = {
+        email: user.email,
+        password: "test-password-only",
+        captchaToken: "ok-token",
+      };
+      // CAPTCHA açıkken belirteçsiz istek Supabase'e gitmeden reddedilir;
+      // Supabase'in reddettiği belirteç ayrı bir iletiyle döner.
+      const missing = await call("/api/auth/signin", {
+        email: user.email,
+        password: "test-password-only",
+      });
+      assert.equal(missing.status, 400);
+      assert.match(
+        (await missing.json()).error,
+        /complete the security check/i,
+      );
+      const rejected = await call("/api/auth/signin", {
+        ...body,
+        captchaToken: "bad-token",
+      });
+      assert.equal(rejected.status, 400);
+      assert.match((await rejected.json()).error, /security check failed/i);
+      assert.equal(
+        (
+          await call("/api/auth/recover", {
+            email: user.email,
+          })
+        ).status,
+        400,
+      );
       assert.equal(
         (
           await call("/api/auth/signin", body, {
@@ -298,6 +337,7 @@ test(
       assert.doesNotMatch(csp, /\*\.supabase\.co/);
       assert.match(csp, /connect-src[^;]*https:\/\/upload\.videodelivery\.net/);
       assert.match(csp, new RegExp("connect-src[^;]*" + upstreamUrl));
+      assert.match(csp, /frame-src[^;]*https:\/\/challenges\.cloudflare\.com/);
       const html = await page.text();
       assert.ok(html.includes(`nonce="${nonce}"`));
       assert.notEqual(
@@ -330,7 +370,7 @@ test(
       for (let i = 0; i < 12 && !limited; i++) {
         const r = await call(
           "/api/auth/signin",
-          { email: user.email, password: "wrong-password" },
+          { ...body, password: "wrong-password" },
           attacker,
         );
         if (r.status === 429) limited = r;
@@ -341,7 +381,7 @@ test(
         (
           await call(
             "/api/auth/signin",
-            { email: user.email, password: "wrong-password" },
+            { ...body, password: "wrong-password" },
             { "X-Forwarded-For": "192.0.2.55, 203.0.113.9" },
           )
         ).status,

@@ -14,6 +14,8 @@ function origin(value: string | undefined) {
   }
 }
 
+const TURNSTILE = "https://challenges.cloudflare.com";
+
 export function contentSecurityPolicy(nonce: string) {
   const development = process.env.NODE_ENV !== "production";
   const supabase = origin(process.env.SUPABASE_URL);
@@ -32,6 +34,12 @@ export function contentSecurityPolicy(nonce: string) {
   }
   // PDF önizlemesi imzalı Supabase Storage bağlantısını iframe'de açar.
   const frame = ["'self'", ...(supabase ? [supabase] : [])];
+  // Girişteki Turnstile CAPTCHA'sı: betik 'strict-dynamic' ile nonce'lu
+  // uygulama betiğinden yüklenir, doğrulama bu kökenden bir iframe'de çalışır.
+  if (process.env.TURNSTILE_SITE_KEY?.trim()) {
+    frame.push(TURNSTILE);
+    connect.add(TURNSTILE);
+  }
   return [
     "default-src 'self'",
     "base-uri 'self'",
