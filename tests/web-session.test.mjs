@@ -154,6 +154,8 @@ test(
           APP_ORIGIN: origin,
           // The old hosting flag must never activate a second backend.
           DERSLIK_HOSTING: "sites",
+          // Testteki istemci, önündeki vekil gibi davranıp başlığı yazar.
+          CLIENT_IP_HEADER: "x-forwarded-for",
         },
         stdio: ["ignore", "pipe", "pipe"],
       },
@@ -321,16 +323,35 @@ test(
       assert.equal(passwordChanged, true);
       assert.equal((await call("/api/auth/signout", {})).status, 200);
       assert.equal((await call("/api/session")).status, 401);
-      // Giriş denemeleri sınırlı: aynı e-postaya 15 dakikada 10 deneme.
+      // Giriş denemeleri e-posta + IP başına sınırlı: saldırganın IP'si
+      // 10 denemeden sonra durur, kurbanın kendi IP'sinden girişi sürer.
+      const attacker = { "X-Forwarded-For": "198.51.100.7, 203.0.113.9" };
       let limited;
       for (let i = 0; i < 12 && !limited; i++) {
-        const r = await call("/api/auth/signin", {
-          email: user.email,
-          password: "wrong-password",
-        });
+        const r = await call(
+          "/api/auth/signin",
+          { email: user.email, password: "wrong-password" },
+          attacker,
+        );
         if (r.status === 429) limited = r;
       }
       assert.ok(limited, "signin was never rate limited");
+      // Vekilin eklediği son değer sayılır; ilk değeri değiştirmek kaçırmaz.
+      assert.equal(
+        (
+          await call(
+            "/api/auth/signin",
+            { email: user.email, password: "wrong-password" },
+            { "X-Forwarded-For": "192.0.2.55, 203.0.113.9" },
+          )
+        ).status,
+        429,
+      );
+      const victim = await call("/api/auth/signin", body, {
+        "X-Forwarded-For": "203.0.113.10",
+      });
+      assert.equal(victim.status, 200, await victim.clone().text());
+      assert.equal((await call("/api/auth/signout", {})).status, 200);
     } finally {
       child.kill("SIGTERM");
       await new Promise((resolve) => {

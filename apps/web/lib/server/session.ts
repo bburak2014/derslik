@@ -80,9 +80,10 @@ export async function readBody(request: Request, limit = 16000) {
 export async function authClient() {
   if (!configured()) throw new HttpError(503, "web.notConfigured");
   const jar = await cookies();
-  // Supabase'in IP başına giriş sınırı ziyaretçiyi ayırt edebilsin diye.
-  // Supabase bu başlığı yalnızca gizli anahtarla gelen isteklerde ve
-  // panelde "IP Address Forwarding" açıksa dikkate alır; aksi halde yok sayar.
+  // Supabase bu başlığı yalnızca gizli anahtarla gelen isteklerde ve panelde
+  // "IP Address Forwarding" açıksa dikkate alır. Burada herkese açık anahtar
+  // kullanıldığı için şu an etkisi yok; asıl koruma rate-limit.ts'teki
+  // sayaçlar. İleride gizli anahtara geçilirse hazır dursun.
   const ip = clientIp(await headers());
   return createServerClient(
     process.env.SUPABASE_URL!,
