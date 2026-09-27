@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { DerslikClient, ApiError, type Access } from "@derslik/api-client";
 import { isMessageKey, translate } from "@derslik/contracts";
 import { serverLocale } from "./locale";
+import { clientIp } from "./client-ip";
 
 export function configured() {
   return !!(
@@ -79,10 +80,15 @@ export async function readBody(request: Request, limit = 16000) {
 export async function authClient() {
   if (!configured()) throw new HttpError(503, "web.notConfigured");
   const jar = await cookies();
+  // Supabase'in IP başına giriş sınırı ziyaretçiyi ayırt edebilsin diye.
+  // Supabase bu başlığı yalnızca gizli anahtarla gelen isteklerde ve
+  // panelde "IP Address Forwarding" açıksa dikkate alır; aksi halde yok sayar.
+  const ip = clientIp(await headers());
   return createServerClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PUBLISHABLE_KEY!,
     {
+      global: { headers: ip ? { "sb-forwarded-for": ip } : {} },
       cookieOptions: {
         httpOnly: true,
         secure: process.env.APP_ORIGIN!.startsWith("https:"),

@@ -3,6 +3,18 @@ import type { Messages } from "./index.js";
 
 export const ja: Messages = {
   api: {
+    fileStorageFull:
+      "ファイルの保存容量がいっぱいです。古いファイルを削除して空きを作ってください。",
+    tooManyPendingUploads:
+      "未完了のアップロードが多すぎます。先に完了するか削除してください。",
+    uploadExpired:
+      "このアップロードは期限切れです。削除してからファイルをもう一度アップロードしてください。",
+    inviteRateLimit:
+      "短時間に送信された招待が多すぎます。しばらくしてからもう一度お試しください。",
+    packageNotEnoughCredits:
+      "パッケージの回数がその週数に足りません。週数を減らすか回数を追加してください。",
+    tooManyRequests:
+      "リクエストが多すぎます。少し待ってからもう一度お試しください。",
     cityRequired: "対面レッスンの場合は都市を入力してください。",
     photoNotFound: "写真が見つかりません。",
     photoTooLarge: "写真は300KB以下にしてください。",
@@ -1089,6 +1101,9 @@ export const ja: Messages = {
     unsupported: "このブラウザーは動画の再生に対応していません。",
   },
   web: {
+    tooManyAttempts: "試行回数が多すぎます。数分後にもう一度お試しください。",
+    passwordRecoveryRequired:
+      "パスワードを変更するには、メールで届いたリセット用リンクを使用してください。",
     actionNotFound: "操作が見つかりません。",
     appRequestRequired: "有効なアプリからのリクエストが必要です。",
     backHome: "ホームに戻る",

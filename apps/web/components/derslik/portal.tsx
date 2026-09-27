@@ -403,6 +403,7 @@ export function Portal({
     content = (
       <MyRequests
         focusId={requestFocus}
+        focusAt={requestFocus ? appliedFocus : undefined}
         onBrowse={() => navigate("teachers")}
         onOpenTeacher={(id) => navigate("teachers", id)}
         onOpenLessons={onOpenWorkspace}

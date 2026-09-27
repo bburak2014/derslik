@@ -1,9 +1,10 @@
 import {
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -14,7 +15,13 @@ import { lockAccountRole } from "../common/account-role.js";
 import { CommandService, toDto } from "../common/command.service.js";
 import { MediaProviders } from "../media/providers.js";
 import { MailService } from "./mail.js";
+import { confirmedEmail } from "../auth/confirmed-email.js";
 import { lockStudent } from "../students/students.service.js";
+
+const INVITES_PER_HOUR = 20,
+  INVITES_PER_DAY = 60;
+const tokenHash = (token: string) =>
+  createHash("sha256").update(token).digest("hex");
 
 @Injectable()
 export class AccessService {
@@ -84,7 +91,8 @@ export class AccessService {
       })
       .strict()
       .parse(input);
-    let studentName = "";
+    let studentName = "",
+      token = "";
     const result = await this.commands.run(
       actor,
       ws,
@@ -92,34 +100,77 @@ export class AccessService {
       { action: "invitation.create", studentId: student, ...c },
       async (tx) => {
         studentName = (await lockStudent(tx, ws, student, true)).name;
-        const token = randomBytes(32).toString("hex"),
-          hash = createHash("sha256").update(token).digest("hex");
+        // Davet e-postası öğretmenin yazdığı adla bizim alan adımızdan gider;
+        // sınırsız olursa spam aracına döner.
+        const sent = (
+          await tx.query(
+            `SELECT count(*) FILTER (WHERE created_at>now()-interval '1 hour')::int AS hour,
+               count(*)::int AS day
+             FROM derslik.invitations WHERE workspace_id=$1 AND created_at>now()-interval '1 day'`,
+            [ws],
+          )
+        ).rows[0];
+        if (sent.hour >= INVITES_PER_HOUR || sent.day >= INVITES_PER_DAY)
+          throw new HttpException(
+            "api.inviteRateLimit",
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        token = randomBytes(32).toString("hex");
         const invite = (
           await tx.query(
             "INSERT INTO derslik.invitations(workspace_id,student_id,email,role,permissions,token_hash,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()+interval '7 days') RETURNING id,email,role,expires_at",
-            [ws, student, c.email, c.role, [...new Set(c.permissions)], hash],
+            [
+              ws,
+              student,
+              c.email,
+              c.role,
+              [...new Set(c.permissions)],
+              tokenHash(token),
+            ],
           )
         ).rows[0];
+        // Bağlantı yanıta commit'ten sonra eklenir: api_commands.response
+        // tekrar için saklanır ve orada açık token durmamalı.
         return {
-          data: {
-            ...invite,
-            url: new URL(`/invite/${token}`, this.config.WEB_ORIGIN).href,
-          },
+          data: invite,
           audit: { role: c.role, studentId: student },
         };
       },
     );
+    if (result.replayed) {
+      // Aynı anahtarla tekrar (ilk yanıt istemciye ulaşmamış olabilir):
+      // saklı yanıtta bağlantı yok, bu yüzden token yenilenir. Eski bağlantı
+      // hiç görülmediği için geçersiz kalması sorun değil.
+      const fresh = randomBytes(32).toString("hex");
+      const rotated = await this.db.transaction(
+        actor,
+        ws,
+        async (tx) =>
+          (
+            await tx.query(
+              "UPDATE derslik.invitations SET token_hash=$3 WHERE workspace_id=$1 AND id=$2 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>now() RETURNING id",
+              [ws, result.data.id, tokenHash(fresh)],
+            )
+          ).rowCount,
+      );
+      return rotated
+        ? { ...result, data: { ...result.data, url: this.inviteUrl(fresh) } }
+        : result;
+    }
+    const url = this.inviteUrl(token);
     // Gönderim commit'ten sonra: sağlayıcı hata verirse davet yine de durur ve
     // öğretmen bağlantıyı kopyalayarak iletebilir. Aynı anahtarla tekrar
     // gelen istek (replayed) ikinci bir e-posta doğurmaz.
-    if (result.replayed) return result;
     const emailed = await this.mail.sendInvite({
       to: c.email,
-      url: result.data.url as string,
+      url,
       studentName,
       role: c.role,
     });
-    return { ...result, data: { ...result.data, emailed } };
+    return { ...result, data: { ...result.data, url, emailed } };
+  }
+  private inviteUrl(token: string) {
+    return new URL(`/invite/${token}`, this.config.WEB_ORIGIN).href;
   }
   async accept(actor: Actor, authorization: string, input: unknown) {
     const { token } = z
@@ -127,24 +178,9 @@ export class AccessService {
       .strict()
       .parse(input);
     // Confirm the bound email with Auth; a token's unconfirmed email alone is insufficient.
-    const response = await fetch(this.config.AUTH_ISSUER + "/user", {
-      headers: {
-        Authorization: authorization,
-        ...(this.config.SUPABASE_PUBLISHABLE_KEY
-          ? { apikey: this.config.SUPABASE_PUBLISHABLE_KEY }
-          : {}),
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) throw new UnauthorizedException("api.refreshSession");
-    const user = (await response.json()) as {
-      id?: string;
-      email?: string;
-      email_confirmed_at?: string;
-    };
-    if (user.id !== actor.id || !user.email_confirmed_at || !user.email)
-      throw new ForbiddenException("api.verifyEmailForInvite");
-    const hash = createHash("sha256").update(token).digest("hex");
+    const email = await confirmedEmail(this.config, authorization, actor.id);
+    if (!email) throw new ForbiddenException("api.verifyEmailForInvite");
+    const hash = tokenHash(token);
     try {
       return await this.db.transaction(actor, null, async (tx) => {
         // Bir e-posta ya öğretmen ya öğrencidir: öğretmen hesabı öğrenci
@@ -153,7 +189,7 @@ export class AccessService {
         const check = (
           await tx.query(
             "SELECT derslik.invitation_role($1,$2) AS role, derslik.is_teacher_account($3) AS teacher",
-            [hash, user.email!.toLowerCase(), actor.id],
+            [hash, email, actor.id],
           )
         ).rows[0];
         if (check.role === "STUDENT" && check.teacher)
@@ -162,7 +198,7 @@ export class AccessService {
           data: (
             await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
               hash,
-              user.email!.toLowerCase(),
+              email,
             ])
           ).rows[0].data,
         };

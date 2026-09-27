@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { generateKeyPair, SignJWT } from "jose";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { fileURLToPath } from "node:url";
 
 async function listen(server) {
@@ -19,16 +19,32 @@ test(
     const userId = randomUUID(),
       ws = randomUUID(),
       foreign = randomUUID();
-    const { privateKey } = await generateKeyPair("ES256");
-    const token = await new SignJWT({
-      sub: userId,
-      role: "authenticated",
-      aud: "authenticated",
-    })
-      .setProtectedHeader({ alg: "ES256" })
-      .setIssuedAt()
-      .setExpirationTime("1h")
-      .sign(privateKey);
+    const { privateKey, publicKey } = await generateKeyPair("ES256");
+    const jwk = {
+      ...(await exportJWK(publicKey)),
+      kid: "web-test",
+      alg: "ES256",
+    };
+    const sign = (claims = {}) =>
+      new SignJWT({
+        sub: userId,
+        role: "authenticated",
+        aud: "authenticated",
+        ...claims,
+      })
+        .setProtectedHeader({ alg: "ES256", kid: "web-test" })
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .sign(privateKey);
+    // Şifre yalnızca sıfırlama bağlantısıyla açılan oturumda değişir (amr).
+    const passwordToken = await sign({
+      amr: [{ method: "password", timestamp: Math.floor(Date.now() / 1000) }],
+    });
+    const recoveryToken = await sign({
+      amr: [{ method: "recovery", timestamp: Math.floor(Date.now() / 1000) }],
+    });
+    let token = passwordToken,
+      passwordChanged = false;
     const user = {
       id: userId,
       aud: "authenticated",
@@ -67,6 +83,14 @@ test(
           refresh_token: randomUUID(),
           user,
         });
+      }
+      if (req.url === "/auth/v1/.well-known/jwks.json")
+        return reply(200, { keys: [jwk] });
+      if (req.url === "/auth/v1/user" && req.method === "PUT") {
+        if (req.headers.authorization !== `Bearer ${token}`)
+          return reply(401, {});
+        passwordChanged = true;
+        return reply(200, user);
       }
       if (req.url === "/auth/v1/user")
         return reply(
@@ -261,8 +285,52 @@ test(
       });
       assert.equal(failed.status, 503);
       assert.match((await failed.json()).error, /Central API/);
+      // CSP: her istekte yeni nonce; satır içi betik ve Supabase joker
+      // karakteri yok, video yükleme adresi izinli.
+      const page = await call("/");
+      const csp = page.headers.get("content-security-policy");
+      const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+      assert.ok(nonce, csp);
+      assert.match(csp, /script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+      assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);
+      assert.doesNotMatch(csp, /\*\.supabase\.co/);
+      assert.match(csp, /connect-src[^;]*https:\/\/upload\.videodelivery\.net/);
+      assert.match(csp, new RegExp("connect-src[^;]*" + upstreamUrl));
+      const html = await page.text();
+      assert.ok(html.includes(`nonce="${nonce}"`));
+      assert.notEqual(
+        /'nonce-([^']+)'/.exec(
+          (await call("/")).headers.get("content-security-policy"),
+        )?.[1],
+        nonce,
+      );
+      // Şifre değiştirme: normal girişle açılan oturum reddedilir.
+      const denied = await call("/api/auth/password", {
+        password: "new-password-123",
+      });
+      assert.equal(denied.status, 403, await denied.clone().text());
+      assert.equal(passwordChanged, false);
+      assert.equal((await call("/api/auth/signout", {})).status, 200);
+      // Sıfırlama bağlantısıyla açılan oturum şifreyi değiştirebilir.
+      token = recoveryToken;
+      assert.equal((await call("/api/auth/signin", body)).status, 200);
+      const changed = await call("/api/auth/password", {
+        password: "new-password-123",
+      });
+      assert.equal(changed.status, 200, await changed.clone().text());
+      assert.equal(passwordChanged, true);
       assert.equal((await call("/api/auth/signout", {})).status, 200);
       assert.equal((await call("/api/session")).status, 401);
+      // Giriş denemeleri sınırlı: aynı e-postaya 15 dakikada 10 deneme.
+      let limited;
+      for (let i = 0; i < 12 && !limited; i++) {
+        const r = await call("/api/auth/signin", {
+          email: user.email,
+          password: "wrong-password",
+        });
+        if (r.status === 429) limited = r;
+      }
+      assert.ok(limited, "signin was never rate limited");
     } finally {
       child.kill("SIGTERM");
       await new Promise((resolve) => {

@@ -3,6 +3,16 @@ import type { Messages } from "./index.js";
 
 export const en: Messages = {
   api: {
+    fileStorageFull: "File storage is full. Delete old files to free up space.",
+    tooManyPendingUploads:
+      "You have too many unfinished uploads. Finish or delete them first.",
+    uploadExpired:
+      "This upload has expired. Delete it and upload the file again.",
+    inviteRateLimit:
+      "Too many invitations were sent in a short time. Please try again later.",
+    packageNotEnoughCredits:
+      "The package does not have enough lesson credits for that many weeks. Choose fewer weeks or add credits.",
+    tooManyRequests: "Too many requests. Please try again in a moment.",
     cityRequired: "Enter a city for in-person lessons.",
     photoNotFound: "Photo not found.",
     photoTooLarge: "The photo can be at most 300 KB.",
@@ -1131,6 +1141,9 @@ export const en: Messages = {
     unsupported: "This browser doesn't support video playback.",
   },
   web: {
+    tooManyAttempts: "Too many attempts. Please try again in a few minutes.",
+    passwordRecoveryRequired:
+      "To change your password, use the reset link sent to your email.",
     actionNotFound: "Action not found.",
     appRequestRequired: "A valid app request is required.",
     backHome: "Back to home",

@@ -50,7 +50,7 @@ test("missing media config stays unavailable; local video permits manual verific
       "Dosya yükleme şu anda kullanılamıyor. Lütfen daha sonra yeniden deneyin.",
     videoMessage: "Video yükleme henüz kullanıma açılmadı.",
   });
-  assert.throws(() => missing.streamReady(), /yapılandırılmamış/);
+  assert.throws(() => missing.streamReady(), /api\.videoServiceNotConfigured/);
   const local = {
     ...config,
     CLOUDFLARE_ACCOUNT_ID: "a".repeat(32),
@@ -84,4 +84,15 @@ test("syncing unchanged client settings leaves file mtime untouched", async () =
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+test("rate limiter counts per key within a fixed window", async () => {
+  const { RateLimiter } =
+    await import("../.api-build/apps/api/src/common/rate-limit.js");
+  const limiter = new RateLimiter(3, 60_000);
+  const start = 1_000_000;
+  for (let i = 0; i < 3; i++) assert.equal(limiter.take("a", start), 0);
+  assert.equal(limiter.take("a", start + 1_000), 59);
+  assert.equal(limiter.take("b", start + 1_000), 0);
+  assert.equal(limiter.take("a", start + 60_000), 0);
+  assert.equal(new RateLimiter(0).take("a"), 0);
 });

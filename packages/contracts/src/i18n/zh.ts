@@ -3,6 +3,13 @@ import type { Messages } from "./index.js";
 
 export const zh: Messages = {
   api: {
+    fileStorageFull: "文件存储空间已满，请删除旧文件以释放空间。",
+    tooManyPendingUploads: "未完成的上传过多，请先完成或删除它们。",
+    uploadExpired: "此次上传已过期，请删除后重新上传文件。",
+    inviteRateLimit: "短时间内发送的邀请过多，请稍后再试。",
+    packageNotEnoughCredits:
+      "课时包的课时不足以安排这么多周，请减少周数或增加课时。",
+    tooManyRequests: "请求过多，请稍后再试。",
     cityRequired: "线下授课请填写城市。",
     photoNotFound: "未找到照片。",
     photoTooLarge: "照片不能超过 300 KB。",
@@ -1024,6 +1031,8 @@ export const zh: Messages = {
     unsupported: "此浏览器不支持视频播放。",
   },
   web: {
+    tooManyAttempts: "尝试次数过多，请几分钟后再试。",
+    passwordRecoveryRequired: "如需修改密码，请使用发送到您邮箱的重置链接。",
     actionNotFound: "未找到该操作。",
     appRequestRequired: "需要有效的应用请求。",
     backHome: "返回首页",

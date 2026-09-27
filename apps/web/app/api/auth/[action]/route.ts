@@ -8,12 +8,20 @@ import {
 } from "@/lib/server/session";
 import { cookies } from "next/headers";
 import { safeAuthNext } from "@/lib/server/auth-next";
+import { clientIp } from "@/lib/server/client-ip";
+import { limit } from "@/lib/server/rate-limit";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
 const credentials = z.object({
   email: z.string().email().max(200),
   password: z.string().min(10).max(128),
 });
+const MINUTE = 60_000;
+// Şifre yalnızca e-postadaki sıfırlama bağlantısıyla açılan oturumda
+// değiştirilebilir. Çalınan bir oturum çerezi böylece kalıcı hesap ele
+// geçirmeye dönüşmez. amr, oturumun nasıl açıldığını söyler.
+const RECOVERY_METHODS = new Set(["recovery", "otp", "magiclink"]);
+const RECOVERY_WINDOW_SECONDS = 60 * 60;
 const signupNext = (value: string | undefined) => {
   const next = safeAuthNext(value);
   return next === "/" ? "" : "?next=" + encodeURIComponent(next);
@@ -26,7 +34,8 @@ export async function POST(
     csrf(request);
     const { action } = await context.params,
       body = await readBody(request),
-      auth = await authClient();
+      auth = await authClient(),
+      ip = clientIp(request.headers) || "local";
     if (action === "oauth") {
       const input = z
         .object({
@@ -68,6 +77,11 @@ export async function POST(
           : credentials
       ).safeParse(body);
       if (!parsed.success) throw new HttpError(400, "web.credentialsInvalid");
+      const email = parsed.data.email.toLowerCase();
+      if (action === "signin") {
+        limit("signin-ip:" + ip, 30, 15 * MINUTE);
+        limit("signin-email:" + email, 10, 15 * MINUTE);
+      } else limit("signup-ip:" + ip, 10, 60 * MINUTE);
       const { error, data } =
         action === "signin"
           ? await auth.auth.signInWithPassword(parsed.data)
@@ -98,6 +112,8 @@ export async function POST(
         .object({ email: z.string().email().max(200) })
         .safeParse(body);
       if (!parsed.success) throw new HttpError(400, "web.emailInvalid");
+      limit("recover-ip:" + ip, 5, 15 * MINUTE);
+      limit("recover-email:" + parsed.data.email.toLowerCase(), 3, 15 * MINUTE);
       const { error } = await auth.auth.resetPasswordForEmail(
         parsed.data.email,
         {
@@ -113,6 +129,17 @@ export async function POST(
         .object({ password: z.string().min(10).max(128) })
         .safeParse(body);
       if (!parsed.success) throw new HttpError(400, "web.passwordTooShort");
+      limit("password-ip:" + ip, 10, 15 * MINUTE);
+      const { data: claims } = await auth.auth.getClaims();
+      if (!claims) throw new HttpError(401, "web.signIn");
+      const now = Math.floor(Date.now() / 1000);
+      const recovered = (claims.claims.amr ?? []).some(
+        (entry) =>
+          typeof entry === "object" &&
+          RECOVERY_METHODS.has(entry.method) &&
+          now - entry.timestamp < RECOVERY_WINDOW_SECONDS,
+      );
+      if (!recovered) throw new HttpError(403, "web.passwordRecoveryRequired");
       const { error } = await auth.auth.updateUser(parsed.data);
       if (error) throw new HttpError(400, "web.passwordChangeFailed");
       return json({ ok: true });

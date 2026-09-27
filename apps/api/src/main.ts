@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { HttpException, HttpStatus } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { NextFunction, Request, Response } from "express";
@@ -11,6 +12,7 @@ import { loadConfig, type ApiConfig } from "./config.js";
 import { DatabaseService } from "./db/database.service.js";
 import { ApiErrorFilter } from "./common/api-error.filter.js";
 import { localeMiddleware } from "./common/i18n.js";
+import { RateLimiter } from "./common/rate-limit.js";
 
 // DATE is a calendar day, not a process-local midnight instant.
 types.setTypeParser(1082, (value) => value);
@@ -65,6 +67,7 @@ export async function createApplication(config: ApiConfig) {
     },
   );
   app.disable("x-powered-by");
+  app.set("trust proxy", config.TRUST_PROXY);
   app.use((req: Request, res: Response, next: NextFunction) => {
     res.setHeader("X-Request-Id", randomUUID());
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -72,6 +75,17 @@ export async function createApplication(config: ApiConfig) {
     next();
   });
   app.use(localeMiddleware);
+  // Herkese açık vitrin oturum istemez; IP başına sınırlanır. Web sunucusu
+  // ziyaretçinin IP'sini X-Forwarded-For ile iletir.
+  const publicLimiter = new RateLimiter(config.RATE_LIMIT_PUBLIC_PER_MINUTE);
+  app.use("/v1/teachers", (req: Request, res: Response, next: NextFunction) => {
+    const wait = publicLimiter.take(req.ip || "unknown");
+    if (!wait) return next();
+    res.setHeader("Retry-After", String(wait));
+    next(
+      new HttpException("api.tooManyRequests", HttpStatus.TOO_MANY_REQUESTS),
+    );
+  });
   // Vitrin fotoğrafı JSON içinde base64 gelir; yalnızca o uç daha büyük gövde alır.
   app.use("/v1/workspaces/:ws/showcase/photo", largeJson(512 * 1024));
   app.useBodyParser("json", { limit: "16kb" });

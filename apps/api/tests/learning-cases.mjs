@@ -207,6 +207,58 @@ export async function learningCases({
     },
   );
   await t.test(
+    "invite links are not stored in plain text and invites are rate limited",
+    async () => {
+      const body = {
+          email: "later@example.test",
+          role: "GUARDIAN",
+          permissions: ["lessons"],
+        },
+        key = randomUUID();
+      const first = (await ok(base + "/invitations", body, { key })).data;
+      const stored = (
+        await admin.query(
+          "SELECT response FROM derslik.api_commands WHERE key=$1",
+          [key],
+        )
+      ).rows[0].response;
+      assert.equal(stored.data.url, undefined);
+      assert.ok(!JSON.stringify(stored).includes(first.url.split("/").at(-1)));
+      // Tekrar: aynı davet, yeni bağlantı; eskisi artık geçmez.
+      const replay = (await ok(base + "/invitations", body, { key })).data;
+      assert.equal(replay.id, first.id);
+      assert.ok(replay.url && replay.url !== first.url);
+      const hashes = (
+        await admin.query(
+          "SELECT token_hash FROM derslik.invitations WHERE id=$1",
+          [first.id],
+        )
+      ).rows;
+      assert.equal(hashes.length, 1);
+      const { createHash } = await import("node:crypto");
+      const hash = (url) =>
+        createHash("sha256").update(url.split("/").at(-1)).digest("hex");
+      assert.equal(hashes[0].token_hash, hash(replay.url));
+      // Saatlik sınır: 20 davet.
+      await admin.query(
+        `INSERT INTO derslik.invitations(workspace_id,student_id,email,role,permissions,token_hash,expires_at)
+         SELECT $1,$2,'bulk'||g||'@example.test','GUARDIAN',ARRAY['lessons'],md5(random()::text)||g,now()+interval '7 days'
+         FROM generate_series(1,20) g`,
+        [ws, student.id],
+      );
+      const limited = await request(base + "/invitations", {
+        method: "POST",
+        body: { ...body, email: "spam@example.test" },
+      });
+      assert.equal(limited.status, 429);
+      assert.match(limited.body.error.message, /çok fazla davet/);
+      await admin.query(
+        "UPDATE derslik.invitations SET created_at=now()-interval '2 days' WHERE workspace_id=$1",
+        [ws],
+      );
+    },
+  );
+  await t.test(
     "assignment submission is student-only, versioned, reviewed and notified",
     async () => {
       assignment = (
@@ -560,18 +612,117 @@ export async function learningCases({
         "UPDATE derslik.workspace_limits SET material_bytes=256 WHERE workspace_id=$1",
         [ws],
       );
-      assert.equal(
-        (
-          await request(media + "/files", {
-            method: "POST",
-            body: { ...body, purpose: "SUBMISSION" },
-            auth: tokenStudent,
-          })
-        ).status,
-        409,
+      const full = await request(media + "/files", {
+        method: "POST",
+        body: { ...body, purpose: "SUBMISSION" },
+        auth: tokenStudent,
+      });
+      assert.equal(full.status, 409);
+      assert.match(full.body.error.message, /Dosya depolama sınırı dolu/);
+      await admin.query(
+        "UPDATE derslik.workspace_limits SET material_bytes=209715200 WHERE workspace_id=$1",
+        [ws],
+      );
+    },
+  );
+  await t.test(
+    "unfinished uploads expire and cannot hold the teacher's file quota",
+    async () => {
+      const body = {
+        assignmentId: assignment.id,
+        purpose: "SUBMISSION",
+        name: "bekleyen.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1024,
+      };
+      const reserve = () =>
+        request(media + "/files", {
+          method: "POST",
+          body,
+          auth: tokenStudent,
+        });
+      let refused;
+      for (let i = 0; i < 6; i++) {
+        const r = await reserve();
+        if (r.status >= 300) {
+          refused = r;
+          break;
+        }
+      }
+      assert.equal(refused?.status, 409);
+      assert.match(refused.body.error.message, /Tamamlanmamış yüklemeniz/);
+      const stale = (
+        await admin.query(
+          "UPDATE derslik.materials SET created_at=now()-interval '4 hours' WHERE workspace_id=$1 AND status='PENDING' AND name='bekleyen.pdf' RETURNING id,object_key",
+          [ws],
+        )
+      ).rows;
+      // Eskiyen bekleyenler kotaya sayılmaz: kalan yer tam bir dosyalık.
+      await admin.query(
+        `UPDATE derslik.workspace_limits SET material_bytes=(
+           SELECT COALESCE(sum(size_bytes),0) FROM derslik.materials WHERE workspace_id=$1 AND status<>'DELETED' AND name<>'bekleyen.pdf'
+         )+1024 WHERE workspace_id=$1`,
+        [ws],
+      );
+      const fresh = await reserve();
+      assert.ok(fresh.status < 300, JSON.stringify(fresh.body));
+      assert.equal((await reserve()).status, 409);
+      // Eskiyen yükleme tamamlanamaz.
+      fileObjects.set(stale[0].object_key, {
+        info: { size: 1024, content_type: "application/pdf" },
+        bytes: Buffer.from("%PDF-1.7"),
+      });
+      const late = await request(media + `/files/${stale[0].id}/finish`, {
+        method: "POST",
+        body: {},
+        auth: tokenStudent,
+      });
+      assert.equal(late.status, 409, JSON.stringify(late.body));
+      assert.match(late.body.error.message, /süresi doldu/);
+      await admin.query(
+        "UPDATE derslik.materials SET status='DELETED' WHERE workspace_id=$1 AND name='bekleyen.pdf'",
+        [ws],
       );
       await admin.query(
         "UPDATE derslik.workspace_limits SET material_bytes=209715200 WHERE workspace_id=$1",
+        [ws],
+      );
+      // Öğrenci tamamlarken öğretmen silerse iki işlem aynı kilit sırasını
+      // izler; deadlock (503) olmaz, biri bekler.
+      for (let i = 0; i < 4; i++) {
+        const f = (
+          await ok(
+            media + "/files",
+            { ...body, name: "yaris-silme.pdf" },
+            { auth: tokenStudent },
+          )
+        ).data;
+        const key = (
+          await admin.query(
+            "SELECT object_key FROM derslik.materials WHERE id=$1",
+            [f.id],
+          )
+        ).rows[0].object_key;
+        fileObjects.set(key, {
+          info: { size: 1024, content_type: "application/pdf" },
+          bytes: Buffer.from("%PDF-1.7"),
+        });
+        const results = await Promise.all([
+          request(media + `/files/${f.id}/finish`, {
+            method: "POST",
+            body: {},
+            auth: tokenStudent,
+          }),
+          request(media + `/files/${f.id}/delete`, {
+            method: "POST",
+            body: {},
+          }),
+        ]);
+        for (const r of results)
+          assert.notEqual(r.status, 503, JSON.stringify(r.body));
+      }
+      await admin.query(
+        "UPDATE derslik.materials SET status='DELETED' WHERE workspace_id=$1 AND name='yaris-silme.pdf'",
         [ws],
       );
     },

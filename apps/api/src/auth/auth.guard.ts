@@ -9,6 +9,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { Request } from "express";
 import { z } from "zod";
 import { CONFIG, type ApiConfig } from "../config.js";
+import { RateLimiter } from "../common/rate-limit.js";
 
 export type Actor = { id: string; email?: string };
 export type ActorRequest = Request & { actor: Actor };
@@ -16,8 +17,10 @@ export type ActorRequest = Request & { actor: Actor };
 @Injectable()
 export class AuthGuard implements CanActivate {
   private readonly jwks;
+  private readonly limiter;
 
   constructor(@Inject(CONFIG) private readonly config: ApiConfig) {
+    this.limiter = new RateLimiter(config.RATE_LIMIT_USER_PER_MINUTE);
     this.jwks = createRemoteJWKSet(
       new URL(config.AUTH_ISSUER + "/.well-known/jwks.json"),
       {
@@ -31,6 +34,8 @@ export class AuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<ActorRequest>();
     request.actor = await this.verify(request.headers.authorization);
+    // Sayaç imza doğrulandıktan sonra: sahte belirteçle kova çoğaltılamaz.
+    this.limiter.check(request.actor.id);
     return true;
   }
 

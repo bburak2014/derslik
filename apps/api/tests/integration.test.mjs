@@ -430,6 +430,13 @@ test(
           ).data;
           const p = (await ok(path("packages"), packageBody(s.id, 1, "100000")))
             .data;
+          // Tek hakla 8 haftalık seri açılmaz; tek ders açılabilir.
+          const series = await request(path("sessions"), {
+            method: "POST",
+            body: sessionBody(s.id, p.id, "2025-03-02T12:00:00Z", 8),
+          });
+          assert.equal(series.status, 409);
+          assert.match(series.body.error.message, /yeterli ders hakkı yok/);
           const l1 = (
             await ok(
               path("sessions"),
@@ -781,7 +788,7 @@ test(
         verifiedUsers,
         sessionBody,
       });
-      await directoryCases({ t, admin, request, ok, token });
+      await directoryCases({ t, admin, request, ok, token, verifiedUsers });
     } finally {
       if (app) await app.close();
       if (jwksServer) await new Promise((resolve) => jwksServer.close(resolve));

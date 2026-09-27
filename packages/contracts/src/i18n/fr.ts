@@ -3,6 +3,17 @@ import type { Messages } from "./index.js";
 
 export const fr: Messages = {
   api: {
+    fileStorageFull:
+      "L’espace de stockage des fichiers est plein. Supprimez d’anciens fichiers pour libérer de la place.",
+    tooManyPendingUploads:
+      "Vous avez trop d’envois inachevés. Terminez-les ou supprimez-les d’abord.",
+    uploadExpired:
+      "Cet envoi a expiré. Supprimez-le et envoyez à nouveau le fichier.",
+    inviteRateLimit:
+      "Trop d’invitations envoyées en peu de temps. Veuillez réessayer plus tard.",
+    packageNotEnoughCredits:
+      "Le forfait ne contient pas assez de séances pour autant de semaines. Choisissez moins de semaines ou ajoutez des séances.",
+    tooManyRequests: "Trop de requêtes. Veuillez réessayer dans un instant.",
     cityRequired: "Indiquez une ville pour les cours en présentiel.",
     photoNotFound: "Photo introuvable.",
     photoTooLarge: "La photo ne doit pas dépasser 300 Ko.",
@@ -1166,6 +1177,10 @@ export const fr: Messages = {
     unsupported: "Ce navigateur ne prend pas en charge la lecture vidéo.",
   },
   web: {
+    tooManyAttempts:
+      "Trop de tentatives. Veuillez réessayer dans quelques minutes.",
+    passwordRecoveryRequired:
+      "Pour changer votre mot de passe, utilisez le lien de réinitialisation reçu par e-mail.",
     actionNotFound: "Action introuvable.",
     appRequestRequired: "Une requête d'application valide est requise.",
     backHome: "Retour à l'accueil",

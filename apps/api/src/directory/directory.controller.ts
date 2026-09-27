@@ -36,7 +36,11 @@ export class PublicDirectoryController {
     @Res() res: Response,
     @Param("id") id: string,
   ) {
-    const actor = await this.auth.optional(req.headers.authorization);
+    // Süresi dolmuş ya da bozuk oturum fotoğrafı engellemez: istek anonim
+    // sayılır ve vitrindeki fotoğraf yine görünür.
+    const actor = await this.auth
+      .optional(req.headers.authorization)
+      .catch(() => null);
     const photo = await this.directory.photo(actor, id);
     res.setHeader("Content-Type", photo.type);
     res.setHeader(
@@ -66,7 +70,12 @@ export class DirectoryController {
     @Param("id") id: string,
     @Body() body: unknown,
   ) {
-    return this.directory.sendRequest(req.actor, id, body);
+    return this.directory.sendRequest(
+      req.actor,
+      req.headers.authorization,
+      id,
+      body,
+    );
   }
   @Put("teacher-relations/:id/review") review(
     @Req() req: ActorRequest,

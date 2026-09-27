@@ -3,6 +3,18 @@ import type { Messages } from "./index.js";
 
 export const de: Messages = {
   api: {
+    fileStorageFull:
+      "Der Dateispeicher ist voll. Löschen Sie alte Dateien, um Platz zu schaffen.",
+    tooManyPendingUploads:
+      "Sie haben zu viele unvollständige Uploads. Schließen Sie diese zuerst ab oder löschen Sie sie.",
+    uploadExpired:
+      "Dieser Upload ist abgelaufen. Löschen Sie ihn und laden Sie die Datei erneut hoch.",
+    inviteRateLimit:
+      "In kurzer Zeit wurden zu viele Einladungen gesendet. Bitte versuchen Sie es später erneut.",
+    packageNotEnoughCredits:
+      "Das Paket hat nicht genug Stunden für so viele Wochen. Wählen Sie weniger Wochen oder fügen Sie Stunden hinzu.",
+    tooManyRequests:
+      "Zu viele Anfragen. Bitte versuchen Sie es gleich noch einmal.",
     cityRequired: "Geben Sie für Präsenzunterricht eine Stadt an.",
     photoNotFound: "Foto nicht gefunden.",
     photoTooLarge: "Das Foto darf höchstens 300 KB groß sein.",
@@ -1176,6 +1188,10 @@ export const de: Messages = {
     unsupported: "Dieser Browser unterstützt keine Videowiedergabe.",
   },
   web: {
+    tooManyAttempts:
+      "Zu viele Versuche. Bitte versuchen Sie es in ein paar Minuten erneut.",
+    passwordRecoveryRequired:
+      "Um Ihr Passwort zu ändern, verwenden Sie den Link zum Zurücksetzen aus Ihrer E-Mail.",
     actionNotFound: "Vorgang nicht gefunden.",
     appRequestRequired: "Eine gültige App-Anfrage ist erforderlich.",
     backHome: "Zur Startseite",
