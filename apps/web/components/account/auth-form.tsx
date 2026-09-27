@@ -221,6 +221,10 @@ export function AuthForm({
                     ...(mode !== "recover"
                       ? { password: f.get("password") }
                       : {}),
+                    // Onay e-postasından sonra davete ya da öğretmene dönülür.
+                    ...(mode === "signup"
+                      ? { next: location.pathname + location.search }
+                      : {}),
                   },
                 );
                 if (mode === "recover" || r.confirmationRequired)

@@ -11,6 +11,11 @@ import { t } from "@derslik/contracts";
 // indirme istemine düşüyordu. Burada PDF, pdf.js ile canvas'a çizilerek
 // uygulamanın içinde gösteriliyor. Dosyanın kendisi doğrudan Supabase'den
 // çekiliyor; CDN'den yalnızca kitaplık geliyor, dosya üçüncü tarafa gitmiyor.
+//
+// CVE-2024-4367: pdf.js before 4.2.67 can run script embedded in a crafted
+// font. 3.x is kept because 4.x ships only as ES modules; the vendor's
+// mitigation is isEvalSupported:false, set on getDocument below. The WebView
+// also refuses to navigate anywhere, so a hostile file cannot leave the page.
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 
 function buildHtml(url: string, background: string, muted: string) {
@@ -36,7 +41,7 @@ function buildHtml(url: string, background: string, muted: string) {
   if (!window.pdfjsLib) return fail("library");
   pdfjsLib.GlobalWorkerOptions.workerSrc = ${JSON.stringify(PDFJS + "/pdf.worker.min.js")};
   pdfjsLib
-    .getDocument({ url: ${JSON.stringify(url)} })
+    .getDocument({ url: ${JSON.stringify(url)}, isEvalSupported: false })
     .promise.then(function (pdf) {
       var holder = document.getElementById("pages");
       var ratio = window.devicePixelRatio || 1;
@@ -126,6 +131,12 @@ export function PdfViewer({
             originWhitelist={["*"]}
             source={{ html }}
             javaScriptEnabled
+            // Only the inline page itself may load; links in a PDF never
+            // navigate the viewer.
+            onShouldStartLoadWithRequest={(request) =>
+              request.url === "about:blank" || request.url.startsWith("data:")
+            }
+            setSupportMultipleWindows={false}
             onMessage={(event) => {
               if (event.nativeEvent.data.startsWith("error:")) setFailed(true);
             }}

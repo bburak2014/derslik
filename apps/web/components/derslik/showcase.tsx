@@ -323,6 +323,13 @@ export function ShowcaseView({
     setAppliedFocus(focus.at);
     setTab("requests");
   }
+  // Vitrin zaten açıkken gelen istek bildirimi: yeni istek listede yoksa
+  // işaretlenemez, bu yüzden bildirime her dokunuşta liste yeniden çekilir.
+  const focusAt = focus?.at;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleyici durumu yalnızca istek bitince yazar.
+    if (focusAt) void reload();
+  }, [focusAt, reload]);
   useEffect(() => {
     if (!focus?.id || !data) return;
     const el = document.querySelector<HTMLElement>(

@@ -65,6 +65,36 @@ const videoSchema = z
   })
   .strict();
 
+// A student's submission files follow the hand-in rule (canEditSubmission):
+// the assignment must be open, and once it has a hand-in the files are frozen
+// after the due day. Reserve, finish and delete all go through this gate, so
+// an upload started earlier cannot complete after the assignment closed.
+async function assignmentGate(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  assignmentId: string,
+  owner: boolean,
+) {
+  await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+    ws + ":" + assignmentId,
+  ]);
+  const assignment = (
+    await tx.query(
+      `SELECT a.id,a.status,a.due_on IS NOT NULL AND a.due_on<${ISTANBUL_TODAY} AND EXISTS(
+         SELECT 1 FROM derslik.submissions s WHERE s.workspace_id=a.workspace_id AND s.assignment_id=a.id
+       ) AS locked
+       FROM derslik.assignments a WHERE a.workspace_id=$1 AND a.student_id=$2 AND a.id=$3`,
+      [ws, student, assignmentId],
+    )
+  ).rows[0];
+  if (!assignment) throw new NotFoundException("api.assignmentNotFound");
+  if (owner) return;
+  if (assignment.status !== "OPEN")
+    throw new ConflictException("api.assignmentClosed");
+  if (assignment.locked) throw new ConflictException("api.dueDatePassedFile");
+}
+
 @Injectable()
 export class MediaService {
   constructor(
@@ -109,23 +139,8 @@ export class MediaService {
             "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
             [ws + ":" + c.assignmentId],
           );
-        const assignment =
-          c.assignmentId &&
-          (
-            await tx.query(
-              `SELECT a.id,a.status,a.due_on IS NOT NULL AND a.due_on<${ISTANBUL_TODAY} AND EXISTS(
-                 SELECT 1 FROM derslik.submissions s WHERE s.workspace_id=a.workspace_id AND s.assignment_id=a.id
-               ) AS locked
-               FROM derslik.assignments a WHERE a.workspace_id=$1 AND a.student_id=$2 AND a.id=$3`,
-              [ws, student, c.assignmentId],
-            )
-          ).rows[0];
-        if (c.assignmentId && !assignment)
-          throw new NotFoundException("api.assignmentNotFound");
-        if (!owner && assignment?.status !== "OPEN")
-          throw new ConflictException("api.assignmentClosed");
-        if (!owner && assignment?.locked)
-          throw new ConflictException("api.dueDatePassedFile");
+        if (c.assignmentId)
+          await assignmentGate(tx, ws, student, c.assignmentId, owner);
         await tx.query("SELECT derslik.expire_subscription($1)", [ws]);
         await tx.query("SELECT derslik.reserve_material_quota($1,$2,$3)", [
           ws,
@@ -219,6 +234,15 @@ export class MediaService {
       student,
       "assignments",
       async (tx) => {
+        if (file.assignment_id && file.purpose === "SUBMISSION")
+          await assignmentGate(
+            tx,
+            ws,
+            student,
+            file.assignment_id,
+            (await tx.query("SELECT derslik.is_owner($1) AS yes", [ws])).rows[0]
+              .yes,
+          );
         const data = (
           await tx.query(
             "UPDATE derslik.materials SET status='READY' WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='PENDING' AND NOT delete_requested RETURNING id,status",
@@ -266,6 +290,12 @@ export class MediaService {
         if (!row) throw new NotFoundException("api.fileNotFound");
         if (!row.owner && row.user_id !== actor.id)
           throw new ForbiddenException("api.fileNotYours");
+        if (
+          row.assignment_id &&
+          row.purpose === "SUBMISSION" &&
+          !row.delete_requested
+        )
+          await assignmentGate(tx, ws, student, row.assignment_id, row.owner);
         await tx.query(
           "UPDATE derslik.materials SET delete_requested=true WHERE workspace_id=$1 AND id=$2",
           [ws, id],

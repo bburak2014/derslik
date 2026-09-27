@@ -7,6 +7,11 @@ import { ApiError } from "@derslik/api-client";
 import Workspace from "@/components/derslik/workspace";
 import { AuthForm } from "./auth-form";
 import { backend, formText, webRequest } from "@/lib/client";
+import {
+  openStudentWorkspace,
+  rememberedStudentMode,
+  rememberMode,
+} from "@/lib/student-mode";
 import { Portal } from "@/components/derslik/portal";
 import { PageLoader, Spinner } from "@/components/derslik/loading";
 import { FormError } from "@/components/derslik/feedback";
@@ -28,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-const MODE_KEY = "derslik-mode";
 /** Öğretmene bağlı olmayan hesap "öğretmen arıyorum" dediyse bu tarayıcıda
  *  hatırlanır; vitrin bağlantısıyla (?teacher=) gelen de öğrenci olarak açılır. */
 function initialStudentMode() {
@@ -36,19 +40,7 @@ function initialStudentMode() {
   const params = new URLSearchParams(location.search);
   if (params.get("teacher")) return true;
   if (["teachers", "requests"].includes(params.get("view") || "")) return true;
-  try {
-    return localStorage.getItem(MODE_KEY) === "student";
-  } catch {
-    return false;
-  }
-}
-function rememberMode(student: boolean) {
-  try {
-    if (student) localStorage.setItem(MODE_KEY, "student");
-    else localStorage.removeItem(MODE_KEY);
-  } catch {
-    /* Depolama kapalıysa seçim yalnızca bu sayfada geçerli. */
-  }
+  return rememberedStudentMode();
 }
 
 export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
@@ -174,14 +166,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
   async function openWorkspace(workspaceId: string) {
     setBusy(true);
     try {
-      const fresh = await webRequest<{ list: Access[] }>("/api/session");
-      const next = fresh.list.find(
-        (a) => a.id === workspaceId && a.role === "STUDENT",
-      );
-      if (!next) throw new Error(t("conn.noticeNoAccess"));
-      await webRequest("/api/session", { key: key(next) });
-      rememberMode(false);
-      location.assign("/?view=lessons");
+      await openStudentWorkspace(workspaceId);
     } catch (e) {
       setError((e as Error).message);
     } finally {

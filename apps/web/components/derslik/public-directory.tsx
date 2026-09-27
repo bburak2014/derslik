@@ -5,6 +5,7 @@ import { t, upper } from "@derslik/contracts";
 import { ThemeToggle } from "@/components/account/theme-toggle";
 import { LanguageSelect } from "@/components/i18n/language-select";
 import { Button } from "@/components/ui/button";
+import { openStudentWorkspace } from "@/lib/student-mode";
 import { TeacherDirectory, TeacherProfileView } from "./directory";
 
 /** Giriş yapmadan gezilen vitrin: /teachers ve /teachers/[id]. Oturum varsa
@@ -57,7 +58,11 @@ export function PublicDirectory({ teacherId }: { teacherId?: string }) {
               id={teacherId}
               signedIn={signedIn}
               backHref="/teachers"
-              onOpenLessons={() => location.assign("/?view=requests")}
+              // Davetle bağlanan öğrencinin "İsteklerim" sayfası boş kalır;
+              // düğme o öğretmendeki dersleri açar.
+              onOpenLessons={(id) =>
+                void openStudentWorkspace(id).catch(() => location.assign("/"))
+              }
               onEditProfile={() => location.assign("/?view=showcase")}
               openRequest={
                 new URLSearchParams(location.search).get("request") === "1"

@@ -1,5 +1,5 @@
 import { Text, View } from "react-native";
-import { addDays, dateKey, dayLabel, t } from "@derslik/contracts";
+import { addDays, dateKey, dayLabel, isDateKey, t } from "@derslik/contracts";
 import { Button, EmptyState, IconButton, Input } from "../ui";
 import { type TeacherCtx } from "./use-teacher-screen";
 
@@ -14,7 +14,7 @@ export function CalendarSection({ ctx }: { ctx: TeacherCtx }) {
             icon="chevron-back"
             label={t("mt.prevDay")}
             onPress={() => {
-              if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setDay(addDays(day, -1));
+              if (isDateKey(day)) setDay(addDays(day, -1));
             }}
           />
           <View style={{ flex: 1 }}>
@@ -32,12 +32,12 @@ export function CalendarSection({ ctx }: { ctx: TeacherCtx }) {
             icon="chevron-forward"
             label={t("mt.nextDay")}
             onPress={() => {
-              if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setDay(addDays(day, 1));
+              if (isDateKey(day)) setDay(addDays(day, 1));
             }}
           />
         </View>
         <Text style={styles.hint}>
-          {/^\d{4}-\d{2}-\d{2}$/.test(day)
+          {isDateKey(day)
             ? dayLabel(day + "T12:00:00+03:00", {
                 weekday: "long",
                 year: "numeric",
