@@ -35,7 +35,7 @@ export async function POST(
     const { action } = await context.params,
       body = await readBody(request),
       auth = await authClient(),
-      ip = clientIp(request.headers) || "local";
+      ip = clientIp(request.headers);
     if (action === "oauth") {
       const input = z
         .object({
@@ -79,9 +79,12 @@ export async function POST(
       if (!parsed.success) throw new HttpError(400, "web.credentialsInvalid");
       const email = parsed.data.email.toLowerCase();
       if (action === "signin") {
-        limit("signin-ip:" + ip, 30, 15 * MINUTE);
-        limit("signin-email:" + email, 10, 15 * MINUTE);
-      } else limit("signup-ip:" + ip, 10, 60 * MINUTE);
+        // E-posta tek başına anahtar olsaydı saldırgan kurbanın adresine 10
+        // yanlış şifre gönderip onu 15 dakika dışarıda tutabilirdi. Anahtar
+        // e-posta + IP; IP bilinmiyorsa (CLIENT_IP_HEADER yok) yalnızca e-posta.
+        if (ip) limit("signin-ip:" + ip, 30, 15 * MINUTE);
+        limit(`signin:${email}:${ip}`, 10, 15 * MINUTE);
+      } else if (ip) limit("signup-ip:" + ip, 10, 60 * MINUTE);
       const { error, data } =
         action === "signin"
           ? await auth.auth.signInWithPassword(parsed.data)
@@ -112,8 +115,8 @@ export async function POST(
         .object({ email: z.string().email().max(200) })
         .safeParse(body);
       if (!parsed.success) throw new HttpError(400, "web.emailInvalid");
-      limit("recover-ip:" + ip, 5, 15 * MINUTE);
-      limit("recover-email:" + parsed.data.email.toLowerCase(), 3, 15 * MINUTE);
+      if (ip) limit("recover-ip:" + ip, 5, 15 * MINUTE);
+      limit(`recover:${parsed.data.email.toLowerCase()}:${ip}`, 3, 15 * MINUTE);
       const { error } = await auth.auth.resetPasswordForEmail(
         parsed.data.email,
         {
@@ -129,7 +132,7 @@ export async function POST(
         .object({ password: z.string().min(10).max(128) })
         .safeParse(body);
       if (!parsed.success) throw new HttpError(400, "web.passwordTooShort");
-      limit("password-ip:" + ip, 10, 15 * MINUTE);
+      if (ip) limit("password-ip:" + ip, 10, 15 * MINUTE);
       const { data: claims } = await auth.auth.getClaims();
       if (!claims) throw new HttpError(401, "web.signIn");
       const now = Math.floor(Date.now() / 1000);

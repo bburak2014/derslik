@@ -164,6 +164,15 @@ Webhook hedefi `https://API_ALAN_ADI/v1/webhooks/subscriptions`; abonelik oluşt
 
 Nest backend uzun yaşayan Node/PostgreSQL bağlantısı kullanır; Sites Worker'ın içine Nest/ham TCP PostgreSQL yerleştirilmez. API ve PostgreSQL'i kendi sunucunda/container ortamında çalıştır. Web aynı Compose ile veya ayrı Next Node barındırmasında çalışabilir. HTTPS reverse proxy, veritabanı yedekleri, geri yükleme denemesi, istek hız sınırı ve log izleme üretim işletimine aittir. Üretimde sertifikalı PostgreSQL TLS kullanıyorsan `DATABASE_SSL=true` yap.
 
+### İstemci IP'si ve hız sınırı
+
+Giriş, kayıt, şifre sıfırlama ve herkese açık öğretmen araması IP başına sınırlanır. İstemci `X-Forwarded-For` gibi başlıkları kendisi yazabildiği için bu başlıklara yalnızca önde onları kendisi yazan bir ters vekil (Caddy, Nginx, Cloudflare) varsa güvenilir:
+
+- **Web**: `CLIENT_IP_HEADER` vekilin ziyaretçi IP'sini verdiği başlığın adıdır. Caddy ve Nginx için `x-forwarded-for` (vekilin sona eklediği değer alınır), Cloudflare için `cf-connecting-ip`. Boş bırakılırsa IP'ye dayalı sınırlar atlanır ve giriş denemesi sınırı yalnızca e-posta başına çalışır; bu durumda biri bir e-postaya 10 yanlış şifre göndererek o hesabın web girişini 15 dakika kilitleyebilir. Üretimde mutlaka ayarla ve web'e vekilin dışından doğrudan erişilemesin.
+- **API**: `TRUST_PROXY` Express'in `trust proxy` ayarıdır (varsayılan `loopback, linklocal, uniquelocal`). `X-Forwarded-For` yalnızca bu adreslerden gelen isteklerde okunur ve sağdan ilk güvenilmeyen adres istemci sayılır. API'nin portu internete doğrudan değil, vekil üzerinden açılmalı; aynı özel ağdaki başka bir makine başlığı kendisi yazarak vitrin sınırını aşabilir.
+
+Supabase'e `sb-forwarded-for` başlığı da gider, ama Supabase onu yalnızca gizli anahtarla gelen isteklerde dikkate alır; web herkese açık anahtarı kullandığı için şu an etkisizdir. Asıl koruma yukarıdaki sayaçlardır.
+
 Yeni kaynak sürümünde webin D1/R2 okuma/yazma yolu kaldırıldı. Mevcut canlı v4 yayın, Nest/PostgreSQL kurulup veri aktarımı doğrulanana kadar korunuyor. Canlı Site’da henüz API ortam ayarları yok; bu kod değişikliği canlı geçiş anlamına gelmez.
 
 API hazır olduğunda Sites web ortamında `API_BASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `APP_ORIGIN` aynı backend/Auth projesine ayarlanır; hiçbir backend sırrı web ortamına konmaz. Yeni sürüm ancak eski kayıtlar için [veri geçişi](veri-gecisi.md) tamamlandıktan sonra yayımlanır. Yayındaki eski veritabanı veya bucket bu çalışma sırasında silinmedi.
