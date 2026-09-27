@@ -197,6 +197,10 @@ export const es: Messages = {
     providerSoon: "Esta forma de iniciar sesión aún no está disponible.",
     providersSoon:
       "Las demás formas de iniciar sesión aún no están disponibles. Continúa con tu correo.",
+    captchaRequired:
+      "Completa la verificación de seguridad antes de continuar.",
+    captchaFailed:
+      "La verificación de seguridad ha fallado. Actualiza la página e inténtalo de nuevo.",
     providersUnreachable:
       "No se pudo acceder a las demás formas de iniciar sesión. Puedes continuar con tu correo.",
     recoverText:

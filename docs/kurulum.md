@@ -171,6 +171,16 @@ Giriş, kayıt, şifre sıfırlama ve herkese açık öğretmen araması IP baş
 - **Web**: `CLIENT_IP_HEADER` vekilin ziyaretçi IP'sini verdiği başlığın adıdır. Caddy ve Nginx için `x-forwarded-for` (vekilin sona eklediği değer alınır), Cloudflare için `cf-connecting-ip`. Boş bırakılırsa IP'ye dayalı sınırlar atlanır ve giriş denemesi sınırı yalnızca e-posta başına çalışır; bu durumda biri bir e-postaya 10 yanlış şifre göndererek o hesabın web girişini 15 dakika kilitleyebilir. Üretimde mutlaka ayarla ve web'e vekilin dışından doğrudan erişilemesin.
 - **API**: `TRUST_PROXY` Express'in `trust proxy` ayarıdır (varsayılan `loopback, linklocal, uniquelocal`). `X-Forwarded-For` yalnızca bu adreslerden gelen isteklerde okunur ve sağdan ilk güvenilmeyen adres istemci sayılır. API'nin portu internete doğrudan değil, vekil üzerinden açılmalı; aynı özel ağdaki başka bir makine başlığı kendisi yazarak vitrin sınırını aşabilir.
 
+### Girişte CAPTCHA (Cloudflare Turnstile)
+
+E-postayla giriş, kayıt ve şifre sıfırlama isteğe bağlı olarak Turnstile doğrulaması ister. Google/Apple/Microsoft girişini etkilemez. Açma sırası önemli; ters sırada açılırsa e-postayla giriş çalışmaz:
+
+1. Cloudflare panelinde **Turnstile → Add widget**: alan adı olarak web sitesinin alan adını ekle (yerelde denemek için `localhost` da), mod "Managed". Panel bir **site key** (açık) ve bir **secret key** (gizli) verir.
+2. Site key'i `.env.api` içine `TURNSTILE_SITE_KEY=` olarak yaz ve `pnpm env:sync` (ya da `pnpm dev`) çalıştır; web ve mobil ayarlarına kendiliğinden geçer. Sunucuda web konteynerine aynı değişken, mobil için EAS ortam değişkenlerine `EXPO_PUBLIC_TURNSTILE_SITE_KEY` ve `EXPO_PUBLIC_TURNSTILE_ORIGIN` (web sitesinin adresi, ör. `https://derslik.app`) girilir. Bu sürüm yayına alınana kadar Supabase'de CAPTCHA'yı açma.
+3. Supabase panelinde **Authentication → Attack Protection → Enable Captcha protection**: sağlayıcı Turnstile, secret key'i buraya yapıştır. Gizli anahtar yalnızca burada durur; repoya ya da `.env` dosyalarına girmez.
+
+Mobil widget, web sitesinin adresiyle açılan bir sayfada çalışır; bu yüzden o alan adı Turnstile'da izinli olmalı. Cloudflare'in test anahtarı `1x00000000000000000000AA` her yerde geçer, yerel deneme için kullanılabilir.
+
 Supabase'e `sb-forwarded-for` başlığı da gider, ama Supabase onu yalnızca gizli anahtarla gelen isteklerde dikkate alır; web herkese açık anahtarı kullandığı için şu an etkisizdir. Asıl koruma yukarıdaki sayaçlardır.
 
 Yeni kaynak sürümünde webin D1/R2 okuma/yazma yolu kaldırıldı. Mevcut canlı v4 yayın, Nest/PostgreSQL kurulup veri aktarımı doğrulanana kadar korunuyor. Canlı Site’da henüz API ortam ayarları yok; bu kod değişikliği canlı geçiş anlamına gelmez.

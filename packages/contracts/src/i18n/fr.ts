@@ -199,6 +199,9 @@ export const fr: Messages = {
     providerSoon: "Cette option de connexion n'est pas encore disponible.",
     providersSoon:
       "Les autres options de connexion ne sont pas encore disponibles. Continuez par e-mail.",
+    captchaRequired: "Terminez la vérification de sécurité avant de continuer.",
+    captchaFailed:
+      "La vérification de sécurité a échoué. Actualisez la page et réessayez.",
     providersUnreachable:
       "Impossible d'accéder aux autres options de connexion. Vous pouvez continuer par e-mail.",
     recoverText:

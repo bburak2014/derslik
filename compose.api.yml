@@ -97,6 +97,9 @@ services:
       # (docs/kurulum.md, "İstemci IP'si ve hız sınırı"). Boşsa IP'ye dayalı
       # sınırlar atlanır.
       CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      # Girişte Cloudflare Turnstile CAPTCHA'sı (açık site anahtarı). Gizli
+      # anahtar yalnızca Supabase panelinde durur.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     ports:
       - "127.0.0.1:${WEB_HTTP_PORT:-3000}:3000"
     depends_on:

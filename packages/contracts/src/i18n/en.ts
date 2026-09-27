@@ -191,6 +191,8 @@ export const en: Messages = {
     providerSoon: "This sign-in option isn't available yet.",
     providersSoon:
       "Other sign-in options aren't available yet. Continue with email.",
+    captchaRequired: "Complete the security check before continuing.",
+    captchaFailed: "The security check failed. Refresh the page and try again.",
     providersUnreachable:
       "Couldn't reach the other sign-in options. You can continue with email.",
     recoverText: "Let's help you get back into your account safely.",

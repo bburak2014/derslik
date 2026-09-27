@@ -22,6 +22,25 @@ const MINUTE = 60_000;
 // geçirmeye dönüşmez. amr, oturumun nasıl açıldığını söyler.
 const RECOVERY_METHODS = new Set(["recovery", "otp", "magiclink"]);
 const RECOVERY_WINDOW_SECONDS = 60 * 60;
+// Turnstile site anahtarı ayarlıysa e-postalı giriş, kayıt ve sıfırlama
+// CAPTCHA belirteci ister; Supabase belirteci Cloudflare'e doğrulatır.
+// Anahtar yoksa hiçbir şey değişmez.
+function captchaOptions(body: unknown) {
+  if (!process.env.TURNSTILE_SITE_KEY?.trim()) return {};
+  const token = z
+    .object({ captchaToken: z.string().min(1).max(4096) })
+    .safeParse(body).data?.captchaToken;
+  if (!token) throw new HttpError(400, "auth.captchaRequired");
+  return { captchaToken: token };
+}
+const authFailure = (
+  error: { code?: string } | null,
+  status: number,
+  key: string,
+) =>
+  error?.code === "captcha_failed"
+    ? new HttpError(400, "auth.captchaFailed")
+    : new HttpError(status, key);
 const signupNext = (value: string | undefined) => {
   const next = safeAuthNext(value);
   return next === "/" ? "" : "?next=" + encodeURIComponent(next);
@@ -85,13 +104,18 @@ export async function POST(
         if (ip) limit("signin-ip:" + ip, 30, 15 * MINUTE);
         limit(`signin:${email}:${ip}`, 10, 15 * MINUTE);
       } else if (ip) limit("signup-ip:" + ip, 10, 60 * MINUTE);
+      const captcha = captchaOptions(body);
       const { error, data } =
         action === "signin"
-          ? await auth.auth.signInWithPassword(parsed.data)
+          ? await auth.auth.signInWithPassword({
+              ...parsed.data,
+              options: captcha,
+            })
           : await auth.auth.signUp({
               email: parsed.data.email,
               password: parsed.data.password,
               options: {
+                ...captcha,
                 // Davet ya da vitrin bağlantısından kaydolan, e-postayı
                 // onayladıktan sonra aynı akışa döner. Onay bağlantısı başka
                 // bir tarayıcıda açılabileceği için çerez değil adres taşır.
@@ -104,7 +128,8 @@ export async function POST(
               },
             });
       if (error)
-        throw new HttpError(
+        throw authFailure(
+          error,
           400,
           action === "signin" ? "web.signinFailed" : "web.signupFailed",
         );
@@ -117,14 +142,16 @@ export async function POST(
       if (!parsed.success) throw new HttpError(400, "web.emailInvalid");
       if (ip) limit("recover-ip:" + ip, 5, 15 * MINUTE);
       limit(`recover:${parsed.data.email.toLowerCase()}:${ip}`, 3, 15 * MINUTE);
+      const captcha = captchaOptions(body);
       const { error } = await auth.auth.resetPasswordForEmail(
         parsed.data.email,
         {
+          ...captcha,
           redirectTo:
             process.env.APP_ORIGIN + "/api/auth/callback?next=/reset-password",
         },
       );
-      if (error) throw new HttpError(503, "web.recoverFailed");
+      if (error) throw authFailure(error, 503, "web.recoverFailed");
       return json({ ok: true });
     }
     if (action === "password") {

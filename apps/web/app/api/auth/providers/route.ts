@@ -5,6 +5,7 @@ export async function GET() {
   try {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const captchaSiteKey = process.env.TURNSTILE_SITE_KEY?.trim();
     if (!url || !key) throw new Error("Not configured");
     const response = await fetch(new URL("/auth/v1/settings", url), {
       headers: { apikey: key },
@@ -19,6 +20,8 @@ export async function GET() {
       providers: ["google", "apple", "azure"].filter(
         (p) => settings.external?.[p] === true,
       ),
+      // Açık anahtar; boşsa form CAPTCHA göstermez.
+      ...(captchaSiteKey ? { captchaSiteKey } : {}),
     });
   } catch {
     return json(

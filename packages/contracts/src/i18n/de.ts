@@ -207,6 +207,10 @@ export const de: Messages = {
     providerSoon: "Diese Anmeldeoption ist noch nicht verfügbar.",
     providersSoon:
       "Weitere Anmeldeoptionen sind noch nicht verfügbar. Fahren Sie mit E-Mail fort.",
+    captchaRequired:
+      "Schließen Sie vor dem Fortfahren die Sicherheitsprüfung ab.",
+    captchaFailed:
+      "Die Sicherheitsprüfung ist fehlgeschlagen. Laden Sie die Seite neu und versuchen Sie es erneut.",
     providersUnreachable:
       "Die weiteren Anmeldeoptionen sind nicht erreichbar. Sie können mit E-Mail fortfahren.",
     recoverText: "Wir helfen Ihnen, sicher wieder in Ihr Konto zu gelangen.",

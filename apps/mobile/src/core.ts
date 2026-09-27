@@ -80,6 +80,10 @@ export const configuration = {
   url: process.env.EXPO_PUBLIC_SUPABASE_URL || "",
   key: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "",
   api: process.env.EXPO_PUBLIC_API_URL || "",
+  // Turnstile CAPTCHA; boşsa giriş ekranı CAPTCHA göstermez.
+  captchaSiteKey: process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY || "",
+  // Widget'ın açıldığı adres; Turnstile'da izinli alan adı olmalı.
+  captchaOrigin: process.env.EXPO_PUBLIC_TURNSTILE_ORIGIN || "",
 };
 export const configured = !!(
   configuration.url &&

@@ -182,6 +182,9 @@ export const tr = {
     providerSoon: "Bu giriş seçeneği henüz kullanıma açılmadı.",
     providersSoon:
       "Diğer giriş seçenekleri henüz kullanıma açılmadı. E-posta ile devam edin.",
+    captchaRequired: "Devam etmeden önce güvenlik doğrulamasını tamamlayın.",
+    captchaFailed:
+      "Güvenlik doğrulaması başarısız oldu. Sayfayı yenileyip tekrar deneyin.",
     providersUnreachable:
       "Diğer giriş seçeneklerine ulaşılamadı. E-posta ile devam edebilirsiniz.",
     recoverText: "Hesabınıza güvenle geri dönmenize yardımcı olalım.",

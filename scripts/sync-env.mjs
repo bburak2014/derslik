@@ -46,11 +46,18 @@ export function clientEnvironment(api, lanHost) {
       SUPABASE_URL: supabase,
       SUPABASE_PUBLISHABLE_KEY: api.SUPABASE_PUBLISHABLE_KEY || "",
       APP_ORIGIN: api.APP_ORIGIN || "http://localhost:3000",
+      TURNSTILE_SITE_KEY: api.TURNSTILE_SITE_KEY || "",
     },
     mobile: {
       EXPO_PUBLIC_API_URL: apiUrl,
       EXPO_PUBLIC_SUPABASE_URL: supabase,
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: api.SUPABASE_PUBLISHABLE_KEY || "",
+      EXPO_PUBLIC_TURNSTILE_SITE_KEY: api.TURNSTILE_SITE_KEY || "",
+      // Mobil CAPTCHA widget'ı web sitesinin adresiyle açılır (Turnstile
+      // yalnızca izinli alan adlarında çalışır).
+      EXPO_PUBLIC_TURNSTILE_ORIGIN: api.TURNSTILE_SITE_KEY
+        ? api.APP_ORIGIN || "http://localhost:3000"
+        : "",
     },
   };
 }
