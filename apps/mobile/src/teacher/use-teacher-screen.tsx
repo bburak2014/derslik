@@ -5,6 +5,7 @@ import type { Access } from "@derslik/api-client";
 import {
   emptyWorkspace,
   dateKey,
+  isDateKey,
   parseLira,
   timeLabel,
   type WorkspaceData,
@@ -36,6 +37,8 @@ export const dateTime = (day: string, time: string) => {
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)
   )
     throw new Error(t("mt.dateTimeFormat"));
+  // 2026-02-31 would otherwise roll over to 3 March without a word.
+  if (!isDateKey(day)) throw new Error(t("mt.dateInvalid"));
   const date = new Date(`${day}T${time}:00+03:00`);
   if (Number.isNaN(date.getTime())) throw new Error(t("mt.dateInvalid"));
   return date.toISOString();

@@ -8,10 +8,12 @@ export async function GET(request: Request) {
   jar.delete("derslik-auth-next");
   const url = new URL(request.url),
     code = url.searchParams.get("code"),
+    queryNext = url.searchParams.get("next"),
+    // Parola sıfırlama ve e-posta onayı adresle, sosyal giriş çerezle gelir.
     next =
-      url.searchParams.get("next") === "/reset-password"
+      queryNext === "/reset-password"
         ? "/reset-password"
-        : safeAuthNext(savedNext);
+        : safeAuthNext(queryNext ?? savedNext);
   if (code) {
     try {
       const auth = await authClient();

@@ -321,6 +321,79 @@ export async function learningCases({
         ).status,
         409,
       );
+      // Files follow the hand-in rule too: once the due day passes with a
+      // hand-in, the student can neither finish an upload started earlier
+      // nor delete a file. The teacher still can.
+      const closing = (
+        await ok(base + "/learning", {
+          action: "assignment.create",
+          title: "Kapanacak ödev",
+          instructions: "",
+          dueOn: istanbulDay(1),
+        })
+      ).data;
+      await ok(
+        portal + "/actions",
+        {
+          action: "assignment.submit",
+          assignmentId: closing.id,
+          body: "Teslim",
+          version: 0,
+        },
+        { auth: tokenStudent },
+      );
+      const submissionFile = {
+        assignmentId: closing.id,
+        purpose: "SUBMISSION",
+        mimeType: "application/pdf",
+        sizeBytes: 128,
+      };
+      const ready = (
+        await ok(
+          media + "/files",
+          { ...submissionFile, name: "hazir.pdf" },
+          { auth: tokenStudent },
+        )
+      ).data;
+      const pending = (
+        await ok(
+          media + "/files",
+          { ...submissionFile, name: "yarim.pdf" },
+          { auth: tokenStudent },
+        )
+      ).data;
+      for (const id of [ready.id, pending.id]) {
+        const key = (
+          await admin.query(
+            "SELECT object_key FROM derslik.materials WHERE id=$1",
+            [id],
+          )
+        ).rows[0].object_key;
+        fileObjects.set(key, {
+          info: { size: 128, content_type: "application/pdf" },
+          bytes: Buffer.from("%PDF-1.7"),
+        });
+      }
+      await ok(media + `/files/${ready.id}/finish`, {}, { auth: tokenStudent });
+      await admin.query(
+        "UPDATE derslik.assignments SET due_on=due_on-2 WHERE id=$1",
+        [closing.id],
+      );
+      for (const path of [
+        `/files/${pending.id}/finish`,
+        `/files/${ready.id}/delete`,
+      ])
+        assert.equal(
+          (
+            await request(media + path, {
+              method: "POST",
+              body: {},
+              auth: tokenStudent,
+            })
+          ).status,
+          409,
+        );
+      await ok(media + `/files/${ready.id}/delete`, {});
       await ok(base + "/learning", {
         action: "assignment.update",
         assignmentId: late.id,

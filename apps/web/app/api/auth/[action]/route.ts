@@ -14,6 +14,10 @@ const credentials = z.object({
   email: z.string().email().max(200),
   password: z.string().min(10).max(128),
 });
+const signupNext = (value: string | undefined) => {
+  const next = safeAuthNext(value);
+  return next === "/" ? "" : "?next=" + encodeURIComponent(next);
+};
 export async function POST(
   request: Request,
   context: { params: Promise<{ action: string }> },
@@ -68,9 +72,18 @@ export async function POST(
         action === "signin"
           ? await auth.auth.signInWithPassword(parsed.data)
           : await auth.auth.signUp({
-              ...parsed.data,
+              email: parsed.data.email,
+              password: parsed.data.password,
               options: {
-                emailRedirectTo: process.env.APP_ORIGIN + "/api/auth/callback",
+                // Davet ya da vitrin bağlantısından kaydolan, e-postayı
+                // onayladıktan sonra aynı akışa döner. Onay bağlantısı başka
+                // bir tarayıcıda açılabileceği için çerez değil adres taşır.
+                emailRedirectTo:
+                  process.env.APP_ORIGIN +
+                  "/api/auth/callback" +
+                  signupNext(
+                    z.object({ next: z.string() }).safeParse(body).data?.next,
+                  ),
               },
             });
       if (error)

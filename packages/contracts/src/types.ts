@@ -154,6 +154,12 @@ export const dayLabel = (
 /** Önizlemesi gösterilebilen resim dosyası mı (ada göre). */
 export const isImageName = (name: string) =>
   /\.(jpe?g|png|webp|gif|avif)$/i.test(name);
+// A real calendar day in YYYY-MM-DD form: 2026-13-26 and 2026-02-31 fail
+// (the Date constructor would reject the first and roll the second over).
+export const isDateKey = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  !Number.isNaN(Date.parse(value)) &&
+  new Date(value).toISOString().startsWith(value);
 export function addDays(date: string, days: number) {
   const d = new Date(date + "T12:00:00+03:00");
   d.setUTCDate(d.getUTCDate() + days);
