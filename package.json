@@ -46,7 +46,13 @@
     "services:check": "node scripts/check-services.mjs",
     "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
     "quality:sonar": "node scripts/sonar.mjs",
-    "quality:dup": "npx -y jscpd@4"
+    "quality:dup": "npx -y jscpd@4",
+    "security:code": "bash scripts/security-scan.sh code",
+    "security:dependencies": "bash scripts/security-scan.sh dependencies",
+    "security:web": "bash scripts/security-scan.sh web",
+    "security:mobile": "bash scripts/security-scan.sh mobile",
+    "security:mobile:stop": "bash scripts/security-scan.sh mobile-stop",
+    "security:status": "bash scripts/security-scan.sh status"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
