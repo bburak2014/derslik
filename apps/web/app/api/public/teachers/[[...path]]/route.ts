@@ -1,6 +1,7 @@
 import { errorResponse, HttpError, optionalToken } from "@/lib/server/session";
 import { serverLocale } from "@/lib/server/locale";
 import { intlTags } from "@derslik/contracts";
+import { clientIp } from "@/lib/server/client-ip";
 export const dynamic = "force-dynamic";
 
 /** Öğretmen vitrini giriş yapmadan da gezilir. Oturum varsa belirteç API'ye
@@ -20,7 +21,8 @@ export async function GET(
       throw new HttpError(400, "web.invalidPath");
     if (!process.env.API_BASE_URL)
       throw new HttpError(503, "web.notConfigured");
-    const token = await optionalToken();
+    const token = await optionalToken(),
+      ip = clientIp(request.headers);
     const url =
       process.env.API_BASE_URL.replace(/\/$/, "") +
       "/v1/teachers" +
@@ -31,6 +33,9 @@ export async function GET(
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         "Accept-Language": intlTags[await serverLocale()],
+        // API vitrini IP başına sınırlar; yoksa tüm ziyaretçiler web
+        // sunucusunun tek IP'sinden geliyor görünürdü.
+        ...(ip ? { "X-Forwarded-For": ip } : {}),
       },
       signal: AbortSignal.timeout(10_000),
     });

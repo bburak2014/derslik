@@ -48,6 +48,10 @@ export class LessonsService {
       if (!pack) throw new NotFoundException("api.packageNotFound");
       if (pack.remaining < 1)
         throw new ConflictException("api.packageNoCredits");
+      // Hak ders tamamlanınca düşer; yine de 1 hakla 8 haftalık seri açmak
+      // takvimde karşılığı olmayan dersler gösterirdi.
+      if (pack.remaining < c.weeks)
+        throw new ConflictException("api.packageNotEnoughCredits");
       if (c.makeupForId) {
         if (c.weeks !== 1) throw new ConflictException("api.makeupSingle");
         const original = (

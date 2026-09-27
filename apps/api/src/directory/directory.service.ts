@@ -1,4 +1,5 @@
 import {
+  Inject,
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -10,6 +11,8 @@ import {
 import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { Actor } from "../auth/auth.guard.js";
+import { confirmedEmail } from "../auth/confirmed-email.js";
+import { CONFIG, type ApiConfig } from "../config.js";
 import { DatabaseService } from "../db/database.service.js";
 import { toDto } from "../common/command.service.js";
 import { apiText } from "../common/i18n.js";
@@ -102,7 +105,10 @@ function imageMatches(bytes: Buffer, mime: string) {
 
 @Injectable()
 export class DirectoryService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    @Inject(CONFIG) private readonly config: ApiConfig,
+  ) {}
 
   // --- Herkese açık vitrin ---------------------------------------------
 
@@ -281,9 +287,18 @@ export class DirectoryService {
     });
   }
 
-  sendRequest(actor: Actor, id: string, input: unknown) {
+  async sendRequest(
+    actor: Actor,
+    authorization: string | undefined,
+    id: string,
+    input: unknown,
+  ) {
     const ws = uuid.parse(id);
     const c = lessonRequestSchema.parse(input);
+    // Öğretmene gösterilen adres Auth'tan, yalnızca onaylıysa alınır; JWT'deki
+    // email alanı onaylanmamış olabilir. Onaysızsa istek telefonla gider.
+    const email =
+      (await confirmedEmail(this.config, authorization, actor.id)) ?? "";
     return this.db.transaction(actor, null, async (tx) => {
       await tx.query(
         "INSERT INTO derslik.users(id) VALUES($1) ON CONFLICT (id) DO NOTHING",
@@ -331,7 +346,7 @@ export class DirectoryService {
             c.subject,
             c.level,
             c.phone,
-            actor.email ?? "",
+            email,
             c.message,
           ],
         )

@@ -1409,12 +1409,15 @@ export function MyRequests({
   onOpenLessons,
   onBrowse,
   focusId,
+  focusAt,
 }: {
   onOpenTeacher: (id: string) => void;
   onOpenLessons?: (workspaceId: string) => void;
   onBrowse: () => void;
   /** Bildirimden gelindiyse vurgulanan istek. */
   focusId?: string | null;
+  /** Bildirime her dokunuşta değişir; liste açıksa yeniden çekilir. */
+  focusAt?: number;
 }) {
   const [items, setItems] = useState<MyLessonRequest[] | null>(null),
     [error, setError] = useState(""),
@@ -1427,10 +1430,12 @@ export function MyRequests({
       setError((e as Error).message);
     }
   }, []);
+  // İsteklerim zaten açıkken gelen yanıt bildirimi (kabul/ret): kart eski
+  // durumda kalmasın diye her dokunuşta liste yeniden çekilir.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleyici durumu yalnızca istek bitince yazar.
     void reload();
-  }, [reload]);
+  }, [reload, focusAt]);
   useEffect(() => {
     if (!focusId || !items) return;
     document

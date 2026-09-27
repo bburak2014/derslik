@@ -2,7 +2,25 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 // Öğretmen vitrini: yayın, filtre, fotoğraf, ders isteği, kabul/red, yorum.
-export async function directoryCases({ t, admin, request, ok, token }) {
+export async function directoryCases({
+  t,
+  admin,
+  request,
+  ok,
+  token: signed,
+  verifiedUsers,
+}) {
+  // Ders isteği e-postayı Auth'tan alır; yalnızca onaylı adres saklanır.
+  // `confirmed: false` JWT'de e-posta taşıyan ama onaylanmamış hesaptır.
+  async function token(sub, claims = {}, confirmed = true) {
+    const value = await signed(sub, claims);
+    verifiedUsers.set(`Bearer ${value}`, {
+      id: sub,
+      email: claims.email ?? `${sub}@example.test`,
+      ...(confirmed ? { email_confirmed_at: new Date().toISOString() } : {}),
+    });
+    return value;
+  }
   const teacher = randomUUID(),
     other = randomUUID(),
     student = randomUUID(),
@@ -12,7 +30,11 @@ export async function directoryCases({ t, admin, request, ok, token }) {
   const tokenTeacher = await token(teacher, { email: "teacher@example.test" }),
     tokenOther = await token(other),
     tokenStudent = await token(student, { email: "ayse@example.test" }),
-    tokenDeclined = await token(declined),
+    tokenDeclined = await token(
+      declined,
+      { email: "ceo@bigbank.example" },
+      false,
+    ),
     tokenCanceller = await token(canceller),
     tokenWaiter = await token(waiter);
   let ws, requestId;
@@ -407,6 +429,8 @@ export async function directoryCases({ t, admin, request, ok, token }) {
           auth: tokenDeclined,
         },
       );
+      // JWT'deki onaylanmamış adres öğretmene gösterilmez.
+      assert.equal(sent.data.email, "");
       const longNote = await request(
         `/v1/workspaces/${ws}/requests/${sent.data.id}/decline`,
         { method: "POST", body: { note: "x".repeat(301) }, auth: tokenTeacher },

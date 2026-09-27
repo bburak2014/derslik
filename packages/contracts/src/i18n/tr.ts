@@ -1,6 +1,18 @@
 // Bu dosya çeviri tablosundan üretilir; metni burada düzenleyin.
 export const tr = {
   api: {
+    fileStorageFull:
+      "Dosya depolama sınırı dolu. Eski dosyaları silerek yer açın.",
+    tooManyPendingUploads:
+      "Tamamlanmamış yüklemeniz çok fazla. Önce onları bitirin ya da silin.",
+    uploadExpired:
+      "Bu yüklemenin süresi doldu. Kaydı silip dosyayı yeniden yükleyin.",
+    inviteRateLimit:
+      "Kısa sürede çok fazla davet gönderildi. Lütfen daha sonra yeniden deneyin.",
+    packageNotEnoughCredits:
+      "Pakette bu kadar hafta için yeterli ders hakkı yok. Hafta sayısını azaltın ya da hak ekleyin.",
+    tooManyRequests:
+      "Çok fazla istek gönderildi. Lütfen biraz sonra yeniden deneyin.",
     cityRequired: "Yüz yüze ders için şehir yazın.",
     photoNotFound: "Fotoğraf bulunamadı.",
     photoTooLarge: "Fotoğraf en fazla 300 KB olabilir.",
@@ -1109,6 +1121,10 @@ export const tr = {
     unsupported: "Bu tarayıcı video oynatmayı desteklemiyor.",
   },
   web: {
+    tooManyAttempts:
+      "Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra yeniden deneyin.",
+    passwordRecoveryRequired:
+      "Şifrenizi değiştirmek için e-postanıza gelen sıfırlama bağlantısını kullanın.",
     actionNotFound: "İşlem bulunamadı.",
     appRequestRequired: "Geçerli uygulama isteği gerekli.",
     backHome: "Ana sayfaya dön",

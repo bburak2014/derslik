@@ -3,66 +3,8 @@ import { fileURLToPath } from "node:url";
 
 const development = process.env.NODE_ENV !== "production";
 
-// The browser only ever talks to this origin and to Supabase Auth; uploads and
-// video playback go straight to Supabase Storage and Cloudflare Stream. Nothing
-// else needs to be reachable from a Derslik page.
-function connectSources() {
-  const sources = new Set(["'self'"]);
-  for (const value of [process.env.SUPABASE_URL, process.env.API_BASE_URL]) {
-    try {
-      if (value) sources.add(new URL(value).origin);
-    } catch {
-      /* A malformed value simply contributes no source. */
-    }
-  }
-  sources.add("https://*.supabase.co");
-  sources.add("https://videodelivery.net");
-  sources.add("https://*.cloudflarestream.com");
-  // Next.js dev HMR opens a WebSocket; connect-src 'self' does not cover the ws:
-  // scheme, so both spellings of the dev host are listed explicitly.
-  if (development) {
-    sources.add("ws://localhost:*");
-    sources.add("ws://127.0.0.1:*");
-  }
-  return [...sources].join(" ");
-}
-
-// PDF önizlemesi imzalı Supabase Storage bağlantısını bir iframe'e koyar.
-// frame-src yazılmazsa default-src 'self' geçerli olur ve önizleme sessizce
-// engellenir. Kaynak dar tutuluyor: yalnızca Supabase, https: geneli değil.
-function frameSources() {
-  const sources = new Set(["'self'"]);
-  try {
-    if (process.env.SUPABASE_URL)
-      sources.add(new URL(process.env.SUPABASE_URL).origin);
-  } catch {
-    /* A malformed value simply contributes no source. */
-  }
-  sources.add("https://*.supabase.co");
-  return [...sources].join(" ");
-}
-
-const policy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-  // Next.js injects inline bootstrap scripts and styles.
-  `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "media-src 'self' blob: https://videodelivery.net https://*.cloudflarestream.com",
-  "font-src 'self' data:",
-  `connect-src ${connectSources()}`,
-  `frame-src ${frameSources()}`,
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  ...(development ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
-
+// Content-Security-Policy her istekte nonce ile proxy.ts'de kurulur.
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: policy },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

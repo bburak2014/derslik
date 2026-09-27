@@ -13,6 +13,7 @@
     "android": {
       "package": "com.derslik.app",
       "permissions": [],
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#141c4d"

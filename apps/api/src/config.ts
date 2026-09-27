@@ -38,6 +38,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       // Davet e-postası. İkisi de tanımlı değilse gönderim atlanır.
       RESEND_API_KEY: z.string().optional(),
       MAIL_FROM: z.string().optional(),
+      // Hız sınırı (dakikada istek). 0 kapatır. Oturumlu istekler hesap
+      // başına, herkese açık vitrin istekleri IP başına sayılır.
+      RATE_LIMIT_USER_PER_MINUTE: z.coerce.number().int().min(0).default(600),
+      RATE_LIMIT_PUBLIC_PER_MINUTE: z.coerce.number().int().min(0).default(120),
+      // İstemci IP'si X-Forwarded-For'dan yalnızca bu adreslerden gelen
+      // isteklerde okunur (Express "trust proxy"). Varsayılan: aynı makine ve
+      // özel ağ (web sunucusu, Docker ağı, yük dengeleyici).
+      TRUST_PROXY: z.string().default("loopback, linklocal, uniquelocal"),
     })
     .parse(
       Object.fromEntries(

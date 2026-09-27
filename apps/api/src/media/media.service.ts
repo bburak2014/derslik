@@ -69,6 +69,40 @@ const videoSchema = z
 // the assignment must be open, and once it has a hand-in the files are frozen
 // after the due day. Reserve, finish and delete all go through this gate, so
 // an upload started earlier cannot complete after the assignment closed.
+// Bekleyen yükleme bu süreden sonra kotaya sayılmaz ve tamamlanamaz
+// (0010 migration'ındaki reserve_material_quota ile aynı değer).
+const PENDING_UPLOAD_HOURS = 3;
+
+async function reserveQuota(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  bytes: number,
+) {
+  try {
+    await tx.query("SELECT derslik.reserve_material_quota($1,$2,$3)", [
+      ws,
+      student,
+      bytes,
+    ]);
+  } catch (error) {
+    const message = (error as Error).message ?? "";
+    if ((error as { code?: string }).code === "23514") {
+      if (message.includes("Too many pending uploads"))
+        throw new ConflictException("api.tooManyPendingUploads");
+      if (message.includes("File storage quota exceeded"))
+        throw new ConflictException("api.fileStorageFull");
+    }
+    throw error;
+  }
+}
+
+function assignmentLock(tx: PoolClient, ws: string, assignmentId: string) {
+  return tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+    ws + ":" + assignmentId,
+  ]);
+}
+
 async function assignmentGate(
   tx: PoolClient,
   ws: string,
@@ -76,9 +110,7 @@ async function assignmentGate(
   assignmentId: string,
   owner: boolean,
 ) {
-  await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
-    ws + ":" + assignmentId,
-  ]);
+  await assignmentLock(tx, ws, assignmentId);
   const assignment = (
     await tx.query(
       `SELECT a.id,a.status,a.due_on IS NOT NULL AND a.due_on<${ISTANBUL_TODAY} AND EXISTS(
@@ -135,18 +167,9 @@ export class MediaService {
           throw new ForbiddenException("api.studentSubmissionOnly");
         if (owner) await lockStudent(tx, ws, student, true);
         if (c.assignmentId)
-          await tx.query(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-            [ws + ":" + c.assignmentId],
-          );
-        if (c.assignmentId)
           await assignmentGate(tx, ws, student, c.assignmentId, owner);
         await tx.query("SELECT derslik.expire_subscription($1)", [ws]);
-        await tx.query("SELECT derslik.reserve_material_quota($1,$2,$3)", [
-          ws,
-          student,
-          c.sizeBytes,
-        ]);
+        await reserveQuota(tx, ws, student, c.sizeBytes);
         const id = randomUUID(),
           objectKey = `${ws}/${student}/${id}`;
         await tx.query(
@@ -245,11 +268,21 @@ export class MediaService {
           );
         const data = (
           await tx.query(
-            "UPDATE derslik.materials SET status='READY' WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='PENDING' AND NOT delete_requested RETURNING id,status",
-            [ws, student, id],
+            "UPDATE derslik.materials SET status='READY' WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='PENDING' AND NOT delete_requested AND created_at>now()-make_interval(hours => $4) RETURNING id,status",
+            [ws, student, id, PENDING_UPLOAD_HOURS],
           )
         ).rows[0];
-        if (!data) throw new ConflictException("api.fileStateChanged");
+        if (!data) {
+          const stale = (
+            await tx.query(
+              "SELECT 1 FROM derslik.materials WHERE workspace_id=$1 AND id=$2 AND status='PENDING' AND created_at<=now()-make_interval(hours => $3)",
+              [ws, id, PENDING_UPLOAD_HOURS],
+            )
+          ).rowCount;
+          throw new ConflictException(
+            stale ? "api.uploadExpired" : "api.fileStateChanged",
+          );
+        }
         return { data };
       },
       true,
@@ -281,10 +314,22 @@ export class MediaService {
       student,
       "assignments",
       async (tx) => {
+        // Kilit sırası finishFile ile aynı: önce ödevin danışma kilidi, sonra
+        // dosya satırı. Ters sıra, öğrenci yüklemeyi tamamlarken öğretmen aynı
+        // dosyayı silerse deadlock'a (503) yol açıyordu.
+        const peek = (
+          await tx.query(
+            "SELECT assignment_id FROM derslik.materials WHERE workspace_id=$1 AND student_id=$2 AND id=$3",
+            [ws, student, uuid.parse(id)],
+          )
+        ).rows[0];
+        if (!peek) throw new NotFoundException("api.fileNotFound");
+        if (peek.assignment_id)
+          await assignmentLock(tx, ws, peek.assignment_id);
         const row = (
           await tx.query(
             "SELECT *,derslik.is_owner($1) AS owner FROM derslik.materials WHERE workspace_id=$1 AND student_id=$2 AND id=$3 FOR UPDATE",
-            [ws, student, uuid.parse(id)],
+            [ws, student, id],
           )
         ).rows[0];
         if (!row) throw new NotFoundException("api.fileNotFound");
