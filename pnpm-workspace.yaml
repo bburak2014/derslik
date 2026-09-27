@@ -5,9 +5,12 @@ packages:
 minimumReleaseAge: 10080
 minimumReleaseAgeIgnoreMissingTime: false
 trustLockfile: false
+# Alt bağımlılıklar yalnızca kayıt defterinden gelir, git veya URL'den değil.
+blockExoticSubdeps: true
 strictDepBuilds: true
 allowBuilds:
   '@embedded-postgres/darwin-arm64': true
+  '@embedded-postgres/linux-arm64': true
   '@embedded-postgres/linux-x64': true
   esbuild: true
   fsevents: true
@@ -30,3 +33,10 @@ overrides:
   brace-expansion@>=5.0.0 <5.0.9: ^5.0.9
   multer@<2.3.0: ^2.3.0
   browserslist@<4.28.7: ^4.28.9
+  undici@>=7.0.0 <7.29.1: 7.29.1
+  react-server-dom-webpack@>=19.2.0 <19.2.8: 19.2.8
+  image-size@>=2.0.0 <2.0.4: ^2.0.4
+  brace-expansion@<1.1.18: ^1.1.18
+  fflate@>=0.7.0 <0.7.5: 0.7.5
+  '@babel/core@>=7.0.0 <7.29.6': ^7.29.6
+  baseline-browser-mapping@<2.11.0: ^2.11.21

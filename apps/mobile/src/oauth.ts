@@ -30,6 +30,11 @@ export function authRoute(value: string): AuthRoute | null {
   } catch {
     return null;
   }
+  // Only this client's own address counts: `derslik://` in a build, and the
+  // same Expo Go server (`exp://<host>:8081`) during development.
+  const own = Linking.parse(Linking.createURL(""));
+  if (!link.scheme || link.scheme !== own.scheme) return null;
+  if (own.hostname && link.hostname !== own.hostname) return null;
   const segments = [link.hostname || "", link.path || ""]
     .join("/")
     .split("/")

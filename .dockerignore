@@ -1,0 +1,22 @@
+# API ve web imajları `COPY . .` ile deponun kökünden derlenir. Yerel sırlar,
+# bağımlılıklar ve derleme çıktıları imaja (ara katmanlar dahil) girmemeli;
+# bağımlılıklar imajın içinde kilit dosyasından yeniden kurulur.
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+.git
+reports
+**/.next
+**/.expo
+**/dist
+.api-build
+.sites-runtime
+.vinext
+.wrangler
+*.tsbuildinfo
+.claude
+.qodo
+opencode.json
+apps/mobile/android
+apps/mobile/ios
