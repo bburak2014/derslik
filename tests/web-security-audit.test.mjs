@@ -17,6 +17,24 @@ test(
         checks.push({ name, result: "passed" });
       });
     try {
+      await check(
+        "public pages render on the server for anonymous visitors",
+        async () => {
+          const teacher = "00000000-0000-4000-8000-000000000000";
+          for (const path of [
+            "/",
+            "/reset-password",
+            "/teachers",
+            `/teachers/${teacher}`,
+            `/teachers/${teacher}?request=1`,
+            "/invite/" + "a".repeat(64),
+          ]) {
+            const response = await client.call(path);
+            assert.equal(response.status, 200, path);
+            await response.arrayBuffer();
+          }
+        },
+      );
       await check("anonymous protected routes reject access", async () => {
         for (const path of [
           "/api/session",

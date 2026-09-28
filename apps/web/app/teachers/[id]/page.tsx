@@ -8,10 +8,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ request?: string | string[] }>;
 }) {
   const { id } = await params;
+  const { request } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id))
     return (
       <main className="connection-state">
@@ -20,6 +23,10 @@ export default async function Page({
       </main>
     );
   return (
-    <PublicDirectory teacherId={id} hasSession={await hasSessionCookie()} />
+    <PublicDirectory
+      teacherId={id}
+      hasSession={await hasSessionCookie()}
+      openRequest={request === "1"}
+    />
   );
 }

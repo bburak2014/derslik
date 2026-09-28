@@ -267,7 +267,7 @@ export function TeacherCard({
           size={64}
         />
         <div className="grid min-w-0 gap-1">
-          <h3 className="font-display truncate text-lg leading-tight font-bold">
+          <h2 className="font-display truncate text-lg leading-tight font-bold">
             {href ? (
               <a href={href} className="card-link">
                 {teacher.displayName}
@@ -277,7 +277,7 @@ export function TeacherCard({
                 {teacher.displayName}
               </button>
             )}
-          </h3>
+          </h2>
           {teacher.headline && (
             <p className="text-muted-foreground line-clamp-2 text-sm">
               {teacher.headline}
@@ -539,10 +539,12 @@ export function TeacherDirectory({
             </SelectContent>
           </Select>
         </div>
+        {/* Tek satır, gerekirse yana kayar: seçici metinleri sayfa açıldıktan
+            sonra dolunca satır ikiye bölünüp kartları aşağı itmesin (CLS). */}
         <div
           role="group"
           aria-label={t("dir.filters")}
-          className="bg-muted/40 flex items-center gap-2 overflow-x-auto border-t px-4 py-3 sm:flex-wrap sm:px-5"
+          className="bg-muted/40 flex items-center gap-2 overflow-x-auto border-t px-4 py-3 sm:px-5"
         >
           {pill(
             <BookOpen />,
@@ -575,14 +577,15 @@ export function TeacherDirectory({
                 city: v === "ONLINE" ? undefined : filters.city,
               }),
           )}
+          {/* Şehir süzgeci sonuç gelmeden de yer tutar; liste gelince
+              süzgeç satırı alta taşıp kartları kaydırmasın (CLS). */}
           {filters.mode !== "ONLINE" &&
-            !!page?.cities.length &&
             pill(
               <MapPin />,
               t("dir.city"),
               filters.city,
               t("dir.anyCity"),
-              page.cities.map((c) => ({ value: c, label: c })),
+              (page?.cities ?? []).map((c) => ({ value: c, label: c })),
               (v) => set({ city: v }),
             )}
           {pill(
