@@ -3,6 +3,7 @@ import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras, type NoticeFocus } from "./learning-panel";
 import { t, upper, type MessageKey } from "@derslik/contracts";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { workspaceResponse } from "@/lib/workspace-prefetch";
 import {
   BookOpen,
   CalendarDays,
@@ -206,7 +207,7 @@ export default function Workspace({
     retryKeys = useRef(new Map<string, string>());
   const reload = useCallback(async () => {
     try {
-      const r = await fetch("/api/workspace", { cache: "no-store" });
+      const r = await workspaceResponse();
       const json = (await r.json()) as WorkspaceData & { error?: string };
       if (!r.ok) throw new Error(json.error || t("ws.loadFailed"));
       setData(json);
