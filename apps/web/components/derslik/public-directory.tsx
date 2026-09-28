@@ -13,8 +13,12 @@ import { TeacherDirectory, TeacherProfileView } from "./directory";
 export function PublicDirectory({
   teacherId,
   hasSession = true,
+  openRequest = false,
 }: {
   teacherId?: string;
+  /** ?request=1: profil istek penceresi açık gelir. Sunucu okur; sayfa
+   *  sunucuda çizilirken `location` yoktur. */
+  openRequest?: boolean;
   /** Sunucu oturum çerezi görmediyse ziyaretçi anonimdir; /api/session
    *  sorulmaz (konsolda boşuna 401 kalmaz, profil hemen çizilir). */
   hasSession?: boolean;
@@ -35,11 +39,14 @@ export function PublicDirectory({
   return (
     <div className="public-shell">
       <header className="public-header">
-        <a href="/teachers" className="brand" aria-label={t("dir.back")}>
-          <BookOpen />
+        {/* Görünen ad erişilebilir adın başında kalır (ekran okuyucu ve
+            sesli komut kullanıcısı "derslik" diyerek bulabilsin). */}
+        <a href="/teachers" className="brand">
+          <BookOpen aria-hidden="true" />
           <span>
             derslik<span className="brand-dot">.</span>
           </span>
+          <span className="sr-only"> · {t("dir.back")}</span>
         </a>
         <div className="flex items-center gap-3">
           <LanguageSelect className="hidden w-40 sm:flex" />
@@ -77,9 +84,7 @@ export function PublicDirectory({
               }
               // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
               onEditProfile={() => location.assign("/?view=showcase")}
-              openRequest={
-                new URLSearchParams(location.search).get("request") === "1"
-              }
+              openRequest={openRequest}
             />
           )
         ) : (
