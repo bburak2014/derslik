@@ -1,5 +1,10 @@
 "use client";
-import { setLocale, type Locale } from "@derslik/contracts";
+import {
+  registerCatalog,
+  setLocale,
+  type Locale,
+  type Messages,
+} from "@derslik/contracts";
 
 /**
  * Sunucunun seçtiği dili (çerez ya da tarayıcı dili) istemcide etkin dil
@@ -9,11 +14,15 @@ import { setLocale, type Locale } from "@derslik/contracts";
  */
 export function I18nProvider({
   locale,
+  messages,
   children,
 }: {
   locale: Locale;
+  /** Türkçe dışındaki dilde sayfanın kataloğu (sunucudan gelir). */
+  messages?: Messages;
   children: React.ReactNode;
 }) {
+  if (messages) registerCatalog(locale, messages);
   setLocale(locale);
   return children;
 }

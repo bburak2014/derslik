@@ -4,7 +4,7 @@ import type { Access } from "@derslik/api-client";
 import { noticeAccess, t, upper, type NoticeTarget } from "@derslik/contracts";
 import type { NoticeFocus } from "@/components/derslik/learning-panel";
 import { ApiError } from "@derslik/api-client";
-import Workspace from "@/components/derslik/workspace";
+import dynamic from "next/dynamic";
 import { AuthForm } from "./auth-form";
 import { backend, formText, webRequest } from "@/lib/client";
 import {
@@ -12,7 +12,6 @@ import {
   rememberedStudentMode,
   rememberMode,
 } from "@/lib/student-mode";
-import { Portal } from "@/components/derslik/portal";
 import { PageLoader, Spinner } from "@/components/derslik/loading";
 import { FormError } from "@/components/derslik/feedback";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// Çalışma alanı ve portal ayrı paketlerde: giriş sayfası (ve her ilk
+// açılış) yalnızca giriş formunun kodunu indirir.
+const chunkLoader = () => (
+  <main className="connection-state">
+    <PageLoader />
+  </main>
+);
+const Workspace = dynamic(() => import("@/components/derslik/workspace"), {
+  loading: chunkLoader,
+});
+const Portal = dynamic(
+  () => import("@/components/derslik/portal").then((m) => m.Portal),
+  { loading: chunkLoader },
+);
+
 /** Öğretmene bağlı olmayan hesap "öğretmen arıyorum" dediyse bu tarayıcıda
  *  hatırlanır; vitrin bağlantısıyla (?teacher=) gelen de öğrenci olarak açılır. */
 function initialStudentMode() {

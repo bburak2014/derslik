@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Hls from "hls.js";
+import type Hls from "hls.js";
 import type { Video, VideoPlayback } from "@derslik/api-client";
 import { backend } from "@/lib/client";
 import { t } from "@derslik/contracts";
@@ -53,8 +53,15 @@ export function VideoPlayer({
           if (playing.current) void el.play().catch(() => {});
         };
         el.addEventListener("loadedmetadata", restore, { once: true });
-        if (el.canPlayType("application/vnd.apple.mpegurl")) el.src = data.url;
-        else if (Hls.isSupported()) {
+        // hls.js (~180 KB gzip) yalnızca Safari dışı tarayıcıda, video
+        // açıldığında yüklenir; giriş ve diğer sayfaların paketine girmez.
+        const HlsClass = el.canPlayType("application/vnd.apple.mpegurl")
+          ? null
+          : (await import("hls.js")).default;
+        if (stopped) return;
+        if (!HlsClass) el.src = data.url;
+        else if (HlsClass.isSupported()) {
+          const Hls = HlsClass;
           hls = new Hls();
           hls.loadSource(data.url);
           hls.attachMedia(el);

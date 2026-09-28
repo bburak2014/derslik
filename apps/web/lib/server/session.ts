@@ -1,3 +1,5 @@
+// Sunucu her dilde metin üretir; tarayıcı paketine girmez.
+import "@derslik/contracts/i18n/all";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { DerslikClient, ApiError, type Access } from "@derslik/api-client";
