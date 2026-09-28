@@ -100,6 +100,12 @@ export class AccessService {
       { action: "invitation.create", studentId: student, ...c },
       async (tx) => {
         studentName = (await lockStudent(tx, ws, student, true)).name;
+        // Öğrenci kilidi yalnızca aynı öğrenciyi sıraya sokar; farklı
+        // öğrencilere aynı anda gelen davetler sayımı birlikte geçmesin diye
+        // sayım çalışma alanı kilidi altında yapılır.
+        await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+          `invitations:${ws}`,
+        ]);
         // Davet e-postası öğretmenin yazdığı adla bizim alan adımızdan gider;
         // sınırsız olursa spam aracına döner.
         const sent = (
