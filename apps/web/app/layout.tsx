@@ -8,16 +8,21 @@ import { serverLocale } from "@/lib/server/locale";
 import "./globals.css";
 
 // Self-hosted by next/font, so the Content-Security-Policy stays at
-// `font-src 'self'` with no external font origin.
+// `font-src 'self'` with no external font origin. Not preloaded: on a slow
+// mobile link the four font files (~120 KB) competed with the app's scripts
+// and delayed the first real paint by ~0.6 s. Text shows in the size-matched
+// fallback first (display: swap) and switches when the font arrives.
 const onest = Onest({
   subsets: ["latin", "latin-ext"], // latin-ext carries ğ İ ı ş
   display: "swap",
+  preload: false,
   variable: "--font-derslik",
 });
 // Başlıklar için karakterli yüz; gövde metni Onest'te kalır.
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin", "latin-ext"],
   display: "swap",
+  preload: false,
   variable: "--font-derslik-display",
 });
 const fonts = `${onest.variable} ${bricolage.variable}`;
