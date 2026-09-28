@@ -25,6 +25,17 @@ test(
           "/api/backend/workspaces/00000000-0000-0000-0000-000000000000/snapshot",
         ])
           assert.equal((await client.call(path)).status, 401, path);
+        // JSON responses run nothing: the strictest policy, no fallbacks.
+        const apiCsp = (await client.call("/api/session")).headers.get(
+          "content-security-policy",
+        );
+        for (const directive of [
+          "default-src 'none'",
+          "base-uri 'none'",
+          "form-action 'none'",
+          "frame-ancestors 'none'",
+        ])
+          assert.ok(apiCsp?.includes(directive), directive);
       });
       await check(
         "cross-origin, sibling origin, fetch metadata, content type and missing custom header are rejected",
@@ -187,6 +198,7 @@ test(
             const csp = response.headers.get("content-security-policy");
             assert.match(csp, /frame-ancestors 'none'/);
             assert.doesNotMatch(csp, /script-src[^;]*unsafe-(inline|eval)/);
+            assert.doesNotMatch(csp, /img-src[^;]*\shttps:(\s|;|$)/);
             assert.equal(response.headers.get("x-frame-options"), "DENY");
             assert.equal(
               response.headers.get("x-content-type-options"),
