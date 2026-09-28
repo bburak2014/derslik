@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Onest } from "next/font/google";
 import { cookies } from "next/headers";
 import { translate } from "@derslik/contracts";
+import { allCatalogs } from "@derslik/contracts/i18n/all";
 import { I18nProvider } from "@/components/i18n/provider";
 import { serverLocale } from "@/lib/server/locale";
 import "./globals.css";
@@ -43,7 +44,14 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={theme ? `${fonts} ${theme}` : fonts}>
       <body className="antialiased">
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        <I18nProvider
+          locale={locale}
+          // Türkçe tarayıcı paketinde zaten var; diğer dillerde yalnızca
+          // sayfanın dili gönderilir.
+          messages={locale === "tr" ? undefined : allCatalogs[locale]}
+        >
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

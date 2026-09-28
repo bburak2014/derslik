@@ -20,7 +20,6 @@ export async function learningCases({
   student,
   pack,
   lesson,
-  actorA,
   actorB,
   actorStudent,
   tokenA,

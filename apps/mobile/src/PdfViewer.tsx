@@ -18,6 +18,11 @@ import { t } from "@derslik/contracts";
 // also refuses to navigate anywhere, so a hostile file cannot leave the page.
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 
+/** Satır içi <script> için JSON: "</script>" gibi bir dizi betiği erken
+ *  kapatamasın diye "<" kaçırılır. */
+const scriptJson = (value: string) =>
+  JSON.stringify(value).replace(/</g, "\\u003c");
+
 function buildHtml(url: string, background: string, muted: string) {
   return `<!doctype html>
 <html><head><meta charset="utf-8">
@@ -39,9 +44,9 @@ function buildHtml(url: string, background: string, muted: string) {
       window.ReactNativeWebView.postMessage("error:" + reason);
   }
   if (!window.pdfjsLib) return fail("library");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = ${JSON.stringify(PDFJS + "/pdf.worker.min.js")};
+  pdfjsLib.GlobalWorkerOptions.workerSrc = ${scriptJson(PDFJS + "/pdf.worker.min.js")};
   pdfjsLib
-    .getDocument({ url: ${JSON.stringify(url)}, isEvalSupported: false })
+    .getDocument({ url: ${scriptJson(url)}, isEvalSupported: false })
     .promise.then(function (pdf) {
       var holder = document.getElementById("pages");
       var ratio = window.devicePixelRatio || 1;

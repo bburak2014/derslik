@@ -38,9 +38,12 @@ export function MediaPlayer({
     [at, setAt] = useState<number | null>(null),
     [busy, setBusy] = useState(false);
   const current = useRef(initialTime),
-    actionRef = useRef(action);
+    actionRef = useRef(action),
+    // Süre işleme bitince değişebilir; oynatıcıyı yeniden kurmadan okunur.
+    duration = useRef(video.duration_seconds);
   useEffect(() => {
     actionRef.current = action;
+    duration.current = video.duration_seconds;
   });
   useEffect(() => {
     let stopped = false,
@@ -83,7 +86,7 @@ export function MediaPlayer({
             videoId: video.id,
             seconds: Math.min(
               Math.floor(current.current),
-              video.duration_seconds || 0,
+              duration.current || 0,
             ),
           })
           .catch(() => {});

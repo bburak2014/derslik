@@ -28,17 +28,29 @@ const rawSecureStorage = {
       generation = Crypto.randomUUID(),
       parts = value.match(/[\s\S]{1,500}/g) || [""];
     if (parts.length > 128) throw new Error("Oturum boyutu sınırı aşıldı.");
-    for (let i = 0; i < parts.length; i++)
+    let written = 0;
+    try {
+      for (; written < parts.length; written++)
+        await SecureStore.setItemAsync(
+          `${key}.${generation}.${written}`,
+          parts[written],
+          options,
+        );
       await SecureStore.setItemAsync(
-        `${key}.${generation}.${i}`,
-        parts[i],
+        key,
+        JSON.stringify({ generation, count: parts.length }),
         options,
       );
-    await SecureStore.setItemAsync(
-      key,
-      JSON.stringify({ generation, count: parts.length }),
-      options,
-    );
+    } catch (error) {
+      // Yarım kalan yeni parçalar silinir; eski oturum yerinde kalır ve
+      // çıkıştan sonra Keychain'de sahipsiz belirteç parçası bırakılmaz.
+      for (let i = 0; i < written; i++)
+        await SecureStore.deleteItemAsync(
+          `${key}.${generation}.${i}`,
+          options,
+        ).catch(() => undefined);
+      throw error;
+    }
     if (old) {
       const m = JSON.parse(old);
       for (let i = 0; i < m.count; i++)

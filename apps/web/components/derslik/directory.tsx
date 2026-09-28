@@ -626,11 +626,11 @@ export function TeacherDirectory({
         </p>
       )}
       {sent && <FormSuccess>{sent}</FormSuccess>}
-      {page && (
-        <p className="text-muted-foreground -mb-2 text-sm" aria-live="polite">
-          {t("dir.resultCount", { count: page.total })}
-        </p>
-      )}
+      {/* Satır ilk yüklemede de yer kaplar; sayı gelince kartlar aşağı
+          kaymasın (CLS). */}
+      <p className="text-muted-foreground -mb-2 text-sm" aria-live="polite">
+        {page ? t("dir.resultCount", { count: page.total }) : " "}
+      </p>
       {/* Arama ve filtre değişince eski sonuçlar yenileri gelene kadar yerinde
           kalır; iskelet yalnızca ilk yüklemede çizilir (kartlar gidip
           gelmesin). */}

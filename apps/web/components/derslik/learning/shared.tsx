@@ -470,14 +470,16 @@ export function LessonItem({
             <ToneBadge
               tone={
                 l.status === "SCHEDULED"
-                  ? "info"
+                  ? "warn"
                   : l.status === "COMPLETED"
                     ? "ok"
                     : "muted"
               }
             >
+              {/* Geçmişte kalıp hâlâ planlı görünen ders, öğretmenin
+                  tamamlandı ya da iptal demesini bekliyor. */}
               {l.status === "SCHEDULED"
-                ? t("lesson.scheduled")
+                ? t("lesson.awaitingConfirmation")
                 : l.status === "COMPLETED"
                   ? t("lesson.completed")
                   : t("lesson.cancelled")}

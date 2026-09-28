@@ -713,7 +713,7 @@ export function LearningScreen({
                       <Text style={[styles.h2, { flex: 1 }]} numberOfLines={2}>
                         {l.topic}
                       </Text>
-                      <LessonStatus status={l.status} />
+                      <LessonStatus status={l.status} endsAt={l.ends_at} />
                     </View>
                     <View style={[styles.row, { gap: 5 }]}>
                       <Ionicons
@@ -1799,6 +1799,7 @@ export function LearningScreen({
               <Image
                 source={{ uri: preview.url }}
                 resizeMode="contain"
+                alt={preview.name}
                 accessibilityLabel={preview.name}
                 style={{ flex: 1, width: "100%" }}
               />

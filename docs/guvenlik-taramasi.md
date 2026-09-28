@@ -30,7 +30,28 @@ bash scripts/security-scan.sh web https://test-ortami.example.com
 
 Hedef adresi yalnızca test yetkiniz olan ortamlarda kullanın. Varsayılan tarama giriş ekranından öteye geçemez. Yetkili öğretmen, öğrenci ve veli akışları için ayrı test hesapları ve oturum bağlamı gerekir. Canlı veriye karşı aktif saldırı taraması bu komuta eklenmemiştir.
 
+### Oturumlu uçtan uca test ve aktif tarama
+
+Gerçek hesaplara dokunmadan, geçici bir veritabanı ve test kimlikleriyle
+çalışır. Her komutu ayrı terminalde, sırayla açın:
+
+```sh
+pnpm security:fixture        # izole API, 127.0.0.1:3101 (20 dk açık kalır)
+pnpm security:seeds          # ZAP için örnek istekler
+pnpm web:build && pnpm security:web-fixture   # üretim web'i, 127.0.0.1:3100
+pnpm security:e2e            # dört rolün web → API → veritabanı testleri
+pnpm security:zap:api        # ZAP aktif tarama, API
+pnpm security:zap:web        # ZAP aktif tarama, web
+```
+
+ZAP adımları API açıldıktan sonraki 10 dakika içinde başlatılmalıdır;
+test kimliklerinin süresi 25 dakikadır. Sunucular yalnızca bu bilgisayardan
+erişilebilir; Docker Desktop onlara `host.docker.internal` üzerinden ulaşır.
+
 ## Mobil
+
+`pnpm mobile:security-test` OAuth yönlendirmesi, oturum saklama, PDF ve
+Turnstile görünümlerini gerçek kaynak koduyla sınar; CI'da da çalışır.
 
 ```sh
 pnpm security:mobile

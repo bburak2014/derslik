@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Hls from "hls.js";
+import type Hls from "hls.js";
 import type { Video, VideoPlayback } from "@derslik/api-client";
 import { backend } from "@/lib/client";
 import { t } from "@derslik/contracts";
@@ -28,9 +28,12 @@ export function VideoPlayer({
     playing = useRef(false),
     [error, setError] = useState(""),
     [ready, setReady] = useState(false);
-  const progressFn = useRef(onProgress);
+  const progressFn = useRef(onProgress),
+    // Süre işleme bitince değişebilir; oynatıcıyı yeniden kurmadan okunur.
+    duration = useRef(video.duration_seconds);
   useEffect(() => {
     progressFn.current = onProgress;
+    duration.current = video.duration_seconds;
   });
   useEffect(() => {
     let stopped = false,
@@ -50,8 +53,15 @@ export function VideoPlayer({
           if (playing.current) void el.play().catch(() => {});
         };
         el.addEventListener("loadedmetadata", restore, { once: true });
-        if (el.canPlayType("application/vnd.apple.mpegurl")) el.src = data.url;
-        else if (Hls.isSupported()) {
+        // hls.js (~180 KB gzip) yalnızca Safari dışı tarayıcıda, video
+        // açıldığında yüklenir; giriş ve diğer sayfaların paketine girmez.
+        const HlsClass = el.canPlayType("application/vnd.apple.mpegurl")
+          ? null
+          : (await import("hls.js")).default;
+        if (stopped) return;
+        if (!HlsClass) el.src = data.url;
+        else if (HlsClass.isSupported()) {
+          const Hls = HlsClass;
           hls = new Hls();
           hls.loadSource(data.url);
           hls.attachMedia(el);
@@ -74,7 +84,7 @@ export function VideoPlayer({
       if (position.current > 0)
         void progressFn
           .current(
-            Math.min(Math.floor(position.current), video.duration_seconds || 0),
+            Math.min(Math.floor(position.current), duration.current || 0),
           )
           .catch(() => {});
     }, 30000);
@@ -86,7 +96,7 @@ export function VideoPlayer({
       if (position.current > 0)
         void progressFn
           .current(
-            Math.min(Math.floor(position.current), video.duration_seconds || 0),
+            Math.min(Math.floor(position.current), duration.current || 0),
           )
           .catch(() => {});
     };

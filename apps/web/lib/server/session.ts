@@ -1,3 +1,5 @@
+// Sunucu her dilde metin üretir; tarayıcı paketine girmez.
+import "@derslik/contracts/i18n/all";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { DerslikClient, ApiError, type Access } from "@derslik/api-client";
@@ -69,8 +71,25 @@ export function csrf(request: Request) {
     throw new HttpError(415, "web.appRequestRequired");
 }
 export async function readBody(request: Request, limit = 16000) {
-  const text = await request.text();
-  if (text.length > limit) throw new HttpError(413, "web.requestTooLarge");
+  // Content-Length bildirilmişse gövde hiç okunmaz; bildirilmemişse (chunked)
+  // sınır aşıldığı anda okuma kesilir, büyük gövde belleğe alınmaz.
+  if (Number(request.headers.get("content-length")) > limit)
+    throw new HttpError(413, "web.requestTooLarge");
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (reader)
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw new HttpError(413, "web.requestTooLarge");
+      }
+      chunks.push(value);
+    }
+  const text = Buffer.concat(chunks).toString("utf8");
   try {
     return JSON.parse(text);
   } catch {
@@ -110,6 +129,14 @@ export async function authClient() {
       },
     },
   );
+}
+/** Supabase oturum çerezi hiç yoksa kullanıcı kesin çıkış yapmıştır. Ağa
+ *  gitmeden bakılır; çerez varsa geçerliliğini istemci /api/session ile
+ *  öğrenir. */
+export async function hasSessionCookie() {
+  return (await cookies())
+    .getAll()
+    .some((c) => /^sb-.+-auth-token(\.\d+)?$/.test(c.name));
 }
 export async function serverSession() {
   const auth = await authClient();

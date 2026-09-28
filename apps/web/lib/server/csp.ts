@@ -49,7 +49,9 @@ export function contentSecurityPolicy(nonce: string) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,
     // Radix ve sonner stil özniteliği yazar; stil enjeksiyonu betik çalıştırmaz.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    // Görseller: kendi BFF'miz (öğretmen fotoğrafı) ve imzalı Supabase
+    // Storage bağlantıları (dosya önizleme). Herhangi bir https: adresi değil.
+    `img-src 'self' data: blob:${supabase ? " " + supabase : ""}`,
     "media-src 'self' blob: https://videodelivery.net https://*.cloudflarestream.com",
     "font-src 'self' data:",
     `connect-src ${[...connect].join(" ")}`,

@@ -8,12 +8,6 @@ import {
   type Plural,
 } from "./core.ts";
 import { tr } from "./tr.ts";
-import { en } from "./en.ts";
-import { de } from "./de.ts";
-import { fr } from "./fr.ts";
-import { es } from "./es.ts";
-import { zh } from "./zh.ts";
-import { ja } from "./ja.ts";
 
 export * from "./core.ts";
 export * from "./flags.ts";
@@ -34,7 +28,13 @@ type Leaves<T, P extends string = ""> = {
 }[keyof T & string];
 export type MessageKey = Leaves<typeof tr>;
 
-const catalogs: Record<Locale, Messages> = { tr, en, de, fr, es, zh, ja };
+// Türkçe (kaynak ve yedek dil) her zaman yüklüdür. Diğer diller kayıtla
+// gelir: sunucu ve mobil hepsini `./all.ts` ile yükler; web tarayıcısı
+// yalnızca sayfanın dilini sunucudan alır (yedi kataloğu indirmez).
+const catalogs: Partial<Record<Locale, Messages>> = { tr };
+export function registerCatalog(locale: Locale, messages: Messages) {
+  catalogs[locale] = messages;
+}
 
 // Tek kullanıcılı istemcilerde (tarayıcı sekmesi, telefon) etkin dil bir
 // modül değişkeninde durur: yardımcı işlevler ve biçimlendiriciler bileşen

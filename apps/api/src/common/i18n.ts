@@ -9,6 +9,8 @@ import {
   type MessageKey,
   type Params,
 } from "../../../../packages/contracts/src/i18n/index.js";
+// Yanıtlar her dilde üretilir: bütün katalogları kaydet.
+import "../../../../packages/contracts/src/i18n/all.js";
 
 // İsteğin dili Accept-Language başlığından gelir: web sunucusu kullanıcının
 // seçtiği dili, mobil uygulama cihazdaki seçimi yazar. Hata iletileri,

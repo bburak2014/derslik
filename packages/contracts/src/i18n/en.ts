@@ -609,6 +609,7 @@ export const en: Messages = {
   },
   lesson: {
     actionsFor: "Lesson actions for {name}",
+    awaitingConfirmation: "Awaiting confirmation",
     cancelled: "Cancelled",
     complete: "Complete",
     completed: "Completed",
@@ -638,6 +639,7 @@ export const en: Messages = {
   meta: {
     description: "Your students, lessons and payments in one place.",
     title: "Derslik · Teacher workspace",
+    titleStudent: "Derslik · Student workspace",
   },
   ml: {
     active: "Active",

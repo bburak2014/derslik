@@ -586,6 +586,7 @@ export const ja: Messages = {
   },
   lesson: {
     actionsFor: "{name} さんの授業の操作",
+    awaitingConfirmation: "確認待ち",
     cancelled: "キャンセル済み",
     complete: "完了",
     completed: "完了",
@@ -614,6 +615,7 @@ export const ja: Messages = {
   meta: {
     description: "生徒、授業、入金をひとつの場所で。",
     title: "Derslik · 講師用ワークスペース",
+    titleStudent: "Derslik · 生徒用スペース",
   },
   ml: {
     active: "有効",
