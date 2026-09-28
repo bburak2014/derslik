@@ -57,22 +57,31 @@ function initialStudentMode() {
   return rememberedStudentMode();
 }
 
+type SessionState = {
+  user: { email: string };
+  list: Access[];
+  active: Access | null;
+};
+
 export function ConnectedWorkspace({
   inviteToken,
   signedOut = false,
+  initialSession = null,
 }: {
   inviteToken?: string;
   /** Sunucu oturum çerezi görmediyse giriş formu ilk HTML'de çizilir; form
    *  JavaScript'i beklemeden görünür. */
   signedOut?: boolean;
+  /** Sunucunun sayfayla birlikte gönderdiği oturum: ilk açılışta
+   *  /api/session beklenmez, çalışma alanı paketi hemen yüklenmeye başlar. */
+  initialSession?: SessionState | null;
 }) {
-  const [session, setSession] = useState<{
-      user: { email: string };
-      list: Access[];
-      active: Access | null;
-    } | null>(null),
+  const [session, setSession] = useState<SessionState | null>(initialSession),
     [error, setError] = useState(""),
-    [loading, setLoading] = useState(!signedOut),
+    [loading, setLoading] = useState(!signedOut && !initialSession),
+    // Sunucu ve ilk istemci çizimi aynı kalsın (hydration): oturum sunucudan
+    // gelse de alan, sayfa tarayıcıda bağlandıktan sonra çizilir.
+    [mounted, setMounted] = useState(false),
     [unauthorized, setUnauthorized] = useState(signedOut),
     [busy, setBusy] = useState(false),
     // Bildirimden açılacak yer; görünüm değişse de yeni görünüm bunu alır.
@@ -94,10 +103,13 @@ export function ConnectedWorkspace({
     }
   }, []);
   useEffect(() => {
-    if (signedOut) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tarayıcıya bağlanınca bir kez; sunucu çizimiyle eşleşme için.
+    setMounted(true);
+    if (signedOut || initialSession) return;
     void reload();
-  }, [reload, signedOut]);
+    // Yalnızca ilk açılışta; sonraki yenilemeler reload() ile yapılır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Sekme başlığı açık olan alana uyar: öğrenci ve veli "öğretmen çalışma
   // alanı" görmesin.
   const studentView =
@@ -107,7 +119,7 @@ export function ConnectedWorkspace({
     if (!session) return;
     document.title = t(studentView ? "meta.titleStudent" : "meta.title");
   }, [session, studentView]);
-  if (loading)
+  if (loading || (!mounted && !signedOut))
     return (
       <main className="connection-state">
         <PageLoader />

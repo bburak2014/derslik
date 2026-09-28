@@ -186,3 +186,18 @@ export async function selectedAccess(client: DerslikClient) {
     null;
   return { list, active };
 }
+/** Sayfa sunucuda çizilirken oturum ve seçili erişim; istemci ilk açılışta
+ *  /api/session'a ayrıca gitmesin (yavaş bağlantıda bir tur kazandırır).
+ *  Belirteç yenilenmesi gerekiyorsa ya da bir hata olursa null döner ve
+ *  istemci eski yoldan (/api/session) devam eder. */
+export async function initialSession() {
+  try {
+    const { user, client } = await serverSession();
+    return {
+      user: { id: user.id, email: user.email ?? "" },
+      ...(await selectedAccess(client)),
+    };
+  } catch {
+    return null;
+  }
+}
