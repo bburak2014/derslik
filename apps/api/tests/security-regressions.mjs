@@ -1,20 +1,16 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { DatabaseService } from "../../../.api-build/apps/api/src/db/database.service.js";
 
-// Opt-in audit reproductions, intentionally fail when the vulnerability remains.
-// Run: DERSLIK_SECURITY_FOCUSED_ONLY=1 pnpm api:test
+// Reproductions of audit findings; each fails if its vulnerability returns.
+// Run only these: DERSLIK_SECURITY_FOCUSED_ONLY=1 pnpm api:test
 export async function securityRegressions({
   t,
-  app,
   admin,
   request,
   ok,
   token,
   wasmMode,
 }) {
-  const results = [];
   const owner = randomUUID(),
     guardian = randomUUID();
   const ownerToken = await token(owner),
@@ -57,32 +53,21 @@ export async function securityRegressions({
         [ws, students[0].id, guardian],
       );
       const title = "RESTRICTED-ASSIGNMENT-METADATA";
-      const assignment = (
-        await ok(
-          `/v1/workspaces/${ws}/students/${students[0].id}/learning`,
-          {
-            action: "assignment.create",
-            title,
-            instructions: "Private assignment instruction",
-            dueOn: null,
-          },
-          { auth: ownerToken },
-        )
-      ).data;
+      await ok(
+        `/v1/workspaces/${ws}/students/${students[0].id}/learning`,
+        {
+          action: "assignment.create",
+          title,
+          instructions: "Private assignment instruction",
+          dueOn: null,
+        },
+        { auth: ownerToken },
+      );
       const portal = await request(`/v1/portal/${ws}/${students[0].id}`, {
         auth: guardianToken,
       });
       const inbox = await request("/v1/inbox", { auth: guardianToken });
       const leaked = JSON.stringify(inbox.body).includes(title);
-      results.push({
-        id: "BACKEND-01",
-        permission: ["lessons"],
-        portalStatus: portal.status,
-        portalAssignmentCount: portal.body.assignments?.length,
-        inboxStatus: inbox.status,
-        assignmentTitleInInbox: leaked,
-        assignmentIdInInbox: JSON.stringify(inbox.body).includes(assignment.id),
-      });
       assert.equal(portal.status, 200);
       assert.deepEqual(portal.body.assignments, []);
       assert.equal(
@@ -102,14 +87,18 @@ export async function securityRegressions({
       SELECT $1,$2,'audit'||g||'@example.test','GUARDIAN',ARRAY['lessons'],md5(random()::text)||g,now()+interval '7 days' FROM generate_series(1,19) g`,
         [ws, students[0].id],
       );
-      // A warm production pool already has parallel DB connections. Without this,
-      // opening SCRAM sessions can serialize a tiny local test by accident.
-      const clients = await Promise.all(
-        students.map(() => app.get(DatabaseService).pool.connect()),
-      );
-      for (const client of clients) client.release();
-      const responses = await Promise.all(
-        students.map((s, n) =>
+      // Hold the workspace invitation lock so every request is in flight at
+      // once. They must wait for it before counting; without the lock each
+      // one would count 19 and insert.
+      const holder = await admin.connect();
+      let settled = 0;
+      try {
+        await holder.query("BEGIN");
+        await holder.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+          [`invitations:${ws}`],
+        );
+        const pending = students.map((s, n) =>
           request(`/v1/workspaces/${ws}/students/${s.id}/invitations`, {
             method: "POST",
             auth: ownerToken,
@@ -118,32 +107,27 @@ export async function securityRegressions({
               role: "GUARDIAN",
               permissions: ["lessons"],
             },
-          }),
-        ),
-      );
+          }).finally(() => settled++),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        assert.equal(settled, 0, "Invitations counted without the lock");
+        await holder.query("COMMIT");
+        const statuses = (await Promise.all(pending)).map((r) => r.status);
+        assert.deepEqual(statuses.sort(), [201, 429, 429, 429, 429]);
+      } finally {
+        await holder.query("ROLLBACK").catch(() => undefined);
+        holder.release();
+      }
       const count = (
         await admin.query(
           "SELECT count(*)::int AS n FROM derslik.invitations WHERE workspace_id=$1 AND created_at>now()-interval '1 hour'",
           [ws],
         )
       ).rows[0].n;
-      results.push({
-        id: "BACKEND-02",
-        before: 19,
-        requestCount: responses.length,
-        statuses: responses.map((r) => r.status),
-        after: count,
-        expectedMaximum: 20,
-      });
       assert.ok(
         count <= 20,
         `Hourly invitation quota was exceeded: ${count} > 20`,
       );
     },
-  );
-  await mkdir("reports/security", { recursive: true });
-  await writeFile(
-    "reports/security/backend-targeted-results.json",
-    JSON.stringify({ nativeConcurrency: !wasmMode, results }, null, 2),
   );
 }

@@ -103,6 +103,17 @@ export type NoticeKind =
   | "ANSWER"
   | "SUMMARY";
 
+/** The portal permission a link needs to see the record a notice opens. */
+const NOTICE_PERMISSION: Record<NoticeKind, string> = {
+  ASSIGNMENT: "assignments",
+  SUBMISSION: "assignments",
+  REVIEW: "assignments",
+  VIDEO: "videos",
+  QUESTION: "videos",
+  ANSWER: "videos",
+  SUMMARY: "notes",
+};
+
 export async function notify(
   tx: PoolClient,
   ws: string,
@@ -122,7 +133,7 @@ export async function notify(
     `INSERT INTO derslik.notifications(workspace_id,user_id,student_id,title,body,kind,target_id)
  SELECT $1,recipient,$2,$3,$4,$6,$7 FROM (
   SELECT owner_id AS recipient FROM derslik.workspaces WHERE id=$1
-  UNION SELECT user_id FROM derslik.portal_links WHERE workspace_id=$1 AND student_id=$2 AND revoked_at IS NULL AND NOT $5
+  UNION SELECT user_id FROM derslik.portal_links WHERE workspace_id=$1 AND student_id=$2 AND revoked_at IS NULL AND NOT $5 AND $8=ANY(permissions)
  ) recipients WHERE recipient<>derslik.actor_id()`,
     [
       ws,
@@ -132,6 +143,7 @@ export async function notify(
       notice.ownerOnly ?? false,
       notice.kind,
       notice.targetId,
+      NOTICE_PERMISSION[notice.kind],
     ],
   );
 }

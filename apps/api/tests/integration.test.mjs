@@ -271,7 +271,6 @@ test(
       if (focusedOnly) {
         await securityRegressions({
           t,
-          app,
           admin,
           request,
           ok,
@@ -858,6 +857,14 @@ test(
         tokenA,
         tokenB,
         actorA,
+        wasmMode,
+      });
+      await securityRegressions({
+        t,
+        admin,
+        request,
+        ok,
+        token,
         wasmMode,
       });
       if (securityFixture) {
