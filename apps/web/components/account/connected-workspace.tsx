@@ -7,6 +7,7 @@ import { ApiError } from "@derslik/api-client";
 import dynamic from "next/dynamic";
 import { AuthForm } from "./auth-form";
 import { backend, formText, webRequest } from "@/lib/client";
+import { prefetchWorkspace } from "@/lib/workspace-prefetch";
 import {
   openStudentWorkspace,
   rememberedStudentMode,
@@ -105,6 +106,13 @@ export function ConnectedWorkspace({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- tarayıcıya bağlanınca bir kez; sunucu çizimiyle eşleşme için.
     setMounted(true);
+    // Oturum sunucudan geldiyse doğru alanın kodu ve (öğretmende) verisi
+    // hemen, birbirini beklemeden istenir.
+    if (initialSession?.active?.role === "OWNER") {
+      prefetchWorkspace();
+      void import("@/components/derslik/workspace");
+    } else if (initialSession?.active)
+      void import("@/components/derslik/portal");
     if (signedOut || initialSession) return;
     void reload();
     // Yalnızca ilk açılışta; sonraki yenilemeler reload() ile yapılır.
