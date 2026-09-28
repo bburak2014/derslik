@@ -2,6 +2,9 @@ import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
 import { accessCases } from "./access-cases.mjs";
+import { securityCases } from "./security-cases.mjs";
+import { securityRegressions } from "./security-regressions.mjs";
+import { holdSecurityFixture } from "./security-fixture.mjs";
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -26,9 +29,13 @@ async function listen(server) {
 }
 
 const wasmMode = process.env.DERSLIK_TEST_ENGINE === "pglite";
+const securityFixture = process.env.DERSLIK_SECURITY_FIXTURE_FILE;
+const fixtureOnly =
+  !!securityFixture && process.env.DERSLIK_SECURITY_FIXTURE_ONLY === "1";
+const focusedOnly = process.env.DERSLIK_SECURITY_FOCUSED_ONLY === "1";
 test(
   `NestJS API / ${wasmMode ? "PGlite (multiplexed, not native concurrency)" : "native PostgreSQL"} / signed JWT`,
-  { timeout: 90_000 },
+  { timeout: securityFixture ? 1_290_000 : 90_000 },
   async (t) => {
     process.umask(0o077);
     const dir = await mkdtemp(join(tmpdir(), "derslik-api-test-"));
@@ -143,10 +150,19 @@ test(
         LEMONSQUEEZY_VARIANT_ID: "456",
         LEMONSQUEEZY_WEBHOOK_SECRET: randomUUID(),
         LEMONSQUEEZY_TEST_MODE: "true",
+        ...(fixtureOnly
+          ? {
+              RATE_LIMIT_USER_PER_MINUTE: "60000",
+              RATE_LIMIT_PUBLIC_PER_MINUTE: "60000",
+            }
+          : {}),
       });
       app = await createApplication(config);
-      await app.listen(0, "127.0.0.1");
-      const base = await app.getUrl();
+      await app.listen(
+        securityFixture ? 3101 : 0,
+        securityFixture ? "0.0.0.0" : "127.0.0.1",
+      );
+      const base = (await app.getUrl()).replace("0.0.0.0", "127.0.0.1");
       const actorA = randomUUID(),
         actorB = randomUUID(),
         actorStudent = randomUUID();
@@ -237,6 +253,33 @@ test(
         method: "TRANSFER",
         reference: "Test kaydı",
       });
+
+      if (fixtureOnly) {
+        await holdSecurityFixture({
+          app,
+          admin,
+          token,
+          ok,
+          base,
+          issuer,
+          publicJwk,
+          verifiedUsers,
+          file: securityFixture,
+        });
+        return;
+      }
+      if (focusedOnly) {
+        await securityRegressions({
+          t,
+          app,
+          admin,
+          request,
+          ok,
+          token,
+          wasmMode,
+        });
+        return;
+      }
 
       await t.test(
         "JWT signature, issuer, audience, expiry, role and anonymous access",
@@ -802,6 +845,34 @@ test(
         tokenStudent,
         actorA,
       });
+      await securityCases({
+        t,
+        config,
+        admin,
+        request,
+        ok,
+        ws,
+        wsB,
+        student,
+        token,
+        tokenA,
+        tokenB,
+        actorA,
+        wasmMode,
+      });
+      if (securityFixture) {
+        await holdSecurityFixture({
+          app,
+          admin,
+          token,
+          ok,
+          base,
+          issuer,
+          publicJwk,
+          verifiedUsers,
+          file: securityFixture,
+        });
+      }
     } finally {
       if (app) await app.close();
       if (jwksServer) await new Promise((resolve) => jwksServer.close(resolve));
