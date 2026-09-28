@@ -597,6 +597,7 @@ export const tr = {
   },
   lesson: {
     actionsFor: "{name} ders işlemleri",
+    awaitingConfirmation: "Onay bekliyor",
     cancelled: "İptal edildi",
     complete: "Tamamla",
     completed: "Tamamlandı",
@@ -624,6 +625,7 @@ export const tr = {
   meta: {
     description: "Öğrencileriniz, dersleriniz ve tahsilatlarınız bir arada.",
     title: "Derslik · Öğretmen çalışma alanı",
+    titleStudent: "Derslik · Öğrenci çalışma alanı",
   },
   ml: {
     active: "Etkin",

@@ -1424,9 +1424,20 @@ export function Badge({
 /** Ders durumu rozeti: web'deki Status bileşeninin karşılığı. */
 export function LessonStatus({
   status,
+  endsAt,
 }: {
   status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
+  /** Verilirse, bitişi geçmiş ama hâlâ planlı ders "onay bekliyor" görünür. */
+  endsAt?: string;
 }) {
+  // Ekran açıldığı andaki saat yeterli; liste yenilenince yeniden bakılır.
+  const [now] = useState(() => Date.now());
+  if (status === "SCHEDULED" && endsAt && Date.parse(endsAt) < now)
+    return (
+      <Badge tone="warning" dot>
+        {t("lesson.awaitingConfirmation")}
+      </Badge>
+    );
   return status === "COMPLETED" ? (
     <Badge tone="success" icon="checkmark">
       {t("lesson.completed")}

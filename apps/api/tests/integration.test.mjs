@@ -95,9 +95,17 @@ test(
         // PGlite has one SQL session and ignores the connection's login role.
         // Explicitly use the real restricted role for ALL application queries.
         // Admin fixture queries occur only between completed HTTP test requests.
+        // The HTTP response can reach the test a moment before the request's
+        // ROLLBACK does; RESET ROLE would then land inside that aborted
+        // transaction. Wait until the single session is idle first.
+        const idle = async () => {
+          for (let i = 0; i < 400 && wasm.isInTransaction(); i++)
+            await new Promise((resolve) => setTimeout(resolve, 5));
+        };
         const adminPool = admin;
         admin = {
           async query(sql, values) {
+            await idle();
             await wasm.exec("RESET ROLE");
             try {
               return await adminPool.query(sql, values);
@@ -158,11 +166,10 @@ test(
           : {}),
       });
       app = await createApplication(config);
-      await app.listen(
-        securityFixture ? 3101 : 0,
-        securityFixture ? "0.0.0.0" : "127.0.0.1",
-      );
-      const base = (await app.getUrl()).replace("0.0.0.0", "127.0.0.1");
+      // Loopback only, also for the scan fixture: Docker Desktop still reaches
+      // it through host.docker.internal, other machines on the network do not.
+      await app.listen(securityFixture ? 3101 : 0, "127.0.0.1");
+      const base = await app.getUrl();
       const actorA = randomUUID(),
         actorB = randomUUID(),
         actorStudent = randomUUID();
@@ -721,12 +728,13 @@ test(
               [actorB, ws],
             );
             assert.equal(
-              (await client.query("SELECT * FROM derslik.students")).rowCount,
+              (await client.query("SELECT * FROM derslik.students")).rows
+                .length,
               0,
             );
             assert.equal(
-              (await client.query("SELECT * FROM derslik.private_notes"))
-                .rowCount,
+              (await client.query("SELECT * FROM derslik.private_notes")).rows
+                .length,
               0,
             );
             await assert.rejects(
@@ -738,7 +746,8 @@ test(
             );
             await client.query("ROLLBACK");
             assert.equal(
-              (await client.query("SELECT * FROM derslik.students")).rowCount,
+              (await client.query("SELECT * FROM derslik.students")).rows
+                .length,
               0,
             );
             await client.query("BEGIN");

@@ -211,7 +211,10 @@ export function AuthForm({
               </div>
             </>
           )}
+          {/* method="post": sayfa JavaScript'i yüklenmeden gönderilirse
+              şifre adres çubuğuna (geçmişe, sunucu kayıtlarına) düşmesin. */}
           <form
+            method="post"
             className="grid gap-4"
             onSubmit={async (e) => {
               e.preventDefault();

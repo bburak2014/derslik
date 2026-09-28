@@ -623,6 +623,7 @@ export const es: Messages = {
   },
   lesson: {
     actionsFor: "Acciones de la clase de {name}",
+    awaitingConfirmation: "Pendiente de confirmación",
     cancelled: "Cancelada",
     complete: "Completar",
     completed: "Completada",
@@ -652,6 +653,7 @@ export const es: Messages = {
   meta: {
     description: "Tus alumnos, clases y cobros en un solo lugar.",
     title: "Derslik · Espacio del profesor",
+    titleStudent: "Derslik · Espacio del alumno",
   },
   ml: {
     active: "Activo",

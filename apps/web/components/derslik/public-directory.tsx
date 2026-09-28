@@ -10,9 +10,20 @@ import { TeacherDirectory, TeacherProfileView } from "./directory";
 
 /** Giriş yapmadan gezilen vitrin: /teachers ve /teachers/[id]. Oturum varsa
  *  profil sayfası istek düğmesini doğrudan gösterir. */
-export function PublicDirectory({ teacherId }: { teacherId?: string }) {
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+export function PublicDirectory({
+  teacherId,
+  hasSession = true,
+}: {
+  teacherId?: string;
+  /** Sunucu oturum çerezi görmediyse ziyaretçi anonimdir; /api/session
+   *  sorulmaz (konsolda boşuna 401 kalmaz, profil hemen çizilir). */
+  hasSession?: boolean;
+}) {
+  const [signedIn, setSignedIn] = useState<boolean | null>(
+    hasSession ? null : false,
+  );
   useEffect(() => {
+    if (!hasSession) return;
     let alive = true;
     fetch("/api/session", { cache: "no-store" })
       .then((r) => alive && setSignedIn(r.ok))
@@ -20,7 +31,7 @@ export function PublicDirectory({ teacherId }: { teacherId?: string }) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [hasSession]);
   return (
     <div className="public-shell">
       <header className="public-header">
@@ -61,8 +72,10 @@ export function PublicDirectory({ teacherId }: { teacherId?: string }) {
               // Davetle bağlanan öğrencinin "İsteklerim" sayfası boş kalır;
               // düğme o öğretmendeki dersleri açar.
               onOpenLessons={(id) =>
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
                 void openStudentWorkspace(id).catch(() => location.assign("/"))
               }
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
               onEditProfile={() => location.assign("/?view=showcase")}
               openRequest={
                 new URLSearchParams(location.search).get("request") === "1"

@@ -634,6 +634,7 @@ export const de: Messages = {
   },
   lesson: {
     actionsFor: "Aktionen für die Stunde von {name}",
+    awaitingConfirmation: "Bestätigung ausstehend",
     cancelled: "Abgesagt",
     complete: "Abschließen",
     completed: "Abgeschlossen",
@@ -663,6 +664,7 @@ export const de: Messages = {
   meta: {
     description: "Ihre Schüler, Stunden und Zahlungen an einem Ort.",
     title: "Derslik · Arbeitsbereich für Lehrkräfte",
+    titleStudent: "Derslik · Schülerbereich",
   },
   ml: {
     active: "Aktiv",

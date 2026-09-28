@@ -28,6 +28,8 @@ jobs:
         run: pnpm mobile:typecheck
       - name: Lint
         run: pnpm lint
+      - name: Mobile security tests
+        run: pnpm mobile:security-test
       - name: API tests
         run: pnpm test
       - name: Media config tests

@@ -43,10 +43,13 @@ export class PublicDirectoryController {
       .catch(() => null);
     const photo = await this.directory.photo(actor, id);
     res.setHeader("Content-Type", photo.type);
+    // Oturumla gelen fotoğraf yayında olmayabilir: saklansa da her seferinde
+    // yeniden doğrulanır; çıkıştan sonra başka hesaba görünmez.
     res.setHeader(
       "Cache-Control",
-      actor ? "private, max-age=86400" : "public, max-age=86400",
+      actor ? "private, no-cache" : "public, max-age=86400",
     );
+    res.setHeader("Vary", "Authorization");
     res.setHeader("Content-Security-Policy", "default-src 'none'");
     res.end(photo.bytes);
   }

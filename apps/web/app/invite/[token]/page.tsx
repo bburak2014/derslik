@@ -1,5 +1,6 @@
 import { ConnectedWorkspace } from "@/components/account/connected-workspace";
 import { serverText } from "@/lib/server/locale";
+import { hasSessionCookie } from "@/lib/server/session";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
@@ -14,5 +15,10 @@ export default async function Page({
         <a href="/">{await serverText("web.backHome")}</a>
       </main>
     );
-  return <ConnectedWorkspace inviteToken={token} />;
+  return (
+    <ConnectedWorkspace
+      inviteToken={token}
+      signedOut={!(await hasSessionCookie())}
+    />
+  );
 }

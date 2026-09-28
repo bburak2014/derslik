@@ -15,7 +15,10 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!_next/static|_next/image|favicon.svg).*)",
+      // /api JSON döner, nonce gerekmez. Proxy'den geçen isteğin gövdesi Next
+      // tarafından önce tamamen belleğe alınır; API yolları hariç tutulunca
+      // büyük gövde sınırı (readBody) okuma sırasında hemen devreye girer.
+      source: "/((?!api/|_next/static|_next/image|favicon.svg).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

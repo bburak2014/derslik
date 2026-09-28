@@ -25,7 +25,7 @@
     "web:dev": "pnpm --filter @derslik/web dev",
     "web:build": "pnpm --filter @derslik/web build",
     "web:start": "pnpm --filter @derslik/web start",
-    "web:test": "node --test tests/web-session.test.mjs",
+    "web:test": "node --test tests/web-session.test.mjs tests/web-security-audit.test.mjs",
     "mobile:start": "node scripts/sync-env.mjs && pnpm --filter @derslik/mobile start",
     "mobile:tunnel": "node scripts/sync-env.mjs && pnpm --filter @derslik/mobile start --tunnel",
     "mobile:localhost": "node scripts/sync-env.mjs && pnpm --filter @derslik/mobile start --localhost",
@@ -33,6 +33,7 @@
     "mobile:ios": "pnpm --filter @derslik/mobile ios",
     "mobile:export": "pnpm --filter @derslik/mobile export",
     "mobile:typecheck": "pnpm --filter @derslik/mobile typecheck",
+    "mobile:security-test": "node scripts/mobile-security-tests.mjs",
     "setup": "node scripts/setup.mjs",
     "test:teaching": "pnpm api:test:pglite",
     "build:local": "pnpm api:build && pnpm web:build",
@@ -52,7 +53,13 @@
     "security:web": "bash scripts/security-scan.sh web",
     "security:mobile": "bash scripts/security-scan.sh mobile",
     "security:mobile:stop": "bash scripts/security-scan.sh mobile-stop",
-    "security:status": "bash scripts/security-scan.sh status"
+    "security:status": "bash scripts/security-scan.sh status",
+    "security:fixture": "pnpm api:build && DERSLIK_SECURITY_FIXTURE_FILE=reports/security/backend-fixture.json DERSLIK_SECURITY_FIXTURE_ONLY=1 node apps/api/tests/run.mjs",
+    "security:seeds": "node apps/api/tests/security-zap-seeds.mjs",
+    "security:web-fixture": "WEB_SECURITY_FIXTURE=reports/security/backend-fixture.json WEB_SECURITY_BACKEND=http://127.0.0.1:3101 WEB_SECURITY_SESSION=reports/security/web-fixture-session.json node tests/web-security-harness.mjs --serve",
+    "security:e2e": "node tests/web-security-e2e.mjs",
+    "security:zap:api": "node scripts/security-zap-fixture.mjs api",
+    "security:zap:web": "node scripts/security-zap-fixture.mjs web"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

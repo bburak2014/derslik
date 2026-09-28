@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.derslik.app",
+      "allowBackup": false,
       "permissions": [],
       "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "adaptiveIcon": {

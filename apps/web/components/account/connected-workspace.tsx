@@ -43,15 +43,23 @@ function initialStudentMode() {
   return rememberedStudentMode();
 }
 
-export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
+export function ConnectedWorkspace({
+  inviteToken,
+  signedOut = false,
+}: {
+  inviteToken?: string;
+  /** Sunucu oturum çerezi görmediyse giriş formu ilk HTML'de çizilir; form
+   *  JavaScript'i beklemeden görünür. */
+  signedOut?: boolean;
+}) {
   const [session, setSession] = useState<{
       user: { email: string };
       list: Access[];
       active: Access | null;
     } | null>(null),
     [error, setError] = useState(""),
-    [loading, setLoading] = useState(true),
-    [unauthorized, setUnauthorized] = useState(false),
+    [loading, setLoading] = useState(!signedOut),
+    [unauthorized, setUnauthorized] = useState(signedOut),
     [busy, setBusy] = useState(false),
     // Bildirimden açılacak yer; görünüm değişse de yeni görünüm bunu alır.
     [focus, setFocus] = useState<NoticeFocus | null>(null),
@@ -72,9 +80,19 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
     }
   }, []);
   useEffect(() => {
+    if (signedOut) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
-  }, [reload]);
+  }, [reload, signedOut]);
+  // Sekme başlığı açık olan alana uyar: öğrenci ve veli "öğretmen çalışma
+  // alanı" görmesin.
+  const studentView =
+    !!session &&
+    (session.active ? session.active.role !== "OWNER" : studentMode);
+  useEffect(() => {
+    if (!session) return;
+    document.title = t(studentView ? "meta.titleStudent" : "meta.title");
+  }, [session, studentView]);
   if (loading)
     return (
       <main className="connection-state">
@@ -140,6 +158,7 @@ export function ConnectedWorkspace({ inviteToken }: { inviteToken?: string }) {
                   await webRequest("/api/session", {
                     key: `${r.data.workspaceId}:${r.data.role}:${r.data.studentId}`,
                   }).catch(() => undefined);
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
                   location.assign("/");
                 } catch (e) {
                   setError((e as Error).message);

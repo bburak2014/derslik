@@ -28,9 +28,12 @@ export function VideoPlayer({
     playing = useRef(false),
     [error, setError] = useState(""),
     [ready, setReady] = useState(false);
-  const progressFn = useRef(onProgress);
+  const progressFn = useRef(onProgress),
+    // Süre işleme bitince değişebilir; oynatıcıyı yeniden kurmadan okunur.
+    duration = useRef(video.duration_seconds);
   useEffect(() => {
     progressFn.current = onProgress;
+    duration.current = video.duration_seconds;
   });
   useEffect(() => {
     let stopped = false,
@@ -74,7 +77,7 @@ export function VideoPlayer({
       if (position.current > 0)
         void progressFn
           .current(
-            Math.min(Math.floor(position.current), video.duration_seconds || 0),
+            Math.min(Math.floor(position.current), duration.current || 0),
           )
           .catch(() => {});
     }, 30000);
@@ -86,7 +89,7 @@ export function VideoPlayer({
       if (position.current > 0)
         void progressFn
           .current(
-            Math.min(Math.floor(position.current), video.duration_seconds || 0),
+            Math.min(Math.floor(position.current), duration.current || 0),
           )
           .catch(() => {});
     };

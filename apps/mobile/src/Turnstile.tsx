@@ -38,6 +38,24 @@ function start(){
 </script></body></html>`;
 }
 
+/** Adresin kökeni; önek karşılaştırması "site.example.saldirgan.test" ya da
+ *  "site.example@saldirgan.test" gibi adresleri de kabul ederdi. */
+function originOf(url: string) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** WebView yalnızca sitenin kendi kökenini ve Cloudflare doğrulamasını açar. */
+export function turnstileAllows(url: string, origin: string) {
+  return (
+    url === "about:blank" ||
+    [origin, "https://challenges.cloudflare.com"].includes(originOf(url))
+  );
+}
+
 /**
  * Belirteç tek kullanımlıktır: her gönderimden sonra `round` artırılır,
  * WebView yeniden kurulur ve yeni belirteç üretilir.
@@ -70,9 +88,7 @@ export function Turnstile({
         // Yalnızca sayfanın kendisi ve Cloudflare'in doğrulama çerçevesi
         // yüklenir; widget'taki bağlantılar uygulamanın içinde açılmaz.
         onShouldStartLoadWithRequest={(request) =>
-          request.url.startsWith(origin) ||
-          request.url.startsWith("https://challenges.cloudflare.com/") ||
-          request.url === "about:blank"
+          turnstileAllows(request.url, origin)
         }
         onMessage={(event) => {
           const data = event.nativeEvent.data;

@@ -39,6 +39,9 @@ export function authRoute(value: string): AuthRoute | null {
     .join("/")
     .split("/")
     .filter((s) => s && s !== "--");
+  // Tam biçim beklenir: build'de yalnızca `auth/<route>`, Expo Go'da sunucu
+  // adının ardından `auth/<route>`. Araya giren başka yol parçası reddedilir.
+  if (segments.length !== (own.hostname ? 3 : 2)) return null;
   const route = segments.at(-1) as AuthRoute | undefined;
   if (segments.at(-2) !== "auth" || !route || !routes.includes(route))
     return null;

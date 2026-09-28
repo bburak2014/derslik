@@ -540,6 +540,7 @@ export const zh: Messages = {
   },
   lesson: {
     actionsFor: "{name} 的课程操作",
+    awaitingConfirmation: "待确认",
     cancelled: "已取消",
     complete: "完成",
     completed: "已完成",
@@ -565,6 +566,7 @@ export const zh: Messages = {
   meta: {
     description: "学生、课程和收款，一处管理。",
     title: "Derslik · 老师工作区",
+    titleStudent: "Derslik · 学生学习空间",
   },
   ml: {
     active: "有效",

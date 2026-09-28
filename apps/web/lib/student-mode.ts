@@ -35,5 +35,6 @@ export async function openStudentWorkspace(workspaceId: string) {
     key: `${next.id}:${next.role}:${next.studentId || ""}`,
   });
   rememberMode(false);
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
   location.assign("/?view=lessons");
 }

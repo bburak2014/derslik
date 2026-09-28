@@ -44,9 +44,12 @@ export async function GET(
       return new Response(await response.arrayBuffer(), {
         headers: {
           "Content-Type": response.headers.get("content-type") || "image/jpeg",
+          // Oturumla gelen fotoğraf yayında olmayabilir; tarayıcı saklasa da
+          // her gösterimde yeniden sorar, çıkıştan sonra başkasına görünmez.
           "Cache-Control": token
-            ? "private, max-age=86400"
+            ? "private, no-cache"
             : "public, max-age=86400",
+          Vary: "Cookie",
           "X-Content-Type-Options": "nosniff",
         },
       });
