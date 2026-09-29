@@ -142,17 +142,17 @@ const isPage = (value: string | null): value is LearningTab =>
   !!value && value in pages;
 
 /** Sayfa yenilense de açık sekme korunsun diye adres çubuğundaki `?view=`. */
-function pageFromUrl(fallback: PortalPage): PortalPage {
-  if (typeof location === "undefined") return fallback;
-  const params = new URLSearchParams(location.search);
+function pageFromUrl(fallback: PortalPage, search?: string): PortalPage {
+  if (search === undefined && typeof location === "undefined") return fallback;
+  const params = new URLSearchParams(search ?? location.search);
   if (params.get("teacher")) return "teachers";
   const value = params.get("view");
   return isPage(value) || isDiscover(value) ? value : fallback;
 }
-const teacherFromUrl = () =>
-  typeof location === "undefined"
+const teacherFromUrl = (search?: string) =>
+  search === undefined && typeof location === "undefined"
     ? null
-    : new URLSearchParams(location.search).get("teacher");
+    : new URLSearchParams(search ?? location.search).get("teacher");
 
 function DiscoverNavigation({
   current,
@@ -269,6 +269,7 @@ export function Portal({
   onOpenWorkspace,
   onStartTeaching,
   teacherAccount = false,
+  initialSearch,
 }: {
   access: Access | null;
   displayName: string;
@@ -284,14 +285,20 @@ export function Portal({
   /** Hesabın kendi öğretmen çalışma alanı var: öğretmen istek gönderemez,
    *  "Öğretmen bul" ve "İsteklerim" gösterilmez. */
   teacherAccount?: boolean;
+  /** Sayfanın sorgu dizesi: sunucu ve istemci ilk çizimde aynı sekmeyi seçer. */
+  initialSearch?: string;
 }) {
   const role: PortalRole = access?.role === "GUARDIAN" ? "GUARDIAN" : "STUDENT";
   // Veli hesabı adına ders isteği gönderilmez; vitrin yalnızca öğrencide.
   // Öğretmen hesabı da istek gönderemez (bir e-posta ya öğretmen ya öğrenci).
   const canDiscover = role === "STUDENT" && !teacherAccount;
   const fallback: PortalPage = access ? "lessons" : "teachers";
-  const [tab, setTab] = useState<PortalPage>(() => pageFromUrl(fallback)),
-    [teacher, setTeacher] = useState<string | null>(teacherFromUrl),
+  const [tab, setTab] = useState<PortalPage>(() =>
+      pageFromUrl(fallback, initialSearch),
+    ),
+    [teacher, setTeacher] = useState<string | null>(() =>
+      teacherFromUrl(initialSearch),
+    ),
     [tabs, setTabs] = useState<LearningTabInfo[]>([]),
     [signoutOpen, setSignoutOpen] = useState(false),
     [requestFocus, setRequestFocus] = useState<string | null>(null),
