@@ -667,8 +667,13 @@ export function CalendarView({
         </div>
         <Tabs value={mode} onValueChange={setMode}>
           <TabsList>
-            <TabsTrigger value="day">{t("calendar.day")}</TabsTrigger>
-            <TabsTrigger value="week">{t("calendar.week")}</TabsTrigger>
+            {/* Gün/hafta görünümü seçer; ayrı sekme paneli yok. */}
+            <TabsTrigger value="day" aria-controls={undefined}>
+              {t("calendar.day")}
+            </TabsTrigger>
+            <TabsTrigger value="week" aria-controls={undefined}>
+              {t("calendar.week")}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -757,9 +762,15 @@ export function StudentsView({
     <section className="panel">
       <div className="section-heading">
         <Tabs value={filter} onValueChange={setFilter}>
+          {/* Sekmeler aşağıdaki tek listeyi süzer; ayrı panel yok. Olmayan
+              panele işaret eden aria-controls kaldırılır. */}
           <TabsList>
-            <TabsTrigger value="active">{t("students.active")}</TabsTrigger>
-            <TabsTrigger value="archive">{t("students.archive")}</TabsTrigger>
+            <TabsTrigger value="active" aria-controls={undefined}>
+              {t("students.active")}
+            </TabsTrigger>
+            <TabsTrigger value="archive" aria-controls={undefined}>
+              {t("students.archive")}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         <span className="text-sm text-muted-foreground">

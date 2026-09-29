@@ -33,7 +33,7 @@ export function PaymentsTab({ ctx }: { ctx: LearningCtx }) {
         {view && refresh}
       </SectionHeading>
       <ItemGroup className="gap-3">
-        <Card className="gap-1 py-5">
+        <Card role="listitem" className="gap-1 py-5">
           <CardHeader className="px-5">
             <CardDescription>{t("students.openBalance")}</CardDescription>
             <CardTitle className="text-2xl tabular-nums">
@@ -50,7 +50,12 @@ export function PaymentsTab({ ctx }: { ctx: LearningCtx }) {
           </CardContent>
         </Card>
         {data.packages.map((p) => (
-          <Item variant="outline" className="bg-card" key={p.id}>
+          <Item
+            role="listitem"
+            variant="outline"
+            className="bg-card"
+            key={p.id}
+          >
             <ItemMedia variant="icon">
               <Package />
             </ItemMedia>
@@ -67,7 +72,12 @@ export function PaymentsTab({ ctx }: { ctx: LearningCtx }) {
           </Item>
         ))}
         {data.payments.map((p) => (
-          <Item variant="outline" className="bg-card" key={p.id}>
+          <Item
+            role="listitem"
+            variant="outline"
+            className="bg-card"
+            key={p.id}
+          >
             <ItemMedia variant="icon">
               <Wallet />
             </ItemMedia>

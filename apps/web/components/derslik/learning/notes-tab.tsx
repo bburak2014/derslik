@@ -82,12 +82,17 @@ export function NotesTab({ ctx }: { ctx: LearningCtx }) {
       </SectionHeading>
       <ItemGroup className="gap-3">
         {!data.notes.length && !data.summaries.length && (
-          <EmptyNote icon={NotebookPen} title={t("learn.noNotes")}>
+          <EmptyNote
+            role="listitem"
+            icon={NotebookPen}
+            title={t("learn.noNotes")}
+          >
             {t("learn.noNotesHint")}
           </EmptyNote>
         )}
         {data.summaries.map((s) => (
           <Item
+            role="listitem"
             variant="outline"
             className="bg-card items-start"
             key={s.id}
@@ -148,7 +153,12 @@ export function NotesTab({ ctx }: { ctx: LearningCtx }) {
           </Item>
         ))}
         {data.notes.map((n) => (
-          <Item variant="outline" className="bg-card items-start" key={n.id}>
+          <Item
+            role="listitem"
+            variant="outline"
+            className="bg-card items-start"
+            key={n.id}
+          >
             <ItemMedia variant="icon">
               <NotebookPen />
             </ItemMedia>
