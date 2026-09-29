@@ -757,9 +757,24 @@ export function StudentsView({
     <section className="panel">
       <div className="section-heading">
         <Tabs value={filter} onValueChange={setFilter}>
+          {/* Sekmeler aşağıdaki tek listeyi süzer; ayrı panel yok. Olmayan
+              panele işaret eden aria-controls kaldırılır; pasif sekme yazısı
+              4,5:1 kontrastı sağlasın diye koyulaştırılır. */}
           <TabsList>
-            <TabsTrigger value="active">{t("students.active")}</TabsTrigger>
-            <TabsTrigger value="archive">{t("students.archive")}</TabsTrigger>
+            <TabsTrigger
+              value="active"
+              aria-controls={undefined}
+              className="text-foreground/75"
+            >
+              {t("students.active")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="archive"
+              aria-controls={undefined}
+              className="text-foreground/75"
+            >
+              {t("students.archive")}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         <span className="text-sm text-muted-foreground">

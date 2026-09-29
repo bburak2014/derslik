@@ -89,7 +89,14 @@ export function LearningPanel(props: LearningPanelProps) {
               aria-label={t("learn.studentContent")}
             >
               {tabs.map((x) => (
-                <TabsTrigger key={x.id} value={x.id} className="flex-none">
+                // İçerik sekmeden bağımsız çizilir; olmayan panele işaret eden
+                // aria-controls kaldırılır, pasif yazı kontrastı yükseltilir.
+                <TabsTrigger
+                  key={x.id}
+                  value={x.id}
+                  aria-controls={undefined}
+                  className="text-foreground/75 flex-none"
+                >
                   {x.title}
                 </TabsTrigger>
               ))}
