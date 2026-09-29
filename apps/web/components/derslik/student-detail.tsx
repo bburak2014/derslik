@@ -279,35 +279,20 @@ export function StudentDetail({
               {/* Dar ekranda sekmeler alt satıra kırılmak yerine yana kayar;
                   paneldeki diğer sekme şeritleriyle aynı davranış. */}
               <TabsList className="mx-6 mt-5 max-w-[calc(100%-3rem)] shrink-0 justify-start overflow-x-auto">
-                <TabsTrigger
-                  value="packages"
-                  className="text-foreground/75 flex-none"
-                >
+                <TabsTrigger value="packages" className="flex-none">
                   {t("detail.tabPackages")}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="lessons"
-                  className="text-foreground/75 flex-none"
-                >
+                <TabsTrigger value="lessons" className="flex-none">
                   {t("nav.lessons")}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="notes"
-                  className="text-foreground/75 flex-none"
-                >
+                <TabsTrigger value="notes" className="flex-none">
                   {t("detail.tabNote")}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="history"
-                  className="text-foreground/75 flex-none"
-                >
+                <TabsTrigger value="history" className="flex-none">
                   {t("detail.tabHistory")}
                 </TabsTrigger>
                 {workspaceId && (
-                  <TabsTrigger
-                    value="learning"
-                    className="text-foreground/75 flex-none"
-                  >
+                  <TabsTrigger value="learning" className="flex-none">
                     {t("detail.tabLearning")}
                   </TabsTrigger>
                 )}

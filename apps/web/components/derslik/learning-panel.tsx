@@ -90,12 +90,12 @@ export function LearningPanel(props: LearningPanelProps) {
             >
               {tabs.map((x) => (
                 // İçerik sekmeden bağımsız çizilir; olmayan panele işaret eden
-                // aria-controls kaldırılır, pasif yazı kontrastı yükseltilir.
+                // aria-controls kaldırılır.
                 <TabsTrigger
                   key={x.id}
                   value={x.id}
                   aria-controls={undefined}
-                  className="text-foreground/75 flex-none"
+                  className="flex-none"
                 >
                   {x.title}
                 </TabsTrigger>
