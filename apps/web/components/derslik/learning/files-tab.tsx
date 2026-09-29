@@ -136,12 +136,17 @@ export function FilesTab({ ctx }: { ctx: LearningCtx }) {
       )}
       <ItemGroup className="gap-3">
         {!data.materials.length && (
-          <EmptyNote icon={FileText} title={t("learn.noFiles")}>
+          <EmptyNote role="listitem" icon={FileText} title={t("learn.noFiles")}>
             {t("learn.noFilesHint")}
           </EmptyNote>
         )}
         {data.materials.map((file) => (
-          <Item variant="outline" className="bg-card" key={file.id}>
+          <Item
+            role="listitem"
+            variant="outline"
+            className="bg-card"
+            key={file.id}
+          >
             <ItemMedia variant="icon">
               {isImageName(file.name) ? <ImageIcon /> : <FileText />}
             </ItemMedia>

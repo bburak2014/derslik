@@ -76,7 +76,11 @@ export function AssignmentsTab({ ctx }: { ctx: LearningCtx }) {
       </SectionHeading>
       <ItemGroup className="gap-3">
         {!data.assignments.length && (
-          <EmptyNote icon={ClipboardList} title={t("learn.noAssignments")}>
+          <EmptyNote
+            role="listitem"
+            icon={ClipboardList}
+            title={t("learn.noAssignments")}
+          >
             {t("learn.noAssignmentsHint")}
           </EmptyNote>
         )}
@@ -98,6 +102,7 @@ export function AssignmentsTab({ ctx }: { ctx: LearningCtx }) {
           const editable = canEditSubmission(a, !!sub, today);
           return (
             <Item
+              role="listitem"
               variant="outline"
               className="bg-card items-start"
               key={a.id}

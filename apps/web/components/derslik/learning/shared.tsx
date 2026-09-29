@@ -403,7 +403,11 @@ export function LessonSchedule({
             />
           ))
         ) : (
-          <EmptyNote icon={CalendarDays} title={t("learn.noUpcoming")}>
+          <EmptyNote
+            role="listitem"
+            icon={CalendarDays}
+            title={t("learn.noUpcoming")}
+          >
             {t("learn.noUpcomingHint")}
           </EmptyNote>
         )}
@@ -440,6 +444,7 @@ export function LessonItem({
 }) {
   return (
     <Item
+      role="listitem"
       variant="outline"
       className={chip ? "border-(--marker) bg-(--marker-soft)" : "bg-card"}
     >
@@ -495,13 +500,17 @@ export function EmptyNote({
   icon: Icon,
   title,
   children,
+  role,
 }: {
   icon: LucideIcon;
   title: string;
   children: React.ReactNode;
+  /** Bir listenin (ItemGroup) içindeyse "listitem": ekran okuyucu ve
+   *  otomatik denetim listenin yalnızca öğe içerdiğini görsün. */
+  role?: "listitem";
 }) {
   return (
-    <Empty className="border md:p-10">
+    <Empty role={role} className="border md:p-10">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <Icon />

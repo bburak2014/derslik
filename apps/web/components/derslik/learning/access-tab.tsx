@@ -102,12 +102,21 @@ export function AccessTab({ ctx }: { ctx: LearningCtx }) {
       )}
       <ItemGroup className="gap-3">
         {access && !access.data?.length && !access.invitations?.length && (
-          <EmptyNote icon={UserPlus} title={t("learn.noInvites")}>
+          <EmptyNote
+            role="listitem"
+            icon={UserPlus}
+            title={t("learn.noInvites")}
+          >
             {t("learn.noInvitesHint")}
           </EmptyNote>
         )}
         {access?.data?.map((a) => (
-          <Item variant="outline" className="bg-card" key={a.id}>
+          <Item
+            role="listitem"
+            variant="outline"
+            className="bg-card"
+            key={a.id}
+          >
             <ItemMedia variant="icon">
               <UserCheck />
             </ItemMedia>
@@ -156,7 +165,12 @@ export function AccessTab({ ctx }: { ctx: LearningCtx }) {
         {access?.invitations?.map((a) => {
           const expired = a.expiresAt < new Date().toISOString();
           return (
-            <Item variant="outline" className="bg-card" key={a.id}>
+            <Item
+              role="listitem"
+              variant="outline"
+              className="bg-card"
+              key={a.id}
+            >
               <ItemMedia variant="icon">
                 <Mail />
               </ItemMedia>

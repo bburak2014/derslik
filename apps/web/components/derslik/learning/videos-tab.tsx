@@ -230,7 +230,11 @@ export function VideosTab({ ctx }: { ctx: LearningCtx }) {
       )}
       <ItemGroup className="gap-3">
         {!data.videos.length && (
-          <EmptyNote icon={VideoIcon} title={t("learn.noVideos")}>
+          <EmptyNote
+            role="listitem"
+            icon={VideoIcon}
+            title={t("learn.noVideos")}
+          >
             {t("learn.noVideosHint")}
           </EmptyNote>
         )}
@@ -238,6 +242,7 @@ export function VideosTab({ ctx }: { ctx: LearningCtx }) {
           const questions = data.questions.filter((q) => q.video_id === v.id);
           return (
             <Item
+              role="listitem"
               variant="outline"
               className="bg-card"
               key={v.id}
