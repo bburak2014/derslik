@@ -6,13 +6,25 @@ import {
 } from "@/lib/server/session";
 import { serverText } from "@/lib/server/locale";
 export const dynamic = "force-dynamic";
-export default async function Home() {
+// Sunucu çizimi adres çubuğundaki görünümle (?view=, ?teacher=) başlasın.
+const searchString = (params: Record<string, string | string[] | undefined>) =>
+  new URLSearchParams(
+    Object.entries(params).flatMap(([k, v]) =>
+      (Array.isArray(v) ? v : v === undefined ? [] : [v]).map((x) => [k, x]),
+    ),
+  ).toString();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (configured()) {
     const signedIn = await hasSessionCookie();
     return (
       <ConnectedWorkspace
         signedOut={!signedIn}
         initialSession={signedIn ? await initialSession() : null}
+        initialSearch={searchString(await searchParams)}
       />
     );
   }

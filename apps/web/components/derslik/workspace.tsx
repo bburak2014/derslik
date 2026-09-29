@@ -175,6 +175,7 @@ export default function Workspace({
   switcher,
   focus,
   onNotice,
+  initialSearch = "",
 }: {
   displayName: string;
   connected: import("@derslik/api-client").Access;
@@ -186,12 +187,17 @@ export default function Workspace({
   /** Bildirimden açılacak yer ve bildirime tıklanınca çağrılan işlev. */
   focus?: NoticeFocus | null;
   onNotice?: (target: import("@derslik/contracts").NoticeTarget) => void;
+  /** Sayfanın sorgu dizesi: sunucu ve istemci ilk çizimde aynı görünümü seçer. */
+  initialSearch?: string;
 }) {
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
     [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false);
-  const [view, setView] = useState<View>("overview"),
+  const [view, setView] = useState<View>(() => {
+      const v = new URLSearchParams(initialSearch).get("view");
+      return navigation.some((n) => n.id === v) ? (v as View) : "overview";
+    }),
     [search, setSearch] = useState(""),
     [selectedDay, setSelectedDay] = useState(dateKey()),
     [studentId, setStudentId] = useState<string | null>(null),

@@ -68,6 +68,7 @@ export function ConnectedWorkspace({
   inviteToken,
   signedOut = false,
   initialSession = null,
+  initialSearch = "",
 }: {
   inviteToken?: string;
   /** Sunucu oturum çerezi görmediyse giriş formu ilk HTML'de çizilir; form
@@ -76,6 +77,8 @@ export function ConnectedWorkspace({
   /** Sunucunun sayfayla birlikte gönderdiği oturum: ilk açılışta
    *  /api/session beklenmez, çalışma alanı paketi hemen yüklenmeye başlar. */
   initialSession?: SessionState | null;
+  /** Sayfanın sorgu dizesi; sunucu ve ilk istemci çizimi aynı görünümü seçer. */
+  initialSearch?: string;
 }) {
   const [session, setSession] = useState<SessionState | null>(initialSession),
     [error, setError] = useState(""),
@@ -127,7 +130,9 @@ export function ConnectedWorkspace({
     if (!session) return;
     document.title = t(studentView ? "meta.titleStudent" : "meta.title");
   }, [session, studentView]);
-  if (loading || (!mounted && !signedOut))
+  // Oturum sunucudan geldiyse alan doğrudan sunucuda çizilir (iskelet ve
+  // başlık ilk HTML'de); gelmediyse eşleşme için bağlanana kadar yükleyici.
+  if (loading || (!mounted && !signedOut && !initialSession))
     return (
       <main className="connection-state">
         <PageLoader />
@@ -281,6 +286,7 @@ export function ConnectedWorkspace({
     return (
       <Portal
         access={null}
+        initialSearch={initialSearch}
         displayName={session.user.email.split("@")[0]}
         onSignout={() => void signout()}
         focus={focus}
@@ -446,6 +452,7 @@ export function ConnectedWorkspace({
   return active.role === "OWNER" ? (
     <Workspace
       key={key(active)}
+      initialSearch={initialSearch}
       displayName={session.user.email.split("@")[0]}
       connected={active}
       onSignout={() => void signout()}
@@ -456,6 +463,7 @@ export function ConnectedWorkspace({
   ) : (
     <Portal
       key={key(active)}
+      initialSearch={initialSearch}
       access={active}
       displayName={session.user.email.split("@")[0]}
       switcher={switcher}
