@@ -3,6 +3,7 @@ import type { Messages } from "./index.js";
 
 export const zh: Messages = {
   api: {
+    calendarNotFound: "未找到日历链接，或该链接已被更换。",
     fileStorageFull: "文件存储空间已满，请删除旧文件以释放空间。",
     tooManyPendingUploads: "未完成的上传过多，请先完成或删除它们。",
     uploadExpired: "此次上传已过期，请删除后重新上传文件。",
@@ -180,6 +181,35 @@ export const zh: Messages = {
     day: "日",
     emptyText: "您可以添加课程，或在日历中选择其他日期。",
     emptyTitle: "此时间段内没有课程。",
+    feedApple: "添加到 Apple 日历",
+    feedBody: "只需将此链接添加到日历一次。新增、改期和取消的课程会自动更新。",
+    feedButton: "连接日历",
+    feedCopied: "链接已复制。",
+    feedCopy: "复制链接",
+    feedCopyManually: "无法复制。请选中链接后自行复制。",
+    feedDelay:
+      "Google 日历每隔几小时读取一次链接，变更可能需要一段时间才会显示。",
+    feedGoogle: "添加到 Google 日历",
+    feedGoogleComputer:
+      "Google 日历只能在电脑上通过链接添加日历。请复制链接，然后在电脑上打开 Google 日历 → 其他日历 → 通过网址添加，粘贴链接。",
+    feedLink: "您的日历链接",
+    feedLocal:
+      "此地址只能在这台电脑上使用。Google 日历需要在正式网站上使用；目前可以用这台电脑上的 Apple 日历试用。",
+    feedOpenFailed: "无法打开日历应用。请复制链接并添加到您的日历。",
+    feedOther:
+      "如使用 Outlook 或其他日历，请复制链接，粘贴到“从网页订阅”或“通过网址添加”处。",
+    feedPrivate:
+      "此链接仅供您本人使用。拿到链接的人都能看到您的课程，请勿分享。",
+    feedRotate: "生成新链接",
+    feedRotateBody: "旧链接会立即失效。您需要将新链接重新添加到日历。",
+    feedRotateTitle: "要生成新链接吗？",
+    feedRotated: "新链接已生成。请从日历中移除旧链接，并添加这个新链接。",
+    feedTitle: "将课程添加到您的日历",
+    icsDescription: "打开 Derslik 查看课程详情：{url}",
+    icsName: "Derslik 课程",
+    icsSummaryGuardian: "{student}：{topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "下一周",
     previousWeek: "上一周",
     recordCount: {

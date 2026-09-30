@@ -37,6 +37,11 @@ import {
   PublicDirectoryController,
 } from "./directory/directory.controller.js";
 import { DirectoryService } from "./directory/directory.service.js";
+import {
+  CalendarController,
+  CalendarFeedController,
+} from "./calendar/calendar.controller.js";
+import { CalendarService } from "./calendar/calendar.service.js";
 @Module({})
 export class AppModule {
   static register(config: ApiConfig): DynamicModule {
@@ -55,6 +60,8 @@ export class AppModule {
         SubscriptionWebhookController,
         PublicDirectoryController,
         DirectoryController,
+        CalendarFeedController,
+        CalendarController,
         ApiController,
       ],
       providers: [
@@ -67,6 +74,7 @@ export class AppModule {
         StudentsService,
         LessonsService,
         LessonRemindersService,
+        CalendarService,
         BillingService,
         SnapshotService,
         LearningService,

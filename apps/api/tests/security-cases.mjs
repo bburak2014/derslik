@@ -238,6 +238,11 @@ export async function securityCases({
           assert.equal(r.status, i < 2 ? 200 : 429);
           if (i === 2) assert.ok(Number(r.headers.get("retry-after")) > 0);
         }
+        // Takvim akışı da IP başına sınırlanır; belirteç tahmini yavaşlar.
+        for (let i = 0; i < 3; i++) {
+          const r = await fetch(url + "/v1/calendar/" + "0".repeat(64));
+          assert.equal(r.status, i < 2 ? 404 : 429);
+        }
       } finally {
         await limited.close();
       }

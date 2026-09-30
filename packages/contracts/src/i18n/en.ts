@@ -3,6 +3,7 @@ import type { Messages } from "./index.js";
 
 export const en: Messages = {
   api: {
+    calendarNotFound: "Calendar link not found, or it has been replaced.",
     fileStorageFull: "File storage is full. Delete old files to free up space.",
     tooManyPendingUploads:
       "You have too many unfinished uploads. Finish or delete them first.",
@@ -220,6 +221,39 @@ export const en: Messages = {
     day: "Day",
     emptyText: "You can add a lesson or pick another day in the calendar.",
     emptyTitle: "No lessons in this period.",
+    feedApple: "Add to Apple Calendar",
+    feedBody:
+      "Add this link to your calendar once. New, rescheduled and cancelled lessons update on their own.",
+    feedButton: "Connect calendar",
+    feedCopied: "Link copied.",
+    feedCopy: "Copy link",
+    feedCopyManually: "Couldn't copy. Select the link and copy it yourself.",
+    feedDelay:
+      "Google Calendar reads the link every few hours, so changes can take a while to appear.",
+    feedGoogle: "Add to Google Calendar",
+    feedGoogleComputer:
+      "Google Calendar only lets you add a calendar by link on a computer. Copy the link, then on a computer paste it under Google Calendar → Other calendars → From URL.",
+    feedLink: "Your calendar link",
+    feedLocal:
+      "This address only works on this computer. Google Calendar will work on the live site; for now you can try it with Apple Calendar on this computer.",
+    feedOpenFailed:
+      "Couldn't open a calendar app. Copy the link and add it to your calendar.",
+    feedOther:
+      'For Outlook or another calendar, copy the link and paste it under "Subscribe from web" or "Add by URL".',
+    feedPrivate:
+      "This link is private to you. Anyone who has it can see your lessons, so don't share it.",
+    feedRotate: "Create a new link",
+    feedRotateBody:
+      "The old link stops working right away. You'll need to add the new link to your calendar again.",
+    feedRotateTitle: "Create a new link?",
+    feedRotated:
+      "Your new link is ready. Remove the old one from your calendar and add this one.",
+    feedTitle: "Add your lessons to your calendar",
+    icsDescription: "Open Derslik for lesson details: {url}",
+    icsName: "Derslik lessons",
+    icsSummaryGuardian: "{student}: {topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "Next week",
     previousWeek: "Previous week",
     recordCount: {

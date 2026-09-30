@@ -86,6 +86,17 @@ export async function createApplication(config: ApiConfig) {
       new HttpException("api.tooManyRequests", HttpStatus.TOO_MANY_REQUESTS),
     );
   });
+  // Takvim akışını takvim uygulamaları oturumsuz okur; o da IP başına sınırlanır.
+  const calendarLimiter = new RateLimiter(config.RATE_LIMIT_PUBLIC_PER_MINUTE);
+  app.use("/v1/calendar", (req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== "GET") return next();
+    const wait = calendarLimiter.take(req.ip || "unknown");
+    if (!wait) return next();
+    res.setHeader("Retry-After", String(wait));
+    next(
+      new HttpException("api.tooManyRequests", HttpStatus.TOO_MANY_REQUESTS),
+    );
+  });
   // Vitrin fotoğrafı JSON içinde base64 gelir; yalnızca o uç daha büyük gövde alır.
   app.use("/v1/workspaces/:ws/showcase/photo", largeJson(512 * 1024));
   app.useBodyParser("json", { limit: "16kb" });
