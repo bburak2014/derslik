@@ -82,6 +82,9 @@ export const students = app.table(
     unique("students_workspace_id").on(t.workspaceId, t.id),
     unique("students_workspace_user").on(t.workspaceId, t.userId),
     index("students_workspace_active").on(t.workspaceId, t.active),
+    uniqueIndex("students_workspace_email")
+      .on(t.workspaceId, sql`lower(btrim(${t.email}))`)
+      .where(sql`btrim(${t.email}) <> ''`),
   ],
 );
 export const packages = app.table(

@@ -89,6 +89,8 @@ export const zh: Messages = {
     studentAlreadyActive: "该学生已处于在读状态。",
     studentArchived: "该学生已归档。",
     studentChanged: "学生记录已被修改，请加载最新版本。",
+    studentEmailTaken:
+      "此邮箱已用于另一条学生记录（包括已归档的）。请使用该学生，不要新建。",
     studentHasScheduledLessons: "请先完成或取消已安排的课程。",
     studentLimitReached: "已达到在读学生数量上限。",
     studentNotFound: "未找到学生。",

@@ -120,6 +120,8 @@ export const es: Messages = {
     studentArchived: "El alumno está archivado.",
     studentChanged:
       "La ficha del alumno ha cambiado. Carga la versión más reciente.",
+    studentEmailTaken:
+      "Otra ficha de alumno ya usa este correo (incluidas las archivadas). Usa ese alumno en lugar de crear uno nuevo.",
     studentHasScheduledLessons:
       "Primero completa o cancela las clases programadas.",
     studentLimitReached: "Has alcanzado el límite de alumnos activos.",

@@ -32,7 +32,14 @@ export class ApiErrorFilter implements ExceptionFilter {
       message = localizeMessage(locale, error.message);
     } else {
       const code = (error as { code?: string })?.code;
-      if (code === "23505" || code === "23P01") {
+      if (
+        code === "23505" &&
+        (error as { constraint?: string }).constraint ===
+          "students_workspace_email"
+      ) {
+        status = 409;
+        message = translate(locale, "api.studentEmailTaken");
+      } else if (code === "23505" || code === "23P01") {
         status = 409;
         message = translate(locale, "api.duplicate");
       } else if (code === "23503" || code === "23514") {

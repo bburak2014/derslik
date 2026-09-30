@@ -126,6 +126,8 @@ export const de: Messages = {
     studentArchived: "Der Schüler wurde archiviert.",
     studentChanged:
       "Der Schülereintrag wurde geändert. Laden Sie die aktuelle Version.",
+    studentEmailTaken:
+      "Diese E-Mail-Adresse gehört bereits zu einem anderen Schülereintrag (auch archivierte zählen). Verwenden Sie diesen Schüler, statt einen neuen anzulegen.",
     studentHasScheduledLessons:
       "Schließen Sie zuerst die geplanten Stunden ab oder sagen Sie sie ab.",
     studentLimitReached: "Die maximale Zahl aktiver Schüler ist erreicht.",

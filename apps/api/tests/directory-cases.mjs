@@ -713,6 +713,157 @@ export async function directoryCases({
       assert.deepEqual(links[0].permissions, ["lessons"]);
     },
   );
+
+  await t.test(
+    "one email belongs to one student record per teacher",
+    async () => {
+      await admin.query(
+        "UPDATE derslik.workspace_limits SET student_limit=50 WHERE workspace_id=$1",
+        [ws],
+      );
+      const commands = `/v1/workspaces/${ws}/commands`;
+      const fields = { grade: "", subject: "Matematik", phone: "" };
+      const send = (body) =>
+        request(commands, { method: "POST", body, auth: tokenTeacher });
+      const elif = (
+        await ok(
+          commands,
+          {
+            action: "student.create",
+            name: "Elif Su",
+            email: "Elif@Example.test",
+            ...fields,
+          },
+          { auth: tokenTeacher },
+        )
+      ).data;
+      // Büyük/küçük harf fark etmez.
+      const again = await send({
+        action: "student.create",
+        name: "Elif Su",
+        email: "elif@example.TEST",
+        ...fields,
+      });
+      assert.equal(again.status, 409);
+      assert.match(again.body.error.message, /başka bir öğrenci kaydında/);
+      const can = (
+        await ok(
+          commands,
+          { action: "student.create", name: "Can Er", email: "", ...fields },
+          { auth: tokenTeacher },
+        )
+      ).data;
+      const moved = await send({
+        action: "student.update",
+        id: can.id,
+        version: can.version,
+        name: "Can Er",
+        email: "ELIF@example.test",
+        ...fields,
+      });
+      assert.equal(moved.status, 409);
+      // Kaydın kendi e-postasıyla kaydedilmesi serbesttir.
+      const kept = (
+        await ok(
+          commands,
+          {
+            action: "student.update",
+            id: elif.id,
+            version: elif.version,
+            name: "Elif Su",
+            email: "elif@example.test",
+            ...fields,
+          },
+          { auth: tokenTeacher },
+        )
+      ).data;
+      // Arşivdeki kayıt da e-postasını tutar.
+      await ok(
+        commands,
+        { action: "student.archive", id: elif.id, version: kept.version },
+        { auth: tokenTeacher },
+      );
+      const archived = await send({
+        action: "student.create",
+        name: "Elif Su",
+        email: "elif@example.test",
+        ...fields,
+      });
+      assert.equal(archived.status, 409);
+      // Benzersiz dizin eşzamanlı yazımları da yakalar.
+      await assert.rejects(
+        admin.query(
+          "INSERT INTO derslik.students(workspace_id,name,subject,email) VALUES($1,'Kopya','Matematik',' elif@EXAMPLE.test ')",
+          [ws],
+        ),
+        (error) => error.constraint === "students_workspace_email",
+      );
+      // Boş e-posta kurala girmez.
+      await ok(
+        commands,
+        { action: "student.create", name: "Deniz", email: "", ...fields },
+        { auth: tokenTeacher },
+      );
+      const count = async () =>
+        Number(
+          (
+            await admin.query(
+              "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1",
+              [ws],
+            )
+          ).rows[0].n,
+        );
+      // Ders isteği, isteyenin onaylı e-postasıyla eşleşen bağlantısız kaydı
+      // kullanır; arşivdeyse geri getirir.
+      const requester = randomUUID();
+      const tokenRequester = await token(requester, {
+        email: "elif@example.test",
+      });
+      const first = await ok(
+        `/v1/teacher-relations/${ws}/requests`,
+        { ...requestBody, studentName: "Elif Su" },
+        { auth: tokenRequester },
+      );
+      const before = await count();
+      const accepted = await ok(
+        `/v1/workspaces/${ws}/requests/${first.data.id}/accept`,
+        {},
+        { auth: tokenTeacher },
+      );
+      assert.equal(accepted.data.studentId, elif.id);
+      assert.equal(await count(), before);
+      const reused = (
+        await admin.query(
+          "SELECT active,user_id FROM derslik.students WHERE id=$1",
+          [elif.id],
+        )
+      ).rows[0];
+      assert.equal(reused.active, true);
+      assert.equal(reused.user_id, requester);
+      // Kayıt başka bir hesaba etkin bağlıysa yeni kayıt e-postasız açılır.
+      const second = randomUUID();
+      const tokenSecond = await token(second, { email: "elif@example.test" });
+      const next = await ok(
+        `/v1/teacher-relations/${ws}/requests`,
+        { ...requestBody, studentName: "Elif Su" },
+        { auth: tokenSecond },
+      );
+      const fresh = await ok(
+        `/v1/workspaces/${ws}/requests/${next.data.id}/accept`,
+        {},
+        { auth: tokenTeacher },
+      );
+      assert.notEqual(fresh.data.studentId, elif.id);
+      assert.equal(
+        (
+          await admin.query("SELECT email FROM derslik.students WHERE id=$1", [
+            fresh.data.studentId,
+          ])
+        ).rows[0].email,
+        "",
+      );
+    },
+  );
 }
 
 async function fetchPhoto(request, ws, auth) {
