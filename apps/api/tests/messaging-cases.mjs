@@ -234,10 +234,7 @@ export async function messagingCases({
       assert.equal(row(first, links.quiet).guardianEmail, null);
       assert.equal(row(first, links.kid).guardianEmail, null);
       assert.equal(threadTitle(row(first, links.pupil)), "Ayşe Yılmaz");
-      assert.equal(
-        threadTitle(row(first, links.parent)),
-        "Ayşe Yılmaz velisi",
-      );
+      assert.equal(threadTitle(row(first, links.parent)), "Ayşe Yılmaz velisi");
       assert.deepEqual(
         (await listOwner(`?student=${ayse.id}`)).map((r) => r.linkId),
         [links.pupil, links.parent, links.quiet],
@@ -353,10 +350,7 @@ export async function messagingCases({
         threadTitle(row(parentList, links.pupil)),
         "Ayşe Yılmaz ile öğretmen",
       );
-      const child = await open(
-        portal(ayse.id, `/${links.pupil}`),
-        tokenParent,
-      );
+      const child = await open(portal(ayse.id, `/${links.pupil}`), tokenParent);
       assert.equal(child.thread.viewer, "GUARDIAN_READ");
       assert.deepEqual(
         child.messages.map((m) => [m.senderRole, m.mine]),
@@ -388,9 +382,9 @@ export async function messagingCases({
       assert.equal(fromParent.replayed, false);
       await send(owner(`/${links.parent}`), "Hoş geldiniz.", tokenTeacher);
       assert.deepEqual(
-        (await open(portal(ayse.id, `/${links.parent}`), tokenParent)).messages.map(
-          (m) => [m.senderRole, m.mine],
-        ),
+        (
+          await open(portal(ayse.id, `/${links.parent}`), tokenParent)
+        ).messages.map((m) => [m.senderRole, m.mine]),
         [
           ["GUARDIAN", true],
           ["OWNER", false],
@@ -406,12 +400,9 @@ export async function messagingCases({
         [[links.quiet, "SELF"]],
       );
       for (const link of [links.pupil, links.parent]) {
-        await refused(
-          portal(ayse.id, `/${link}`),
-          404,
-          "api.messageNotFound",
-          { auth: tokenQuiet },
-        );
+        await refused(portal(ayse.id, `/${link}`), 404, "api.messageNotFound", {
+          auth: tokenQuiet,
+        });
         await refused(
           portal(ayse.id, `/${link}`),
           404,
@@ -433,12 +424,9 @@ export async function messagingCases({
         [tokenPupil, links.parent],
         [tokenPupil, links.quiet],
       ]) {
-        await refused(
-          portal(ayse.id, `/${link}`),
-          404,
-          "api.messageNotFound",
-          { auth },
-        );
+        await refused(portal(ayse.id, `/${link}`), 404, "api.messageNotFound", {
+          auth,
+        });
         await refused(
           portal(ayse.id, `/${link}`),
           404,
@@ -678,11 +666,7 @@ export async function messagingCases({
       assert.equal((await kidThread())[0].unread, 1);
       assert.equal((await teacherRow()).unread, 0);
       assert.equal(unreadBadge(await kidThread()), 1);
-      await ok(
-        portal(mehmet.id, `/${links.kid}/read`),
-        {},
-        { auth: tokenKid },
-      );
+      await ok(portal(mehmet.id, `/${links.kid}/read`), {}, { auth: tokenKid });
       assert.equal(unreadBadge(await kidThread()), 0);
 
       // Velinin yalnızca okuduğu çocuk yazışması sayaca girmez.
@@ -717,7 +701,22 @@ export async function messagingCases({
           send(owner(`/${links.kid}`), `Toplu ${x}`, tokenTeacher),
         ),
       );
-      const thread = (path) => open(owner(`/${links.kid}${path}`), tokenTeacher);
+      // İstemci zamanı milisaniyeyle geri gönderir: yazışmadaki her mesajın
+      // zamanı milisaniyede ve benzersiz olmalı, yoksa sayfa sınırındaki
+      // mesaj kaybolur.
+      assert.deepEqual(
+        (
+          await admin.query(
+            `SELECT count(*)::int AS n, count(DISTINCT created_at)::int AS distinct,
+              count(*) FILTER (WHERE created_at<>date_trunc('milliseconds',created_at))::int AS submillisecond
+             FROM derslik.messages WHERE link_id=$1`,
+            [links.kid],
+          )
+        ).rows[0],
+        { n: 8, distinct: 8, submillisecond: 0 },
+      );
+      const thread = (path) =>
+        open(owner(`/${links.kid}${path}`), tokenTeacher);
       const full = await thread("?limit=100");
       assert.equal(full.messages.length, 8);
       assert.equal(full.more, false);
@@ -757,10 +756,11 @@ export async function messagingCases({
       assert.deepEqual(single, full.messages);
       assert.equal((await thread("?limit=8")).more, false);
       assert.equal((await thread("?limit=7")).more, true);
-      assert.deepEqual(
-        await thread("?before=2000-01-01T00:00:00.000Z"),
-        { thread: full.thread, messages: [], more: false },
-      );
+      assert.deepEqual(await thread("?before=2000-01-01T00:00:00.000Z"), {
+        thread: full.thread,
+        messages: [],
+        more: false,
+      });
       // Öğrenci de aynı sayfaları görür.
       assert.deepEqual(
         (
@@ -850,12 +850,10 @@ export async function messagingCases({
         ).rows[0].n,
         1,
       );
-      await refused(
-        path,
-        409,
-        "api.idempotencyKeyReused",
-        { ...post(tokenTeacher, { body: `${secret} değişti` }), key },
-      );
+      await refused(path, 409, "api.idempotencyKeyReused", {
+        ...post(tokenTeacher, { body: `${secret} değişti` }),
+        key,
+      });
       // Portal tarafında da aynı kural.
       const portalKey = randomUUID();
       const p1 = await send(
@@ -923,12 +921,9 @@ export async function messagingCases({
         (await ok(foreign(""), undefined, { auth: tokenStranger })).data,
         [],
       );
-      await refused(
-        foreign(`/${links.pupil}`),
-        404,
-        "api.messageNotFound",
-        { auth: tokenStranger },
-      );
+      await refused(foreign(`/${links.pupil}`), 404, "api.messageNotFound", {
+        auth: tokenStranger,
+      });
       await refused(
         foreign(`/${links.pupil}`),
         404,
@@ -952,7 +947,6 @@ export async function messagingCases({
         "api.messageNotFound",
         post(tokenStranger),
       );
-      assert.equal(await messageCount(links.pupil), await messageCount(links.pupil));
 
       // Erişimi kaldırılan öğrenci: portal öğrenci düzeyinde reddeder;
       // öğretmen geçmişi okur, yazamaz; veli çocuğun yazışmasını artık görmez.
@@ -1086,12 +1080,8 @@ export async function messagingCases({
         [[links.pupil, true]],
       );
       assert.equal(
-        (
-          await open(
-            portal(ayse.id, `/${links.pupil}?limit=100`),
-            tokenPupil,
-          )
-        ).messages.length,
+        (await open(portal(ayse.id, `/${links.pupil}?limit=100`), tokenPupil))
+          .messages.length,
         history,
       );
       await send(portal(ayse.id, `/${links.pupil}`), "Geri döndüm", tokenPupil);
@@ -1116,8 +1106,8 @@ export async function messagingCases({
         assert.equal(archived.active, false);
         assert.equal(archived.canSend, false);
         assert.ok(
-          (await open(owner(`/${links.parent}`), tokenTeacher)).messages.length >
-            0,
+          (await open(owner(`/${links.parent}`), tokenTeacher)).messages
+            .length > 0,
         );
         await refused(
           owner(`/${links.parent}`),

@@ -85,6 +85,7 @@ export async function accessCases({
   tokenB,
   tokenStudent,
   actorA,
+  actorStudent,
 }) {
   await t.test(
     "every route rejects a foreign teacher and a student outside their grant",
@@ -100,8 +101,26 @@ export async function accessCases({
         "SELECT id FROM derslik.students WHERE workspace_id=$1 AND id<>$2 ORDER BY id LIMIT 1",
         [ws, student.id],
       );
+      // Öğrencinin (artık kaldırılmış) bağlantısında bir yazışma: metni ve
+      // okunma kaydı başka hiçbir hesaba görünmemeli, değişmemeli.
+      const link = (
+        await admin.query(
+          "SELECT id FROM derslik.portal_links WHERE workspace_id=$1 AND student_id=$2 AND user_id=$3 AND role='STUDENT'",
+          [ws, student.id, actorStudent],
+        )
+      ).rows[0].id;
+      const messageText = `Gizli yazışma ${randomUUID()}`;
+      await admin.query(
+        "INSERT INTO derslik.messages(workspace_id,link_id,sender_id,body) VALUES($1,$2,$3,$4)",
+        [ws, link, actorA, messageText],
+      );
+      await admin.query(
+        "INSERT INTO derslik.message_reads(workspace_id,link_id,user_id,read_at) VALUES($1,$2,$3,now()) ON CONFLICT DO NOTHING",
+        [ws, link, actorA],
+      );
       const ids = {
         student: student.id,
+        link,
         lesson: await q("lessons"),
         payment: await q("payments"),
         material: await q("materials"),
@@ -123,6 +142,7 @@ export async function accessCases({
         if (path.includes("/videos/")) return ids.video;
         if (path.includes("/inbox/")) return ids.notification;
         if (path.includes("/requests/")) return ids.request;
+        if (path.includes("/messages/")) return ids.link;
         return ids.student;
       }
       function fill(path, workspace, studentId) {
@@ -162,6 +182,7 @@ export async function accessCases({
         ).rows)
           secrets.add(row.id);
       secrets.add(student.name);
+      secrets.add(messageText);
 
       const before = await digest(admin, ws);
       const leaks = [];
