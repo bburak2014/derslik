@@ -649,6 +649,14 @@ export const es: Messages = {
     inviteSubject: "Invitación a Derslik · {name}",
     inviteValidity:
       "El enlace es válido durante 7 días. Solo puedes aceptar la invitación con una cuenta que use esta dirección de correo.",
+    reminderSubject: "Recordatorio de clase · {time}",
+    reminderIntroStudent: "Tu clase con {teacher} empieza pronto.",
+    reminderIntroGuardian:
+      "La clase de {student} con {teacher} empieza pronto.",
+    reminderTime: "Hora: {time}",
+    reminderTopic: "Tema: {topic}",
+    reminderLocation: "Lugar: {location}",
+    reminderOpen: "Abrir clases",
   },
   meta: {
     description: "Tus alumnos, clases y cobros en un solo lugar.",
@@ -862,6 +870,7 @@ export const es: Messages = {
     videos: "Vídeos de clase",
   },
   notice: {
+    lessonReminder: "Próxima clase",
     requestAccepted: "Tu solicitud de clase fue aceptada",
     requestDeclined: "Tu solicitud de clase fue rechazada",
     requestNew: "Nueva solicitud de clase",

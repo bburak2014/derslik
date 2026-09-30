@@ -12,7 +12,9 @@ export type NoticeKind =
   | "ANSWER"
   | "SUMMARY"
   | "REQUEST"
-  | "REQUEST_DECISION";
+  | "REQUEST_DECISION"
+  /** Yaklaşan ders hatırlatması; hedef ders kaydıdır. */
+  | "LESSON";
 
 export type Notice = {
   id: string;
@@ -30,6 +32,8 @@ export type Notice = {
 /** Bildirimin açtığı bölüm: öğretmende Ödevler / Ders videoları sayfası ya da
  *  öğrenci dosyasındaki Paylaşımlar, öğrenci ve velide aynı adlı sekme. */
 export type NoticeSection =
+  /** Öğretmende takvim, öğrenci ve velide Dersler sekmesi. */
+  | "lessons"
   | "assignments"
   | "videos"
   | "notes"
@@ -43,7 +47,7 @@ export type NoticeTarget = {
   /** İstek bildirimlerinde öğrenci kaydı henüz yoksa boş. */
   studentId: string;
   section: NoticeSection;
-  /** Bölümde öne çıkarılacak ödev, video veya özet. */
+  /** Bölümde öne çıkarılacak ders, ödev, video veya özet. */
   itemId: string | null;
 };
 
@@ -57,6 +61,7 @@ const sections: Record<NoticeKind, NoticeSection> = {
   SUMMARY: "notes",
   REQUEST: "requests",
   REQUEST_DECISION: "myRequests",
+  LESSON: "lessons",
 };
 
 /** Başlıklar sunucuda sabit metinler; türü yazılmamış eski bildirimler için. */
@@ -89,6 +94,7 @@ const noticeKeys: MessageKey[] = [
   "notice.requestNew",
   "notice.requestAccepted",
   "notice.requestDeclined",
+  "notice.lessonReminder",
 ];
 /** Bildirim başlığı veya gövdesi, okuyanın dilinde. Öğretmenin yazdığı ödev
  *  ya da video adı gibi serbest metinler olduğu gibi kalır. */
@@ -120,12 +126,13 @@ export function noticeTarget(n: Notice): NoticeTarget | null {
 /** Bildirim simgesinin türü; web lucide, mobil Ionicons simgesiyle çizer.
  *  Türü yazılmamış eski bildirimlerde sunucunun sabit Türkçe başlığına bakılır. */
 export type NoticeIcon =
-  "question" | "video" | "summary" | "assignment" | "other";
+  "question" | "video" | "summary" | "assignment" | "lesson" | "other";
 
 export function noticeIcon(n: Pick<Notice, "kind" | "title">): NoticeIcon {
   if (n.kind === "QUESTION" || n.kind === "ANSWER") return "question";
   if (n.kind === "VIDEO") return "video";
   if (n.kind === "SUMMARY") return "summary";
+  if (n.kind === "LESSON") return "lesson";
   if (n.kind) return "assignment";
   const title = n.title.toLocaleLowerCase("tr");
   if (title.includes("soru")) return "question";

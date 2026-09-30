@@ -2,6 +2,8 @@ import { BillingProvider } from "../../../.api-build/apps/api/src/subscriptions/
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import { MediaProviders } from "../../../.api-build/apps/api/src/media/providers.js";
+import { MailService } from "../../../.api-build/apps/api/src/access/mail.js";
+import { LessonRemindersService } from "../../../.api-build/apps/api/src/lessons/reminders.service.js";
 // Due dates are Istanbul calendar days (UTC+3, no DST).
 const istanbulDay = (offset) =>
   new Date(Date.now() + 3 * 3600_000 + offset * 86400_000)
@@ -1240,6 +1242,151 @@ export async function learningCases({
         (await ok(`/v1/workspaces/${ws}/settings/limits`)).data.limits.plan,
         "PILOT",
       );
+    },
+  );
+  await t.test(
+    "lesson reminders notify teacher, student and guardian once, email only the portal",
+    async () => {
+      const reminders = app.get(LessonRemindersService),
+        mail = app.get(MailService),
+        sent = [],
+        original = mail.sendLessonReminder;
+      mail.sendLessonReminder = async (message) => {
+        sent.push(message);
+        return true;
+      };
+      try {
+        // Nothing else is due; earlier tests use fixed past dates.
+        assert.equal(await reminders.run(), 0);
+        // The guardian's app runs in English: the email follows it.
+        await ok("/v1/inbox", undefined, {
+          auth: tokenGuardian,
+          headers: { "Accept-Language": "en-US,en;q=0.9" },
+        });
+        // The address comes from Auth, only once confirmed, and only when the
+        // session's address differs from the stored one.
+        await admin.query("UPDATE derslik.users SET email='' WHERE id=$1", [
+          actorStudent,
+        ]);
+        const withEmail = await token(actorStudent, {
+            email: "student@example.test",
+          }),
+          unconfirmed = await token(guardian, {
+            email: "changed@example.test",
+          });
+        verifiedUsers.set(`Bearer ${withEmail}`, {
+          id: actorStudent,
+          email: "student@example.test",
+          email_confirmed_at: new Date().toISOString(),
+        });
+        verifiedUsers.set(`Bearer ${unconfirmed}`, {
+          id: guardian,
+          email: "changed@example.test",
+        });
+        await ok("/v1/inbox", undefined, { auth: withEmail });
+        await ok("/v1/inbox", undefined, {
+          auth: unconfirmed,
+          headers: { "Accept-Language": "en" },
+        });
+        assert.deepEqual(
+          (
+            await admin.query(
+              "SELECT id,email FROM derslik.users WHERE id = ANY($1) ORDER BY email",
+              [[actorStudent, guardian]],
+            )
+          ).rows.map((r) => r.email),
+          ["guardian@example.test", "student@example.test"],
+        );
+        const reminderPack = (
+          await ok(`/v1/workspaces/${ws}/packages`, {
+            studentId: student.id,
+            name: "Hatırlatma",
+            granted: 4,
+            priceMinor: "400000",
+            expiresOn: null,
+          })
+        ).data;
+        const soon = new Date(
+          Math.ceil((Date.now() + 30 * 60_000) / 60_000) * 60_000,
+        );
+        const later = new Date(soon.getTime() + 5 * 3600_000);
+        const [due] = (
+          await ok(
+            `/v1/workspaces/${ws}/sessions`,
+            sessionBody(student.id, reminderPack.id, soon.toISOString()),
+          )
+        ).data.lessons;
+        const [notYet] = (
+          await ok(
+            `/v1/workspaces/${ws}/sessions`,
+            sessionBody(student.id, reminderPack.id, later.toISOString()),
+          )
+        ).data.lessons;
+        assert.equal(await reminders.run(), 1);
+        const notices = (
+          await admin.query(
+            "SELECT user_id,title,body,kind,student_id FROM derslik.notifications WHERE target_id=$1 ORDER BY user_id",
+            [due.id],
+          )
+        ).rows;
+        assert.equal(notices.length, 3);
+        assert.ok(
+          notices.every(
+            (n) =>
+              n.kind === "LESSON" &&
+              n.title === "notice.lessonReminder" &&
+              n.body === due.topic &&
+              n.student_id === student.id,
+          ),
+        );
+        assert.deepEqual(
+          (
+            await admin.query(
+              "SELECT count(*)::int AS n FROM derslik.notifications WHERE target_id=$1",
+              [notYet.id],
+            )
+          ).rows[0].n,
+          0,
+        );
+        // The teacher sees it in the app only; student and guardian get mail.
+        assert.deepEqual(sent.map((m) => [m.to, m.role, m.locale]).sort(), [
+          ["guardian@example.test", "GUARDIAN", "en"],
+          ["student@example.test", "STUDENT", "tr"],
+        ]);
+        assert.equal(sent[0].topic, due.topic);
+        assert.equal(sent[0].startsAt.getTime(), soon.getTime());
+        const studentInbox = (
+          await ok("/v1/inbox", undefined, { auth: tokenStudent })
+        ).data;
+        assert.ok(
+          studentInbox.some(
+            (n) => n.kind === "LESSON" && n.targetId === due.id,
+          ),
+        );
+        // A second pass, e.g. from another API copy, sends nothing.
+        assert.equal(await reminders.run(), 0);
+        // Moving the lesson re-arms its reminder for the new time.
+        await ok(`/v1/workspaces/${ws}/sessions/${due.id}/reschedule`, {
+          version: due.version,
+          startsAt: new Date(soon.getTime() + 10 * 60_000).toISOString(),
+          duration: 60,
+        });
+        assert.equal(await reminders.run(), 1);
+        // Cancelled lessons are never reminded.
+        await ok(`/v1/workspaces/${ws}/sessions/${notYet.id}/cancel`, {
+          version: notYet.version,
+        });
+        await admin.query(
+          "UPDATE derslik.lessons SET starts_at=now()+interval '20 minutes', ends_at=now()+interval '80 minutes' WHERE id=$1",
+          [notYet.id],
+        );
+        assert.equal(await reminders.run(), 0);
+        await ok(`/v1/workspaces/${ws}/sessions/${due.id}/cancel`, {
+          version: due.version + 1,
+        });
+      } finally {
+        mail.sendLessonReminder = original;
+      }
     },
   );
   await t.test(

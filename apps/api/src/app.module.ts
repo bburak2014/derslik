@@ -7,6 +7,7 @@ import { WorkspacesService } from "./workspaces/workspaces.service.js";
 import { QueriesService } from "./workspaces/queries.service.js";
 import { StudentsService } from "./students/students.service.js";
 import { LessonsService } from "./lessons/lessons.service.js";
+import { LessonRemindersService } from "./lessons/reminders.service.js";
 import { BillingService } from "./billing/billing.service.js";
 import { ApiController } from "./api.controller.js";
 import { HealthController } from "./health.controller.js";
@@ -65,6 +66,7 @@ export class AppModule {
         QueriesService,
         StudentsService,
         LessonsService,
+        LessonRemindersService,
         BillingService,
         SnapshotService,
         LearningService,

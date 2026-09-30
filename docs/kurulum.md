@@ -160,7 +160,21 @@ Webhook hedefi `https://API_ALAN_ADI/v1/webhooks/subscriptions`; abonelik oluşt
 
 Önce test modunda checkout, yenileme, iptal ve webhook'ları kendi hesabında doğrula. Canlıya geçerken gerçek hesap/variant/token kullanıp `LEMONSQUEEZY_TEST_MODE=false` yap. Test ve canlı olaylar karışırsa reddedilir. Fiyat/vergiler checkout sayfasında gösterilir. [Checkout API](https://docs.lemonsqueezy.com/api/checkouts/create-checkout), [webhook senkronizasyonu](https://docs.lemonsqueezy.com/guides/developer-guide/webhooks), [abonelik statüleri](https://docs.lemonsqueezy.com/api/subscriptions/the-subscription-object).
 
-## 8. Sunucu ve mevcut Sites yayını
+## 8. E-posta: davetler ve ders hatırlatması
+
+Öğrenci/veli davetleri ve ders hatırlatmaları [Resend](https://resend.com) ile gider. Resend'de alan adını ekle, verdiği SPF/DKIM kayıtlarını DNS'e gir ve doğrulandığını gör; sonra bir API anahtarı üret. Anahtar yalnızca `.env.api` dosyasında durur, depoya ve sohbete girmez:
+
+```dotenv
+RESEND_API_KEY=re_...
+MAIL_FROM=Derslik <ders@alanadin.com>
+LESSON_REMINDER_MINUTES=60
+```
+
+`MAIL_FROM` doğrulanmış alan adından bir adres olmalı; `onboarding@resend.dev` yalnızca Resend hesabının kendi adresine gönderir. İkisi boşsa e-posta atlanır: davet bağlantısı kopyalanarak, hatırlatma uygulama içi bildirimle çalışmaya devam eder.
+
+API her dakika önümüzdeki `LESSON_REMINDER_MINUTES` dakikada (varsayılan 60, `0` kapatır) başlayacak planlı dersleri bulur. Öğretmene, öğrenciye ve derslere erişimi olan veliye uygulamada bildirim yazılır; öğrenci ve veliye ayrıca uygulamada seçtikleri dilde e-posta gider. Her ders bir kez hatırlatılır, saati değişirse yeni saat için yeniden. E-posta adresi davet kabul edilirken ya da bildirimler açılırken Auth'tan onaylı olarak alınır. Gönderilemeyen e-posta yeniden denenmez; bildirim uygulamada kalır.
+
+## 9. Sunucu ve mevcut Sites yayını
 
 Nest backend uzun yaşayan Node/PostgreSQL bağlantısı kullanır; Sites Worker'ın içine Nest/ham TCP PostgreSQL yerleştirilmez. API ve PostgreSQL'i kendi sunucunda/container ortamında çalıştır. Web aynı Compose ile veya ayrı Next Node barındırmasında çalışabilir. HTTPS reverse proxy, veritabanı yedekleri, geri yükleme denemesi, istek hız sınırı ve log izleme üretim işletimine aittir. Üretimde sertifikalı PostgreSQL TLS kullanıyorsan `DATABASE_SSL=true` yap.
 

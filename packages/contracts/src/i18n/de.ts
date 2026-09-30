@@ -660,6 +660,14 @@ export const de: Messages = {
     inviteSubject: "Derslik-Einladung · {name}",
     inviteValidity:
       "Der Link ist 7 Tage gültig. Die Einladung können Sie nur mit einem Konto annehmen, das diese E-Mail-Adresse verwendet.",
+    reminderSubject: "Erinnerung an Ihre Stunde · {time}",
+    reminderIntroStudent: "Ihre Stunde bei {teacher} beginnt bald.",
+    reminderIntroGuardian:
+      "Die Stunde von {student} bei {teacher} beginnt bald.",
+    reminderTime: "Zeit: {time}",
+    reminderTopic: "Thema: {topic}",
+    reminderLocation: "Ort: {location}",
+    reminderOpen: "Stunden öffnen",
   },
   meta: {
     description: "Ihre Schüler, Stunden und Zahlungen an einem Ort.",
@@ -878,6 +886,7 @@ export const de: Messages = {
     videos: "Unterrichtsvideos",
   },
   notice: {
+    lessonReminder: "Anstehende Stunde",
     requestAccepted: "Ihre Unterrichtsanfrage wurde angenommen",
     requestDeclined: "Ihre Unterrichtsanfrage wurde abgelehnt",
     requestNew: "Neue Unterrichtsanfrage",

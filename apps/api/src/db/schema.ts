@@ -22,6 +22,9 @@ const createdAt = () =>
 export const users = app.table("users", {
   id: uuid("id").primaryKey(),
   createdAt: createdAt(),
+  // Ders hatırlatması e-postası için kişinin kendi oturumundan yazılır.
+  email: text("email").notNull().default(""),
+  locale: text("locale").notNull().default("tr"),
 });
 export const workspaces = app.table(
   "workspaces",
@@ -127,6 +130,7 @@ export const lessons = app.table(
     status: text("status").notNull().default("SCHEDULED"),
     version: integer("version").notNull().default(0),
     seriesId: uuid("series_id"),
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [

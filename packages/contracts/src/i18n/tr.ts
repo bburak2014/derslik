@@ -621,6 +621,13 @@ export const tr = {
     inviteSubject: "Derslik daveti · {name}",
     inviteValidity:
       "Bağlantı 7 gün geçerlidir. Daveti yalnızca bu e-posta adresiyle açtığınız hesapla kabul edebilirsiniz.",
+    reminderSubject: "Ders hatırlatması · {time}",
+    reminderIntroStudent: "{teacher} ile dersiniz yaklaşıyor.",
+    reminderIntroGuardian: "{student} için {teacher} ile olan ders yaklaşıyor.",
+    reminderTime: "Zaman: {time}",
+    reminderTopic: "Konu: {topic}",
+    reminderLocation: "Yer: {location}",
+    reminderOpen: "Dersleri aç",
   },
   meta: {
     description: "Öğrencileriniz, dersleriniz ve tahsilatlarınız bir arada.",
@@ -829,6 +836,7 @@ export const tr = {
     videos: "Ders videoları",
   },
   notice: {
+    lessonReminder: "Yaklaşan ders",
     requestAccepted: "Ders isteğiniz kabul edildi",
     requestDeclined: "Ders isteğiniz kabul edilmedi",
     requestNew: "Yeni ders isteği",
