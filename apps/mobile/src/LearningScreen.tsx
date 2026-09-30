@@ -81,6 +81,7 @@ import { setStringAsync } from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { PdfViewer } from "./PdfViewer";
 import { MediaPlayer } from "./MediaPlayer";
+import { CalendarFeed } from "./calendar-feed";
 const empty: LearningData = {
   lessons: [],
   assignments: [],
@@ -691,6 +692,8 @@ export function LearningScreen({
           )}
         {tab === "lessons" && (
           <>
+            {/* Öğretmen kendi bağlantısını Takvim sekmesinden alır. */}
+            {!owner && <CalendarFeed />}
             {!data.lessons.length && (
               <EmptyState
                 icon="calendar-outline"

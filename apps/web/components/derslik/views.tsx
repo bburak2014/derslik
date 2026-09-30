@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ToneBadge } from "./feedback";
+import { CalendarFeedButton } from "./calendar-feed";
 import {
   money,
   dateKey,
@@ -705,7 +706,8 @@ export function CalendarView({
           );
         })}
       </div>
-      <div className="section-heading">
+      {/* Dar ekranda düğmeler başlığın altına iner. */}
+      <div className="section-heading flex-wrap">
         <div>
           <h2>
             {mode === "week"
@@ -714,9 +716,16 @@ export function CalendarView({
           </h2>
           <p>{t("calendar.recordCount", { count: visible.length })}</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => actions.newLesson()}>
-          <Plus /> {t("calendar.addLesson")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarFeedButton size="sm" />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => actions.newLesson()}
+          >
+            <Plus /> {t("calendar.addLesson")}
+          </Button>
+        </div>
       </div>
       {visible.length ? (
         <LessonRows

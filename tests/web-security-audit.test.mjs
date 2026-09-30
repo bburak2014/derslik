@@ -273,6 +273,69 @@ test(
         },
       );
       await check(
+        "calendar feed is private, uncached and never proxies malformed names",
+        async () => {
+          const known = web.calendarToken;
+          const upstreamCalls = () =>
+            web.requests.filter((r) => r.url.startsWith("/v1/calendar/"))
+              .length;
+          // Calendar apps send no cookie, origin or custom header.
+          const feed = await fetch(`${web.origin}/api/calendar/${known}.ics`);
+          assert.equal(feed.status, 200);
+          assert.match(feed.headers.get("content-type"), /^text\/calendar/);
+          assert.equal(feed.headers.get("cache-control"), "private, no-cache");
+          assert.equal(feed.headers.get("referrer-policy"), "no-referrer");
+          const csp = feed.headers.get("content-security-policy");
+          for (const directive of [
+            "default-src 'none'",
+            "base-uri 'none'",
+            "form-action 'none'",
+            "frame-ancestors 'none'",
+          ])
+            assert.ok(csp?.includes(directive), directive);
+          assert.match(await feed.text(), /^BEGIN:VCALENDAR\r\n/);
+          const unknown = await fetch(
+            `${web.origin}/api/calendar/${"0".repeat(64)}.ics`,
+          );
+          assert.equal(unknown.status, 404);
+          assert.equal(
+            unknown.headers.get("cache-control"),
+            "private, no-cache",
+          );
+          await unknown.arrayBuffer();
+          // Raw request paths: fetch would resolve %2e%2e before sending.
+          // Next itself redirects a bare %2e%2e segment, so the traversal
+          // cases keep an encoded slash and reach the route; its own plain
+          // text 404 shows the route rejected the name.
+          const raw = (path) =>
+            new Promise((resolve, reject) => {
+              const req = httpRequest(web.origin, { path }, (res) => {
+                res.resume();
+                res.on("end", () =>
+                  resolve([res.statusCode, res.headers["content-type"]]),
+                );
+              });
+              req.on("error", reject);
+              req.end();
+            });
+          const before = upstreamCalls();
+          for (const path of [
+            `/api/calendar/${known}`,
+            `/api/calendar/${known.toUpperCase()}.ics`,
+            `/api/calendar/${known.slice(1)}.ics`,
+            `/api/calendar/${known}.ics.ics`,
+            `/api/calendar/%2e%2e%2f${known}.ics`,
+            `/api/calendar/${known}.ics%2f..`,
+            "/api/calendar/..%2f..%2fsession",
+          ]) {
+            const [status, type] = await raw(path);
+            assert.equal(status, 404, path);
+            assert.match(type, /^text\/plain/, path);
+          }
+          assert.equal(upstreamCalls(), before);
+        },
+      );
+      await check(
         "oversized streaming body is rejected before it ends",
         async () => {
           const state = await new Promise((resolve, reject) => {

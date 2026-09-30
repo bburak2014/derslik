@@ -42,6 +42,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Takvim bağlantısındaki belirteç tek anahtardır; adres başka siteye
+      // gitmesin. Bu liste route'un kendi başlığını ezer, aynı anahtarda
+      // sonraki kural geçer.
+      {
+        source: "/api/calendar/:path*",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
     ];
   },
 };

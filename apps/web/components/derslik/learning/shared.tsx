@@ -316,14 +316,16 @@ export function SectionHeading({
   description: string;
   children?: React.ReactNode;
 }) {
+  // Dar ekranda düğmeler başlığın altına iner; başlık birkaç harflik bir
+  // sütuna sıkışmaz.
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="grid min-w-0 gap-1">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div className="grid min-w-0 flex-1 basis-56 gap-1">
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         <p className="text-muted-foreground text-sm">{description}</p>
       </div>
       {children && (
-        <div className="flex shrink-0 items-center gap-2">{children}</div>
+        <div className="flex flex-wrap items-center gap-2">{children}</div>
       )}
     </div>
   );
