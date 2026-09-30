@@ -241,29 +241,29 @@ export const fr: Messages = {
     feedCopyManually:
       "Copie impossible. Sélectionnez le lien et copiez-le vous-même.",
     feedDelay:
-      "Google Agenda lit le lien toutes les quelques heures : les changements peuvent mettre du temps à apparaître.",
+      "Google Agenda lit le lien toutes les quelques heures : les changements peuvent mettre du temps à apparaître.",
     feedGoogle: "Ajouter à Google Agenda",
     feedGoogleComputer:
       "Google Agenda ne permet d'ajouter un agenda par lien que sur ordinateur. Copiez le lien, puis sur un ordinateur collez-le dans Google Agenda → Autres agendas → À partir de l'URL.",
     feedLink: "Votre lien de calendrier",
     feedLocal:
-      "Cette adresse ne fonctionne que sur cet ordinateur. Google Agenda fonctionnera avec le site en ligne ; pour l'instant, vous pouvez essayer avec le Calendrier Apple de cet ordinateur.",
+      "Cette adresse ne fonctionne que sur cet ordinateur. Google Agenda fonctionnera avec le site en ligne ; pour l'instant, vous pouvez essayer avec le Calendrier Apple de cet ordinateur.",
     feedOpenFailed:
       "Impossible d'ouvrir une application de calendrier. Copiez le lien et ajoutez-le à votre calendrier.",
     feedOther:
-      "Pour Outlook ou un autre calendrier, copiez le lien et collez-le dans « S'abonner depuis le web » ou « Ajouter par URL ».",
+      "Pour Outlook ou un autre calendrier, copiez le lien et collez-le dans « S'abonner depuis le web » ou « Ajouter par URL ».",
     feedPrivate:
-      "Ce lien vous est personnel. Toute personne qui l'a peut voir vos cours : ne le partagez pas.",
+      "Ce lien vous est personnel. Toute personne qui l'a peut voir vos cours : ne le partagez pas.",
     feedRotate: "Créer un nouveau lien",
     feedRotateBody:
       "L'ancien lien cesse aussitôt de fonctionner. Vous devrez ajouter le nouveau lien à votre calendrier.",
-    feedRotateTitle: "Créer un nouveau lien ?",
+    feedRotateTitle: "Créer un nouveau lien ?",
     feedRotated:
       "Votre nouveau lien est prêt. Retirez l'ancien de votre calendrier et ajoutez celui-ci.",
     feedTitle: "Ajoutez vos cours à votre calendrier",
-    icsDescription: "Ouvrez Derslik pour le détail du cours : {url}",
+    icsDescription: "Ouvrez Derslik pour le détail du cours : {url}",
     icsName: "Cours Derslik",
-    icsSummaryGuardian: "{student} : {topic} · {teacher}",
+    icsSummaryGuardian: "{student} : {topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "Semaine suivante",
