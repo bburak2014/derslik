@@ -27,6 +27,9 @@ const open = new Set([
   "POST /v1/teacher-relations/:id/review/delete",
   "GET /v1/requests",
   "GET /v1/media/capabilities",
+  // Takvim uygulaması oturumsuz okur; bağlantıdaki belirteç çağıranın kendi
+  // akışıdır. Oluşturma ve yenileme yalnızca çağıranın kendi bağlantısına dokunur.
+  "GET /v1/calendar/:token",
   // İmzalı gövdeyle doğrulanır; kimlik yolu kullanmaz.
   "POST /v1/webhooks/subscriptions",
   "POST /v1/webhooks/stream",

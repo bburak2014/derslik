@@ -3,6 +3,8 @@ import type { Messages } from "./index.js";
 
 export const es: Messages = {
   api: {
+    calendarNotFound:
+      "No se encontró el enlace del calendario o ya se reemplazó.",
     fileStorageFull:
       "El almacenamiento de archivos está lleno. Elimina archivos antiguos para liberar espacio.",
     tooManyPendingUploads:
@@ -229,6 +231,41 @@ export const es: Messages = {
     day: "Día",
     emptyText: "Puedes añadir una clase o elegir otro día en el calendario.",
     emptyTitle: "No tienes clases en este periodo.",
+    feedApple: "Añadir a Calendario de Apple",
+    feedBody:
+      "Añade este enlace a tu calendario una sola vez. Las clases nuevas, reprogramadas y canceladas se actualizan solas.",
+    feedButton: "Conectar calendario",
+    feedCopied: "Enlace copiado.",
+    feedCopy: "Copiar enlace",
+    feedCopyManually: "No se pudo copiar. Selecciona el enlace y cópialo tú.",
+    feedDelay:
+      "Google Calendar lee el enlace cada pocas horas, así que los cambios pueden tardar en aparecer.",
+    feedGoogle: "Añadir a Google Calendar",
+    feedGoogleComputer:
+      "Google Calendar solo permite añadir un calendario por enlace desde un ordenador. Copia el enlace y, en un ordenador, pégalo en Google Calendar → Otros calendarios → Desde URL.",
+    feedGooglePaste:
+      "Enlace copiado. En la página de Google Calendar que se abre, pégalo en el campo de URL y añade el calendario.",
+    feedLink: "Tu enlace de calendario",
+    feedLocal:
+      "Es una dirección local de desarrollo, así que Google Calendar no puede acceder a ella; funcionará con el sitio publicado. Por ahora puedes probarlo con Calendario de Apple en un dispositivo que acceda a esta dirección.",
+    feedOpenFailed:
+      "No se pudo abrir una aplicación de calendario. Copia el enlace y añádelo a tu calendario.",
+    feedOther:
+      "Para Outlook u otro calendario, copia el enlace y pégalo en «Suscribirse desde la web» o «Añadir por URL».",
+    feedPrivate:
+      "Este enlace es solo tuyo. Cualquiera que lo tenga puede ver tus clases; no lo compartas.",
+    feedRotate: "Crear un enlace nuevo",
+    feedRotateBody:
+      "El enlace anterior deja de funcionar al momento. Tendrás que añadir el nuevo enlace a tu calendario.",
+    feedRotateTitle: "¿Crear un enlace nuevo?",
+    feedRotated:
+      "Tu enlace nuevo está listo. Quita el anterior de tu calendario y añade este.",
+    feedTitle: "Añade tus clases a tu calendario",
+    icsDescription: "Abre Derslik para ver los detalles de la clase: {url}",
+    icsName: "Clases de Derslik",
+    icsSummaryGuardian: "{student}: {topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "Semana siguiente",
     previousWeek: "Semana anterior",
     recordCount: {

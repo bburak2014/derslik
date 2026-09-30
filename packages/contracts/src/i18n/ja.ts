@@ -3,6 +3,8 @@ import type { Messages } from "./index.js";
 
 export const ja: Messages = {
   api: {
+    calendarNotFound:
+      "カレンダーのリンクが見つからないか、新しいリンクに置き換えられています。",
     fileStorageFull:
       "ファイルの保存容量がいっぱいです。古いファイルを削除して空きを作ってください。",
     tooManyPendingUploads:
@@ -217,6 +219,42 @@ export const ja: Messages = {
     day: "日",
     emptyText: "授業を追加するか、カレンダーで別の日を選んでください。",
     emptyTitle: "この期間に授業はありません。",
+    feedApple: "Apple カレンダーに追加",
+    feedBody:
+      "このリンクをカレンダーに一度追加するだけで、新しい授業、日時が変わった授業、キャンセルされた授業が自動で反映されます。",
+    feedButton: "カレンダーと連携",
+    feedCopied: "リンクをコピーしました。",
+    feedCopy: "リンクをコピー",
+    feedCopyManually:
+      "コピーできませんでした。リンクを選択して手動でコピーしてください。",
+    feedDelay:
+      "Google カレンダーは数時間ごとにリンクを読み込むため、変更が表示されるまで時間がかかることがあります。",
+    feedGoogle: "Google カレンダーに追加",
+    feedGoogleComputer:
+      "Google カレンダーでリンクからカレンダーを追加できるのはパソコンだけです。リンクをコピーし、パソコンで Google カレンダー → 他のカレンダー → URL で追加 に貼り付けてください。",
+    feedGooglePaste:
+      "リンクをコピーしました。開いた Google カレンダーのページで URL 欄に貼り付け、カレンダーを追加してください。",
+    feedLink: "あなたのカレンダーリンク",
+    feedLocal:
+      "これはローカル開発用のアドレスのため、Google カレンダーからはアクセスできません。公開サイトでは使えます。今はこのアドレスにアクセスできる端末の Apple カレンダーで試せます。",
+    feedOpenFailed:
+      "カレンダーアプリを開けませんでした。リンクをコピーしてカレンダーに追加してください。",
+    feedOther:
+      "Outlook などほかのカレンダーでは、リンクをコピーして「Web から購読」や「URL で追加」に貼り付けてください。",
+    feedPrivate:
+      "このリンクはあなた専用です。リンクを知っている人は誰でも授業を見られるため、共有しないでください。",
+    feedRotate: "新しいリンクを作成",
+    feedRotateBody:
+      "古いリンクはすぐに使えなくなります。新しいリンクをカレンダーにもう一度追加する必要があります。",
+    feedRotateTitle: "新しいリンクを作成しますか？",
+    feedRotated:
+      "新しいリンクができました。古いリンクをカレンダーから削除し、こちらを追加してください。",
+    feedTitle: "授業をカレンダーに追加",
+    icsDescription: "授業の詳細は Derslik で確認できます: {url}",
+    icsName: "Derslik の授業",
+    icsSummaryGuardian: "{student}: {topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "次の週",
     previousWeek: "前の週",
     recordCount: {

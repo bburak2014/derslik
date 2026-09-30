@@ -86,6 +86,34 @@ export async function createApplication(config: ApiConfig) {
       new HttpException("api.tooManyRequests", HttpStatus.TOO_MANY_REQUESTS),
     );
   });
+  // Takvim akışını takvim uygulamaları oturumsuz okur. Sınır bağlantı
+  // başınadır, IP başına değil: Google ve Apple bütün abonelikleri birkaç ortak
+  // sunucudan okur ve web vekili ziyaretçi IP'sini her kurulumda bilmez.
+  // Belirteç 256 bittir; tahmin edilemez, bilinmeyen belirteç tek bir indeksli
+  // okumaya mal olur. Express HEAD'i de GET işleyicisine verir.
+  const calendarLimiter = new RateLimiter(
+    config.RATE_LIMIT_CALENDAR_PER_MINUTE,
+  );
+  app.use("/v1/calendar", (req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    // Aynı bağlantının kodlanmış ya da sonu eğik çizgili biçimi de aynı
+    // sayaca düşer. Belirteç biçiminde olmayan yol veritabanına hiç ulaşmaz
+    // (işleyicide 404); sayılmaz, sayaç da uzun yollarla şişirilemez.
+    let path = req.path;
+    try {
+      path = decodeURIComponent(path);
+    } catch {
+      return next();
+    }
+    const token = /^\/([a-f0-9]{64})\/?$/i.exec(path)?.[1];
+    if (!token) return next();
+    const wait = calendarLimiter.take(token.toLowerCase());
+    if (!wait) return next();
+    res.setHeader("Retry-After", String(wait));
+    next(
+      new HttpException("api.tooManyRequests", HttpStatus.TOO_MANY_REQUESTS),
+    );
+  });
   // Vitrin fotoğrafı JSON içinde base64 gelir; yalnızca o uç daha büyük gövde alır.
   app.use("/v1/workspaces/:ws/showcase/photo", largeJson(512 * 1024));
   app.useBodyParser("json", { limit: "16kb" });

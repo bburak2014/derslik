@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { readFile, writeFile, chmod } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
@@ -13,7 +13,8 @@ export async function startWebSecurityHarness({
   ipHeader = "x-forwarded-for",
 } = {}) {
   const userId = randomUUID(),
-    workspaceId = randomUUID();
+    workspaceId = randomUUID(),
+    calendarToken = randomBytes(32).toString("hex");
   const requests = [];
   const { privateKey, publicKey } = await generateKeyPair("ES256");
   const jwk = {
@@ -111,6 +112,17 @@ export async function startWebSecurityHarness({
       return reply(200, { user: null, session: null });
     if (url.pathname === "/v1/teachers")
       return reply(200, { data: [], total: 0 });
+    // Calendar apps read the feed without a session; only one token exists.
+    const feed = /^\/v1\/calendar\/([a-f0-9]{64})$/.exec(url.pathname);
+    if (feed) {
+      if (feed[1] !== calendarToken)
+        return reply(404, { error: { message: "Calendar not found" } });
+      return res
+        .writeHead(200, { "Content-Type": "text/calendar; charset=utf-8" })
+        .end(
+          "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Derslik//Test//EN\r\nEND:VCALENDAR\r\n",
+        );
+    }
     if (url.pathname === `/v1/teachers/${workspaceId}/photo`) {
       if (!account)
         return reply(404, { error: { message: "Unpublished teacher" } });
@@ -261,6 +273,7 @@ export async function startWebSecurityHarness({
     requests,
     accounts,
     workspaceId,
+    calendarToken,
     child,
     close,
     makeClient,

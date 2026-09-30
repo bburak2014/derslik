@@ -1,6 +1,7 @@
 // Bu dosya çeviri tablosundan üretilir; metni burada düzenleyin.
 export const tr = {
   api: {
+    calendarNotFound: "Takvim bağlantısı bulunamadı ya da yenilenmiş.",
     fileStorageFull:
       "Dosya depolama sınırı dolu. Eski dosyaları silerek yer açın.",
     tooManyPendingUploads:
@@ -212,6 +213,41 @@ export const tr = {
     day: "Gün",
     emptyText: "Ders ekleyebilir veya takvimden başka bir gün seçebilirsiniz.",
     emptyTitle: "Bu aralıkta dersiniz yok.",
+    feedApple: "Apple Takvim'e ekle",
+    feedBody:
+      "Bu bağlantıyı takviminize bir kez ekleyin. Yeni, ertelenen ve iptal edilen dersler kendiliğinden güncellenir.",
+    feedButton: "Takvime bağla",
+    feedCopied: "Bağlantı kopyalandı.",
+    feedCopy: "Bağlantıyı kopyala",
+    feedCopyManually: "Kopyalanamadı. Bağlantıyı seçip kendiniz kopyalayın.",
+    feedDelay:
+      "Google Takvim bağlantıyı birkaç saatte bir okur; değişikliklerin görünmesi zaman alabilir.",
+    feedGoogle: "Google Takvim'e ekle",
+    feedGoogleComputer:
+      "Google Takvim'de bağlantıyla takvim ekleme yalnızca bilgisayarda yapılır. Bağlantıyı kopyalayıp bilgisayarda Google Takvim → Diğer takvimler → URL ile ekle bölümüne yapıştırın.",
+    feedGooglePaste:
+      "Bağlantı kopyalandı. Açılan Google Takvim sayfasında URL alanına yapıştırıp takvimi ekleyin.",
+    feedLink: "Takvim bağlantınız",
+    feedLocal:
+      "Bu yerel bir geliştirme adresi; Google Takvim ona ulaşamaz, canlı sitede çalışır. Şimdilik bu adrese ulaşabilen bir cihazdaki Apple Takvim ile deneyebilirsiniz.",
+    feedOpenFailed:
+      "Takvim uygulaması açılamadı. Bağlantıyı kopyalayıp takviminize ekleyin.",
+    feedOther:
+      'Outlook veya başka bir takvim için bağlantıyı kopyalayıp "İnternetten abone ol" ya da "URL ile ekle" bölümüne yapıştırın.',
+    feedPrivate:
+      "Bu bağlantı size özeldir. Bağlantıya sahip olan herkes derslerinizi görebilir; paylaşmayın.",
+    feedRotate: "Yeni bağlantı oluştur",
+    feedRotateBody:
+      "Eski bağlantı hemen çalışmaz olur. Yeni bağlantıyı takviminize yeniden eklemeniz gerekir.",
+    feedRotateTitle: "Yeni bağlantı oluşturulsun mu?",
+    feedRotated:
+      "Yeni bağlantı hazır. Eskisini takviminizden kaldırıp yenisini ekleyin.",
+    feedTitle: "Derslerinizi takviminize ekleyin",
+    icsDescription: "Ders ayrıntıları için Derslik'i açın: {url}",
+    icsName: "Derslik dersleri",
+    icsSummaryGuardian: "{student}: {topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "Sonraki hafta",
     previousWeek: "Önceki hafta",
     recordCount: {

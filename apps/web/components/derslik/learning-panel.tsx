@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { FormError } from "./feedback";
 import { VideoPlayer } from "./video-player";
+import { CalendarFeedButton } from "./calendar-feed";
 import { AccessTab } from "./learning/access-tab";
 import { PaymentsTab } from "./learning/payments-tab";
 import { NotesTab } from "./learning/notes-tab";
@@ -133,6 +134,8 @@ export function LearningPanel(props: LearningPanelProps) {
       {tab === "lessons" && "lessons" in data && (
         <LessonSchedule lessons={data.lessons}>
           {view && refresh}
+          {/* Öğretmen kendi takvimini Takvim sayfasından bağlar. */}
+          {!owner && <CalendarFeedButton />}
         </LessonSchedule>
       )}
       {tab === "assignments" && <AssignmentsTab ctx={ctx} />}

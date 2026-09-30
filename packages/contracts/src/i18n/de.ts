@@ -3,6 +3,7 @@ import type { Messages } from "./index.js";
 
 export const de: Messages = {
   api: {
+    calendarNotFound: "Kalenderlink nicht gefunden oder bereits ersetzt.",
     fileStorageFull:
       "Der Dateispeicher ist voll. Löschen Sie alte Dateien, um Platz zu schaffen.",
     tooManyPendingUploads:
@@ -240,6 +241,42 @@ export const de: Messages = {
     emptyText:
       "Sie können eine Stunde hinzufügen oder im Kalender einen anderen Tag wählen.",
     emptyTitle: "In diesem Zeitraum haben Sie keine Stunden.",
+    feedApple: "Zu Apple Kalender hinzufügen",
+    feedBody:
+      "Fügen Sie diesen Link einmal zu Ihrem Kalender hinzu. Neue, verschobene und abgesagte Stunden werden automatisch aktualisiert.",
+    feedButton: "Kalender verbinden",
+    feedCopied: "Link kopiert.",
+    feedCopy: "Link kopieren",
+    feedCopyManually:
+      "Kopieren nicht möglich. Markieren Sie den Link und kopieren Sie ihn selbst.",
+    feedDelay:
+      "Google Kalender liest den Link nur alle paar Stunden, daher können Änderungen etwas dauern.",
+    feedGoogle: "Zu Google Kalender hinzufügen",
+    feedGoogleComputer:
+      "In Google Kalender lässt sich ein Kalender per Link nur am Computer hinzufügen. Kopieren Sie den Link und fügen Sie ihn am Computer unter Google Kalender → Weitere Kalender → Per URL ein.",
+    feedGooglePaste:
+      "Link kopiert. Fügen Sie ihn auf der geöffneten Google-Kalender-Seite in das URL-Feld ein und fügen Sie den Kalender hinzu.",
+    feedLink: "Ihr Kalenderlink",
+    feedLocal:
+      "Das ist eine lokale Entwicklungsadresse, die Google Kalender nicht erreicht; mit der Live-Website funktioniert es. Vorerst können Sie es mit Apple Kalender auf einem Gerät ausprobieren, das diese Adresse erreicht.",
+    feedOpenFailed:
+      "Keine Kalender-App konnte geöffnet werden. Kopieren Sie den Link und fügen Sie ihn Ihrem Kalender hinzu.",
+    feedOther:
+      "Für Outlook oder einen anderen Kalender kopieren Sie den Link und fügen ihn unter „Aus dem Web abonnieren“ bzw. „Per URL hinzufügen“ ein.",
+    feedPrivate:
+      "Dieser Link gehört nur Ihnen. Wer ihn hat, sieht Ihre Stunden – teilen Sie ihn nicht.",
+    feedRotate: "Neuen Link erstellen",
+    feedRotateBody:
+      "Der alte Link funktioniert sofort nicht mehr. Sie müssen den neuen Link erneut zu Ihrem Kalender hinzufügen.",
+    feedRotateTitle: "Neuen Link erstellen?",
+    feedRotated:
+      "Ihr neuer Link ist bereit. Entfernen Sie den alten aus Ihrem Kalender und fügen Sie diesen hinzu.",
+    feedTitle: "Stunden zu Ihrem Kalender hinzufügen",
+    icsDescription: "Details zur Stunde finden Sie in Derslik: {url}",
+    icsName: "Derslik-Stunden",
+    icsSummaryGuardian: "{student}: {topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "Nächste Woche",
     previousWeek: "Vorige Woche",
     recordCount: {

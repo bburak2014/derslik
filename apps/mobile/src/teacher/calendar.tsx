@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { addDays, dateKey, dayLabel, isDateKey, t } from "@derslik/contracts";
 import { Button, EmptyState, IconButton, Input } from "../ui";
+import { CalendarFeed } from "../calendar-feed";
 import { type TeacherCtx } from "./use-teacher-screen";
 
 export function CalendarSection({ ctx }: { ctx: TeacherCtx }) {
@@ -48,6 +49,7 @@ export function CalendarSection({ ctx }: { ctx: TeacherCtx }) {
       <Button icon="add" onPress={() => newLesson()}>
         {t("ws.planLesson")}
       </Button>
+      <CalendarFeed />
       {data.lessons
         .filter((l) => dateKey(l.starts_at) === day)
         .sort((a, b) => a.starts_at.localeCompare(b.starts_at))

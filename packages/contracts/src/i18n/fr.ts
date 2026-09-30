@@ -3,6 +3,7 @@ import type { Messages } from "./index.js";
 
 export const fr: Messages = {
   api: {
+    calendarNotFound: "Lien de calendrier introuvable ou déjà remplacé.",
     fileStorageFull:
       "L’espace de stockage des fichiers est plein. Supprimez d’anciens fichiers pour libérer de la place.",
     tooManyPendingUploads:
@@ -231,6 +232,42 @@ export const fr: Messages = {
     emptyText:
       "Vous pouvez ajouter un cours ou choisir un autre jour dans le calendrier.",
     emptyTitle: "Aucun cours sur cette période.",
+    feedApple: "Ajouter au Calendrier Apple",
+    feedBody:
+      "Ajoutez ce lien une seule fois à votre calendrier. Les cours nouveaux, reportés et annulés se mettent à jour d'eux-mêmes.",
+    feedButton: "Lier un calendrier",
+    feedCopied: "Lien copié.",
+    feedCopy: "Copier le lien",
+    feedCopyManually:
+      "Copie impossible. Sélectionnez le lien et copiez-le vous-même.",
+    feedDelay:
+      "Google Agenda lit le lien toutes les quelques heures : les changements peuvent mettre du temps à apparaître.",
+    feedGoogle: "Ajouter à Google Agenda",
+    feedGoogleComputer:
+      "Google Agenda ne permet d'ajouter un agenda par lien que sur ordinateur. Copiez le lien, puis sur un ordinateur collez-le dans Google Agenda → Autres agendas → À partir de l'URL.",
+    feedGooglePaste:
+      "Lien copié. Sur la page Google Agenda qui s'ouvre, collez-le dans le champ URL et ajoutez l'agenda.",
+    feedLink: "Votre lien de calendrier",
+    feedLocal:
+      "C'est une adresse de développement locale : Google Agenda ne peut pas y accéder, mais il fonctionnera avec le site en ligne. Pour l'instant, vous pouvez essayer avec le Calendrier Apple sur un appareil qui accède à cette adresse.",
+    feedOpenFailed:
+      "Impossible d'ouvrir une application de calendrier. Copiez le lien et ajoutez-le à votre calendrier.",
+    feedOther:
+      "Pour Outlook ou un autre calendrier, copiez le lien et collez-le dans « S'abonner depuis le web » ou « Ajouter par URL ».",
+    feedPrivate:
+      "Ce lien vous est personnel. Toute personne qui l'a peut voir vos cours : ne le partagez pas.",
+    feedRotate: "Créer un nouveau lien",
+    feedRotateBody:
+      "L'ancien lien cesse aussitôt de fonctionner. Vous devrez ajouter le nouveau lien à votre calendrier.",
+    feedRotateTitle: "Créer un nouveau lien ?",
+    feedRotated:
+      "Votre nouveau lien est prêt. Retirez l'ancien de votre calendrier et ajoutez celui-ci.",
+    feedTitle: "Ajoutez vos cours à votre calendrier",
+    icsDescription: "Ouvrez Derslik pour le détail du cours : {url}",
+    icsName: "Cours Derslik",
+    icsSummaryGuardian: "{student} : {topic} · {teacher}",
+    icsSummaryStudent: "{topic} · {teacher}",
+    icsSummaryTeacher: "{topic} · {student}",
     nextWeek: "Semaine suivante",
     previousWeek: "Semaine précédente",
     recordCount: {

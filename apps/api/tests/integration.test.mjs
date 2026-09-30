@@ -1,6 +1,7 @@
 import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
+import { calendarCases } from "./calendar-cases.mjs";
 import { accessCases } from "./access-cases.mjs";
 import { securityCases } from "./security-cases.mjs";
 import { securityRegressions } from "./security-regressions.mjs";
@@ -841,6 +842,16 @@ test(
         sessionBody,
       });
       await directoryCases({ t, admin, request, ok, token, verifiedUsers });
+      await calendarCases({
+        t,
+        config,
+        admin,
+        request,
+        ok,
+        token,
+        tokenB,
+        sessionBody,
+      });
       await accessCases({
         t,
         app,
