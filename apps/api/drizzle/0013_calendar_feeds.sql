@@ -28,8 +28,9 @@ $$;
 -- alanının bütün derslerini, öğrenci/veli derslere erişimi olan etkin
 -- bağlantılarındaki (arşivlenmemiş) öğrencinin derslerini. Erişim kalkınca
 -- dersler bir sonraki okumada takvimden düşer. İptal edilen dersler dönmez;
--- abone takvim, akışta olmayan etkinliği siler. Son 90 günden eskisi ve
--- 2000'den fazlası alınmaz.
+-- abone takvim, akışta olmayan etkinliği siler. Son 90 günden eskisi alınmaz;
+-- 2000'den fazlası varsa önce yaklaşan dersler, sonra en yeni geçmiş dersler
+-- kalır.
 CREATE FUNCTION derslik.calendar_feed(feed_token text)
 RETURNS TABLE(
  lesson_id uuid, version int, starts_at timestamptz, ends_at timestamptz,
@@ -63,7 +64,11 @@ RETURNS TABLE(
  )
  SELECT id, version, starts_at, ends_at, status, topic, location,
   student_name, teacher_name, role
- FROM visible ORDER BY starts_at, id LIMIT 2000
+ FROM (
+  SELECT * FROM visible
+  ORDER BY (ends_at<=now()), abs(extract(epoch FROM starts_at-now())), id
+  LIMIT 2000
+ ) kept ORDER BY starts_at, id
 $$;
 REVOKE ALL ON FUNCTION derslik.calendar_feed_owner(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION derslik.calendar_feed_owner(text) TO derslik_app;

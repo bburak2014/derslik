@@ -243,9 +243,11 @@ export const es: Messages = {
     feedGoogle: "Añadir a Google Calendar",
     feedGoogleComputer:
       "Google Calendar solo permite añadir un calendario por enlace desde un ordenador. Copia el enlace y, en un ordenador, pégalo en Google Calendar → Otros calendarios → Desde URL.",
+    feedGooglePaste:
+      "Enlace copiado. En la página de Google Calendar que se abre, pégalo en el campo de URL y añade el calendario.",
     feedLink: "Tu enlace de calendario",
     feedLocal:
-      "Esta dirección solo funciona en este ordenador. Google Calendar funcionará con el sitio publicado; por ahora puedes probarlo con Calendario de Apple en este ordenador.",
+      "Es una dirección local de desarrollo, así que Google Calendar no puede acceder a ella; funcionará con el sitio publicado. Por ahora puedes probarlo con Calendario de Apple en un dispositivo que acceda a esta dirección.",
     feedOpenFailed:
       "No se pudo abrir una aplicación de calendario. Copia el enlace y añádelo a tu calendario.",
     feedOther:

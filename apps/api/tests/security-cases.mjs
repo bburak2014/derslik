@@ -220,6 +220,7 @@ export async function securityCases({
         ...config,
         RATE_LIMIT_USER_PER_MINUTE: 2,
         RATE_LIMIT_PUBLIC_PER_MINUTE: 2,
+        RATE_LIMIT_CALENDAR_PER_MINUTE: 2,
       });
       await limited.listen(0, "127.0.0.1");
       const url = await limited.getUrl();
@@ -238,11 +239,30 @@ export async function securityCases({
           assert.equal(r.status, i < 2 ? 200 : 429);
           if (i === 2) assert.ok(Number(r.headers.get("retry-after")) > 0);
         }
-        // Takvim akışı da IP başına sınırlanır; belirteç tahmini yavaşlar.
-        for (let i = 0; i < 3; i++) {
-          const r = await fetch(url + "/v1/calendar/" + "0".repeat(64));
-          assert.equal(r.status, i < 2 ? 404 : 429);
-        }
+        // Takvim akışı bağlantı başına sınırlanır: HEAD de sayılır, başka IP
+        // sınırı sıfırlamaz, başka bağlantı etkilenmez (Google ve Apple
+        // bütün abonelikleri ortak sunuculardan okur).
+        // Kodlanmış ya da sonu eğik çizgili biçim de aynı sayaca düşer.
+        const zero = "0".repeat(64);
+        const statuses = [];
+        for (const [i, [method, path]] of [
+          ["HEAD", zero],
+          ["GET", "%30" + zero.slice(1)],
+          ["GET", zero + "/"],
+        ].entries())
+          statuses.push(
+            (
+              await fetch(url + "/v1/calendar/" + path, {
+                method,
+                headers: { "X-Forwarded-For": `198.51.100.${i + 10}` },
+              })
+            ).status,
+          );
+        assert.deepEqual(statuses, [404, 404, 429]);
+        assert.equal(
+          (await fetch(url + "/v1/calendar/" + "1".repeat(64))).status,
+          404,
+        );
       } finally {
         await limited.close();
       }

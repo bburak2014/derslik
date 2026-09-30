@@ -225,9 +225,11 @@ export const tr = {
     feedGoogle: "Google Takvim'e ekle",
     feedGoogleComputer:
       "Google Takvim'de bağlantıyla takvim ekleme yalnızca bilgisayarda yapılır. Bağlantıyı kopyalayıp bilgisayarda Google Takvim → Diğer takvimler → URL ile ekle bölümüne yapıştırın.",
+    feedGooglePaste:
+      "Bağlantı kopyalandı. Açılan Google Takvim sayfasında URL alanına yapıştırıp takvimi ekleyin.",
     feedLink: "Takvim bağlantınız",
     feedLocal:
-      "Bu adres yalnızca bu bilgisayarda çalışır. Google Takvim canlı sitede çalışır; şimdilik bu bilgisayardaki Apple Takvim ile deneyebilirsiniz.",
+      "Bu yerel bir geliştirme adresi; Google Takvim ona ulaşamaz, canlı sitede çalışır. Şimdilik bu adrese ulaşabilen bir cihazdaki Apple Takvim ile deneyebilirsiniz.",
     feedOpenFailed:
       "Takvim uygulaması açılamadı. Bağlantıyı kopyalayıp takviminize ekleyin.",
     feedOther:

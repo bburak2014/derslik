@@ -32,13 +32,16 @@ export function CalendarFeed() {
   async function toggle() {
     setError("");
     setNotice("");
-    if (open || url) {
-      setOpen(!open);
+    if (open) {
+      setOpen(false);
       return;
     }
+    // Bağlantı başka bir cihazda yenilenmiş olabilir; her açılışta güncelini
+    // alır (istek aynı bağlantıyı döndürür, yenisini üretmez).
     setLoading(true);
     try {
       const r = await request<{ data: { url: string } }>("/calendar", {});
+      if (r.data.url !== url) setCopied(false);
       setUrl(r.data.url);
       setOpen(true);
     } catch (e) {
@@ -48,7 +51,6 @@ export function CalendarFeed() {
     }
   }
   async function openApp(address: string) {
-    setError("");
     try {
       await Linking.openURL(address);
     } catch {
@@ -60,9 +62,19 @@ export function CalendarFeed() {
     try {
       await setStringAsync(url);
       setCopied(true);
+      return true;
     } catch {
       setError(t("calendar.feedCopyManually"));
+      return false;
     }
+  }
+  // Google'a bağlantı adreste verilmez (düz http ile okurdu); kopyalanıp
+  // açılan sayfadaki URL alanına yapıştırılır.
+  async function openGoogle(address: string) {
+    setNotice("");
+    const copiedNow = await copy();
+    await openApp(address);
+    if (copiedNow) setNotice(t("calendar.feedGooglePaste"));
   }
   const rotate = () =>
     confirmAction(
@@ -86,16 +98,21 @@ export function CalendarFeed() {
       },
       setError,
     );
-  // iPhone'da Apple Takvim tek dokunuşla abone olur; Android'de önce Google
-  // gelir, ama Google bağlantıyla eklemeyi yalnızca bilgisayarda yapar.
-  // Google yerel adrese ulaşamaz; o zaman düğme gösterilmez.
-  const apple = links && (
+  // iPhone'da Apple Takvim tek dokunuşla abone olur. Android webcal://
+  // adresini açamaz; orada yalnızca Google ve kopyalama kalır. Google
+  // bağlantıyla eklemeyi yalnızca bilgisayarda yapar ve yerel adrese
+  // ulaşamaz; o zaman düğme gösterilmez.
+  const apple = links && Platform.OS !== "android" && (
     <Button
       key="apple"
       secondary
       size="sm"
       trailingIcon="open-outline"
-      onPress={() => void openApp(links.webcal)}
+      onPress={() => {
+        setError("");
+        setNotice("");
+        void openApp(links.webcal);
+      }}
     >
       {t("calendar.feedApple")}
     </Button>
@@ -106,7 +123,7 @@ export function CalendarFeed() {
         secondary
         size="sm"
         trailingIcon="open-outline"
-        onPress={() => void openApp(links.google)}
+        onPress={() => void openGoogle(links.google)}
       >
         {t("calendar.feedGoogle")}
       </Button>

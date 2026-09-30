@@ -1,4 +1,3 @@
-import { clientIp } from "@/lib/server/client-ip";
 export const dynamic = "force-dynamic";
 
 // Takvim uygulamaları (Google, Apple) bu adresi oturumsuz ve düzenli okur.
@@ -19,22 +18,18 @@ function text(status: number) {
 }
 
 export async function GET(
-  request: Request,
+  _request: Request,
   context: { params: Promise<{ file: string }> },
 ) {
   const { file } = await context.params;
   const token = /^([a-f0-9]{64})\.ics$/.exec(file)?.[1];
   if (!token) return text(404);
   if (!process.env.API_BASE_URL) return text(503);
-  const ip = clientIp(request.headers);
   try {
     const response = await fetch(
       process.env.API_BASE_URL.replace(/\/$/, "") + "/v1/calendar/" + token,
       {
         cache: "no-store",
-        // API akışı IP başına sınırlar; yoksa tüm takvimler web sunucusunun
-        // tek IP'sinden geliyor görünürdü.
-        headers: ip ? { "X-Forwarded-For": ip } : {},
         signal: AbortSignal.timeout(10_000),
       },
     );

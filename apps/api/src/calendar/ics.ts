@@ -72,6 +72,18 @@ export function calendar(input: {
     // Apple ve Outlook bu aralığı dikkate alır; Google kendi aralığıyla okur.
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",
+    // RFC 5545 takvimde en az bir bileşen ister; ders yokken de akış geçerli
+    // kalsın. Saatler UTC yazılır, bu tanım yalnızca takvimin saat dilimidir
+    // (Türkiye 2016'dan beri yaz saati uygulamadan UTC+3).
+    "BEGIN:VTIMEZONE",
+    "TZID:Europe/Istanbul",
+    "BEGIN:STANDARD",
+    "DTSTART:20160907T000000",
+    "TZOFFSETFROM:+0300",
+    "TZOFFSETTO:+0300",
+    "TZNAME:+03",
+    "END:STANDARD",
+    "END:VTIMEZONE",
   ];
   for (const e of input.events)
     lines.push(

@@ -58,11 +58,13 @@ export function CalendarFeedButton({
       setError((e as Error).message);
     }
   }
-  async function copy() {
+  async function copy(google = false) {
     try {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
       setError("");
+      // Google için ayrı not: kopyalandı ve açılan sayfada nereye yapıştırılır.
+      if (google) setNotice(t("calendar.feedGooglePaste"));
+      else setCopied(true);
     } catch {
       // Pano izni yoksa (ör. http üzerinden yerel ağ) seçip elle kopyalatır.
       input.current?.focus();
@@ -94,7 +96,9 @@ export function CalendarFeedButton({
         setError("");
         setNotice("");
         setCopied(false);
-        if (!url) void load();
+        // Bağlantı başka bir cihazda yenilenmiş olabilir; her açılışta
+        // güncelini alır (istek aynı bağlantıyı döndürür, yenisini üretmez).
+        void load();
       }}
     >
       <DialogTrigger asChild>
@@ -156,6 +160,8 @@ export function CalendarFeedButton({
                     href={links.google}
                     target="_blank"
                     rel="noopener noreferrer"
+                    // Google sayfası açılırken bağlantı panoya kopyalanır.
+                    onClick={() => void copy(true)}
                   >
                     <ExternalLink /> {t("calendar.feedGoogle")}
                   </a>

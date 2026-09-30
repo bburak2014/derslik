@@ -245,9 +245,11 @@ export const fr: Messages = {
     feedGoogle: "Ajouter à Google Agenda",
     feedGoogleComputer:
       "Google Agenda ne permet d'ajouter un agenda par lien que sur ordinateur. Copiez le lien, puis sur un ordinateur collez-le dans Google Agenda → Autres agendas → À partir de l'URL.",
+    feedGooglePaste:
+      "Lien copié. Sur la page Google Agenda qui s'ouvre, collez-le dans le champ URL et ajoutez l'agenda.",
     feedLink: "Votre lien de calendrier",
     feedLocal:
-      "Cette adresse ne fonctionne que sur cet ordinateur. Google Agenda fonctionnera avec le site en ligne ; pour l'instant, vous pouvez essayer avec le Calendrier Apple de cet ordinateur.",
+      "C'est une adresse de développement locale : Google Agenda ne peut pas y accéder, mais il fonctionnera avec le site en ligne. Pour l'instant, vous pouvez essayer avec le Calendrier Apple sur un appareil qui accède à cette adresse.",
     feedOpenFailed:
       "Impossible d'ouvrir une application de calendrier. Copiez le lien et ajoutez-le à votre calendrier.",
     feedOther:

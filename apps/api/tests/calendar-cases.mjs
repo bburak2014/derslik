@@ -121,6 +121,10 @@ export async function calendarCases({
       assert.deepEqual(uids(feed.text), [first.id, other.id].sort());
       assert.ok(feed.text.startsWith("BEGIN:VCALENDAR\r\n"));
       assert.ok(feed.text.endsWith("END:VCALENDAR\r\n"));
+      assert.match(
+        feed.text,
+        /\r\nBEGIN:VTIMEZONE\r\nTZID:Europe\/Istanbul\r\n/,
+      );
       assert.match(feed.text, /\r\nX-WR-CALNAME:Derslik dersleri\r\n/);
       assert.match(
         feed.text,
@@ -184,6 +188,9 @@ export async function calendarCases({
       const revoked = await read(pupilUrl);
       assert.equal(revoked.status, 200);
       assert.deepEqual(uids(revoked.text), []);
+      // Ders yokken de takvimde bir bileşen olur (RFC 5545); katı istemciler
+      // boş takvimi reddeder.
+      assert.match(revoked.text, /\r\nBEGIN:VTIMEZONE\r\n/);
       // Arşivlenen öğrencinin dersleri velide görünmez.
       await admin.query(
         "UPDATE derslik.students SET active=false WHERE workspace_id=$1 AND id=$2",
@@ -203,6 +210,27 @@ export async function calendarCases({
       assert.equal(await feedOf(tokenTeacher), renewed);
       assert.equal((await read(old)).status, 404);
       assert.equal((await read(renewed)).status, 200);
+      // 2000'den fazla ders varsa yaklaşan dersler kalır, en eski geçmiş
+      // dersler düşer.
+      await admin.query(
+        `INSERT INTO derslik.lessons(workspace_id,student_id,package_id,topic,starts_at,ends_at,status)
+         SELECT workspace_id,student_id,package_id,'Eski ders',
+          now()-interval '2 hours'-g*interval '45 minutes',
+          now()-interval '2 hours'-g*interval '45 minutes'+interval '30 minutes',
+          'COMPLETED'
+         FROM derslik.lessons l, generate_series(1,2000) g WHERE l.id=$1`,
+        [other.id],
+      );
+      try {
+        const busy = uids((await read(renewed)).text);
+        assert.equal(busy.length, 2000);
+        assert.ok(busy.includes(first.id) && busy.includes(other.id));
+      } finally {
+        await admin.query(
+          "DELETE FROM derslik.lessons WHERE workspace_id=$1 AND topic='Eski ders'",
+          [ws],
+        );
+      }
       // Biçimi bozuk ya da bilinmeyen belirteç aynı 404'ü alır.
       for (const bad of ["abc", "A".repeat(64), "0".repeat(64)]) {
         const r = await request(`/v1/calendar/${bad}`, { auth: null });

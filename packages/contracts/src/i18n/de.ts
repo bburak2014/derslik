@@ -254,9 +254,11 @@ export const de: Messages = {
     feedGoogle: "Zu Google Kalender hinzufügen",
     feedGoogleComputer:
       "In Google Kalender lässt sich ein Kalender per Link nur am Computer hinzufügen. Kopieren Sie den Link und fügen Sie ihn am Computer unter Google Kalender → Weitere Kalender → Per URL ein.",
+    feedGooglePaste:
+      "Link kopiert. Fügen Sie ihn auf der geöffneten Google-Kalender-Seite in das URL-Feld ein und fügen Sie den Kalender hinzu.",
     feedLink: "Ihr Kalenderlink",
     feedLocal:
-      "Diese Adresse funktioniert nur auf diesem Computer. Google Kalender funktioniert mit der Live-Website; vorerst können Sie es mit Apple Kalender auf diesem Computer ausprobieren.",
+      "Das ist eine lokale Entwicklungsadresse, die Google Kalender nicht erreicht; mit der Live-Website funktioniert es. Vorerst können Sie es mit Apple Kalender auf einem Gerät ausprobieren, das diese Adresse erreicht.",
     feedOpenFailed:
       "Keine Kalender-App konnte geöffnet werden. Kopieren Sie den Link und fügen Sie ihn Ihrem Kalender hinzu.",
     feedOther:

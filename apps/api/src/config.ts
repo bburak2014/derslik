@@ -49,6 +49,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       // başına, herkese açık vitrin istekleri IP başına sayılır.
       RATE_LIMIT_USER_PER_MINUTE: z.coerce.number().int().min(0).default(600),
       RATE_LIMIT_PUBLIC_PER_MINUTE: z.coerce.number().int().min(0).default(120),
+      // Takvim akışı bağlantı başına sayılır: Google ve Apple bütün
+      // abonelikleri birkaç ortak sunucudan okur, IP başına sınır onları keserdi.
+      RATE_LIMIT_CALENDAR_PER_MINUTE: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .default(30),
       // İstemci IP'si X-Forwarded-For'dan yalnızca bu adreslerden gelen
       // isteklerde okunur (Express "trust proxy"). Varsayılan: aynı makine ve
       // özel ağ (web sunucusu, Docker ağı, yük dengeleyici).

@@ -86,11 +86,25 @@ export async function createApplication(config: ApiConfig) {
       new HttpException("api.tooManyRequests", HttpStatus.TOO_MANY_REQUESTS),
     );
   });
-  // Takvim akışını takvim uygulamaları oturumsuz okur; o da IP başına sınırlanır.
-  const calendarLimiter = new RateLimiter(config.RATE_LIMIT_PUBLIC_PER_MINUTE);
+  // Takvim akışını takvim uygulamaları oturumsuz okur. Sınır bağlantı
+  // başınadır, IP başına değil: Google ve Apple bütün abonelikleri birkaç ortak
+  // sunucudan okur ve web vekili ziyaretçi IP'sini her kurulumda bilmez.
+  // Belirteç 256 bittir; tahmin edilemez, bilinmeyen belirteç tek bir indeksli
+  // okumaya mal olur. Express HEAD'i de GET işleyicisine verir.
+  const calendarLimiter = new RateLimiter(
+    config.RATE_LIMIT_CALENDAR_PER_MINUTE,
+  );
   app.use("/v1/calendar", (req: Request, res: Response, next: NextFunction) => {
-    if (req.method !== "GET") return next();
-    const wait = calendarLimiter.take(req.ip || "unknown");
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    // Aynı bağlantının kodlanmış ya da sonu eğik çizgili biçimi de aynı
+    // sayaca düşer.
+    let key = req.path;
+    try {
+      key = decodeURIComponent(key);
+    } catch {
+      // Bozuk kodlama işleyicide 404 alır.
+    }
+    const wait = calendarLimiter.take(key.replace(/\/+$/, "").toLowerCase());
     if (!wait) return next();
     res.setHeader("Retry-After", String(wait));
     next(
