@@ -68,14 +68,6 @@ export function CalendarFeed() {
       return false;
     }
   }
-  // Google'a bağlantı adreste verilmez (düz http ile okurdu); kopyalanıp
-  // açılan sayfadaki URL alanına yapıştırılır.
-  async function openGoogle(address: string) {
-    setNotice("");
-    const copiedNow = await copy();
-    await openApp(address);
-    if (copiedNow) setNotice(t("calendar.feedGooglePaste"));
-  }
   const rotate = () =>
     confirmAction(
       t("calendar.feedRotateTitle"),
@@ -99,9 +91,8 @@ export function CalendarFeed() {
       setError,
     );
   // iPhone'da Apple Takvim tek dokunuşla abone olur. Android webcal://
-  // adresini açamaz; orada yalnızca Google ve kopyalama kalır. Google
-  // bağlantıyla eklemeyi yalnızca bilgisayarda yapar ve yerel adrese
-  // ulaşamaz; o zaman düğme gösterilmez.
+  // adresini açamaz; orada yalnızca Google ve kopyalama kalır. Google yerel
+  // adrese ulaşamaz; o zaman düğme gösterilmez.
   const apple = links && Platform.OS !== "android" && (
     <Button
       key="apple"
@@ -122,8 +113,14 @@ export function CalendarFeed() {
       <Button
         secondary
         size="sm"
-        trailingIcon="open-outline"
-        onPress={() => void openGoogle(links.google)}
+        trailingIcon="copy-outline"
+        // Google bağlantıyla takvim eklemeyi yalnızca bilgisayarda yapar
+        // (uygulamada ve telefon tarayıcısında yok); bağlantı kopyalanır,
+        // alttaki not bilgisayarda nereye yapıştırılacağını söyler.
+        onPress={() => {
+          setNotice("");
+          void copy().then((ok) => ok && setNotice(t("calendar.feedCopied")));
+        }}
       >
         {t("calendar.feedGoogle")}
       </Button>

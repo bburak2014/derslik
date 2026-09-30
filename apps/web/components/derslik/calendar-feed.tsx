@@ -67,6 +67,7 @@ export function CalendarFeedButton({
       else setCopied(true);
     } catch {
       // Pano izni yoksa (ör. http üzerinden yerel ağ) seçip elle kopyalatır.
+      setNotice("");
       input.current?.focus();
       input.current?.select();
       setError(t("calendar.feedCopyManually"));
@@ -98,6 +99,8 @@ export function CalendarFeedButton({
         setCopied(false);
         // Bağlantı başka bir cihazda yenilenmiş olabilir; her açılışta
         // güncelini alır (istek aynı bağlantıyı döndürür, yenisini üretmez).
+        // Eskisi o sırada gösterilmez: kopyalanamaz, yenilemeyle yarışmaz.
+        setUrl("");
         void load();
       }}
     >
@@ -160,8 +163,15 @@ export function CalendarFeedButton({
                     href={links.google}
                     target="_blank"
                     rel="noopener noreferrer"
-                    // Google sayfası açılırken bağlantı panoya kopyalanır.
-                    onClick={() => void copy(true)}
+                    onClick={(e) => {
+                      // Telefonda Google bağlantıyla takvim eklemez: sayfa
+                      // açılmaz, bağlantı kopyalanır, alttaki not bilgisayarı
+                      // anlatır. Bilgisayarda sayfa açılırken kopyalanır.
+                      const phone =
+                        window.matchMedia("(pointer: coarse)").matches;
+                      if (phone) e.preventDefault();
+                      void copy(!phone);
+                    }}
                   >
                     <ExternalLink /> {t("calendar.feedGoogle")}
                   </a>

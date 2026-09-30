@@ -223,8 +223,17 @@ export async function calendarCases({
       );
       try {
         const busy = uids((await read(renewed)).text);
+        const past = (
+          await admin.query(
+            "SELECT id FROM derslik.lessons WHERE workspace_id=$1 AND topic='Eski ders' ORDER BY starts_at",
+            [ws],
+          )
+        ).rows.map((r) => r.id);
         assert.equal(busy.length, 2000);
         assert.ok(busy.includes(first.id) && busy.includes(other.id));
+        // En eski iki geçmiş ders düşer, en yenisi kalır.
+        assert.ok(!busy.includes(past[0]) && !busy.includes(past[1]));
+        assert.ok(busy.includes(past[2]) && busy.includes(past.at(-1)));
       } finally {
         await admin.query(
           "DELETE FROM derslik.lessons WHERE workspace_id=$1 AND topic='Eski ders'",

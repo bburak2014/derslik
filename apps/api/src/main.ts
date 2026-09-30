@@ -97,14 +97,17 @@ export async function createApplication(config: ApiConfig) {
   app.use("/v1/calendar", (req: Request, res: Response, next: NextFunction) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     // Aynı bağlantının kodlanmış ya da sonu eğik çizgili biçimi de aynı
-    // sayaca düşer.
-    let key = req.path;
+    // sayaca düşer. Belirteç biçiminde olmayan yol veritabanına hiç ulaşmaz
+    // (işleyicide 404); sayılmaz, sayaç da uzun yollarla şişirilemez.
+    let path = req.path;
     try {
-      key = decodeURIComponent(key);
+      path = decodeURIComponent(path);
     } catch {
-      // Bozuk kodlama işleyicide 404 alır.
+      return next();
     }
-    const wait = calendarLimiter.take(key.replace(/\/+$/, "").toLowerCase());
+    const token = /^\/([a-f0-9]{64})\/?$/i.exec(path)?.[1];
+    if (!token) return next();
+    const wait = calendarLimiter.take(token.toLowerCase());
     if (!wait) return next();
     res.setHeader("Retry-After", String(wait));
     next(

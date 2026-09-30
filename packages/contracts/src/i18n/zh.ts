@@ -193,7 +193,7 @@ export const zh: Messages = {
     feedGoogleComputer:
       "Google 日历只能在电脑上通过链接添加日历。请复制链接，然后在电脑上打开 Google 日历 → 其他日历 → 通过网址添加，粘贴链接。",
     feedGooglePaste:
-      "链接已复制。请在打开的 Google 日历页面中，将链接粘贴到网址栏并添加日历。",
+      "链接已复制。请在打开的 Google 日历页面中，将链接粘贴到网址输入框并添加日历。",
     feedLink: "您的日历链接",
     feedLocal:
       "这是本地开发地址，Google 日历无法访问；在正式网站上即可使用。目前可以在能访问此地址的设备上用 Apple 日历试用。",
