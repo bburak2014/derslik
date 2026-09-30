@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import {
   Bell,
   BellOff,
+  CalendarDays,
   CheckCheck,
   ChevronRight,
   ClipboardList,
@@ -64,6 +65,7 @@ const noticeIcons: Record<NoticeIcon, React.ReactNode> = {
   video: <VideoIcon />,
   summary: <Sparkles />,
   assignment: <ClipboardList />,
+  lesson: <CalendarDays />,
   other: <Bell />,
 };
 

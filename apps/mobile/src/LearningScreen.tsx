@@ -699,7 +699,7 @@ export function LearningScreen({
               />
             )}
             {data.lessons.map((l) => (
-              <Card key={l.id}>
+              <Card key={l.id} {...spot(l.id)}>
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   <DateTile date={l.starts_at} />
                   <View style={{ flex: 1, gap: 3 }}>
@@ -1840,6 +1840,7 @@ const noticeIcons: Record<NoticeIcon, IconName> = {
   video: "videocam-outline",
   summary: "sparkles-outline",
   assignment: "clipboard-outline",
+  lesson: "calendar-outline",
   other: "notifications-outline",
 };
 

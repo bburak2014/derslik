@@ -246,6 +246,7 @@ export default function Workspace({
     setSearch("");
     setHubFocus(null);
     setShowcaseFocus(null);
+    setCalendarFocus(false);
     window.history.pushState({}, "", "/?view=" + v);
   }
   // Bildirim: ödev ve videolar kendi sayfalarında o öğrenciyle açılır;
@@ -258,6 +259,7 @@ export default function Workspace({
       id: string | null;
       at: number;
     } | null>(null),
+    [calendarFocus, setCalendarFocus] = useState(false),
     [requests, setRequests] = useState(0);
   // Kenar çubuğundaki istek sayacı sayfa açılışında bir kez alınır; vitrin
   // sayfası açıkken oradaki liste sayacı günceller.
@@ -282,12 +284,22 @@ export default function Workspace({
     focus.workspaceId === connected.id
   ) {
     setAppliedFocus(focus.at);
+    setCalendarFocus(focus.section === "lessons");
     if (focus.section === "requests") {
       setView("showcase");
       setShowcaseFocus({ id: focus.itemId, at: focus.at });
       setStudentId(null);
     } else if (focus.section === "myRequests") {
       // Öğrenci bildirimi; öğretmen görünümünde açılacak yeri yok.
+    } else if (focus.section === "lessons") {
+      // Ders hatırlatması: takvim o dersin gününde açılır.
+      const lesson = data.lessons.find((l) => l.id === focus.itemId);
+      setSelectedDay(dateKey(lesson?.starts_at));
+      setView("calendar");
+      setSearch("");
+      setHubFocus(null);
+      setShowcaseFocus(null);
+      setStudentId(null);
     } else if (focus.section === "notes") {
       setNotesFocus(focus);
       setStudentId(focus.studentId);
@@ -299,7 +311,11 @@ export default function Workspace({
     }
   }
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
-  const focusedView = showcaseFocus ? "showcase" : hubFocus?.section;
+  const focusedView = showcaseFocus
+    ? "showcase"
+    : calendarFocus
+      ? "calendar"
+      : hubFocus?.section;
   useEffect(() => {
     if (focusedView) window.history.pushState({}, "", "/?view=" + focusedView);
   }, [focusedView, appliedFocus]);

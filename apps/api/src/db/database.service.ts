@@ -100,6 +100,29 @@ export class DatabaseService implements OnModuleDestroy {
     }
   }
 
+  /** Oturumsuz arka plan işleri (ders hatırlatması). Kimlik boş kalır; RLS
+   *  hiçbir tabloyu açmaz, iş yalnızca kendi SECURITY DEFINER fonksiyonuyla
+   *  yapılır. */
+  async systemTransaction<T>(fn: (tx: PoolClient) => Promise<T>): Promise<T> {
+    const tx = await this.pool.connect();
+    try {
+      await tx.query("BEGIN");
+      await tx.query("SET LOCAL statement_timeout = '8s'");
+      await tx.query("SET LOCAL lock_timeout = '5s'");
+      await tx.query(
+        "SELECT set_config('app.actor_id', '', true), set_config('app.workspace_id', '', true)",
+      );
+      const result = await fn(tx);
+      await tx.query("COMMIT");
+      return result;
+    } catch (error) {
+      await tx.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      tx.release();
+    }
+  }
+
   async onModuleDestroy() {
     await this.pool.end();
   }

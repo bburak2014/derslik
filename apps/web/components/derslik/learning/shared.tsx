@@ -447,6 +447,7 @@ export function LessonItem({
       role="listitem"
       variant="outline"
       className={chip ? "border-(--marker) bg-(--marker-soft)" : "bg-card"}
+      data-notice-target={l.id}
     >
       <ItemMedia
         variant="icon"

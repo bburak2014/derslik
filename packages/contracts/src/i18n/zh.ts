@@ -562,6 +562,13 @@ export const zh: Messages = {
       "请在 7 天内通过下方链接登录。只有使用此邮箱地址的账号才能接受邀请。",
     inviteSubject: "Derslik 邀请 · {name}",
     inviteValidity: "链接 7 天内有效。只有使用此邮箱地址的账号才能接受邀请。",
+    reminderSubject: "课程提醒 · {time}",
+    reminderIntroStudent: "您与 {teacher} 的课程即将开始。",
+    reminderIntroGuardian: "{student} 与 {teacher} 的课程即将开始。",
+    reminderTime: "时间：{time}",
+    reminderTopic: "主题：{topic}",
+    reminderLocation: "地点：{location}",
+    reminderOpen: "打开课程",
   },
   meta: {
     description: "学生、课程和收款，一处管理。",
@@ -759,6 +766,7 @@ export const zh: Messages = {
     videos: "课程视频",
   },
   notice: {
+    lessonReminder: "即将开始的课程",
     requestAccepted: "你的上课申请已被接受",
     requestDeclined: "你的上课申请未被接受",
     requestNew: "新的上课申请",

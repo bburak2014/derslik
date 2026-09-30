@@ -23,7 +23,7 @@ export class LearningController {
     return this.access.list(req.actor);
   }
   @Get("inbox") inbox(@Req() req: ActorRequest) {
-    return this.access.inbox(req.actor);
+    return this.access.inbox(req.actor, req.headers.authorization);
   }
   @Post("inbox/:id/read") read(
     @Req() req: ActorRequest,

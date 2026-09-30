@@ -611,6 +611,14 @@ export const ja: Messages = {
     inviteSubject: "Derslik への招待 · {name}",
     inviteValidity:
       "リンクの有効期間は 7 日間です。招待は、このメールアドレスのアカウントでのみ承認できます。",
+    reminderSubject: "授業のお知らせ · {time}",
+    reminderIntroStudent: "{teacher} との授業がまもなく始まります。",
+    reminderIntroGuardian:
+      "{student} さんの {teacher} との授業がまもなく始まります。",
+    reminderTime: "日時：{time}",
+    reminderTopic: "内容：{topic}",
+    reminderLocation: "場所：{location}",
+    reminderOpen: "授業を開く",
   },
   meta: {
     description: "生徒、授業、入金をひとつの場所で。",
@@ -817,6 +825,7 @@ export const ja: Messages = {
     videos: "授業動画",
   },
   notice: {
+    lessonReminder: "まもなく始まる授業",
     requestAccepted: "レッスンリクエストが承認されました",
     requestDeclined: "レッスンリクエストは辞退されました",
     requestNew: "新しいレッスンリクエスト",

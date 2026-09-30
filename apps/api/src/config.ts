@@ -38,6 +38,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       // Davet e-postası. İkisi de tanımlı değilse gönderim atlanır.
       RESEND_API_KEY: z.string().optional(),
       MAIL_FROM: z.string().optional(),
+      // Ders hatırlatması dersten kaç dakika önce gitsin. 0 kapatır.
+      LESSON_REMINDER_MINUTES: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(1440)
+        .default(60),
       // Hız sınırı (dakikada istek). 0 kapatır. Oturumlu istekler hesap
       // başına, herkese açık vitrin istekleri IP başına sayılır.
       RATE_LIMIT_USER_PER_MINUTE: z.coerce.number().int().min(0).default(600),

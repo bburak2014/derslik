@@ -149,7 +149,8 @@ export class LessonsService {
       checkExpiry(pack.expires_on, start);
       const data = (
         await tx.query(
-          "UPDATE derslik.lessons SET starts_at=$3,ends_at=$4,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
+          // Yeni saat için hatırlatma yeniden gider.
+          "UPDATE derslik.lessons SET starts_at=$3,ends_at=$4,reminded_at=NULL,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
           [ws, c.id, start, end],
         )
       ).rows[0];

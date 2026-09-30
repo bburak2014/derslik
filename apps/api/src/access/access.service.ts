@@ -17,6 +17,7 @@ import { MediaProviders } from "../media/providers.js";
 import { MailService } from "./mail.js";
 import { confirmedEmail } from "../auth/confirmed-email.js";
 import { lockStudent } from "../students/students.service.js";
+import { currentLocale } from "../common/i18n.js";
 
 const INVITES_PER_HOUR = 20,
   INVITES_PER_DAY = 60;
@@ -200,14 +201,18 @@ export class AccessService {
         ).rows[0];
         if (check.role === "STUDENT" && check.teacher)
           throw new ConflictException("api.accountIsTeacher");
-        return {
-          data: (
-            await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
-              hash,
-              email,
-            ])
-          ).rows[0].data,
-        };
+        const accepted = (
+          await tx.query("SELECT derslik.accept_invitation($1,$2) AS data", [
+            hash,
+            email,
+          ])
+        ).rows[0].data;
+        // Onaylı adres: ders hatırlatması e-postası buraya gider.
+        await tx.query(
+          "UPDATE derslik.users SET email=$2, locale=$3 WHERE id=$1",
+          [actor.id, email, currentLocale()],
+        );
+        return { data: accepted };
       });
     } catch (error) {
       // accept_invitation raises one error for every refusal. The usual cause
@@ -303,21 +308,54 @@ export class AccessService {
       };
     });
   }
-  inbox(actor: Actor) {
-    return this.db.transaction(actor, null, async (tx) => {
-      // Süresi dolan ders istekleri önce kapanır; öğrencinin bildirimi hemen düşer.
-      await tx.query("SELECT derslik.expire_requests()");
-      return {
-        data: toDto(
-          (
-            await tx.query(
-              "SELECT id,workspace_id,student_id,title,body,kind,target_id,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
-              [actor.id],
-            )
-          ).rows,
-        ),
-      };
-    });
+  async inbox(actor: Actor, authorization?: string) {
+    const { contact, data } = await this.db.transaction(
+      actor,
+      null,
+      async (tx) => {
+        // Süresi dolan ders istekleri önce kapanır; öğrencinin bildirimi hemen düşer.
+        await tx.query("SELECT derslik.expire_requests()");
+        // Ders hatırlatması e-postası uygulamada seçili dilde yazılır. Web ve
+        // mobil zil sayacı için bildirimleri her açılışta okur.
+        const contact = (
+          await tx.query(
+            `WITH changed AS (
+               UPDATE derslik.users SET locale=$2 WHERE id=$1 AND locale<>$2
+             )
+             SELECT email, EXISTS(SELECT 1 FROM derslik.portal_links WHERE user_id=$1 AND revoked_at IS NULL) AS linked
+             FROM derslik.users WHERE id=$1`,
+            [actor.id, currentLocale()],
+          )
+        ).rows[0] as { email: string; linked: boolean } | undefined;
+        return {
+          contact,
+          data: toDto(
+            (
+              await tx.query(
+                "SELECT id,workspace_id,student_id,title,body,kind,target_id,read_at,created_at FROM derslik.notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",
+                [actor.id],
+              )
+            ).rows,
+          ),
+        };
+      },
+    );
+    // Hatırlatma e-postası yalnızca öğrenci ve velilere gider. Adres Auth'tan,
+    // yalnızca onaylıysa alınır (JWT'deki email onaysız olabilir); oturumdaki
+    // adres kayıtlıyla aynıysa Auth'a hiç sorulmaz.
+    if (contact?.linked && actor.email && actor.email !== contact.email)
+      await this.rememberEmail(actor, authorization).catch(() => undefined);
+    return { data };
+  }
+  private async rememberEmail(actor: Actor, authorization?: string) {
+    const email = await confirmedEmail(this.config, authorization, actor.id);
+    if (!email) return;
+    await this.db.transaction(actor, null, (tx) =>
+      tx.query("UPDATE derslik.users SET email=$2 WHERE id=$1", [
+        actor.id,
+        email,
+      ]),
+    );
   }
   readNotification(actor: Actor, id: string) {
     return this.db.transaction(actor, null, async (tx) => ({
