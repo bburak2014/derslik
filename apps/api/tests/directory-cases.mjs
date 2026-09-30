@@ -813,8 +813,9 @@ export async function directoryCases({
             )
           ).rows[0].n,
         );
-      // Ders isteği, isteyenin onaylı e-postasıyla eşleşen bağlantısız kaydı
-      // kullanır; arşivdeyse geri getirir.
+      // Ders isteği e-postayla eski kayda bağlanmaz (öğretmenin yazdığı
+      // e-posta doğrulanmamıştır, veliye ait olabilir): yeni kayıt açılır,
+      // e-posta başka kayıtta olduğu için boş kalır, eski kayda dokunulmaz.
       const requester = randomUUID();
       const tokenRequester = await token(requester, {
         email: "elif@example.test",
@@ -830,37 +831,56 @@ export async function directoryCases({
         {},
         { auth: tokenTeacher },
       );
-      assert.equal(accepted.data.studentId, elif.id);
-      assert.equal(await count(), before);
-      const reused = (
+      assert.notEqual(accepted.data.studentId, elif.id);
+      assert.equal(await count(), before + 1);
+      const created = (
+        await admin.query("SELECT email FROM derslik.students WHERE id=$1", [
+          accepted.data.studentId,
+        ])
+      ).rows[0];
+      assert.equal(created.email, "");
+      const untouched = (
         await admin.query(
-          "SELECT active,user_id FROM derslik.students WHERE id=$1",
+          "SELECT active,user_id,email FROM derslik.students WHERE id=$1",
           [elif.id],
         )
       ).rows[0];
-      assert.equal(reused.active, true);
-      assert.equal(reused.user_id, requester);
-      // Kayıt başka bir hesaba etkin bağlıysa yeni kayıt e-postasız açılır.
-      const second = randomUUID();
-      const tokenSecond = await token(second, { email: "elif@example.test" });
+      assert.deepEqual(untouched, {
+        active: false,
+        user_id: null,
+        email: "elif@example.test",
+      });
+      assert.equal(
+        (
+          await admin.query(
+            "SELECT count(*) AS n FROM derslik.portal_links WHERE student_id=$1",
+            [elif.id],
+          )
+        ).rows[0].n,
+        "0",
+      );
+      // Kimsede olmayan e-posta yeni kayda yazılır.
+      const newcomer = randomUUID();
+      const tokenNewcomer = await token(newcomer, {
+        email: "Yeni@Example.test",
+      });
       const next = await ok(
         `/v1/teacher-relations/${ws}/requests`,
-        { ...requestBody, studentName: "Elif Su" },
-        { auth: tokenSecond },
+        { ...requestBody, studentName: "Yeni Öğrenci" },
+        { auth: tokenNewcomer },
       );
       const fresh = await ok(
         `/v1/workspaces/${ws}/requests/${next.data.id}/accept`,
         {},
         { auth: tokenTeacher },
       );
-      assert.notEqual(fresh.data.studentId, elif.id);
       assert.equal(
         (
           await admin.query("SELECT email FROM derslik.students WHERE id=$1", [
             fresh.data.studentId,
           ])
         ).rows[0].email,
-        "",
+        "yeni@example.test",
       );
     },
   );
