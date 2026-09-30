@@ -76,6 +76,20 @@ export async function preflight(snapshot, objects) {
       warnings.push(
         `teaching_assignments/${a.id}: teslim tarihi boş; PostgreSQL due_on alanında null olarak koruyun`,
       );
+  // PostgreSQL'de bir öğretmende bir e-posta tek öğrenci kaydında durur
+  // (0012_one_student_per_email); aktarımda kopyaların e-postası boşaltılmalı.
+  const emails = new Map();
+  for (const s of data.students) {
+    const email =
+      typeof s.email === "string" ? s.email.trim().toLowerCase() : "";
+    if (!email) continue;
+    const key = `${s.workspace_id}\u0000${email}`;
+    if (emails.has(key))
+      warnings.push(
+        `students/${s.id}: aynı öğretmende students/${emails.get(key)} ile aynı e-posta; aktarımda birinin e-postası boş bırakılmalı`,
+      );
+    else emails.set(key, s.id);
+  }
   for (const s of data.students) {
     const charges = data.packages
       .filter((p) => p.student_id === s.id)

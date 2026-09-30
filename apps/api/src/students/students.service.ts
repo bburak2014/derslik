@@ -25,6 +25,23 @@ export async function lockStudent(
   return student;
 }
 
+// Bir öğretmende bir e-posta tek öğrenci kaydında durur (arşivdekiler dahil);
+// büyük/küçük harf fark etmez. Veritabanındaki benzersiz dizin eşzamanlı
+// kayıtları da yakalar.
+async function assertEmailFree(
+  tx: PoolClient,
+  ws: string,
+  email: string,
+  id: string | null,
+) {
+  if (!email.trim()) return;
+  const { rowCount } = await tx.query(
+    "SELECT 1 FROM derslik.students WHERE workspace_id=$1 AND btrim(email)<>'' AND lower(btrim(email))=lower(btrim($2)) AND id IS DISTINCT FROM $3::uuid LIMIT 1",
+    [ws, email, id],
+  );
+  if (rowCount) throw new ConflictException("api.studentEmailTaken");
+}
+
 @Injectable()
 export class StudentsService {
   async mutate(
@@ -53,6 +70,7 @@ export class StudentsService {
       );
       if (count >= limit)
         throw new ConflictException("api.studentLimitReached");
+      await assertEmailFree(tx, ws, c.email, null);
       const student = (
         await tx.query(
           "INSERT INTO derslik.students (workspace_id,name,grade,subject,phone,email) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
@@ -115,6 +133,7 @@ export class StudentsService {
           ).rows[0],
         };
       }
+      await assertEmailFree(tx, ws, c.email, c.id);
       return {
         data: (
           await tx.query(

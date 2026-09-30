@@ -112,6 +112,8 @@ export const ja: Messages = {
     studentArchived: "この生徒はアーカイブされています。",
     studentChanged:
       "生徒の情報が変更されています。最新の内容を読み込んでください。",
+    studentEmailTaken:
+      "このメールアドレスは別の生徒の情報で使われています（アーカイブ済みを含む）。新しく追加せず、その生徒を使ってください。",
     studentHasScheduledLessons:
       "先に予定中の授業を完了するかキャンセルしてください。",
     studentLimitReached: "在籍生徒数の上限に達しました。",

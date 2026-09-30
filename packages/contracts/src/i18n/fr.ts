@@ -122,6 +122,8 @@ export const fr: Messages = {
     studentArchived: "L'élève a été archivé.",
     studentChanged:
       "La fiche de l'élève a été modifiée. Chargez la dernière version.",
+    studentEmailTaken:
+      "Cette adresse e-mail est déjà utilisée par une autre fiche d'élève (y compris archivée). Utilisez cet élève au lieu d'en créer un nouveau.",
     studentHasScheduledLessons: "Terminez ou annulez d'abord les cours prévus.",
     studentLimitReached: "Vous avez atteint la limite d'élèves actifs.",
     studentNotFound: "Élève introuvable.",

@@ -114,6 +114,8 @@ export const en: Messages = {
     studentAlreadyActive: "The student is already active.",
     studentArchived: "The student has been archived.",
     studentChanged: "The student record has changed. Load the latest version.",
+    studentEmailTaken:
+      "Another student record already uses this email (archived ones included). Use that student instead of adding a new one.",
     studentHasScheduledLessons:
       "First complete or cancel the scheduled lessons.",
     studentLimitReached: "You've reached your active student limit.",

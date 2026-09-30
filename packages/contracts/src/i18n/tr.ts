@@ -107,6 +107,8 @@ export const tr = {
     studentAlreadyActive: "Öğrenci zaten aktif.",
     studentArchived: "Öğrenci arşivlenmiş.",
     studentChanged: "Öğrenci kaydı değişmiş. Güncel sürümü yükleyin.",
+    studentEmailTaken:
+      "Bu e-posta başka bir öğrenci kaydında var (arşivdekiler dahil). Yeni kayıt açmak yerine o öğrenciyi kullanın.",
     studentHasScheduledLessons:
       "Önce planlanan dersleri tamamlayın veya iptal edin.",
     studentLimitReached: "Aktif öğrenci sınırına ulaşıldı.",
