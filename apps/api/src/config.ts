@@ -56,6 +56,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
         .int()
         .min(0)
         .default(30),
+      // Mesaj gönderimi hesap başına ayrıca sınırlanır (genel sınırın içinde).
+      RATE_LIMIT_MESSAGES_PER_MINUTE: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .default(30),
       // İstemci IP'si X-Forwarded-For'dan yalnızca bu adreslerden gelen
       // isteklerde okunur (Express "trust proxy"). Varsayılan: aynı makine ve
       // özel ağ (web sunucusu, Docker ağı, yük dengeleyici).

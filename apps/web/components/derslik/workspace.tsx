@@ -291,6 +291,8 @@ export default function Workspace({
       setStudentId(null);
     } else if (focus.section === "myRequests") {
       // Öğrenci bildirimi; öğretmen görünümünde açılacak yeri yok.
+    } else if (focus.section === "messages") {
+      // Mesaj bildirimi; mesajlar görünümü eklenince yazışma orada açılır.
     } else if (focus.section === "lessons") {
       // Ders hatırlatması: takvim o dersin gününde açılır.
       const lesson = data.lessons.find((l) => l.id === focus.itemId);

@@ -14,7 +14,9 @@ export type NoticeKind =
   | "REQUEST"
   | "REQUEST_DECISION"
   /** Yaklaşan ders hatırlatması; hedef ders kaydıdır. */
-  | "LESSON";
+  | "LESSON"
+  /** Yeni mesaj; hedef yazışmadır (portal bağlantısı). */
+  | "MESSAGE";
 
 export type Notice = {
   id: string;
@@ -40,14 +42,16 @@ export type NoticeSection =
   /** Öğretmenin vitrin sayfasındaki gelen ders istekleri. */
   | "requests"
   /** Öğrencinin gönderdiği istekler (kabul edildiyse o öğretmenin dersleri). */
-  | "myRequests";
+  | "myRequests"
+  /** Mesajlar; öne çıkan kayıt yazışmadır. */
+  | "messages";
 
 export type NoticeTarget = {
   workspaceId: string;
   /** İstek bildirimlerinde öğrenci kaydı henüz yoksa boş. */
   studentId: string;
   section: NoticeSection;
-  /** Bölümde öne çıkarılacak ders, ödev, video veya özet. */
+  /** Bölümde öne çıkarılacak ders, ödev, video, özet veya yazışma. */
   itemId: string | null;
 };
 
@@ -62,6 +66,7 @@ const sections: Record<NoticeKind, NoticeSection> = {
   REQUEST: "requests",
   REQUEST_DECISION: "myRequests",
   LESSON: "lessons",
+  MESSAGE: "messages",
 };
 
 /** Başlıklar sunucuda sabit metinler; türü yazılmamış eski bildirimler için. */
@@ -95,6 +100,9 @@ const noticeKeys: MessageKey[] = [
   "notice.requestAccepted",
   "notice.requestDeclined",
   "notice.lessonReminder",
+  "notice.messageFromTeacher",
+  "notice.messageFromStudent",
+  "notice.messageFromGuardian",
 ];
 /** Bildirim başlığı veya gövdesi, okuyanın dilinde. Öğretmenin yazdığı ödev
  *  ya da video adı gibi serbest metinler olduğu gibi kalır. */
@@ -126,13 +134,20 @@ export function noticeTarget(n: Notice): NoticeTarget | null {
 /** Bildirim simgesinin türü; web lucide, mobil Ionicons simgesiyle çizer.
  *  Türü yazılmamış eski bildirimlerde sunucunun sabit Türkçe başlığına bakılır. */
 export type NoticeIcon =
-  "question" | "video" | "summary" | "assignment" | "lesson" | "other";
+  | "question"
+  | "video"
+  | "summary"
+  | "assignment"
+  | "lesson"
+  | "message"
+  | "other";
 
 export function noticeIcon(n: Pick<Notice, "kind" | "title">): NoticeIcon {
   if (n.kind === "QUESTION" || n.kind === "ANSWER") return "question";
   if (n.kind === "VIDEO") return "video";
   if (n.kind === "SUMMARY") return "summary";
   if (n.kind === "LESSON") return "lesson";
+  if (n.kind === "MESSAGE") return "message";
   if (n.kind) return "assignment";
   const title = n.title.toLocaleLowerCase("tr");
   if (title.includes("soru")) return "question";

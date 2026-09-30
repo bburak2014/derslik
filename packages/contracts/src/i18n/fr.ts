@@ -90,6 +90,13 @@ export const fr: Messages = {
     makeupPickCancelled:
       "Pour un rattrapage, choisissez un cours annulé du même élève.",
     makeupSingle: "Un cours de rattrapage doit être ponctuel.",
+    messageClosed:
+      "Vous ne pouvez pas envoyer de messages dans cette conversation.",
+    messageInvalid:
+      "Un message ne peut pas être vide et ne peut pas dépasser 2000 caractères.",
+    messageNotFound: "Conversation introuvable.",
+    messageRateLimit:
+      "Vous envoyez des messages trop rapidement. Patientez un instant, puis réessayez.",
     noStudentAccess: "Vous n'avez pas accès à cet élève.",
     noWorkspaceAccess: "Vous n'avez pas accès à cet espace de travail.",
     noteChanged:
@@ -276,6 +283,62 @@ export const fr: Messages = {
     },
     thisWeek: "Les cours de la semaine",
     week: "Semaine",
+  },
+  chat: {
+    back: "Conversations",
+    childThread: "{student} et l'enseignant",
+    closed:
+      "Cette personne n'a plus accès ; vous ne pouvez plus envoyer de nouveaux messages.",
+    count: "{count} / 2000",
+    emptyPortal: "Votre conversation avec l'enseignant apparaît ici.",
+    emptyTeacherText:
+      "Dès que vous donnez accès à un élève ou à un parent, vous pouvez lui écrire ici.",
+    emptyTeacherTitle: "Personne à qui écrire pour l'instant",
+    emptyThread: "Aucun message pour l'instant. Écrivez le premier.",
+    failed: "Le message n'a pas été envoyé. Réessayez.",
+    guardianOf: "Parent de {student}",
+    hideClosed: "Masquer les conversations fermées",
+    messageStudent: "Messages",
+    noAccount:
+      "Cet élève n'a pas encore de compte associé. Donnez-lui d'abord accès pour échanger des messages.",
+    noResults: "Aucune conversation ne correspond à votre recherche.",
+    older: "Messages précédents",
+    onlyUnread: "Non lus",
+    pick: "Choisissez une conversation.",
+    placeholder: "Écrivez un message",
+    privacy: "Les numéros de téléphone ne sont pas partagés.",
+    readOnly:
+      "Cette conversation a lieu entre l'élève et l'enseignant ; vous pouvez seulement la lire.",
+    readersNone: "Seuls vous et votre interlocuteur voyez cette conversation.",
+    readersStudent: {
+      one: "Le compte de votre parent peut aussi lire cette conversation, messages précédents compris.",
+      other:
+        "{count} comptes parents peuvent aussi lire cette conversation, messages précédents compris.",
+    },
+    readersTeacher: {
+      one: "Le parent de l'élève peut aussi lire cette conversation, messages précédents compris.",
+      other:
+        "{count} parents de l'élève peuvent aussi lire cette conversation, messages précédents compris.",
+    },
+    search: "Rechercher par nom",
+    send: "Envoyer",
+    showClosed: {
+      one: "Afficher {count} conversation fermée",
+      other: "Afficher {count} conversations fermées",
+    },
+    someone: "Ancien participant",
+    subtitleGuardian:
+      "Échangez avec l'enseignant directement dans l'application.",
+    subtitleStudent:
+      "Échangez avec votre enseignant directement dans l'application.",
+    subtitleTeacher:
+      "Écrivez à vos élèves et à leurs parents sans partager de numéro de téléphone.",
+    title: "Messages",
+    unread: {
+      one: "{count} nouveau message",
+      other: "{count} nouveaux messages",
+    },
+    you: "Vous",
   },
   common: {
     actions: "Actions",
@@ -908,6 +971,7 @@ export const fr: Messages = {
     calendar: "Calendrier des cours",
     files: "PDF et fichiers",
     lessons: "Cours",
+    messages: "Messages",
     notes: "Partages",
     overview: "Vue d'ensemble",
     payments: "Encaissements",
@@ -924,6 +988,9 @@ export const fr: Messages = {
     answeredBody:
       "Vous pouvez consulter la réponse à votre question sur la vidéo.",
     assignmentNew: "Nouveau devoir",
+    messageFromGuardian: "Nouveau message d'un parent",
+    messageFromStudent: "Nouveau message d'un élève",
+    messageFromTeacher: "Nouveau message de votre enseignant",
     question: "Nouvelle question sur une vidéo",
     questionBody: "Vous pouvez répondre à la question horodatée.",
     reviewed: "Devoir évalué",

@@ -93,6 +93,13 @@ export const de: Messages = {
     makeupPickCancelled:
       "Wählen Sie für eine Nachholstunde eine abgesagte Stunde desselben Schülers.",
     makeupSingle: "Eine Nachholstunde muss ein Einzeltermin sein.",
+    messageClosed:
+      "In dieser Unterhaltung können Sie keine Nachrichten senden.",
+    messageInvalid:
+      "Eine Nachricht darf nicht leer sein und höchstens 2000 Zeichen lang sein.",
+    messageNotFound: "Unterhaltung nicht gefunden.",
+    messageRateLimit:
+      "Sie senden Nachrichten zu schnell. Warten Sie einen Moment und versuchen Sie es erneut.",
     noStudentAccess: "Sie haben keinen Zugriff auf diesen Schüler.",
     noWorkspaceAccess: "Sie haben keinen Zugriff auf diesen Arbeitsbereich.",
     noteChanged:
@@ -285,6 +292,60 @@ export const de: Messages = {
     },
     thisWeek: "Stunden dieser Woche",
     week: "Woche",
+  },
+  chat: {
+    back: "Unterhaltungen",
+    childThread: "{student} und die Lehrkraft",
+    closed:
+      "Diese Person hat keinen Zugang mehr; neue Nachrichten können nicht gesendet werden.",
+    count: "{count} / 2000",
+    emptyPortal: "Ihre Unterhaltung mit der Lehrkraft erscheint hier.",
+    emptyTeacherText:
+      "Sobald Sie einem Schüler oder Elternteil Zugang geben, können Sie ihm hier schreiben.",
+    emptyTeacherTitle: "Noch niemand, dem Sie schreiben können",
+    emptyThread: "Noch keine Nachrichten. Schreiben Sie die erste.",
+    failed: "Die Nachricht wurde nicht gesendet. Versuchen Sie es erneut.",
+    guardianOf: "Elternteil von {student}",
+    hideClosed: "Geschlossene Unterhaltungen ausblenden",
+    messageStudent: "Nachrichten",
+    noAccount:
+      "Dieser Schüler hat noch kein verknüpftes Konto. Geben Sie zuerst Zugang, um Nachrichten zu schreiben.",
+    noResults: "Keine Unterhaltung passt zu Ihrer Suche.",
+    older: "Frühere Nachrichten",
+    onlyUnread: "Ungelesen",
+    pick: "Wählen Sie eine Unterhaltung.",
+    placeholder: "Nachricht schreiben",
+    privacy: "Telefonnummern werden nicht geteilt.",
+    readOnly:
+      "Diese Unterhaltung findet zwischen dem Schüler und der Lehrkraft statt; Sie können sie nur lesen.",
+    readersNone: "Nur Sie und Ihr Gegenüber sehen diese Unterhaltung.",
+    readersStudent: {
+      one: "Das Konto Ihres Elternteils kann diese Unterhaltung ebenfalls lesen, auch frühere Nachrichten.",
+      other:
+        "{count} Elternkonten können diese Unterhaltung ebenfalls lesen, auch frühere Nachrichten.",
+    },
+    readersTeacher: {
+      one: "Ein Elternteil des Schülers kann diese Unterhaltung ebenfalls lesen, auch frühere Nachrichten.",
+      other:
+        "{count} Elternteile des Schülers können diese Unterhaltung ebenfalls lesen, auch frühere Nachrichten.",
+    },
+    search: "Nach Namen suchen",
+    send: "Senden",
+    showClosed: {
+      one: "{count} geschlossene Unterhaltung anzeigen",
+      other: "{count} geschlossene Unterhaltungen anzeigen",
+    },
+    someone: "Ehemaliger Teilnehmer",
+    subtitleGuardian: "Schreiben Sie der Lehrkraft direkt in der App.",
+    subtitleStudent: "Schreiben Sie Ihrer Lehrkraft direkt in der App.",
+    subtitleTeacher:
+      "Schreiben Sie Ihren Schülern und deren Eltern, ohne Telefonnummern zu teilen.",
+    title: "Nachrichten",
+    unread: {
+      one: "{count} neue Nachricht",
+      other: "{count} neue Nachrichten",
+    },
+    you: "Sie",
   },
   common: {
     actions: "Aktionen",
@@ -918,6 +979,7 @@ export const de: Messages = {
     calendar: "Stundenkalender",
     files: "PDFs und Dateien",
     lessons: "Stunden",
+    messages: "Nachrichten",
     notes: "Geteilte Notizen",
     overview: "Übersicht",
     payments: "Zahlungen",
@@ -934,6 +996,9 @@ export const de: Messages = {
     answeredBody:
       "Sie können jetzt die Antwort auf Ihre Frage zum Video lesen.",
     assignmentNew: "Neue Aufgabe",
+    messageFromGuardian: "Neue Nachricht von einem Elternteil",
+    messageFromStudent: "Neue Nachricht von einem Schüler",
+    messageFromTeacher: "Neue Nachricht von Ihrer Lehrkraft",
     question: "Neue Frage zu einem Video",
     questionBody: "Sie können die Frage mit Zeitstempel beantworten.",
     reviewed: "Aufgabe bewertet",

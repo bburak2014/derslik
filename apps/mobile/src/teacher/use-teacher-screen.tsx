@@ -94,6 +94,8 @@ export function useTeacherScreen({
       setShowcaseFocus(focus.itemId);
     } else if (focus.section === "myRequests") {
       // Öğrencinin kendi istekleri; öğretmen görünümünde açılacak yer yok.
+    } else if (focus.section === "messages") {
+      // Mesaj bildirimi; mesajlar ekranı eklenince yazışma orada açılır.
     } else if (focus.section === "lessons") {
       // Ders hatırlatması: takvim o dersin gününde açılır.
       const lesson = data.lessons.find((l) => l.id === focus.itemId);

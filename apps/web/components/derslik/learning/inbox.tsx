@@ -22,6 +22,7 @@ import {
   CheckCheck,
   ChevronRight,
   ClipboardList,
+  MessageCircle,
   MessageSquare,
   Sparkles,
   Video as VideoIcon,
@@ -66,6 +67,7 @@ const noticeIcons: Record<NoticeIcon, React.ReactNode> = {
   summary: <Sparkles />,
   assignment: <ClipboardList />,
   lesson: <CalendarDays />,
+  message: <MessageCircle />,
   other: <Bell />,
 };
 

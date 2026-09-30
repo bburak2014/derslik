@@ -1844,6 +1844,7 @@ const noticeIcons: Record<NoticeIcon, IconName> = {
   summary: "sparkles-outline",
   assignment: "clipboard-outline",
   lesson: "calendar-outline",
+  message: "chatbubbles-outline",
   other: "notifications-outline",
 };
 

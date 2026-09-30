@@ -355,6 +355,8 @@ export function Portal({
       setRequestFocus(focus.itemId);
     } else if (
       focus.section !== "requests" &&
+      // Mesaj bildirimi; mesajlar sayfası eklenince yazışma orada açılır.
+      focus.section !== "messages" &&
       access &&
       focus.workspaceId === access.id &&
       focus.studentId === access.studentId
