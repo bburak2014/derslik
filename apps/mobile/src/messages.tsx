@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
 import { ApiError } from "@derslik/api-client";
 import {
   addDays,
@@ -23,6 +24,7 @@ import {
   dayLabel,
   lower,
   MESSAGE_MAX,
+  messageLength,
   senderLabel,
   t,
   threadTitle,
@@ -138,15 +140,14 @@ export function useMessages(path: string | null) {
     }
     return r.data;
   }, [path]);
-  // Sessiz yükleme: hata ekranda listenin üstünde görünür.
+  // Sessiz yükleme: hata ekranda listenin üstünde görünür. Eldeki liste
+  // korunur; hiç liste yoksa boş durum değil "Yeniden dene" görünür.
   const load = useCallback(async () => {
     const mine = seq.current + 1;
     try {
       await reload();
     } catch (e) {
-      if (mine !== seq.current) return;
-      setError((e as Error).message);
-      setThreads((old) => old ?? []);
+      if (mine === seq.current) setError((e as Error).message);
     }
   }, [reload]);
   useEffect(() => {
@@ -263,12 +264,12 @@ function ThreadRow({
     when = thread.lastAt ? timeAgo(thread.lastAt, now) : "",
     unread =
       thread.unread > 0 ? t("chat.unread", { count: thread.unread }) : "",
-    preview = thread.lastBody
-      ? (thread.lastMine ? t("chat.you") + ": " : "") +
-        thread.lastBody.replace(/\s+/g, " ")
-      : thread.canSend
-        ? t("chat.emptyThread")
-        : "";
+    // Mesajı olmayan yazışmada önizleme satırı boş kalır (satır boyu aynı).
+    last = thread.lastBody?.replace(/\s+/g, " ") ?? "",
+    preview =
+      last && thread.lastMine
+        ? t("chat.preview", { name: t("chat.you"), text: last })
+        : last;
   return (
     <ListRow
       divider={divider}
@@ -299,9 +300,18 @@ function ThreadRow({
             ]}
             numberOfLines={1}
           >
-            {preview}
+            {preview || " "}
           </Text>
-          {!!unread && <Badge tone="info">{unread}</Badge>}
+          {/* Rozet yalnızca sayıyı gösterir (360 px'te önizlemeye yer kalsın);
+              tam metin satırın erişilebilirlik etiketindedir. Velinin yalnızca
+              okuduğu yazışma sayaca girmediği için sönük tonda. */}
+          {!!unread && (
+            <Badge
+              tone={thread.viewer === "GUARDIAN_READ" ? "neutral" : "info"}
+            >
+              {thread.unread > 99 ? "99+" : thread.unread}
+            </Badge>
+          )}
         </View>
       </View>
       <Ionicons name="chevron-forward" size={17} color={colors.faint} />
@@ -428,6 +438,7 @@ export function ThreadList({
   const { colors, styles } = useTheme();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false),
+    [retrying, setRetrying] = useState(false),
     [showClosed, setShowClosed] = useState(false);
   const { threads, error, now, search, unreadOnly, studentFilter } = messages;
   const teacher = viewer === "OWNER";
@@ -496,11 +507,28 @@ export function ThreadList({
       <PrivacyNote />
       <ErrorText message={error} />
       {!threads ? (
-        <ActivityIndicator
-          color={colors.brand}
-          accessibilityLabel={t("common.loading")}
-          style={{ paddingVertical: 28 }}
-        />
+        // İlk yükleme hata verdiyse boş durum yerine yeniden deneme.
+        error ? (
+          <Button
+            secondary
+            size="sm"
+            icon="refresh-outline"
+            loading={retrying}
+            style={{ alignSelf: "flex-start" }}
+            onPress={() => {
+              setRetrying(true);
+              void messages.load().finally(() => setRetrying(false));
+            }}
+          >
+            {t("common.retry")}
+          </Button>
+        ) : (
+          <ActivityIndicator
+            color={colors.brand}
+            accessibilityLabel={t("common.loading")}
+            style={{ paddingVertical: 28 }}
+          />
+        )
       ) : !threads.length ? (
         <EmptyState
           icon="chatbubbles-outline"
@@ -613,7 +641,10 @@ const MessageItems = React.memo(function MessageItems({
         )}
         <View
           accessible
-          accessibilityLabel={`${senderLabel(m, thread)}: ${m.body}, ${time}`}
+          accessibilityLabel={`${t("chat.preview", {
+            name: senderLabel(m, thread),
+            text: m.body,
+          })}, ${time}`}
           style={{
             alignSelf: m.mine ? "flex-end" : "flex-start",
             maxWidth: "86%",
@@ -656,9 +687,11 @@ const MessageItems = React.memo(function MessageItems({
 
 /** Kimlerin okuyabildiği: öğretmen ve öğrenci için öğrenci yazışmasını okuyan
  *  veli sayısı, yoksa "yalnızca ikiniz". */
+const sharedThread = (thread: MessageThread) =>
+  thread.role === "STUDENT" && thread.guardianReaders > 0;
 function readersText(thread: MessageThread) {
   const count = thread.guardianReaders;
-  if (thread.role === "STUDENT" && count > 0)
+  if (sharedThread(thread))
     return thread.viewer === "OWNER"
       ? t("chat.readersTeacher", { count })
       : t("chat.readersStudent", { count });
@@ -667,8 +700,9 @@ function readersText(thread: MessageThread) {
 
 /**
  * Bir yazışma: başlık, eskiden yeniye mesajlar, altta klavyenin üstünde
- * duran yazma alanı. Açılınca ve karşı taraftan yeni mesaj gelince okundu
- * bildirilir.
+ * duran yazma alanı. Açılınca, karşı taraftan yeni mesaj gelince ve okunmamış
+ * mesaj kaldıkça (okundu isteği başarısız olduysa) her yoklamada okundu
+ * bildirilir; yalnızca ekran açık ve uygulama ön plandayken.
  *
  * Yerleşim: `KeyboardAvoidingView` klavyenin örttüğü payı kendi çerçevesine
  * göre hesaplar; çerçeve üst kenarı ekranın tepesinde olan bir kabın (ekranın
@@ -714,8 +748,21 @@ export function Conversation({
     callbacks.current = { onBack, onUpdate, onRead };
   });
   const known = useRef(new Set<string>()),
+    // Ekrandaki mesajlar (durumun eşzamanlı kopyası): okundu isteğinin
+    // `upTo`'su ve birleştirmeler bundan hesaplanır.
+    shown = useRef<ChatMessage[]>([]),
     loaded = useRef(false),
     seq = useRef(0),
+    // Yazışmadan çıkılınca geç gelen yanıt durumu değiştirmez, okundu
+    // göndermez.
+    alive = useRef(true),
+    // Aynı anda tek okundu isteği gider.
+    reading = useRef(false),
+    // Gönderimin tekrar anahtarı: yalnızca aynı metnin hatadan sonraki
+    // yeniden denemesi aynı anahtarla gider (sunucu ikinci kez kaydetmez).
+    // Gönderilince ya da metin değişince bırakılır; aynı metin ("Tamam")
+    // sonradan ayrı bir mesaj olarak gönderilebilir.
+    sendKey = useRef<{ text: string; key: string } | null>(null),
     sendLock = useRef(false),
     olderLock = useRef(false),
     scroller = useRef<ScrollView>(null),
@@ -726,65 +773,111 @@ export function Conversation({
     // boyu ve konum; yeni mesaj gelince yumuşak kaydırma isteği.
     keep = useRef<{ content: number; y: number } | null>(null),
     smooth = useRef(false);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const show = useCallback((list: ChatMessage[]) => {
+    shown.current = list;
+    setItems(list);
+  }, []);
 
+  /** Yazışmayı `upTo`'ya (az önce alınıp ekrana konan son sayfanın en yeni
+   *  mesajının zamanı, sunucunun verdiği gibi) kadar okundu sayar: arada
+   *  gelen ama henüz gösterilmeyen mesaj okunmamış kalır. Ekrandan
+   *  çıkıldıysa ya da uygulama ön planda değilse gönderilmez; yazışma
+   *  okunmamış kalır, sonraki yoklama yeniden dener. */
   const markRead = useCallback(
-    async (current: MessageThread) => {
+    async (current: MessageThread, upTo: string | undefined) => {
+      if (
+        !upTo ||
+        !alive.current ||
+        reading.current ||
+        AppState.currentState !== "active"
+      )
+        return;
+      reading.current = true;
       try {
-        await request(url + "/read", {});
+        await request(url + "/read", { upTo });
         callbacks.current.onUpdate?.({ ...current, unread: 0 });
         callbacks.current.onRead?.();
       } catch {
-        // Okundu bilgisi bir sonraki açılışta yeniden gönderilir.
+        // Yazışma okunmamış kalır; sonraki yoklama yeniden dener.
+      } finally {
+        reading.current = false;
       }
     },
     [url],
   );
 
-  // En yeni sayfayı alır ve elimizdekilerle birleştirir. Arada 50'den fazla
-  // yeni mesaj varsa (uzun süre arka planda kalındıysa) liste yeni sayfayla
+  // En yeni sayfayı alır ve elimizdekilerle birleştirir. Sayfanın en eski
+  // mesajı elde yoksa (uzun süre arka planda kalındıysa; dönüp hemen mesaj
+  // gönderilmiş olsa da) arada mesaj kalmış olabilir: liste yeni sayfayla
   // değişir, "Önceki mesajlar" düğmesi geri kalanı getirir.
   const refresh = useCallback(async () => {
     const mine = ++seq.current;
     try {
       const page = (await request<ThreadPage>(url)).data;
-      if (mine !== seq.current) return;
+      if (!alive.current || mine !== seq.current) return;
       setThread(page.thread);
       setNow(Date.now());
       setError("");
       callbacks.current.onUpdate?.(page.thread);
-      const fresh = page.messages.filter((m) => !known.current.has(m.id));
+      const newest = page.messages[page.messages.length - 1]?.createdAt;
       if (!loaded.current) {
         loaded.current = true;
-        known.current = new Set(page.messages.map((m) => m.id));
-        setItems(page.messages);
+        // Yükleme bitmeden gönderilen mesaj sayfada yoksa listede kalır.
+        const local = shown.current.filter(
+          (m) => !page.messages.some((x) => x.id === m.id),
+        );
+        known.current = new Set([...page.messages, ...local].map((m) => m.id));
+        show(byTime([...page.messages, ...local]));
         setMore(page.more);
-        void markRead(page.thread);
+        void markRead(page.thread, newest);
         return;
       }
-      if (!fresh.length) return;
-      if (page.more && fresh.length === page.messages.length) {
+      const fresh = page.messages.filter((m) => !known.current.has(m.id)),
+        oldest = page.messages[0],
+        gap = page.more && !!oldest && !known.current.has(oldest.id);
+      if (gap) {
         known.current = new Set(page.messages.map((m) => m.id));
-        setItems(page.messages);
+        show(page.messages);
         setMore(true);
-      } else {
+        smooth.current = true;
+      } else if (fresh.length) {
         for (const m of fresh) known.current.add(m.id);
-        setItems((old) => byTime([...(old ?? []), ...fresh]));
+        show(byTime([...shown.current, ...fresh]));
+        if (atBottom.current) smooth.current = true;
       }
-      if (atBottom.current) smooth.current = true;
       const incoming = fresh.filter((m) => !m.mine);
+      // Okundu isteği gitmediyse ya da başarısız olduysa her yoklamada
+      // yeniden denenir.
+      if (incoming.length || page.thread.unread > 0)
+        void markRead(page.thread, newest);
       if (incoming.length) {
-        void markRead(page.thread);
         const last = incoming[incoming.length - 1];
         AccessibilityInfo.announceForAccessibility(
           incoming.length === 1
-            ? `${senderLabel(last, page.thread)}: ${last.body}`
+            ? t("chat.preview", {
+                name: senderLabel(last, page.thread),
+                text: last.body,
+              })
             : t("chat.unread", { count: incoming.length }),
         );
       }
     } catch (e) {
-      if (mine === seq.current) setError((e as Error).message);
+      if (!alive.current || mine !== seq.current) return;
+      // Yoklama hatası (bağlantı) eldeki mesajları korur, uyarı göstermez;
+      // ilk yükleme hatası ve yazışmanın kapanması (403/404) gösterilir.
+      if (
+        !loaded.current ||
+        (e instanceof ApiError && (e.status === 403 || e.status === 404))
+      )
+        setError((e as Error).message);
     }
-  }, [url, markRead]);
+  }, [url, markRead, show]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void refresh();
@@ -803,7 +896,7 @@ export function Conversation({
   }, [canGoBack]);
 
   async function loadOlder() {
-    const oldest = items?.[0];
+    const oldest = shown.current[0];
     if (!oldest || olderLock.current) return;
     olderLock.current = true;
     setOlderBusy(true);
@@ -813,6 +906,7 @@ export function Conversation({
           `${url}?before=${encodeURIComponent(oldest.createdAt)}`,
         )
       ).data;
+      if (!alive.current) return;
       const add = page.messages.filter((m) => !known.current.has(m.id));
       for (const m of add) known.current.add(m.id);
       setMore(page.more);
@@ -821,21 +915,37 @@ export function Conversation({
           content: metrics.current.content,
           y: metrics.current.y,
         };
-        setItems((old) => byTime([...add, ...(old ?? [])]));
+        show(byTime([...add, ...shown.current]));
       }
     } catch (e) {
-      setError((e as Error).message);
+      if (alive.current) setError((e as Error).message);
     } finally {
       olderLock.current = false;
-      setOlderBusy(false);
+      if (alive.current) setOlderBusy(false);
     }
   }
 
+  // Karakterler veritabanı gibi sayılır: emoji tek karakter.
   const body = cleanMessage(draft),
-    tooLong = body.length > MESSAGE_MAX;
+    length = messageLength(body),
+    tooLong = length > MESSAGE_MAX;
+  function changeDraft(text: string) {
+    setDraft(text);
+    if (sendError) setSendError("");
+    // Metin değişti: bekleyen anahtar artık bu metne ait değil.
+    if (sendKey.current && sendKey.current.text !== cleanMessage(text))
+      sendKey.current = null;
+  }
   async function send() {
-    const raw = draft;
-    if (!thread?.canSend || !body || tooLong || sendLock.current) return;
+    const raw = draft,
+      text = body;
+    if (!thread?.canSend || !text || tooLong || sendLock.current) return;
+    // Aynı metnin yeniden denemesi aynı anahtarla, yeni metin yeni anahtarla.
+    const attempt =
+      sendKey.current?.text === text
+        ? sendKey.current
+        : { text, key: Crypto.randomUUID() };
+    sendKey.current = attempt;
     // Çift dokunuşta ikinci gönderim burada durur; düğme de kapanır.
     sendLock.current = true;
     setSending(true);
@@ -843,8 +953,11 @@ export function Conversation({
     try {
       const r = await request<{ data: { id: string; createdAt: string } }>(
         url,
-        { body },
+        { body: text },
+        attempt.key,
       );
+      if (sendKey.current === attempt) sendKey.current = null;
+      if (!alive.current) return;
       // Gönderim sürerken yazılan ek metin silinmez.
       setDraft((current) =>
         current.startsWith(raw)
@@ -857,22 +970,36 @@ export function Conversation({
           id: r.data.id,
           senderRole: thread.viewer === "OWNER" ? "OWNER" : thread.role,
           mine: true,
-          body,
+          body: text,
           createdAt: r.data.createdAt,
         };
-        setItems((old) => byTime([...(old ?? []), own]));
+        show(byTime([...shown.current, own]));
       }
       smooth.current = true;
       void refresh();
     } catch (e) {
+      // Sunucu metni geri çevirdiyse (4xx) sonraki deneme yeni anahtarla
+      // gider. Bağlantı ya da sunucu hatasında anahtar korunur: metin belki
+      // kaydedildi, aynı metnin yeniden denemesi ikinci kez kaydedilmez.
+      if (
+        e instanceof ApiError &&
+        e.status < 500 &&
+        sendKey.current === attempt
+      )
+        sendKey.current = null;
+      if (!alive.current) return;
       // Taslak yerinde kalır. Sunucunun açıkladığı hatalar (çok hızlı, kapalı
       // yazışma) olduğu gibi, bağlantı hataları genel metinle gösterilir.
       setSendError(
         e instanceof ApiError && e.status < 500 ? e.message : t("chat.failed"),
       );
+      // Yazışma kapandıysa ya da erişim kalktıysa yazma alanı hemen kapalı
+      // yazışma notuna döner.
+      if (e instanceof ApiError && (e.status === 403 || e.status === 404))
+        void refresh();
     } finally {
       sendLock.current = false;
-      setSending(false);
+      if (alive.current) setSending(false);
     }
   }
 
@@ -908,7 +1035,7 @@ export function Conversation({
   };
 
   const email = thread ? guardianEmail(thread) : null;
-  const near = body.length >= MESSAGE_MAX - 200;
+  const near = length >= MESSAGE_MAX - 200;
   return (
     <>
       <KeyboardAvoidingView
@@ -949,6 +1076,33 @@ export function Conversation({
             )}
           </View>
         </View>
+        {/* Kimlerin okuyabildiği ve gizlilik notu başlığın altında sabit durur;
+            mesajlar kaydırılınca da görünür kalır. */}
+        {!!thread && thread.viewer !== "GUARDIAN_READ" && (
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.line,
+              backgroundColor: colors.sunken,
+            }}
+          >
+            <Ionicons
+              name={
+                sharedThread(thread) ? "eye-outline" : "lock-closed-outline"
+              }
+              size={14}
+              color={colors.muted}
+              style={{ marginTop: 2 }}
+            />
+            <Text style={[styles.caption, { flex: 1, color: colors.muted }]}>
+              {readersText(thread)} {t("chat.privacy")}
+            </Text>
+          </View>
+        )}
         {!!error && (
           <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
             <ErrorText message={error} />
@@ -971,38 +1125,6 @@ export function Conversation({
           onContentSizeChange={onContentSizeChange}
           onLayout={(e) => onLayout(e.nativeEvent.layout.height)}
         >
-          {!!thread && thread.viewer !== "GUARDIAN_READ" && (
-            <View
-              style={{
-                alignSelf: "center",
-                maxWidth: 420,
-                gap: 4,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                marginBottom: 6,
-                borderRadius: radius.control,
-                backgroundColor: colors.sunken,
-              }}
-            >
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                <Ionicons
-                  name="eye-outline"
-                  size={14}
-                  color={colors.muted}
-                  style={{ marginTop: 1 }}
-                />
-                <Text
-                  style={[
-                    styles.caption,
-                    { flexShrink: 1, color: colors.muted },
-                  ]}
-                >
-                  {readersText(thread)}
-                </Text>
-              </View>
-              <PrivacyNote />
-            </View>
-          )}
           {more && (
             <Button
               secondary
@@ -1070,10 +1192,7 @@ export function Conversation({
                 accessibilityLabel={t("chat.placeholder")}
                 placeholder={t("chat.placeholder")}
                 value={draft}
-                onChangeText={(text) => {
-                  setDraft(text);
-                  if (sendError) setSendError("");
-                }}
+                onChangeText={changeDraft}
                 maxLength={20000}
                 invalid={tooLong}
                 style={{
@@ -1101,7 +1220,7 @@ export function Conversation({
                   tooLong && { color: colors.danger },
                 ]}
               >
-                {t("chat.count", { count: body.length })}
+                {t("chat.count", { count: length })}
               </Text>
             )}
           </View>
@@ -1145,8 +1264,11 @@ export function PortalMessages({
   viewer: "STUDENT" | "GUARDIAN";
 }) {
   const { colors } = useTheme();
-  const { threads, open, path } = messages;
+  const { threads, open, path, error } = messages;
   if (!path) return null;
+  // İlk yükleme hata verdiyse liste görünümü hatayı ve "Yeniden dene"yi çizer.
+  if (!threads && error)
+    return <ThreadList messages={messages} viewer={viewer} inset />;
   if (!threads)
     return (
       <ActivityIndicator

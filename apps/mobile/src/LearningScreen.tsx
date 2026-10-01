@@ -38,6 +38,7 @@ import {
   timeAgo,
   type NoticeIcon,
   money,
+  noticeBody,
   noticeTarget,
   noticeText,
   t,
@@ -2024,7 +2025,7 @@ export function Inbox({
                       />
                     )}
                   </View>
-                  <Text style={styles.muted}>{noticeText(n.body)}</Text>
+                  <Text style={styles.muted}>{noticeBody(n)}</Text>
                   <View style={[styles.row, { gap: 14, marginTop: 4 }]}>
                     <Text style={styles.caption}>
                       {timeAgo(n.createdAt, now)}

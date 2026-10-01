@@ -187,10 +187,10 @@ export function useTeacherScreen({
       setBusy(false);
     }
   }
-  /** Öğrenci dosyasındaki Mesajlar düğmesi: tek yazışma varsa o, birden çok
-   *  varsa (öğrenci ve veliler) o öğrenciyle süzülmüş liste açılır. Karar
-   *  güncel listeyle verilir (az önce erişim verilmiş olabilir); liste de
-   *  böylece yenilenir. Bağlı hesap yoksa false döner. */
+  /** Öğrenci dosyasındaki Mesajlar düğmesi: liste o öğrenciyle süzülür; tek
+   *  yazışma varsa o da açılır, birden çok varsa (öğrenci ve veliler) süzülmüş
+   *  liste görünür. Karar güncel listeyle verilir (az önce erişim verilmiş
+   *  olabilir); liste de böylece yenilenir. Bağlı hesap yoksa false döner. */
   async function messageStudent(person: Student) {
     const own = (await messages.reload()).filter(
       (x) => x.studentId === person.id,
@@ -200,9 +200,9 @@ export function useTeacherScreen({
     setLearning(false);
     messages.setSearch("");
     messages.setUnreadOnly(false);
-    messages.setStudentFilter(
-      own.length === 1 ? null : { id: person.id, name: person.name },
-    );
+    // Süzgeç tek yazışmada da kurulur: geri dönünce liste bu öğrenciyle
+    // sınırlı kalır (web'deki gibi).
+    messages.setStudentFilter({ id: person.id, name: person.name });
     messages.setOpen(own.length === 1 ? own[0].linkId : null);
     setTab("messages");
     return true;
@@ -637,11 +637,12 @@ export function useTeacherScreen({
   // Dar ekranda marka, üç simge ve "Hesabım" yazısı yan yana sığmıyor: telefonda
   // hesap düğmesi simgeye döner; çok dar ekranda (ya da büyük yazıda) marka
   // yalnızca işaretiyle, öğrenci dosyasının geri düğmesi yazısız çizilir.
-  // Adlar ekran okuyucuda kalır.
+  // Adlar ekran okuyucuda kalır. Ölçü: kenar boşlukları 40, dört simge 200,
+  // marka 121 (toplam 373), "Öğrenciler" geri düğmesi 112 (toplam 364) px.
   const scale = Math.max(1, fontScale),
     phone = width < 520,
-    tight = width < 400 * scale,
-    narrow = width < 380 * scale;
+    tight = width < 380 * scale,
+    narrow = width < 370 * scale;
   const header = (
     <View style={styles.header}>
       {student && narrow ? (

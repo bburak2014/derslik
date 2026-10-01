@@ -123,23 +123,29 @@ export const client = new DerslikClient({
   },
 });
 const retryKeys = new Map<string, string>();
+/** `idempotencyKey` verilirse anahtarı çağıran yönetir (ör. mesaj gönderimi:
+ *  aynı metin ayrı ayrı gönderilebilmeli). Verilmezse aynı yol ve gövdenin
+ *  ağ ya da sunucu hatasından sonraki denemesi aynı anahtarla gider. */
 export async function request<T = unknown>(
   path: string,
   body?: unknown,
+  idempotencyKey?: string,
 ): Promise<T> {
-  const signature = path + JSON.stringify(body),
-    key = retryKeys.get(signature) || Crypto.randomUUID();
-  if (body !== undefined) retryKeys.set(signature, key);
+  const own = !!idempotencyKey,
+    signature = path + JSON.stringify(body),
+    key = idempotencyKey || retryKeys.get(signature) || Crypto.randomUUID();
+  if (body !== undefined && !own) retryKeys.set(signature, key);
   try {
     const result = await client.request<T>("/v1" + path, {
       method: body === undefined ? "GET" : "POST",
       body,
       key: body === undefined ? undefined : key,
     });
-    retryKeys.delete(signature);
+    if (!own) retryKeys.delete(signature);
     return result;
   } catch (e) {
-    if (e instanceof ApiError && e.status < 500) retryKeys.delete(signature);
+    if (!own && e instanceof ApiError && e.status < 500)
+      retryKeys.delete(signature);
     throw e;
   }
 }
