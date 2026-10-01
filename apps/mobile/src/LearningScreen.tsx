@@ -314,6 +314,10 @@ export function LearningScreen({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
   }, [reload]);
+  // Ayarlama ekranının saat yükleyicisi bunlara bağlı; her çizimde yeniden
+  // oluşturulsalar yükleme döngüye girerdi.
+  const closeBooking = useCallback(() => setBooking(false), []),
+    refreshLessons = useCallback(() => void reload(), [reload]);
   async function action(command: unknown) {
     if (inFlight.current) throw new Error(t("mt.busy"));
     inFlight.current = true;
@@ -1913,11 +1917,11 @@ export function LearningScreen({
       <FormSheet form={form} onClose={() => setForm(null)} />
       {student && (
         <BookingSheet
-          visible={booking}
+          visible={booking && !!(data as PortalData).booking?.enabled}
           workspaceId={access.id}
           studentId={studentId}
-          onClose={() => setBooking(false)}
-          onChanged={() => void reload()}
+          onClose={closeBooking}
+          onChanged={refreshLessons}
           onMessage={
             ((data as PortalData).permissions || []).includes("lessons")
               ? () => setTab("messages")

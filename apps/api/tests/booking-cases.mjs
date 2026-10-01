@@ -36,14 +36,16 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
     rival = randomUUID(),
     third = randomUUID(),
     quiet = randomUUID(),
-    loud = randomUUID();
+    loud = randomUUID(),
+    learner = randomUUID();
   const tokenTeacher = await token(teacher),
     tokenPupil = await token(pupil),
     tokenParent = await token(parent),
     tokenRival = await token(rival),
     tokenThird = await token(third),
     tokenQuiet = await token(quiet),
-    tokenLoud = await token(loud);
+    tokenLoud = await token(loud),
+    tokenLearner = await token(learner);
   const D3 = istanbulDay(3),
     D10 = istanbulDay(10),
     D17 = istanbulDay(17),
@@ -57,9 +59,11 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
     mehmet,
     zeynep,
     kerem,
+    selin,
     ayseLesson,
     mehmetLesson,
-    winner;
+    winner,
+    selinLessons;
   const save = (body) =>
     request(`${base}/booking`, { method: "PUT", body, auth: tokenTeacher });
   const settings = (overrides = {}) => ({
@@ -96,6 +100,28 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
       body: { version: lessonVersion },
       auth,
     });
+  const student = async (name, subject) =>
+    (
+      await ok(
+        `${base}/students`,
+        { name, grade: "", subject, phone: "", email: "" },
+        { auth: tokenTeacher },
+      )
+    ).data;
+  const packageFor = async (s, granted, expiresOn) =>
+    (
+      await ok(
+        `${base}/packages`,
+        {
+          studentId: s.id,
+          name: `${granted} ders`,
+          granted,
+          priceMinor: "100000",
+          expiresOn,
+        },
+        { auth: tokenTeacher },
+      )
+    ).data;
 
   await t.test("öğretmen müsaitliğini sürüm kontrolüyle kaydeder", async () => {
     ws = (
@@ -183,28 +209,6 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
   await t.test(
     "boş saatler aralık, kapalı gün, ders, önceden ayarlama ve paket bitişine göre üretilir",
     async () => {
-      const student = async (name, subject) =>
-        (
-          await ok(
-            `${base}/students`,
-            { name, grade: "", subject, phone: "", email: "" },
-            { auth: tokenTeacher },
-          )
-        ).data;
-      const packageFor = async (s, granted, expiresOn) =>
-        (
-          await ok(
-            `${base}/packages`,
-            {
-              studentId: s.id,
-              name: `${granted} ders`,
-              granted,
-              priceMinor: "100000",
-              expiresOn,
-            },
-            { auth: tokenTeacher },
-          )
-        ).data;
       ayse = await student("Ayşe Ayarlar", "Fizik");
       mehmet = await student("Mehmet Rakip", "Kimya");
       zeynep = await student("Zeynep Yarış", "Biyoloji");
@@ -453,6 +457,20 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
         403,
       );
       assert.equal((await book(mehmet, slot, tokenTeacher)).status, 403);
+      // Bağlı veli ve öğrenci öğretmenin ayarlarını okuyamaz, değiştiremez.
+      for (const auth of [tokenParent, tokenPupil]) {
+        assert.equal((await request(`${base}/booking`, { auth })).status, 403);
+        assert.equal(
+          (
+            await request(`${base}/booking`, {
+              method: "PUT",
+              body: settings(),
+              auth,
+            })
+          ).status,
+          403,
+        );
+      }
       // Ayarlama kapalıyken liste ve ayarlama 409; portal özeti kapalı.
       await configure({ enabled: false });
       assert.equal(
@@ -478,6 +496,7 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
           .status,
         403,
       );
+      assert.equal((await book(zeynep, slot, tokenThird)).status, 403);
       await admin.query(
         "UPDATE derslik.portal_links SET revoked_at=NULL WHERE workspace_id=$1 AND user_id=$2",
         [ws, third],
@@ -606,6 +625,69 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
         )
       ).rows.map((r) => r.user_id);
       assert.ok(reminded.includes(teacher) && reminded.includes(winner.bookedBy));
+    },
+  );
+
+  await t.test(
+    "birden çok pakette önce süresi en erken biten paketin hakkı kullanılır",
+    async () => {
+      selin = await student("Selin Paket", "Matematik");
+      // Süresiz paket önce açılır: seçim açılış sırasına değil bitişe bakar.
+      selin.open = await packageFor(selin, 3, null);
+      selin.soon = await packageFor(selin, 1, istanbulDay(30));
+      await admin.query(
+        "INSERT INTO derslik.users(id) VALUES($1) ON CONFLICT DO NOTHING",
+        [learner],
+      );
+      await admin.query(
+        "INSERT INTO derslik.portal_links(workspace_id,student_id,user_id,role,permissions) VALUES($1,$2,$3,'STUDENT',ARRAY['lessons'])",
+        [ws, selin.id, learner],
+      );
+      assert.equal((await slotsOf(selin, tokenLearner)).freeCredits, 4);
+      const first = await book(selin, at(D3, "10:00"), tokenLearner);
+      assert.equal(first.status, 201, JSON.stringify(first.body));
+      assert.equal(first.body.data.packageId, selin.soon.id);
+      // Süreli paketin tek hakkı planlı derste; sıradaki ders süresiz paketten.
+      const second = await book(selin, at(D3, "11:00"), tokenLearner);
+      assert.equal(second.status, 201, JSON.stringify(second.body));
+      assert.equal(second.body.data.packageId, selin.open.id);
+      assert.equal((await slotsOf(selin, tokenLearner)).freeCredits, 2);
+      selinLessons = [first.body.data, second.body.data];
+    },
+  );
+
+  await t.test(
+    "öğrencinin iptali hakkı geri verir; ayarlama kapalıyken de iptal edilir",
+    async () => {
+      const [first] = selinLessons;
+      await configure({ enabled: false });
+      const done = await cancel(selin, first, first.version, tokenLearner);
+      assert.equal(done.status, 201, JSON.stringify(done.body));
+      assert.equal(done.body.data.status, "CANCELLED");
+      await configure();
+      assert.equal((await slotsOf(selin, tokenLearner)).freeCredits, 3);
+      // Geri gelen hak yine önce süreli paketten kullanılır.
+      const again = await book(selin, at(D3, "12:00"), tokenLearner);
+      assert.equal(again.status, 201, JSON.stringify(again.body));
+      assert.equal(again.body.data.packageId, selin.soon.id);
+      assert.equal((await slotsOf(selin, tokenLearner)).freeCredits, 2);
+    },
+  );
+
+  await t.test(
+    "öğretmen öğrencinin ayarladığı dersi iptal eder; etiket kalır, hak geri gelir",
+    async () => {
+      const [, second] = selinLessons;
+      const cancelled = (
+        await ok(
+          `${base}/sessions/${second.id}/cancel`,
+          { version: second.version },
+          { auth: tokenTeacher },
+        )
+      ).data;
+      assert.equal(cancelled.status, "CANCELLED");
+      assert.equal(cancelled.bookedBy, learner);
+      assert.equal((await slotsOf(selin, tokenLearner)).freeCredits, 3);
     },
   );
 }

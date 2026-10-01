@@ -260,6 +260,8 @@ export const en: Messages = {
     cancelUntilStart: "Until the lesson starts",
     cancelWindow: "Cancellation deadline",
     cancelled: "Lesson cancelled.",
+    cancelNotAllowed:
+      "This time is inside the cancellation deadline, so you won't be able to cancel after booking.",
     closedDays: "Closed days",
     closedDaysHint: "Students can't book lessons on holidays and days off.",
     confirm: "Book",

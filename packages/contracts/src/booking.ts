@@ -194,6 +194,17 @@ export function groupSlotsByDay(slots: readonly BookingSlot[]) {
 export const cancelDeadline = (startsAt: string, cancelHours: number) =>
   new Date(Date.parse(startsAt) - cancelHours * 3_600_000);
 
+/** `now` anında hâlâ iptal edilebiliyorsa son an; iptal süresi geçtiyse null
+ *  (ör. 12 saat önceden ayarlanan ders, 24 saat iptal süresinin içindedir). */
+export const cancelableUntil = (
+  startsAt: string,
+  cancelHours: number,
+  now: number,
+) => {
+  const deadline = cancelDeadline(startsAt, cancelHours);
+  return now <= deadline.getTime() ? deadline : null;
+};
+
 /** Öğrenci bu dersi şimdi iptal edebilir mi. Kural API'deki
  *  derslik.cancel_booking ile aynı; son kararı sunucu verir. `now` çizim
  *  dışından gelir (bileşenler saati durumda tutar). */
@@ -204,7 +215,7 @@ export const canCancelBooking = (
 ) =>
   lesson.status === "SCHEDULED" &&
   !!lesson.booked_by &&
-  now <= cancelDeadline(lesson.starts_at, cancelHours).getTime();
+  cancelableUntil(lesson.starts_at, cancelHours, now) !== null;
 
 /** "9 Ekim Cuma 15:00" gibi gün ve saat, etkin dilde ve İstanbul saatiyle. */
 export const dayTimeLabel = (iso: string) =>

@@ -282,6 +282,8 @@ export const de: Messages = {
     cancelUntilStart: "Bis zum Stundenbeginn",
     cancelWindow: "Absagefrist",
     cancelled: "Stunde abgesagt.",
+    cancelNotAllowed:
+      "Diese Zeit liegt innerhalb der Absagefrist. Nach dem Buchen können Sie nicht mehr absagen.",
     closedDays: "Geschlossene Tage",
     closedDaysHint:
       "An Feiertagen und freien Tagen können Schüler keine Stunden buchen.",
