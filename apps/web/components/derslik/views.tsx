@@ -56,7 +56,7 @@ import {
   type View,
 } from "@/lib/domain/types";
 import type { Actions } from "./workspace";
-import { intlLocale, lower, t } from "@derslik/contracts";
+import { intlLocale, lower, scheduledByDay, t } from "@derslik/contracts";
 
 export function balanceFor(data: WorkspaceData, id: string) {
   return (
@@ -644,6 +644,8 @@ export function CalendarView({
       ? dateKey(l.starts_at) >= start && dateKey(l.starts_at) <= days[6]
       : dateKey(l.starts_at) === selectedDay,
   );
+  // Planlı dersi olan günler şeritte uyarı tonuyla görünür.
+  const scheduled = scheduledByDay(data.lessons);
   return (
     <section className="panel calendar-panel">
       <div className="calendar-toolbar">
@@ -695,7 +697,7 @@ export function CalendarView({
           return (
             <button
               key={d}
-              className={`day-button ${d === selectedDay ? "selected" : ""} ${d === today ? "today" : ""}`}
+              className={`day-button ${d === selectedDay ? "selected" : ""} ${d === today ? "today" : ""} ${scheduled.has(d) ? "has-lessons" : ""}`}
               onClick={() => {
                 onSelectDay(d);
                 setMode("day");

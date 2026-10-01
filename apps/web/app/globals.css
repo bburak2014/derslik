@@ -880,6 +880,16 @@
   .day-button.selected > strong {
     color: var(--brand-hover);
   }
+  /* Planlı dersi olan gün uyarı tonuyla öne çıkar. Seçili gün ve üzerine
+     gelme yine marka rengindedir (o kurallar dosyada sonra gelir). */
+  .day-button.has-lessons {
+    border-color: var(--warn-line);
+    background: var(--warn-soft);
+  }
+  .day-button.has-lessons > small {
+    color: var(--warn);
+    font-weight: 600;
+  }
   .search-row {
     display: flex;
     align-items: center;

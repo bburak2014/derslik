@@ -191,6 +191,26 @@ export function groupSlotsByDay(slots: readonly BookingSlot[]) {
   return days;
 }
 
+/** Planlı derslerin saatleri ("15:00–16:00") İstanbul gününe göre, başlangıç
+ *  sırasıyla. İptal edilen ve tamamlanan dersler sayılmaz. Ders ayarlama
+ *  penceresi ve öğretmen takvimi dersi olan günleri bununla vurgular. */
+export function scheduledByDay(
+  lessons: readonly { status: string; starts_at: string; ends_at: string }[],
+) {
+  const days = new Map<string, string[]>();
+  const scheduled = lessons
+    .filter((l) => l.status === "SCHEDULED")
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  for (const l of scheduled) {
+    const key = dateKey(l.starts_at);
+    days.set(key, [
+      ...(days.get(key) ?? []),
+      `${timeLabel(l.starts_at)}–${timeLabel(l.ends_at)}`,
+    ]);
+  }
+  return days;
+}
+
 /** Öğrencinin dersi en son iptal edebileceği an. */
 export const cancelDeadline = (startsAt: string, cancelHours: number) =>
   new Date(Date.parse(startsAt) - cancelHours * 3_600_000);

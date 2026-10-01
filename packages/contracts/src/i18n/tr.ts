@@ -256,6 +256,7 @@ export const tr = {
     closedDaysHint: "Tatil ve izin günlerinde öğrenciler ders ayarlayamaz.",
     confirm: "Ayarla",
     dayClosed: "Kapalı",
+    dayHasLessons: "Bu gün dersiniz var: {times}",
     description: "Öğrencilerinizin ders ayarlayabileceği boş saatleri girin.",
     duration: "Ders süresi",
     enabled: "Öğrenciler boş saatlerimden ders ayarlayabilsin",
@@ -266,6 +267,7 @@ export const tr = {
       other: "Boşta {count} ders hakkınız var",
     },
     from: "Başlangıç tarihi",
+    hasLesson: "dersiniz var",
     hours: {
       one: "{count} saat",
       other: "{count} saat",

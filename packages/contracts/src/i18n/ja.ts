@@ -260,6 +260,7 @@ export const ja: Messages = {
     closedDaysHint: "休日や休みの日は生徒が授業を予約できません。",
     confirm: "予約する",
     dayClosed: "休み",
+    dayHasLessons: "この日はすでに授業があります：{times}",
     description: "生徒が授業を予約できる空き時間を設定します。",
     duration: "授業時間",
     enabled: "空き時間に生徒が授業を予約できるようにする",
@@ -269,6 +270,7 @@ export const ja: Messages = {
       other: "利用できる授業 {count} 回",
     },
     from: "開始日",
+    hasLesson: "授業あり",
     hours: {
       other: "{count} 時間",
     },

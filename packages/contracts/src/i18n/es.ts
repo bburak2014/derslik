@@ -277,6 +277,7 @@ export const es: Messages = {
       "En vacaciones y días libres los alumnos no pueden reservar clases.",
     confirm: "Reservar",
     dayClosed: "Cerrado",
+    dayHasLessons: "Ya tienes clase este día: {times}",
     description:
       "Indica las horas libres en las que tus alumnos pueden reservar clases.",
     duration: "Duración de la clase",
@@ -288,6 +289,7 @@ export const es: Messages = {
       other: "Tienes {count} clases disponibles",
     },
     from: "Fecha de inicio",
+    hasLesson: "tienes clase",
     hours: {
       one: "{count} hora",
       other: "{count} horas",

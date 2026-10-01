@@ -266,6 +266,7 @@ export const en: Messages = {
     closedDaysHint: "Students can't book lessons on holidays and days off.",
     confirm: "Book",
     dayClosed: "Closed",
+    dayHasLessons: "You already have a lesson this day: {times}",
     description: "Set the free times when your students can book lessons.",
     duration: "Lesson length",
     enabled: "Let students book lessons in my free times",
@@ -276,6 +277,7 @@ export const en: Messages = {
       other: "{count} lesson credits available",
     },
     from: "Start date",
+    hasLesson: "you have a lesson",
     hours: {
       one: "{count} hour",
       other: "{count} hours",

@@ -216,6 +216,7 @@ export const zh: Messages = {
     closedDaysHint: "节假日和休息日学生无法预约课程。",
     confirm: "预约",
     dayClosed: "休息",
+    dayHasLessons: "当天已有课程：{times}",
     description: "设置学生可以预约课程的空闲时间。",
     duration: "课程时长",
     enabled: "允许学生在我的空闲时间预约课程",
@@ -224,6 +225,7 @@ export const zh: Messages = {
       other: "可用课时 {count} 节",
     },
     from: "开始日期",
+    hasLesson: "已有课程",
     hours: {
       other: "{count} 小时",
     },

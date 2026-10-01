@@ -160,7 +160,9 @@ function AvailabilityDialog({
         if (!next && !busy) onClose();
       }}
     >
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[640px]">
+      {/* Pencere baştan son boyutunda açılır: ayarlar gelince büyüyüp kaymaz
+          (form her zaman bu yükseklikten uzundur, içeride kayar). */}
+      <DialogContent className="h-[min(90dvh,52rem)] content-start overflow-y-auto sm:max-w-[640px]">
         <DialogHeader>
           <DialogTitle>{t("booking.title")}</DialogTitle>
           <DialogDescription>{t("booking.description")}</DialogDescription>
@@ -178,7 +180,7 @@ function AvailabilityDialog({
               </Button>
             </div>
           ) : (
-            <PageLoader compact />
+            <PageLoader />
           )
         ) : (
           <form onSubmit={save} className="grid gap-6">

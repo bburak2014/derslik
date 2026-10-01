@@ -13,6 +13,7 @@ import {
   minutesOf,
   nextWindow,
   presetOptions,
+  scheduledByDay,
   settingsIssues,
   timeOf,
   weekdayName,
@@ -201,6 +202,29 @@ test("iptal süresinin içindeki saat için onay adımında son an gösterilmez"
   assert.equal(
     cancelableUntil(startsAt, 0, Date.parse(startsAt))?.toISOString(),
     startsAt,
+  );
+});
+
+test("planlı dersler İstanbul gününe göre saatleriyle gruplanır", () => {
+  const lesson = (status, startsAt, endsAt) => ({
+    status,
+    starts_at: startsAt,
+    ends_at: endsAt,
+  });
+  const days = scheduledByDay([
+    lesson("SCHEDULED", "2026-10-02T15:00:00.000Z", "2026-10-02T16:00:00.000Z"),
+    lesson("SCHEDULED", "2026-10-02T12:00:00.000Z", "2026-10-02T13:00:00.000Z"),
+    lesson("CANCELLED", "2026-10-05T13:00:00.000Z", "2026-10-05T14:00:00.000Z"),
+    lesson("COMPLETED", "2026-09-30T11:40:00.000Z", "2026-09-30T12:40:00.000Z"),
+    // UTC'de 5 Ekim, İstanbul'da 6 Ekim 00:30.
+    lesson("SCHEDULED", "2026-10-05T21:30:00.000Z", "2026-10-05T22:30:00.000Z"),
+  ]);
+  assert.deepEqual(
+    [...days],
+    [
+      ["2026-10-02", ["15:00–16:00", "18:00–19:00"]],
+      ["2026-10-06", ["00:30–01:30"]],
+    ],
   );
 });
 

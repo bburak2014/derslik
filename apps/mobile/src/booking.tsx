@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { ApiError } from "@derslik/api-client";
 import {
   cancelableUntil,
   dayLabel,
   dayTimeLabel,
   groupSlotsByDay,
+  scheduledByDay,
   t,
   timeLabel,
   type BookingSlot,
@@ -28,6 +30,8 @@ import {
 type Props = {
   workspaceId: string;
   studentId: string;
+  /** Öğrencinin dersleri; planlı dersi olan günler uyarı tonuyla görünür. */
+  lessons: readonly { status: string; starts_at: string; ends_at: string }[];
   onClose: () => void;
   /** Ders listesi ve ayarlama özeti yenilensin. */
   onChanged: () => void;
@@ -54,6 +58,7 @@ export function BookingSheet({
 function BookingBody({
   workspaceId,
   studentId,
+  lessons,
   onClose,
   onChanged,
   onMessage,
@@ -87,6 +92,8 @@ function BookingBody({
   }, [load]);
   const days = slots ? groupSlotsByDay(slots.slots) : [];
   const current = days.find((d) => d.day === day) ?? days[0];
+  const booked = scheduledByDay(lessons);
+  const dayLessons = current ? booked.get(current.day) : undefined;
   async function book() {
     if (!chosen || busy) return;
     setBusy(true);
@@ -198,12 +205,23 @@ function BookingBody({
               contentContainerStyle={{ gap: 8 }}
             >
               {days.map((d) => {
-                const on = d.day === current.day;
+                const on = d.day === current.day,
+                  // Bu gün zaten planlı dersi var: seçili değilse uyarı tonu.
+                  warn = booked.has(d.day) && !on;
+                const label = dayLabel(d.day + "T12:00:00+03:00", {
+                  weekday: "short",
+                  month: "short",
+                });
                 return (
                   <Pressable
                     key={d.day}
                     accessibilityRole="button"
                     accessibilityState={{ selected: on }}
+                    accessibilityLabel={
+                      booked.has(d.day)
+                        ? `${label}, ${t("booking.hasLesson")}`
+                        : label
+                    }
                     onPress={() => setDay(d.day)}
                     style={{
                       minHeight: 40,
@@ -211,20 +229,54 @@ function BookingBody({
                       paddingHorizontal: 14,
                       borderRadius: 999,
                       borderWidth: 1,
-                      borderColor: on ? colors.brandLine : colors.lineControl,
-                      backgroundColor: on ? colors.brandSoft : colors.surface,
+                      borderColor: on
+                        ? colors.brandLine
+                        : warn
+                          ? colors.warnLine
+                          : colors.lineControl,
+                      backgroundColor: on
+                        ? colors.brandSoft
+                        : warn
+                          ? colors.warnSoft
+                          : colors.surface,
                     }}
                   >
-                    <Text style={{ ...type.medium, color: colors.ink }}>
-                      {dayLabel(d.day + "T12:00:00+03:00", {
-                        weekday: "short",
-                        month: "short",
-                      })}
+                    <Text
+                      style={{
+                        ...type.medium,
+                        color: warn ? colors.warn : colors.ink,
+                      }}
+                    >
+                      {label}
                     </Text>
                   </Pressable>
                 );
               })}
             </ScrollView>
+            {dayLessons && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.warnLine,
+                  backgroundColor: colors.warnSoft,
+                }}
+              >
+                <Ionicons
+                  name="warning-outline"
+                  size={18}
+                  color={colors.warn}
+                  accessible={false}
+                />
+                <Text style={[styles.muted, { flex: 1, color: colors.warn }]}>
+                  {t("booking.dayHasLessons", { times: dayLessons.join(", ") })}
+                </Text>
+              </View>
+            )}
             <Text style={styles.label}>{t("booking.pickTime")}</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {current.slots.map((s) => (

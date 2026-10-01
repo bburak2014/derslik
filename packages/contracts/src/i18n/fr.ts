@@ -281,6 +281,7 @@ export const fr: Messages = {
       "Les élèves ne peuvent pas réserver pendant les vacances et les jours de repos.",
     confirm: "Réserver",
     dayClosed: "Fermé",
+    dayHasLessons: "Vous avez déjà cours ce jour-là : {times}",
     description:
       "Indiquez les créneaux libres où vos élèves peuvent réserver un cours.",
     duration: "Durée du cours",
@@ -292,6 +293,7 @@ export const fr: Messages = {
       other: "{count} séances disponibles",
     },
     from: "Date de début",
+    hasLesson: "vous avez cours",
     hours: {
       one: "{count} heure",
       other: "{count} heures",

@@ -1920,6 +1920,7 @@ export function LearningScreen({
           visible={booking && !!(data as PortalData).booking?.enabled}
           workspaceId={access.id}
           studentId={studentId}
+          lessons={(data as PortalData).lessons ?? []}
           onClose={closeBooking}
           onChanged={refreshLessons}
           onMessage={

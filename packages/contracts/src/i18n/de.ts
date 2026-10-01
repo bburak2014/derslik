@@ -289,6 +289,7 @@ export const de: Messages = {
       "An Feiertagen und freien Tagen können Schüler keine Stunden buchen.",
     confirm: "Buchen",
     dayClosed: "Geschlossen",
+    dayHasLessons: "An diesem Tag haben Sie schon Unterricht: {times}",
     description:
       "Legen Sie die freien Zeiten fest, in denen Ihre Schüler Stunden buchen können.",
     duration: "Stundenlänge",
@@ -300,6 +301,7 @@ export const de: Messages = {
       other: "{count} freie Stunden verfügbar",
     },
     from: "Startdatum",
+    hasLesson: "Sie haben Unterricht",
     hours: {
       one: "{count} Stunde",
       other: "{count} Stunden",
