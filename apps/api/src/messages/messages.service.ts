@@ -16,6 +16,7 @@ import { CommandService, toDto } from "../common/command.service.js";
 import { RateLimiter } from "../common/rate-limit.js";
 import { uuid } from "../contracts.js";
 import { messageSchema } from "../../../../packages/contracts/src/messages.js";
+import { RealtimeService } from "./realtime.service.js";
 
 const listQuery = z.object({ student: uuid.optional() });
 /** İstemcinin geri gönderdiği mesaj zamanı. PostgreSQL'in kabul etmediği
@@ -42,6 +43,7 @@ export class MessagesService {
   constructor(
     private readonly db: DatabaseService,
     private readonly commands: CommandService,
+    private readonly realtime: RealtimeService,
     @Inject(CONFIG) config: ApiConfig,
   ) {
     this.limiter = new RateLimiter(config.RATE_LIMIT_MESSAGES_PER_MINUTE);
@@ -137,7 +139,7 @@ export class MessagesService {
     const side = this.side(student);
     const body = parsed.data.body;
     try {
-      return await this.commands.run(
+      const result = await this.commands.run(
         actor,
         ws,
         key,
@@ -171,6 +173,11 @@ export class MessagesService {
           ? { studentId: student, permission: "lessons", write: false }
           : undefined,
       );
+      // Commit'ten sonra: alıcılar yazışmayı anında yeniler. Aynı anahtarla
+      // tekrar (replayed) yeni mesaj yazmaz, olay da göndermez.
+      if (!result.replayed)
+        this.realtime.publish({ t: "message", w: ws, l: link });
+      return result;
     } catch (error) {
       // Erişim, ilk denetimle kilit arasında kalktıysa (erişim kaldırma,
       // arşivleme) send_message aynı kararı verir.
@@ -185,7 +192,7 @@ export class MessagesService {
 
   /** Yazışmayı `upTo` anına (istemcinin gördüğü en yeni mesaj) kadar okundu
    *  sayar; karşı taraftan okunmamış mesaj kalmadıysa bildirimi de okunur. */
-  read(
+  async read(
     actor: Actor,
     ws: string,
     student: string | null,
@@ -193,7 +200,7 @@ export class MessagesService {
     input: unknown,
   ) {
     const { upTo } = readBody.parse(input ?? {});
-    return this.run(actor, ws, student, async (tx) => {
+    const result = await this.run(actor, ws, student, async (tx) => {
       const read = (
         await tx.query(
           "SELECT derslik.read_messages($1,$2::uuid,$3,$4,$5::timestamptz) AS read",
@@ -203,5 +210,8 @@ export class MessagesService {
       if (!read) throw new NotFoundException("api.messageNotFound");
       return { data: { read: true } };
     });
+    // Okuyanın öteki sekme ve cihazlarındaki okunmamış sayacı düşer.
+    this.realtime.publish({ t: "read", w: ws, l: link, u: actor.id });
+    return result;
   }
 }

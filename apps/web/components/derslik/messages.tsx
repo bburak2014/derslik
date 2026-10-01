@@ -7,7 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { ApiError } from "@derslik/api-client";
+import { ApiError, eventConcerns } from "@derslik/api-client";
+import { useMessageEvents, useSocketLive } from "@/lib/message-socket";
 import {
   MESSAGE_MAX,
   addDays,
@@ -70,12 +71,17 @@ import { FormError } from "./feedback";
 import { Skeleton, Spinner } from "./loading";
 
 // Uygulama içi mesajlaşma: öğretmen çalışma alanı ve öğrenci/veli portalı
-// aynı bileşeni kullanır. Websocket yok; açık yazışma 15 sn'de, liste ve
-// sayaçlar 60 sn'de bir, yalnızca sekme görünürken yenilenir. Telefon numarası
-// hiçbir yerde gösterilmez.
+// aynı bileşeni kullanır. Yeni mesaj soketle anında gelir: soket yalnızca
+// hangi yazışmanın değiştiğini söyler, mesajlar REST'ten çekilir. Soket
+// kuruluyken ya da kopukken yoklama sürer (açık yazışma 15 sn, liste ve
+// sayaçlar 60 sn; soket bağlıyken açık yazışma da 60 sn), yalnızca sekme
+// görünürken. Telefon numarası hiçbir yerde gösterilmez.
 
 const LIST_POLL = 60_000,
   THREAD_POLL = 15_000,
+  LIVE_THREAD_POLL = 60_000,
+  // Art arda gelen olaylar tek isteğe toplanır.
+  EVENT_DELAY = 250,
   PAGE = 50,
   // Karakter sayacı sınıra yaklaşınca görünür.
   COUNT_FROM = MESSAGE_MAX - 200;
@@ -137,6 +143,29 @@ function useVisiblePoll(run: () => void, every: number, enabled = true) {
   }, [every, enabled]);
 }
 
+/** `run`'ı kısa bir gecikmeyle bir kez çalıştırır; gecikme içinde gelen
+ *  çağrılar birleşir. */
+function useCoalesced(run: () => void) {
+  const latest = useRef(run),
+    timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    latest.current = run;
+  });
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  return useCallback(() => {
+    if (timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      latest.current();
+    }, EVENT_DELAY);
+  }, []);
+}
+
 /** Son mesajın zamanı; mesajı olmayan yazışma en sona. */
 const lastTime = (x: MessageThread) =>
   x.lastAt ? Date.parse(x.lastAt) : -Infinity;
@@ -173,6 +202,14 @@ export function useMessageThreads(path: string | null) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleyici durumu yalnızca istek bitince yazar.
     void reload();
   }, [reload]);
+  // Yeni mesaj ya da başka sekmede okuma: liste, sayaç ve zil hemen yenilenir.
+  const reloadSoon = useCoalesced(() => {
+    void reload();
+    window.dispatchEvent(new Event("derslik:inbox"));
+  });
+  useMessageEvents((event) => {
+    if (path && eventConcerns(path, event)) reloadSoon();
+  }, !!path);
   // Liste az önce alındıysa ya da tek satırını açık yazışma zaten yokluyorsa
   // (ör. öğrencinin tek yazışması açık) bu tur atlanır; aynı veri iki kez
   // istenmez.
@@ -825,7 +862,21 @@ function Conversation({
   useEffect(() => {
     void latest(true);
   }, [latest]);
-  useVisiblePoll(() => void latest(false), THREAD_POLL);
+  const live = useSocketLive();
+  useVisiblePoll(
+    () => void latest(false),
+    live ? LIVE_THREAD_POLL : THREAD_POLL,
+  );
+  // Bu yazışmaya yeni mesaj gelince hemen çekilir (okundu olayı listeyi
+  // yeniler, yazışmayı değil).
+  const latestSoon = useCoalesced(() => void latest(false));
+  useMessageEvents((event) => {
+    if (
+      event.type === "resync" ||
+      (event.type === "message" && event.thread === linkId)
+    )
+      latestSoon();
+  });
   useEffect(() => {
     if (!refreshAt || refreshAt === seenRefresh.current) return;
     seenRefresh.current = refreshAt;

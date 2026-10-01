@@ -6,6 +6,8 @@
 //    adındaki ya da kendi sunucusundaki Supabase de böylece çalışır ve
 //    *.supabase.co joker karakteri gerekmez (başka Supabase projesine veri
 //    kaçırılamaz).
+import { socketUrl } from "./realtime";
+
 function origin(value: string | undefined) {
   try {
     return value ? new URL(value).origin : null;
@@ -20,7 +22,12 @@ export function contentSecurityPolicy(nonce: string) {
   const development = process.env.NODE_ENV !== "production";
   const supabase = origin(process.env.SUPABASE_URL);
   const connect = new Set(["'self'"]);
-  for (const value of [supabase, origin(process.env.API_BASE_URL)])
+  for (const value of [
+    supabase,
+    origin(process.env.API_BASE_URL),
+    // Anlık mesajlaşma soketi (ws/wss); connect-src http kaynağı ws'yi kapsamaz.
+    origin(socketUrl() ?? undefined),
+  ])
     if (value) connect.add(value);
   // Video: yükleme (tus) upload.videodelivery.net'e, oynatma listeleri
   // videodelivery.net ve müşteri alt alanlarına gider.

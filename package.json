@@ -80,6 +80,7 @@
     "rxjs": "^7.8.2",
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
+    "ws": "8.21.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -93,6 +94,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",

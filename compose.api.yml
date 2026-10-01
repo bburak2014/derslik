@@ -45,9 +45,12 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: "3001"
       DATABASE_URL: postgresql://derslik_app:${API_DATABASE_PASSWORD}@postgres:5432/derslik
+      # Anlık mesajlaşmanın LISTEN bağlantısı; boşsa DATABASE_URL.
+      DATABASE_LISTEN_URL: ${DATABASE_LISTEN_URL:-}
       DATABASE_SSL: "false"
       AUTH_ISSUER: ${AUTH_ISSUER:?Set the Supabase project auth issuer in .env.api}
       WEB_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-}
       TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
@@ -93,6 +96,9 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       API_BASE_URL: http://api:3001
+      # Tarayıcının anlık mesajlaşma soketi için eriştiği API adresi
+      # (API_BASE_URL Docker iç ağındadır, tarayıcı ona ulaşamaz).
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:${API_HTTP_PORT:-3001}}
       SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL in .env.api}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Set the Supabase public key}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}

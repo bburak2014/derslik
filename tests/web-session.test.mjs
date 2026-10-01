@@ -130,6 +130,8 @@ test(
           : reply(201, { data: { id: randomUUID() } });
       if (req.url === `/v1/workspaces/${foreign}/snapshot`)
         return reply(403, { error: { message: "Workspace forbidden" } });
+      if (req.url === "/v1/socket/ticket" && req.method === "POST")
+        return reply(201, { data: { ticket: "a".repeat(64), expiresIn: 30 } });
       return reply(404, { error: { message: "Unknown route" } });
     });
     const upstreamUrl = `http://127.0.0.1:${await listen(upstream)}`,
@@ -345,6 +347,22 @@ test(
           (await call("/")).headers.get("content-security-policy"),
         )?.[1],
         nonce,
+      );
+      // Anlık mesajlaşma: bilet oturum çereziyle alınır, soket adresi API'nin
+      // tarayıcıdan erişilen adresidir ve CSP'de izinlidir.
+      const socketOrigin = upstreamUrl.replace(/^http/, "ws");
+      assert.match(csp, new RegExp("connect-src[^;]*" + socketOrigin));
+      const socket = await call("/api/socket", {});
+      assert.equal(socket.status, 200, await socket.clone().text());
+      assert.deepEqual((await socket.json()).data, {
+        ticket: "a".repeat(64),
+        expiresIn: 30,
+        url: socketOrigin + "/v1/socket",
+      });
+      assert.equal(
+        (await call("/api/socket", {}, { Origin: "https://foreign.example" }))
+          .status,
+        403,
       );
       // Şifre değiştirme: normal girişle açılan oturum reddedilir.
       const denied = await call("/api/auth/password", {

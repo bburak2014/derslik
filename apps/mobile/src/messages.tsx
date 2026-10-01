@@ -16,7 +16,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
-import { ApiError } from "@derslik/api-client";
+import { ApiError, eventConcerns } from "@derslik/api-client";
+import { useMessageEvents, useSocketLive } from "./message-socket";
 import {
   addDays,
   cleanMessage,
@@ -53,11 +54,39 @@ import {
 } from "./ui";
 
 // Uygulama içi mesajlaşma: öğretmen ve portal (öğrenci, veli) aynı parçaları
-// kullanır. Anlık bağlantı yok; açık yazışma 15 sn'de bir, liste ve sayaç
-// dakikada bir yoklanır. Uygulama arka plandayken yoklama durur.
+// kullanır. Yeni mesaj soketle anında gelir (soket yalnızca hangi yazışmanın
+// değiştiğini söyler, mesajlar REST'ten çekilir). Yoklama yedektir: açık
+// yazışma 15 sn'de (soket bağlıyken 60 sn'de), liste ve sayaç dakikada bir.
+// Uygulama arka plandayken soket kapanır, yoklama durur.
 
 const THREAD_POLL = 15000,
-  LIST_POLL = 60000;
+  LIVE_THREAD_POLL = 60000,
+  LIST_POLL = 60000,
+  // Art arda gelen olaylar tek isteğe toplanır.
+  EVENT_DELAY = 250;
+
+/** `run`'ı kısa bir gecikmeyle bir kez çalıştırır; gecikme içinde gelen
+ *  çağrılar birleşir. */
+function useCoalesced(run: () => void) {
+  const latest = useRef(run),
+    timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    latest.current = run;
+  });
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  return useCallback(() => {
+    if (timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      latest.current();
+    }, EVENT_DELAY);
+  }, []);
+}
 
 type ThreadPage = {
   data: { thread: MessageThread; messages: ChatMessage[]; more: boolean };
@@ -153,6 +182,11 @@ export function useMessages(path: string | null) {
   useEffect(() => {
     void load();
   }, [load]);
+  // Yeni mesaj ya da başka cihazda okuma: liste ve sayaç hemen yenilenir.
+  const loadSoon = useCoalesced(() => void load());
+  useMessageEvents((event) => {
+    if (path && eventConcerns(path, event)) loadSoon();
+  }, !!path);
   // Liste az önce (ör. aşağı çekip yenileyerek) alındıysa ya da tek satırını
   // açık yazışma zaten yokluyorsa (öğrencinin tek yazışması) bu tur atlanır.
   usePolling(
@@ -882,7 +916,17 @@ export function Conversation({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void refresh();
   }, [refresh]);
-  usePolling(refresh, THREAD_POLL);
+  const live = useSocketLive();
+  usePolling(refresh, live ? LIVE_THREAD_POLL : THREAD_POLL);
+  // Bu yazışmaya yeni mesaj gelince hemen çekilir.
+  const refreshSoon = useCoalesced(() => void refresh());
+  useMessageEvents((event) => {
+    if (
+      event.type === "resync" ||
+      (event.type === "message" && event.thread === linkId)
+    )
+      refreshSoon();
+  });
 
   // Android geri tuşu yazışmadan listeye döner.
   const canGoBack = !!onBack;

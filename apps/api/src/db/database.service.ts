@@ -4,6 +4,7 @@ import {
   Injectable,
   type OnModuleDestroy,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import { CONFIG, type ApiConfig } from "../config.js";
 import type { Actor } from "../auth/auth.guard.js";
@@ -11,10 +12,15 @@ import type { Actor } from "../auth/auth.guard.js";
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
   readonly pool: Pool;
+  /** Bu API sürecinin bağlantı adı (application_name). Mesaj olayları
+   *  (NOTIFY) yazanın adını taşır; olayı kendi içinde zaten dağıtan süreç
+   *  kendi bildirimini bundan tanır. */
+  readonly instance = "derslik-api-" + randomUUID();
 
   constructor(@Inject(CONFIG) config: ApiConfig) {
     this.pool = new Pool({
       connectionString: config.DATABASE_URL,
+      application_name: this.instance,
       max: 10,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 30_000,
