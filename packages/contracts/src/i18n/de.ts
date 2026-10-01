@@ -315,6 +315,7 @@ export const de: Messages = {
     onlyUnread: "Ungelesen",
     pick: "Wählen Sie eine Unterhaltung.",
     placeholder: "Nachricht schreiben",
+    preview: "{name}: {text}",
     privacy: "Telefonnummern werden nicht geteilt.",
     readOnly:
       "Diese Unterhaltung findet zwischen dem Schüler und der Lehrkraft statt; Sie können sie nur lesen.",

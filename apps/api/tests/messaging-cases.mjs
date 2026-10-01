@@ -568,6 +568,7 @@ export async function messagingCases({
         ],
       );
       // Veli yazınca başlık veliyi, gövde öğrencinin adını söyler.
+      await ok(owner(`/${links.parent}/read`), {}, { auth: tokenTeacher });
       await send(
         portal(ayse.id, `/${links.parent}`),
         "Kısa bir soru",
@@ -580,10 +581,63 @@ export async function messagingCases({
         ]),
         [["notice.messageFromGuardian", "Ayşe Yılmaz: Kısa bir soru"]],
       );
-      // Yazan kişi yazışmayı okumuş sayılır; kendi okunmamış bildirimi de düşer.
-      await send(owner(`/${links.parent}`), "Yanıt", tokenTeacher);
-      assert.equal((await unreadNotices(teacher, links.parent)).length, 0);
+      // Yazmak okumak sayılmaz: velinin mesajı okunmamış kalır.
+      const reply = (
+        await send(owner(`/${links.parent}`), "Yanıt", tokenTeacher)
+      ).data;
+      assert.equal((await unreadNotices(teacher, links.parent)).length, 1);
+      assert.equal(row(await listOwner(), links.parent).unread, 1);
+      // Okuma, istemcinin gördüğü en yeni mesaja kadardır. Velinin mesajından
+      // önceki bir an okunursa mesaj da bildirim de okunmamış kalır.
+      const parentThread = await open(owner(`/${links.parent}`), tokenTeacher);
+      const fromParent = parentThread.messages.findLast((m) => !m.mine);
+      assert.equal(fromParent.body, "Kısa bir soru");
+      const earlier = new Date(
+        Date.parse(fromParent.createdAt) - 1,
+      ).toISOString();
+      await ok(
+        owner(`/${links.parent}/read`),
+        { upTo: earlier },
+        { auth: tokenTeacher },
+      );
+      assert.equal(row(await listOwner(), links.parent).unread, 1);
+      assert.equal((await unreadNotices(teacher, links.parent)).length, 1);
+      await ok(
+        owner(`/${links.parent}/read`),
+        { upTo: fromParent.createdAt },
+        { auth: tokenTeacher },
+      );
       assert.equal(row(await listOwner(), links.parent).unread, 0);
+      assert.equal((await unreadNotices(teacher, links.parent)).length, 0);
+      // İleri bir an en yeni mesajla sınırlanır: sonra gelen mesaj okunmamış
+      // kalır ve yeni bildirim açar.
+      await ok(
+        owner(`/${links.parent}/read`),
+        { upTo: "2999-01-01T00:00:00.000Z" },
+        { auth: tokenTeacher },
+      );
+      await send(
+        portal(ayse.id, `/${links.parent}`),
+        "Bir şey daha",
+        tokenParent,
+      );
+      assert.equal(row(await listOwner(), links.parent).unread, 1);
+      assert.equal((await unreadNotices(teacher, links.parent)).length, 1);
+      await ok(owner(`/${links.parent}/read`), {}, { auth: tokenTeacher });
+      assert.equal(row(await listOwner(), links.parent).unread, 0);
+      assert.equal((await unreadNotices(teacher, links.parent)).length, 0);
+      assert.ok(Date.parse(reply.createdAt) > Date.parse(fromParent.createdAt));
+      // Geçersiz okuma anı 400 döner.
+      for (const upTo of [
+        "dün",
+        "2026-10-01T10:00:00+05:60",
+        "0000-01-01T00:00:00Z",
+      ])
+        await refused(owner(`/${links.parent}/read`), 400, null, {
+          method: "POST",
+          body: { upTo },
+          auth: tokenTeacher,
+        });
       // Veli çocuğunun yazışması için bildirim almaz; kimse kendi mesajı için
       // bildirim almaz; öğretmen yalnızca öğrenci/veli mesajı için, bağlantının
       // hesabı yalnızca öğretmen mesajı için bildirim alır.
@@ -657,17 +711,19 @@ export async function messagingCases({
       assert.equal((await kidThread())[0].unread, 3);
       assert.equal((await teacherRow()).unread, 0);
       assert.equal((await teacherRow()).lastMine, true);
-      // Yazan, o ana kadarki mesajları okumuş sayılır.
+      // Yazmak okumak sayılmaz; kişinin kendi mesajı okunmamış sayılmaz.
       await send(portal(mehmet.id, `/${links.kid}`), "Öğrenci 1", tokenKid);
-      assert.equal((await kidThread())[0].unread, 0);
+      assert.equal((await kidThread())[0].unread, 3);
       assert.equal((await kidThread())[0].lastMine, true);
       assert.equal((await teacherRow()).unread, 1);
       await send(owner(`/${links.kid}`), "Öğretmen 4", tokenTeacher);
-      assert.equal((await kidThread())[0].unread, 1);
-      assert.equal((await teacherRow()).unread, 0);
-      assert.equal(unreadBadge(await kidThread()), 1);
+      assert.equal((await kidThread())[0].unread, 4);
+      assert.equal((await teacherRow()).unread, 1);
+      assert.equal(unreadBadge(await kidThread()), 4);
       await ok(portal(mehmet.id, `/${links.kid}/read`), {}, { auth: tokenKid });
       assert.equal(unreadBadge(await kidThread()), 0);
+      await ok(owner(`/${links.kid}/read`), {}, { auth: tokenTeacher });
+      assert.equal((await teacherRow()).unread, 0);
 
       // Velinin yalnızca okuduğu çocuk yazışması sayaca girmez.
       await ok(
@@ -761,6 +817,16 @@ export async function messagingCases({
         messages: [],
         more: false,
       });
+      // Saat farkı geçerli her biçim aynı anı verir (+16:00 PostgreSQL'de
+      // geçersizdir; sunucu anı UTC'ye çevirir).
+      const newest = full.messages.at(-1);
+      const shifted = new Date(Date.parse(newest.createdAt) + 16 * 3600e3)
+        .toISOString()
+        .replace("Z", "+16:00");
+      assert.deepEqual(
+        (await thread(`?before=${encodeURIComponent(shifted)}`)).messages,
+        full.messages.slice(-50, -1),
+      );
       // Öğrenci de aynı sayfaları görür.
       assert.deepEqual(
         (
@@ -774,6 +840,9 @@ export async function messagingCases({
         "?limit=iki",
         "?before=dün",
         "?before=2026-13-45",
+        // PostgreSQL'in kabul etmediği zamanlar da 500 değil 400 döner.
+        `?before=${encodeURIComponent("2026-10-01T10:00:00+05:60")}`,
+        "?before=0000-01-01T00:00:00Z",
       ])
         await refused(owner(`/${links.kid}${bad}`), 400, "api.invalidFields", {
           auth: tokenTeacher,
@@ -908,6 +977,12 @@ export async function messagingCases({
       await refused(portal(ayse.id), 403, "api.noStudentAccess", {
         auth: tokenB,
       });
+      await refused(
+        portal(ayse.id, `/${links.pupil}`),
+        403,
+        "api.noStudentAccess",
+        post(tokenB),
+      );
       // Kendi çalışma alanında A'nın yazışma kimliğiyle: yazışma yok.
       const wsS = (
         await ok(
@@ -1028,7 +1103,7 @@ export async function messagingCases({
           IF (SELECT count(*) FROM derslik.message_access('${ws}',NULL,'${links.parent}','OWNER'))<>1
            OR (SELECT count(*) FROM derslik.message_access('${ws}',NULL,'${links.parent}','BOGUS'))<>0
            OR (SELECT count(*) FROM derslik.message_access('${ws}','${ayse.id}','${links.parent}','OWNER'))<>0
-           OR derslik.read_messages('${ws}','${ayse.id}','${links.parent}','PORTAL')
+           OR derslik.read_messages('${ws}','${ayse.id}','${links.parent}','PORTAL',NULL)
           THEN RAISE EXCEPTION 'message_access'; END IF;
         END $$`),
         null,
@@ -1134,13 +1209,13 @@ export async function messagingCases({
       });
       await limited.listen(0, "127.0.0.1");
       const url = await limited.getUrl();
-      const call = async (path, auth, body) => {
+      const call = async (path, auth, body, key = randomUUID()) => {
         const r = await fetch(url + path, {
           method: body ? "POST" : "GET",
           headers: {
             Authorization: `Bearer ${auth}`,
             "Content-Type": "application/json",
-            "Idempotency-Key": randomUUID(),
+            "Idempotency-Key": key,
           },
           ...(body ? { body: JSON.stringify(body) } : {}),
         });
@@ -1153,13 +1228,32 @@ export async function messagingCases({
           (await call(path, tokenTeacher, { body: "" })).status,
           400,
         );
+        // Reddedilen istek de sayılmaz (başka öğretmenin yazışması).
+        assert.equal(
+          (await call(owner(`/${randomUUID()}`), tokenTeacher, { body: "Yok" }))
+            .status,
+          404,
+        );
         const results = [];
+        const keys = [randomUUID(), randomUUID(), randomUUID()];
         for (let i = 0; i < 3; i++)
-          results.push(await call(path, tokenTeacher, { body: `Hızlı ${i}` }));
+          results.push(
+            await call(path, tokenTeacher, { body: `Hızlı ${i}` }, keys[i]),
+          );
         assert.deepEqual(
           results.map((r) => r.status),
           [201, 201, 429],
         );
+        // Yanıtı kaybolan gönderimin aynı anahtarla tekrarı sınıra takılmaz.
+        const replay = await call(
+          path,
+          tokenTeacher,
+          { body: "Hızlı 1" },
+          keys[1],
+        );
+        assert.equal(replay.status, 201);
+        assert.equal(replay.body.replayed, true);
+        assert.equal(replay.body.data.id, results[1].body.data.id);
         assert.equal(
           results[2].body.error.message,
           text("api.messageRateLimit"),

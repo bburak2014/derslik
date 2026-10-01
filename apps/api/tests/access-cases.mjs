@@ -187,7 +187,14 @@ export async function accessCases({
       const before = await digest(admin, ws);
       const leaks = [];
       async function attempt(label, method, url, auth) {
-        const body = method === "GET" ? undefined : { version: 0 };
+        // Mesaj gönderimi gövdeyi yetkiden önce doğrular; geçerli bir metin
+        // isteği yetki denetimine kadar götürür.
+        const body =
+          method === "GET"
+            ? undefined
+            : url.includes("/messages/")
+              ? { version: 0, body: "x" }
+              : { version: 0 };
         const r = await request(url, { method, body, auth });
         if (r.status >= 300) return;
         const text = JSON.stringify(r.body);

@@ -112,6 +112,21 @@ export function noticeText(text: string): string {
   return legacy ? t(legacy) : text;
 }
 
+/** Bildirim gövdesi, okuyanın dilinde. Mesaj bildiriminde sunucu
+ *  "Gönderen: önizleme" yazar; ayraç okuyanın diline göre yeniden kurulur
+ *  (ör. Fransızcada iki noktadan önce boşluk). */
+export function noticeBody(n: Pick<Notice, "kind" | "body">): string {
+  if (n.kind === "MESSAGE") {
+    const cut = n.body.indexOf(": ");
+    if (cut > 0)
+      return t("chat.preview", {
+        name: n.body.slice(0, cut),
+        text: n.body.slice(cut + 2),
+      });
+  }
+  return noticeText(n.body);
+}
+
 export function noticeTarget(n: Notice): NoticeTarget | null {
   if (n.kind === "REQUEST" || n.kind === "REQUEST_DECISION")
     return {

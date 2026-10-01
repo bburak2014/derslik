@@ -22,12 +22,23 @@ export function cleanMessage(text: string): string {
   return out.trim();
 }
 
+/** Karakter sayısı: emoji gibi iki kod birimli karakterler bir sayılır
+ *  (veritabanındaki `char_length` gibi). Sayaçlar da bunu kullanır. */
+export function messageLength(text: string): number {
+  return [...text].length;
+}
+
 export const messageSchema = z.object({
   body: z
     .string()
     .max(20000)
     .transform(cleanMessage)
-    .pipe(z.string().min(1).max(MESSAGE_MAX)),
+    .pipe(
+      z
+        .string()
+        .min(1)
+        .refine((body) => messageLength(body) <= MESSAGE_MAX),
+    ),
 });
 
 /** Çağıranın yazışmadaki yeri: öğretmen, yazışmanın kendi tarafı ya da

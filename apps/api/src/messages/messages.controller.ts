@@ -62,8 +62,15 @@ export class MessagesController {
     @Req() req: ActorRequest,
     @Param("ws") ws: string,
     @Param("id") id: string,
+    @Body() body: unknown,
   ) {
-    return this.messages.read(req.actor, uuid.parse(ws), null, uuid.parse(id));
+    return this.messages.read(
+      req.actor,
+      uuid.parse(ws),
+      null,
+      uuid.parse(id),
+      body,
+    );
   }
   @Get("portal/:ws/:student/messages") portalList(
     @Req() req: ActorRequest,
@@ -114,12 +121,14 @@ export class MessagesController {
     @Param("ws") ws: string,
     @Param("student") student: string,
     @Param("id") id: string,
+    @Body() body: unknown,
   ) {
     return this.messages.read(
       req.actor,
       uuid.parse(ws),
       uuid.parse(student),
       uuid.parse(id),
+      body,
     );
   }
 }

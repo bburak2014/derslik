@@ -18,10 +18,19 @@ import { uuid } from "../contracts.js";
 import { messageSchema } from "../../../../packages/contracts/src/messages.js";
 
 const listQuery = z.object({ student: uuid.optional() });
+/** İstemcinin geri gönderdiği mesaj zamanı. PostgreSQL'in kabul etmediği
+ *  biçimler (ör. +16:00 farkı, 0 yılı) 500 değil 400 döner. */
+const messageTime = z
+  .string()
+  .datetime({ offset: true })
+  .transform((v) => new Date(v))
+  .refine((d) => !Number.isNaN(d.getTime()) && d.getUTCFullYear() >= 1)
+  .transform((d) => d.toISOString());
 const pageQuery = z.object({
-  before: z.string().datetime({ offset: true }).optional(),
+  before: messageTime.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
+const readBody = z.object({ upTo: messageTime.optional() });
 
 /** Uygulama içi mesajlaşma. Yazışma bir portal bağlantısıdır; erişim
  *  kuralları veritabanındaki `derslik.message_access` fonksiyonundadır.
@@ -125,11 +134,6 @@ export class MessagesService {
   ) {
     const parsed = messageSchema.safeParse(input);
     if (!parsed.success) throw new BadRequestException("api.messageInvalid");
-    if (this.limiter.take(actor.id))
-      throw new HttpException(
-        "api.messageRateLimit",
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
     const side = this.side(student);
     const body = parsed.data.body;
     try {
@@ -148,6 +152,13 @@ export class MessagesService {
           if (!access) throw new NotFoundException("api.messageNotFound");
           if (!access.can_send)
             throw new ForbiddenException("api.messageClosed");
+          // Sınır yalnızca yeni gönderimde sayılır: aynı anahtarla tekrar
+          // (yanıtı kaybolan gönderim) ve reddedilen istekler sayılmaz.
+          if (this.limiter.take(actor.id))
+            throw new HttpException(
+              "api.messageRateLimit",
+              HttpStatus.TOO_MANY_REQUESTS,
+            );
           const data = (
             await tx.query(
               "SELECT * FROM derslik.send_message($1,$2::uuid,$3,$4,$5)",
@@ -172,13 +183,21 @@ export class MessagesService {
     }
   }
 
-  /** Yazışmayı okundu sayar; bu yazışmanın okunmamış bildirimi de okunur. */
-  read(actor: Actor, ws: string, student: string | null, link: string) {
+  /** Yazışmayı `upTo` anına (istemcinin gördüğü en yeni mesaj) kadar okundu
+   *  sayar; karşı taraftan okunmamış mesaj kalmadıysa bildirimi de okunur. */
+  read(
+    actor: Actor,
+    ws: string,
+    student: string | null,
+    link: string,
+    input: unknown,
+  ) {
+    const { upTo } = readBody.parse(input ?? {});
     return this.run(actor, ws, student, async (tx) => {
       const read = (
         await tx.query(
-          "SELECT derslik.read_messages($1,$2::uuid,$3,$4) AS read",
-          [ws, student, link, this.side(student)],
+          "SELECT derslik.read_messages($1,$2::uuid,$3,$4,$5::timestamptz) AS read",
+          [ws, student, link, this.side(student), upTo ?? null],
         )
       ).rows[0]?.read;
       if (!read) throw new NotFoundException("api.messageNotFound");
