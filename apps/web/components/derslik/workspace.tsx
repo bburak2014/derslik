@@ -87,6 +87,14 @@ const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
   { id: "videos", label: "nav.videos", icon: Video },
   { id: "showcase", label: "nav.showcase", icon: Store },
 ];
+const viewFromUrl = (search: string): View => {
+  const v = new URLSearchParams(search).get("view");
+  return navigation.some((n) => n.id === v) ? (v as View) : "overview";
+};
+/** Sunucuda sayfanın sorgu dizesi, tarayıcıda adres çubuğu (ilk açılışta
+ *  ikisi aynıdır; çizimler eşleşir). */
+const clientSearch = (initial: string) =>
+  typeof location === "undefined" ? initial : location.search;
 const titles: Record<View, { title: MessageKey; subtitle: MessageKey }> = {
   messages: {
     title: "chat.title",
@@ -213,16 +221,21 @@ export default function Workspace({
     [loading, setLoading] = useState(true),
     [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false);
-  const [view, setView] = useState<View>(() => {
-      const v = new URLSearchParams(initialSearch).get("view");
-      return navigation.some((n) => n.id === v) ? (v as View) : "overview";
-    }),
+  // Tarayıcıda adres çubuğunun kendisi okunur: erişim değişip alan yeniden
+  // kurulduğunda sayfanın ilk açılıştaki sorgu dizesi eskimiş olabilir.
+  const [view, setView] = useState<View>(() =>
+      viewFromUrl(clientSearch(initialSearch)),
+    ),
     [search, setSearch] = useState(""),
     [selectedDay, setSelectedDay] = useState(dateKey()),
     [studentId, setStudentId] = useState<string | null>(null),
     [modal, setModal] = useState<ModalState | null>(null),
     // Mesajlar görünümünde açık yazışma ve öğrenci süzgeci (adres çubuğunda).
-    [chat, setChat] = useState(() => chatFromSearch(initialSearch));
+    [chat, setChat] = useState(() =>
+      chatFromSearch(clientSearch(initialSearch)),
+    ),
+    // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
+    [chatFocus, setChatFocus] = useState(0);
   const [signoutOpen, setSignoutOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<{
     title: string;
@@ -253,13 +266,16 @@ export default function Workspace({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
   }, [reload]);
+  // İlk durum zaten adresten kuruldu; burada yalnızca geri/ileri izlenir.
+  // Açılışta yeniden okunsaydı ilk çizimde uygulanan bildirim (ör. portaldan
+  // gelen mesaj bildirimi) eski adresle ezilirdi.
   useEffect(() => {
     const sync = () => {
-      const v = new URLSearchParams(location.search).get("view");
-      if (navigation.some((n) => n.id === v)) setView(v as View);
+      setView(viewFromUrl(location.search));
       setChat(chatFromSearch(location.search));
+      // Bildirimle açılan yazışmadan geri dönüldü: adres yeniden yazılmaz.
+      setChatFocus(0);
     };
-    sync();
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
@@ -301,8 +317,6 @@ export default function Workspace({
       at: number;
     } | null>(null),
     [calendarFocus, setCalendarFocus] = useState(false),
-    // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
-    [chatFocus, setChatFocus] = useState(0),
     [requests, setRequests] = useState(0);
   // Kenar çubuğundaki okunmamış mesaj sayacı ve Mesajlar görünümü aynı
   // listeyi kullanır; liste görünürken dakikada bir yenilenir.
@@ -331,6 +345,8 @@ export default function Workspace({
   ) {
     setAppliedFocus(focus.at);
     setCalendarFocus(focus.section === "lessons");
+    // Önceki mesaj bildirimi yeni bildirimin adresini ezmesin.
+    setChatFocus(focus.section === "messages" ? focus.at : 0);
     if (focus.section === "requests") {
       setView("showcase");
       setShowcaseFocus({ id: focus.itemId, at: focus.at });
@@ -341,7 +357,6 @@ export default function Workspace({
       // Mesaj bildirimi: yazışma Mesajlar görünümünde açılır.
       setView("messages");
       setChat({ thread: focus.itemId, student: null });
-      setChatFocus(focus.at);
       setSearch("");
       setHubFocus(null);
       setShowcaseFocus(null);
@@ -362,6 +377,7 @@ export default function Workspace({
     } else {
       setView(focus.section);
       setHubFocus(focus);
+      setShowcaseFocus(null);
       setSearch("");
       setStudentId(null);
     }
