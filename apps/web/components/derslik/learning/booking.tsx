@@ -166,8 +166,9 @@ function BookingDialog({
         </DialogHeader>
         {/* Gövde her durumda aynı yükseklikte: saatler gelirken, gün
             değişirken ve onay adımında pencere büyüyüp kaymaz. Saatler
-            kendi alanında kayar. */}
-        <div className="flex h-80 flex-col gap-3">
+            kendi alanında kayar. min-w-0: yatay kayan gün satırı pencereyi
+            genişletmesin. */}
+        <div className="flex h-80 min-w-0 flex-col gap-3">
           {!slots ? (
             error ? (
               <FormError>{error}</FormError>
