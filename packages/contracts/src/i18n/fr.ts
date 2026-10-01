@@ -274,6 +274,8 @@ export const fr: Messages = {
     cancelUntilStart: "Jusqu'au début du cours",
     cancelWindow: "Délai d'annulation",
     cancelled: "Cours annulé.",
+    cancelNotAllowed:
+      "Ce créneau est déjà dans le délai d'annulation. Une fois réservé, vous ne pourrez plus l'annuler.",
     closedDays: "Jours de fermeture",
     closedDaysHint:
       "Les élèves ne peuvent pas réserver pendant les vacances et les jours de repos.",

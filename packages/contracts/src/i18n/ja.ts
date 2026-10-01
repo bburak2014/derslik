@@ -254,6 +254,8 @@ export const ja: Messages = {
     cancelUntilStart: "授業開始まで",
     cancelWindow: "キャンセル期限",
     cancelled: "授業をキャンセルしました。",
+    cancelNotAllowed:
+      "この時間はキャンセル期限内のため、予約後はキャンセルできません。",
     closedDays: "休業日",
     closedDaysHint: "休日や休みの日は生徒が授業を予約できません。",
     confirm: "予約する",

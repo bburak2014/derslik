@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "@derslik/api-client";
 import {
-  cancelDeadline,
+  cancelableUntil,
   dayLabel,
   dayTimeLabel,
   groupSlotsByDay,
@@ -64,15 +64,23 @@ function BookingBody({
     [error, setError] = useState(""),
     [day, setDay] = useState(""),
     [chosen, setChosen] = useState<BookingSlot | null>(null),
+    // Saatin seçildiği an; onay adımındaki iptal notu buna göre yazılır.
+    [chosenAt, setChosenAt] = useState(0),
     [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     try {
       setSlots((await request<{ data: BookingSlots }>(base + "/slots")).data);
       setError("");
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        // Ayarlama kapanmış: ekran kapanır, dersler yenilenince düğme gider.
+        onChanged();
+        onClose();
+        return;
+      }
       setError((e as Error).message);
     }
-  }, [base]);
+  }, [base, onChanged, onClose]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void load();
@@ -102,6 +110,11 @@ function BookingBody({
       setBusy(false);
     }
   }
+  // Seçilen saat iptal süresinin içindeyse ayarlandıktan sonra iptal edilemez.
+  const until =
+    chosen && slots
+      ? cancelableUntil(chosen.startsAt, slots.cancelHours, chosenAt)
+      : null;
   const summary = slots
     ? [
         t("booking.minutes", { count: slots.durationMinutes }),
@@ -169,14 +182,11 @@ function BookingBody({
               {slots.location || t("lesson.noLocation")}
             </Text>
             <Text style={styles.caption}>
-              {t("booking.cancelUntil", {
-                time: dayTimeLabel(
-                  cancelDeadline(
-                    chosen.startsAt,
-                    slots.cancelHours,
-                  ).toISOString(),
-                ),
-              })}
+              {until
+                ? t("booking.cancelUntil", {
+                    time: dayTimeLabel(until.toISOString()),
+                  })
+                : t("booking.cancelNotAllowed")}
             </Text>
           </Card>
         ) : (
@@ -222,7 +232,10 @@ function BookingBody({
                   key={s.startsAt}
                   secondary
                   size="sm"
-                  onPress={() => setChosen(s)}
+                  onPress={() => {
+                    setChosen(s);
+                    setChosenAt(Date.now());
+                  }}
                   style={{ minWidth: 88 }}
                 >
                   {timeLabel(s.startsAt)}

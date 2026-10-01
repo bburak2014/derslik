@@ -211,6 +211,7 @@ export const zh: Messages = {
     cancelUntilStart: "直到上课开始",
     cancelWindow: "取消期限",
     cancelled: "课程已取消。",
+    cancelNotAllowed: "该时间已在取消期限内，预约后将无法取消。",
     closedDays: "休息日",
     closedDaysHint: "节假日和休息日学生无法预约课程。",
     confirm: "预约",

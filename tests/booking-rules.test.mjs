@@ -4,6 +4,7 @@ import {
   BOOKING_HORIZON_DAYS,
   bookingSettingsSchema,
   canCancelBooking,
+  cancelableUntil,
   cancelDeadline,
   dayTimeLabel,
   findOverlap,
@@ -182,6 +183,25 @@ test("iptal yalnızca öğrencinin ayarladığı planlı derste ve süre dolmada
   assert.equal(canCancelBooking({ ...lesson, booked_by: null }, 24, 0), false);
   assert.equal(canCancelBooking({ ...lesson, status: "CANCELLED" }, 24, 0), false);
   assert.equal(canCancelBooking(lesson, 0, Date.parse(lesson.starts_at)), true);
+});
+
+test("iptal süresinin içindeki saat için onay adımında son an gösterilmez", () => {
+  const startsAt = "2026-10-10T12:00:00.000Z";
+  // 24 saat kala son an 9 Ekim 12:00 (UTC); bu andan sonra seçilen saat
+  // ayarlandıktan sonra iptal edilemez (ör. 12 saat önceden ayarlama, 24
+  // saat iptal süresi).
+  assert.equal(
+    cancelableUntil(startsAt, 24, Date.parse("2026-10-09T11:59:00.000Z"))?.toISOString(),
+    "2026-10-09T12:00:00.000Z",
+  );
+  assert.equal(
+    cancelableUntil(startsAt, 24, Date.parse("2026-10-09T12:01:00.000Z")),
+    null,
+  );
+  assert.equal(
+    cancelableUntil(startsAt, 0, Date.parse(startsAt))?.toISOString(),
+    startsAt,
+  );
 });
 
 test("gün adları ve tarih-saat etiketi etkin dilde yazılır", () => {

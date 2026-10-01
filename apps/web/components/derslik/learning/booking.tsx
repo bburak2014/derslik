@@ -5,7 +5,7 @@ import { CalendarDays, CalendarPlus, Wallet } from "lucide-react";
 import { ApiError } from "@derslik/api-client";
 import {
   canCancelBooking,
-  cancelDeadline,
+  cancelableUntil,
   dayLabel,
   dayTimeLabel,
   groupSlotsByDay,
@@ -48,6 +48,11 @@ export function BookButton({
   onOpenMessages?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { reload } = ctx;
+  // Pencerenin saat yükleyicisi bunlara bağlı; her çizimde yeniden
+  // oluşturulsalar yükleme döngüye girerdi.
+  const close = useCallback(() => setOpen(false), []),
+    changed = useCallback(() => void reload(), [reload]);
   const booking = "booking" in ctx.data ? ctx.data.booking : null;
   if (!ctx.student || !booking?.enabled) return null;
   return (
@@ -59,8 +64,8 @@ export function BookButton({
         <BookingDialog
           workspaceId={ctx.workspaceId}
           studentId={ctx.studentId}
-          onClose={() => setOpen(false)}
-          onChanged={() => void ctx.reload()}
+          onClose={close}
+          onChanged={changed}
           onOpenMessages={onOpenMessages}
         />
       )}
@@ -87,15 +92,24 @@ function BookingDialog({
     [error, setError] = useState(""),
     [day, setDay] = useState(""),
     [chosen, setChosen] = useState<BookingSlot | null>(null),
+    // Saatin seçildiği an; onay adımındaki iptal notu buna göre yazılır.
+    [chosenAt, setChosenAt] = useState(0),
     [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     try {
       setSlots((await backend<{ data: BookingSlots }>(base + "/slots")).data);
       setError("");
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        // Ayarlama kapanmış: pencere kapanır, portal yenilenince düğme gider.
+        toast.error(e.message, { id: "booking-error" });
+        onChanged();
+        onClose();
+        return;
+      }
       setError((e as Error).message);
     }
-  }, [base]);
+  }, [base, onChanged, onClose]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void load();
@@ -116,7 +130,7 @@ function BookingDialog({
       if (e instanceof ApiError && e.status === 409) {
         // Saat dolmuş, hak bitmiş ya da ayarlama kapanmış olabilir: liste ve
         // portal yenilenir, pencere seçime döner.
-        toast.error(e.message);
+        toast.error(e.message, { id: "booking-error" });
         setChosen(null);
         onChanged();
         await load();
@@ -125,6 +139,11 @@ function BookingDialog({
       setBusy(false);
     }
   }
+  // Seçilen saat iptal süresinin içindeyse ayarlandıktan sonra iptal edilemez.
+  const until =
+    chosen && slots
+      ? cancelableUntil(chosen.startsAt, slots.cancelHours, chosenAt)
+      : null;
   const summary = slots
     ? [
         t("booking.minutes", { count: slots.durationMinutes }),
@@ -188,14 +207,11 @@ function BookingDialog({
               </ItemContent>
             </Item>
             <p className="text-muted-foreground text-sm">
-              {t("booking.cancelUntil", {
-                time: dayTimeLabel(
-                  cancelDeadline(
-                    chosen.startsAt,
-                    slots.cancelHours,
-                  ).toISOString(),
-                ),
-              })}
+              {until
+                ? t("booking.cancelUntil", {
+                    time: dayTimeLabel(until.toISOString()),
+                  })
+                : t("booking.cancelNotAllowed")}
             </p>
             {error && <FormError>{error}</FormError>}
             <DialogFooter>
@@ -245,7 +261,10 @@ function BookingDialog({
                   key={s.startsAt}
                   type="button"
                   variant="outline"
-                  onClick={() => setChosen(s)}
+                  onClick={() => {
+                    setChosen(s);
+                    setChosenAt(Date.now());
+                  }}
                 >
                   {timeLabel(s.startsAt)}
                 </Button>

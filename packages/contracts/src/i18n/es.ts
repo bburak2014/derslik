@@ -270,6 +270,8 @@ export const es: Messages = {
     cancelUntilStart: "Hasta que empiece la clase",
     cancelWindow: "Plazo de cancelación",
     cancelled: "Clase cancelada.",
+    cancelNotAllowed:
+      "Esta hora ya está dentro del plazo de cancelación. Una vez reservada, no podrás cancelarla.",
     closedDays: "Días cerrados",
     closedDaysHint:
       "En vacaciones y días libres los alumnos no pueden reservar clases.",

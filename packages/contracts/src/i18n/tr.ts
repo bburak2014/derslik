@@ -250,6 +250,8 @@ export const tr = {
     cancelUntilStart: "Ders başlayana kadar",
     cancelWindow: "İptal için son süre",
     cancelled: "Ders iptal edildi.",
+    cancelNotAllowed:
+      "Bu saat iptal süresinin içinde; ayarladıktan sonra iptal edemezsiniz.",
     closedDays: "Kapalı günler",
     closedDaysHint: "Tatil ve izin günlerinde öğrenciler ders ayarlayamaz.",
     confirm: "Ayarla",
