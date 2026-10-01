@@ -185,6 +185,29 @@ Giriş, kayıt, şifre sıfırlama ve herkese açık öğretmen araması IP baş
 - **Web**: `CLIENT_IP_HEADER` vekilin ziyaretçi IP'sini verdiği başlığın adıdır. Caddy ve Nginx için `x-forwarded-for` (vekilin sona eklediği değer alınır), Cloudflare için `cf-connecting-ip`. Boş bırakılırsa IP'ye dayalı sınırlar atlanır ve giriş denemesi sınırı yalnızca e-posta başına çalışır; bu durumda biri bir e-postaya 10 yanlış şifre göndererek o hesabın web girişini 15 dakika kilitleyebilir. Üretimde mutlaka ayarla ve web'e vekilin dışından doğrudan erişilemesin.
 - **API**: `TRUST_PROXY` Express'in `trust proxy` ayarıdır (varsayılan `loopback, linklocal, uniquelocal`). `X-Forwarded-For` yalnızca bu adreslerden gelen isteklerde okunur ve sağdan ilk güvenilmeyen adres istemci sayılır. API'nin portu internete doğrudan değil, vekil üzerinden açılmalı; aynı özel ağdaki başka bir makine başlığı kendisi yazarak vitrin sınırını aşabilir.
 
+### Anlık mesajlaşma (WebSocket)
+
+Yeni mesaj karşı tarafa soketle anında gider. İstemci `POST /v1/socket/ticket` ile 30 saniyelik, tek kullanımlık bir bilet alır (web'de tarayıcı bileti oturum çereziyle `/api/socket`'ten alır; oturum belirteci tarayıcıya hiç verilmez) ve API'nin `/v1/socket` adresine bağlanır. Sokete yalnızca "şu yazışma değişti" bilgisi gider; mesajlar her zamanki REST uçlarından, aynı erişim kurallarıyla çekilir. Soket kurulamazsa ya da koparsa uygulama yoklamayla çalışmaya devam eder (açık yazışma 15 sn, liste 60 sn) ve soket arka planda yeniden kurulur.
+
+- **Web**: Tarayıcı sokete doğrudan API'ye bağlanır. Adres `API_PUBLIC_URL`'den (yoksa `API_BASE_URL`'den) türetilir ve CSP'ye eklenir. Docker'da `API_BASE_URL` iç ağ adresi olduğu için web konteynerine tarayıcının ulaşabildiği `API_PUBLIC_URL` verilir (Compose varsayılanı `http://localhost:3001`).
+- **Mobil**: `EXPO_PUBLIC_API_URL`'in `ws`/`wss` biçimine bağlanır. Uygulama arka plandayken soket kapanır, öne gelince yeniden kurulur ve ekran bir kez yenilenir. Uygulama kapalıyken haber vermek için push bildirimi gerekir (henüz yok).
+- **Ters vekil**: `/v1/socket` için WebSocket yükseltmesine izin ver. Caddy bunu kendiliğinden yapar. Nginx örneği:
+
+  ```nginx
+  location /v1/socket {
+    proxy_pass http://api:3001;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 120s;
+  }
+  ```
+
+  Sunucu 25 sn'de bir ping gönderir; vekilin boşta bekleme süresi 60 sn'den uzun olmalı. Tarayıcıdan gelen bağlantının `Origin`'i `CORS_ORIGINS`, `WEB_ORIGIN` ya da `API_PUBLIC_URL`'den biri olmalı; mobil uygulama API'nin kendi adresini yazar (`API_PUBLIC_URL` ya da vekilin ilettiği `Host`).
+- **Veritabanı**: Olayı isteği işleyen API kopyası kendisi dağıtır; birden fazla kopya çalışıyorsa diğerleri PostgreSQL `LISTEN/NOTIFY` ile öğrenir. `LISTEN` oturum boyunca açık kalan bir bağlantı ister: `DATABASE_URL` işlem modlu bir havuza (ör. Supabase'in 6543 portu) gidiyorsa `DATABASE_LISTEN_URL`'e doğrudan ya da oturum modlu bağlantı adresini yaz.
+- **Sınırlar**: hesap başına en fazla 10 soket ve dakikada 30 bilet; bir bağlantı en fazla 1 saat açık kalır, istemci yeni biletle döner. Erişimi kaldırılan kişi bir sonraki olaydan itibaren haber almaz.
+
 ### Girişte CAPTCHA (Cloudflare Turnstile)
 
 E-postayla giriş, kayıt ve şifre sıfırlama isteğe bağlı olarak Turnstile doğrulaması ister. Google/Apple/Microsoft girişini etkilemez. Açma sırası önemli; ters sırada açılırsa e-postayla giriş çalışmaz:

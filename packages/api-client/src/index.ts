@@ -316,3 +316,9 @@ export type SignedUrl = { url: string };
 export type VideoPlayback = { url: string; expiresAt: number };
 export type InvitationResult = { id: string; url: string; emailed?: boolean };
 export { uploadTus, type UploadSource } from "./uploads.ts";
+export {
+  eventConcerns,
+  MessageSocket,
+  type MessageSocketEvent,
+  type SocketTicket,
+} from "./socket.ts";

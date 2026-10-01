@@ -38,6 +38,8 @@ WEB_ORIGIN=http://localhost:3000
 DATABASE_URL=postgresql://derslik_app:${runtime}@127.0.0.1:5433/derslik
 DATABASE_ADMIN_URL=postgresql://postgres:${admin}@127.0.0.1:5433/derslik
 DATABASE_SSL=false
+# Anlık mesajlaşmanın LISTEN bağlantısı; işlem modlu havuzda doğrudan adres.
+DATABASE_LISTEN_URL=
 CLOUDFLARE_ACCOUNT_ID=
 CLOUDFLARE_STREAM_TOKEN=
 CLOUDFLARE_STREAM_WEBHOOK_SECRET=

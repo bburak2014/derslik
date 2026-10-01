@@ -13,10 +13,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       API_HOST: z.string().default("127.0.0.1"),
       DATABASE_URL: z.string().url(),
       DATABASE_SSL: z.enum(["true", "false"]).default("false"),
+      // Anlık mesajlaşmanın LISTEN bağlantısı. LISTEN oturum boyunca açık
+      // kalan bir bağlantı ister; DATABASE_URL işlem modlu bir havuza
+      // (ör. Supabase 6543) gidiyorsa buraya doğrudan ya da oturum modlu adres
+      // yazılır. Boşsa DATABASE_URL kullanılır.
+      DATABASE_LISTEN_URL: z.string().url().optional(),
       AUTH_ISSUER: z.string().url(),
       AUTH_AUDIENCE: z.string().default("authenticated"),
       CORS_ORIGINS: z.string().default(""),
       WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+      // API'nin istemcilerin gördüğü adresi (web ve mobilin kullandığı).
+      // Mobil soket bağlantısı Origin olarak bu adresi yazar.
+      API_PUBLIC_URL: z.string().url().optional(),
       SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
       SUPABASE_SECRET_KEY: z.string().optional(),
       SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),

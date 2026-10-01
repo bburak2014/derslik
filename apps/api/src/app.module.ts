@@ -44,6 +44,8 @@ import {
 import { CalendarService } from "./calendar/calendar.service.js";
 import { MessagesController } from "./messages/messages.controller.js";
 import { MessagesService } from "./messages/messages.service.js";
+import { RealtimeController } from "./messages/realtime.controller.js";
+import { RealtimeService } from "./messages/realtime.service.js";
 @Module({})
 export class AppModule {
   static register(config: ApiConfig): DynamicModule {
@@ -65,6 +67,7 @@ export class AppModule {
         CalendarFeedController,
         CalendarController,
         MessagesController,
+        RealtimeController,
         ApiController,
       ],
       providers: [
@@ -89,6 +92,7 @@ export class AppModule {
         SubscriptionService,
         DirectoryService,
         MessagesService,
+        RealtimeService,
       ],
     };
   }

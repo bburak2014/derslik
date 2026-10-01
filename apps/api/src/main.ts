@@ -13,6 +13,7 @@ import { DatabaseService } from "./db/database.service.js";
 import { ApiErrorFilter } from "./common/api-error.filter.js";
 import { localeMiddleware } from "./common/i18n.js";
 import { RateLimiter } from "./common/rate-limit.js";
+import { RealtimeService } from "./messages/realtime.service.js";
 
 // DATE is a calendar day, not a process-local midnight instant.
 types.setTypeParser(1082, (value) => value);
@@ -134,6 +135,8 @@ export async function createApplication(config: ApiConfig) {
   try {
     await app.get(DatabaseService).assertRuntimeRole();
     await app.init();
+    // Anlık mesajlaşma soketi aynı HTTP sunucusunda, /v1/socket'te.
+    app.get(RealtimeService).attach(app.getHttpServer());
     return app;
   } catch (error) {
     await app.close();

@@ -3,6 +3,7 @@ import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
 import { calendarCases } from "./calendar-cases.mjs";
 import { messagingCases } from "./messaging-cases.mjs";
+import { realtimeCases } from "./realtime-cases.mjs";
 import { accessCases } from "./access-cases.mjs";
 import { securityCases } from "./security-cases.mjs";
 import { securityRegressions } from "./security-regressions.mjs";
@@ -866,6 +867,7 @@ test(
         tokenB,
         verifiedUsers,
       });
+      await realtimeCases({ t, admin, request, ok, token, base, wasmMode });
       await accessCases({
         t,
         app,
