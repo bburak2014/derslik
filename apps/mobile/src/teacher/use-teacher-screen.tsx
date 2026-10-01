@@ -507,6 +507,13 @@ export function useTeacherScreen({
                 </Badge>
               </View>
             )}
+            {!!l.booked_by && (
+              <View style={{ marginTop: 4 }}>
+                <Badge tone="info" icon="person-outline">
+                  {t("booking.bookedByStudent")}
+                </Badge>
+              </View>
+            )}
           </View>
         </View>
         {l.status === "SCHEDULED" ? (
