@@ -43,6 +43,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ToneBadge } from "./feedback";
 import { CalendarFeedButton } from "./calendar-feed";
+import { AvailabilityButton } from "./availability-dialog";
 import {
   money,
   dateKey,
@@ -232,6 +233,11 @@ export function LessonRows({
                 <span className="meta-credit">
                   {t("lesson.creditsLeft", { count: pack?.remaining ?? 0 })}
                 </span>
+                {l.booked_by && (
+                  <ToneBadge tone="info">
+                    {t("booking.bookedByStudent")}
+                  </ToneBadge>
+                )}
               </div>
             </div>
             <div className="lesson-actions">
@@ -618,12 +624,15 @@ export function CalendarView({
   selectedDay,
   onSelectDay,
   busy,
+  workspaceId,
 }: {
   data: WorkspaceData;
   actions: Actions;
   selectedDay: string;
   onSelectDay: (day: string) => void;
   busy: boolean;
+  /** Müsaitlik ayarları bu çalışma alanınındır. */
+  workspaceId: string;
 }) {
   const [mode, setMode] = useState("day"),
     today = dateKey();
@@ -717,6 +726,7 @@ export function CalendarView({
           <p>{t("calendar.recordCount", { count: visible.length })}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <AvailabilityButton workspaceId={workspaceId} />
           <CalendarFeedButton size="sm" />
           <Button
             size="sm"

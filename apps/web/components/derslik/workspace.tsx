@@ -648,6 +648,7 @@ export default function Workspace({
                   selectedDay={selectedDay}
                   onSelectDay={setSelectedDay}
                   busy={busy}
+                  workspaceId={connected.id}
                 />
               )}
               {view === "students" && (
