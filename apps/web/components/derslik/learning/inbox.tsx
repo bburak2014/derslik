@@ -5,6 +5,7 @@ import {
   noticeIcon,
   timeAgo,
   type NoticeIcon,
+  noticeBody,
   noticeTarget,
   noticeText,
   intlLocale,
@@ -248,7 +249,9 @@ export function AccountExtras({
                 )}
               </div>
               <p className="text-muted-foreground text-sm leading-snug">
-                {noticeText(n.body)}
+                {/* Mesaj bildiriminde "Gönderen: önizleme" ayracı okuyanın
+                    dilinde yeniden kurulur. */}
+                {noticeBody(n)}
               </p>
               <div className="flex items-center gap-3 pt-1">
                 <span className="text-muted-foreground text-xs">

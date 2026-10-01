@@ -303,6 +303,7 @@ export const es: Messages = {
     onlyUnread: "No leídos",
     pick: "Elige una conversación.",
     placeholder: "Escribe un mensaje",
+    preview: "{name}: {text}",
     privacy: "Los números de teléfono no se comparten.",
     readOnly:
       "Esta conversación es entre el alumno y el profesor; solo puedes leerla.",

@@ -283,6 +283,7 @@ export const tr = {
     onlyUnread: "Okunmamışlar",
     pick: "Bir yazışma seçin.",
     placeholder: "Mesajınızı yazın",
+    preview: "{name}: {text}",
     privacy: "Telefon numaraları paylaşılmaz.",
     readOnly:
       "Bu yazışma öğrenciyle öğretmen arasında; yalnızca okuyabilirsiniz.",

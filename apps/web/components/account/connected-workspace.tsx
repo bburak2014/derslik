@@ -7,6 +7,7 @@ import { ApiError } from "@derslik/api-client";
 import dynamic from "next/dynamic";
 import { AuthForm } from "./auth-form";
 import { backend, formText, webRequest } from "@/lib/client";
+import { clearChatDrafts, forgetChatInUrl } from "@/lib/chat-drafts";
 import { prefetchWorkspace } from "@/lib/workspace-prefetch";
 import {
   openStudentWorkspace,
@@ -99,6 +100,8 @@ export function ConnectedWorkspace({
       setError("");
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
+        // Oturum düştü: aynı sekmede başka hesap girebilir.
+        clearChatDrafts();
         setUnauthorized(true);
         setSession(null);
       } else setError((e as Error).message);
@@ -160,6 +163,8 @@ export function ConnectedWorkspace({
   async function signout() {
     try {
       await webRequest("/api/auth/signout", {});
+      // Yarım mesajlar bu sekmede giriş yapacak başka hesaba kalmasın.
+      clearChatDrafts();
       setSession(null);
       setUnauthorized(true);
     } catch (e) {
@@ -272,6 +277,7 @@ export function ConnectedWorkspace({
       setBusy(true);
       try {
         await webRequest("/api/session", { key: key(next) });
+        forgetChatInUrl();
         await reload();
       } catch (e) {
         setError((e as Error).message);
@@ -415,6 +421,7 @@ export function ConnectedWorkspace({
                 setFocus(null);
                 try {
                   await webRequest("/api/session", { key: value });
+                  forgetChatInUrl();
                   await reload();
                 } catch (e) {
                   setError((e as Error).message);

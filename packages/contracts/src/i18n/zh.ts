@@ -243,6 +243,7 @@ export const zh: Messages = {
     onlyUnread: "未读",
     pick: "请选择一个对话。",
     placeholder: "输入消息",
+    preview: "{name}：{text}",
     privacy: "不会共享电话号码。",
     readOnly: "此对话在学生与老师之间进行，您只能阅读。",
     readersNone: "只有您和对方能看到此对话。",

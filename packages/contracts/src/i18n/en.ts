@@ -278,11 +278,11 @@ export const en: Messages = {
     count: "{count} / 2000",
     emptyPortal: "Your conversation with the teacher appears here.",
     emptyTeacherText:
-      "Once you give a student or guardian access, you can message them here.",
+      "Once you give a student or parent access, you can message them here.",
     emptyTeacherTitle: "No one to message yet",
     emptyThread: "No messages yet. Write the first one.",
     failed: "The message wasn't sent. Try again.",
-    guardianOf: "Guardian of {student}",
+    guardianOf: "Parent of {student}",
     hideClosed: "Hide closed conversations",
     messageStudent: "Messages",
     noAccount:
@@ -292,19 +292,20 @@ export const en: Messages = {
     onlyUnread: "Unread",
     pick: "Choose a conversation.",
     placeholder: "Write a message",
+    preview: "{name}: {text}",
     privacy: "Phone numbers aren't shared.",
     readOnly:
       "This conversation is between the student and the teacher; you can only read it.",
     readersNone: "Only you and the other person can see this conversation.",
     readersStudent: {
-      one: "Your guardian's account can also read this conversation, earlier messages included.",
+      one: "Your parent's account can also read this conversation, earlier messages included.",
       other:
-        "{count} guardian accounts can also read this conversation, earlier messages included.",
+        "{count} parent accounts can also read this conversation, earlier messages included.",
     },
     readersTeacher: {
-      one: "The student's guardian can also read this conversation, earlier messages included.",
+      one: "The student's parent can also read this conversation, earlier messages included.",
       other:
-        "{count} of the student's guardians can also read this conversation, earlier messages included.",
+        "{count} of the student's parents can also read this conversation, earlier messages included.",
     },
     search: "Search by name",
     send: "Send",
@@ -316,7 +317,7 @@ export const en: Messages = {
     subtitleGuardian: "Message the teacher inside the app.",
     subtitleStudent: "Message your teacher inside the app.",
     subtitleTeacher:
-      "Message your students and their guardians without sharing phone numbers.",
+      "Message your students and their parents without sharing phone numbers.",
     title: "Messages",
     unread: {
       one: "{count} new message",
@@ -957,7 +958,7 @@ export const en: Messages = {
     answered: "Your question was answered",
     answeredBody: "You can now see the answer to your video question.",
     assignmentNew: "New assignment",
-    messageFromGuardian: "New message from a guardian",
+    messageFromGuardian: "New message from a parent",
     messageFromStudent: "New message from a student",
     messageFromTeacher: "New message from your teacher",
     question: "New question on a video",

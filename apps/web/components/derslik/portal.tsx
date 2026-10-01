@@ -319,14 +319,19 @@ export function Portal({
   // Öğretmen hesabı da istek gönderemez (bir e-posta ya öğretmen ya öğrenci).
   const canDiscover = role === "STUDENT" && !teacherAccount;
   const fallback: PortalPage = access ? "lessons" : "teachers";
+  // Tarayıcıda adres çubuğunun kendisi okunur (undefined): erişim değişip
+  // portal yeniden kurulduğunda ilk açılışın sorgu dizesi eskimiş olabilir.
+  // Sunucuda sayfanın sorgu dizesi; ilk açılışta ikisi aynıdır.
+  const startSearch = () =>
+    typeof location === "undefined" ? initialSearch : undefined;
   const [tab, setTab] = useState<PortalPage>(() =>
-      pageFromUrl(fallback, initialSearch),
+      pageFromUrl(fallback, startSearch()),
     ),
     [teacher, setTeacher] = useState<string | null>(() =>
-      teacherFromUrl(initialSearch),
+      teacherFromUrl(startSearch()),
     ),
     [chatThread, setChatThread] = useState<string | null>(() =>
-      threadFromUrl(initialSearch),
+      threadFromUrl(startSearch()),
     ),
     // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
     [chatFocus, setChatFocus] = useState(0),
@@ -340,6 +345,8 @@ export function Portal({
       setTab(pageFromUrl(fallback));
       setTeacher(teacherFromUrl());
       setChatThread(threadFromUrl());
+      // Bildirimle açılan yazışmadan geri dönüldü: adres yeniden yazılmaz.
+      setChatFocus(0);
     };
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
@@ -402,6 +409,9 @@ export function Portal({
       setTab("requests");
       setTeacher(null);
       setRequestFocus(focus.itemId);
+      // Önceki bildirimlerin adresi bu bildirimin adresini ezmesin.
+      setPanelFocus(undefined);
+      setChatFocus(0);
     } else if (
       focus.section === "messages" &&
       access &&
@@ -426,6 +436,7 @@ export function Portal({
       setAppliedFocus(focus.at);
       setTab(focus.section);
       setPanelFocus({ id: focus.itemId, at: focus.at });
+      setChatFocus(0);
     }
   }
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).

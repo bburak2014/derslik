@@ -292,6 +292,7 @@ export const ja: Messages = {
     onlyUnread: "未読",
     pick: "やり取りを選択してください。",
     placeholder: "メッセージを入力",
+    preview: "{name}: {text}",
     privacy: "電話番号は共有されません。",
     readOnly: "このやり取りは生徒と講師の間のものです。閲覧のみ可能です。",
     readersNone: "このやり取りは、あなたと相手の方だけが見られます。",
