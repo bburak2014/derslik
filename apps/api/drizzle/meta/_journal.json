@@ -120,6 +120,13 @@
       "when": 1789620000000,
       "tag": "0016_message_events",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789640000000,
+      "tag": "0017_booking_settings",
+      "breakpoints": true
     }
   ]
 }

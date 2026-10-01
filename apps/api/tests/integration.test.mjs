@@ -2,6 +2,7 @@ import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
 import { calendarCases } from "./calendar-cases.mjs";
+import { bookingCases } from "./booking-cases.mjs";
 import { messagingCases } from "./messaging-cases.mjs";
 import { realtimeCases } from "./realtime-cases.mjs";
 import { accessCases } from "./access-cases.mjs";
@@ -857,6 +858,7 @@ test(
         tokenB,
         sessionBody,
       });
+      await bookingCases({ t, app, admin, request, ok, token });
       await messagingCases({
         t,
         config,

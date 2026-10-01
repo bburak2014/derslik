@@ -46,6 +46,8 @@ import { MessagesController } from "./messages/messages.controller.js";
 import { MessagesService } from "./messages/messages.service.js";
 import { RealtimeController } from "./messages/realtime.controller.js";
 import { RealtimeService } from "./messages/realtime.service.js";
+import { BookingController } from "./booking/booking.controller.js";
+import { BookingService } from "./booking/booking.service.js";
 @Module({})
 export class AppModule {
   static register(config: ApiConfig): DynamicModule {
@@ -68,6 +70,7 @@ export class AppModule {
         CalendarController,
         MessagesController,
         RealtimeController,
+        BookingController,
         ApiController,
       ],
       providers: [
@@ -93,6 +96,7 @@ export class AppModule {
         DirectoryService,
         MessagesService,
         RealtimeService,
+        BookingService,
       ],
     };
   }
