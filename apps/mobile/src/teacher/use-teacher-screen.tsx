@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Access } from "@derslik/api-client";
 import {
@@ -30,6 +30,7 @@ import {
   useTheme,
 } from "../ui";
 import { type NoticeFocus, type TeachingView } from "../LearningScreen";
+import { useMessages } from "../messages";
 
 export const dateTime = (day: string, time: string) => {
   if (
@@ -61,6 +62,7 @@ export function useTeacherScreen({
   onNotice,
 }: TeacherScreenProps) {
   const { colors, styles, section } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
@@ -84,7 +86,11 @@ export function useTeacherScreen({
     [learningFocus, setLearningFocus] = useState<NoticeFocus | null>(null),
     // Vitrin: bekleyen ders isteği sayısı ve bildirimden gelinen istek.
     [requests, setRequests] = useState(0),
-    [showcaseFocus, setShowcaseFocus] = useState<string | null>(null);
+    [showcaseFocus, setShowcaseFocus] = useState<string | null>(null),
+    // Mesaj okununca o yazışmanın bildirimleri de okunur; zil yeniden sayılır.
+    [noticeTick, setNoticeTick] = useState(0);
+  // Mesajlar: yazışma listesi, açık yazışma ve başlıktaki okunmamış sayacı.
+  const messages = useMessages(`/workspaces/${access.id}/messages`);
   if (focus && focus.at !== appliedFocus && focus.workspaceId === access.id) {
     setAppliedFocus(focus.at);
     if (focus.section === "requests") {
@@ -95,7 +101,13 @@ export function useTeacherScreen({
     } else if (focus.section === "myRequests") {
       // Öğrencinin kendi istekleri; öğretmen görünümünde açılacak yer yok.
     } else if (focus.section === "messages") {
-      // Mesaj bildirimi; mesajlar ekranı eklenince yazışma orada açılır.
+      // Mesaj bildirimi: yazışma Mesajlar ekranında açılır.
+      setSelected(null);
+      setLearning(false);
+      messages.setSearch("");
+      messages.setStudentFilter(null);
+      messages.setOpen(focus.itemId);
+      setTab("messages");
     } else if (focus.section === "lessons") {
       // Ders hatırlatması: takvim o dersin gününde açılır.
       const lesson = data.lessons.find((l) => l.id === focus.itemId);
@@ -118,7 +130,8 @@ export function useTeacherScreen({
   }
   const inFlight = useRef(false);
   // Zildeki sayaç için bildirimler sessizce alınır (web ile aynı); hata olursa
-  // zil sayaçsız kalır. Bildirimler sekmesinden çıkınca yeniden sayılır.
+  // zil sayaçsız kalır. Bildirimler sekmesinden çıkınca ve bir yazışma
+  // okununca yeniden sayılır.
   const inInbox = tab === "inbox";
   useEffect(() => {
     let alive = true;
@@ -130,7 +143,7 @@ export function useTeacherScreen({
     return () => {
       alive = false;
     };
-  }, [inInbox]);
+  }, [inInbox, noticeTick]);
   const load = useCallback(async () => {
     try {
       setData(await request(`/workspaces/${access.id}/snapshot`));
@@ -173,6 +186,26 @@ export function useTeacherScreen({
       inFlight.current = false;
       setBusy(false);
     }
+  }
+  /** Öğrenci dosyasındaki Mesajlar düğmesi: tek yazışma varsa o, birden çok
+   *  varsa (öğrenci ve veliler) o öğrenciyle süzülmüş liste açılır. Karar
+   *  güncel listeyle verilir (az önce erişim verilmiş olabilir); liste de
+   *  böylece yenilenir. Bağlı hesap yoksa false döner. */
+  async function messageStudent(person: Student) {
+    const own = (await messages.reload()).filter(
+      (x) => x.studentId === person.id,
+    );
+    if (!own.length) return false;
+    setSelected(null);
+    setLearning(false);
+    messages.setSearch("");
+    messages.setUnreadOnly(false);
+    messages.setStudentFilter(
+      own.length === 1 ? null : { id: person.id, name: person.name },
+    );
+    messages.setOpen(own.length === 1 ? own[0].linkId : null);
+    setTab("messages");
+    return true;
   }
   const student = data.students.find((s) => s.id === selected),
     active = data.students.filter((s) => s.active),
@@ -598,10 +631,27 @@ export function useTeacherScreen({
             ? t("nav.payments")
             : tab === "teaching"
               ? t("mt.teaching")
-              : t("mt.notifications");
+              : tab === "messages"
+                ? t("chat.title")
+                : t("mt.notifications");
+  // Dar ekranda marka, üç simge ve "Hesabım" yazısı yan yana sığmıyor: telefonda
+  // hesap düğmesi simgeye döner; çok dar ekranda (ya da büyük yazıda) marka
+  // yalnızca işaretiyle, öğrenci dosyasının geri düğmesi yazısız çizilir.
+  // Adlar ekran okuyucuda kalır.
+  const scale = Math.max(1, fontScale),
+    phone = width < 520,
+    tight = width < 400 * scale,
+    narrow = width < 380 * scale;
   const header = (
     <View style={styles.header}>
-      {student ? (
+      {student && narrow ? (
+        <IconButton
+          ghost
+          icon="chevron-back"
+          label={t("nav.students")}
+          onPress={() => setSelected(null)}
+        />
+      ) : student ? (
         <Button
           variant="ghost"
           size="sm"
@@ -612,7 +662,7 @@ export function useTeacherScreen({
           {t("nav.students")}
         </Button>
       ) : (
-        <Brand />
+        <Brand compact={tight} />
       )}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <IconButton
@@ -629,6 +679,20 @@ export function useTeacherScreen({
         />
         <IconButton
           ghost
+          icon="chatbubbles-outline"
+          label={t("chat.title")}
+          selected={tab === "messages" && !student}
+          count={messages.badge}
+          onPress={() => {
+            setSelected(null);
+            messages.setOpen(null);
+            messages.setSearch("");
+            messages.setStudentFilter(null);
+            setTab("messages");
+          }}
+        />
+        <IconButton
+          ghost
           icon="notifications-outline"
           label={t("mt.notifications")}
           selected={tab === "inbox" && !student}
@@ -638,14 +702,22 @@ export function useTeacherScreen({
             setTab("inbox");
           }}
         />
-        <Button
-          secondary
-          size="sm"
-          icon="person-circle-outline"
-          onPress={onAccount}
-        >
-          {t("mt.myAccount")}
-        </Button>
+        {phone ? (
+          <IconButton
+            icon="person-circle-outline"
+            label={t("mt.myAccount")}
+            onPress={onAccount}
+          />
+        ) : (
+          <Button
+            secondary
+            size="sm"
+            icon="person-circle-outline"
+            onPress={onAccount}
+          >
+            {t("mt.myAccount")}
+          </Button>
+        )}
       </View>
     </View>
   );
@@ -725,6 +797,9 @@ export function useTeacherScreen({
     setRequests,
     showcaseFocus,
     setShowcaseFocus,
+    messages,
+    messageStudent,
+    setNoticeTick,
     inFlight,
     inInbox,
     load,

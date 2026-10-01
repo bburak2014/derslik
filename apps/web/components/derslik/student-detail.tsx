@@ -15,6 +15,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Send,
+  MessageCircle,
+  Info,
 } from "lucide-react";
 import {
   Sheet,
@@ -29,6 +31,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   money,
   dateKey,
@@ -108,8 +112,14 @@ export function StudentDetail({
   busy,
   workspaceId,
   focus,
+  onMessages,
+  messagesUnread = 0,
 }: {
   workspaceId?: string;
+  /** "Mesajlar": öğrencinin yazışmalarını açar; bağlı hesabı yoksa false. */
+  onMessages?: (studentId: string) => Promise<boolean>;
+  /** Öğrencinin ve velilerinin okunmamış mesajları. */
+  messagesUnread?: number;
   /** Bildirimden gelindiyse "Öğrenme" sekmesi Paylaşımlar'da açılır. */
   focus?: import("./learning-panel").NoticeFocus | null;
   student: Student | null;
@@ -134,6 +144,13 @@ export function StudentDetail({
       invite: 0,
       notice: focus.at,
     });
+  // Bağlı hesabı olmayan öğrencide "Mesajlar" açıklama gösterir; hangi
+  // öğrenci için gösterildiği tutulur, başka öğrenciye geçince kaybolur.
+  const [chat, setChat] = useState<{
+    id: string;
+    busy: boolean;
+    none: boolean;
+  }>({ id: "", busy: false, none: false });
   const current =
     tabState.id === student?.id
       ? tabState
@@ -197,6 +214,34 @@ export function StudentDetail({
                 >
                   <Pencil /> {t("common.edit")}
                 </Button>
+                {workspaceId && onMessages && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={chat.id === student.id && chat.busy}
+                    onClick={async () => {
+                      const id = student.id;
+                      setChat({ id, busy: true, none: false });
+                      const opened = await onMessages(id);
+                      setChat({ id, busy: false, none: !opened });
+                    }}
+                  >
+                    {chat.id === student.id && chat.busy ? (
+                      <Spinner />
+                    ) : (
+                      <MessageCircle />
+                    )}
+                    {t("chat.messageStudent")}
+                    {messagesUnread > 0 && (
+                      <Badge className="h-5 min-w-5 px-1.5 tabular-nums">
+                        <span aria-hidden="true">{messagesUnread}</span>
+                        <span className="sr-only">
+                          {t("chat.unread", { count: messagesUnread })}
+                        </span>
+                      </Badge>
+                    )}
+                  </Button>
+                )}
                 {workspaceId && !!student.active && (
                   <Button
                     variant="outline"
@@ -233,6 +278,12 @@ export function StudentDetail({
                   </Button>
                 )}
               </div>
+              {chat.id === student.id && chat.none && (
+                <Alert role="status" className="mt-3">
+                  <Info />
+                  <AlertDescription>{t("chat.noAccount")}</AlertDescription>
+                </Alert>
+              )}
             </SheetHeader>
             <div className="detail-stats">
               <div>

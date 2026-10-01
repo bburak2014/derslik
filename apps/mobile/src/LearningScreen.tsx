@@ -82,6 +82,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { PdfViewer } from "./PdfViewer";
 import { MediaPlayer } from "./MediaPlayer";
 import { CalendarFeed } from "./calendar-feed";
+import { PortalMessages, useMessages } from "./messages";
 const empty: LearningData = {
   lessons: [],
   assignments: [],
@@ -213,6 +214,13 @@ export function LearningScreen({
     } | null>(null),
     [progress, setProgress] = useState<number | null>(null),
     [links, setLinks] = useState<StudentAccessList | null>(null);
+  // Mesajlar sekmesi yalnızca öğrenci ve velide; portal mesaj uçları Dersler
+  // iznini ister. Liste dakikada bir yoklanır, sekme adında okunmamış sayısı.
+  const chat = useMessages(
+    !owner && ((data as PortalData).permissions || []).includes("lessons")
+      ? `/portal/${access.id}/${studentId}/messages`
+      : null,
+  );
   const inFlight = useRef(false),
     fileReservations = useRef(
       new Map<string, { id: string; uploadUrl?: string | null }>(),
@@ -232,9 +240,11 @@ export function LearningScreen({
   ) {
     setAppliedFocus(focus.at);
     // İstek bildirimleri vitrin ekranlarına aittir; burada dersler açık kalır.
+    // Mesaj bildirimi Mesajlar sekmesinde o yazışmayı açar.
     if (focus.section !== "requests" && focus.section !== "myRequests") {
       if (!view) setTab(focus.section);
-      setHighlight(focus.itemId);
+      if (focus.section === "messages") chat.setOpen(focus.itemId);
+      else setHighlight(focus.itemId);
     }
   }
   useEffect(() => {
@@ -323,6 +333,15 @@ export function LearningScreen({
     : (data as PortalData).permissions || [];
   const tabs = [
     { id: "lessons", label: t("nav.lessons"), permission: "lessons" },
+    ...(owner
+      ? []
+      : [
+          {
+            id: "messages",
+            label: t("nav.messages") + (chat.badge ? ` (${chat.badge})` : ""),
+            permission: "lessons",
+          },
+        ]),
     {
       id: "assignments",
       label: t("nav.assignments"),
@@ -560,60 +579,74 @@ export function LearningScreen({
           : a.due_on && a.due_on < dateKey()
             ? ["danger", t("learn.late")]
             : ["warning", t("learn.awaiting")];
+  // Ekranın başlığı ve sekme şeridi; Mesajlar sekmesi de aynılarını çizer.
+  const header = !view && (
+    <View style={styles.header}>
+      {owner ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="chevron-back"
+          onPress={onBack}
+          style={{ marginLeft: -10 }}
+        >
+          {t("mt.studentFile")}
+        </Button>
+      ) : (
+        <Brand />
+      )}
+      {!owner && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {onDiscover && (
+            <IconButton
+              ghost
+              icon="search-outline"
+              label={t("nav.findTeacher")}
+              onPress={onDiscover}
+            />
+          )}
+          <Button
+            secondary
+            size="sm"
+            icon="person-circle-outline"
+            onPress={onBack}
+          >
+            {t("mt.myAccount")}
+          </Button>
+        </View>
+      )}
+    </View>
+  );
+  const strip = !view && (
+    <TabStrip
+      tabs={tabs}
+      value={tab}
+      onChange={(id) => {
+        setTab(id);
+        if (id === "access") void loadLinks();
+      }}
+    />
+  );
+  // Mesajlar sekmesi kaydırma alanının yerine çizilir: yazışmanın yazma alanı
+  // altta, klavyenin üstünde durur ve sekmenin kendi yenilemesi vardır.
+  if (tab === "messages" && chat.path)
+    return (
+      <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
+        {header}
+        {strip}
+        <PortalMessages
+          messages={chat}
+          viewer={student ? "STUDENT" : "GUARDIAN"}
+        />
+      </SafeAreaView>
+    );
   return (
     <SafeAreaView
       style={styles.screen}
       edges={view ? ["left", "right"] : ["top", "left", "right"]}
     >
-      {!view && (
-        <View style={styles.header}>
-          {owner ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon="chevron-back"
-              onPress={onBack}
-              style={{ marginLeft: -10 }}
-            >
-              {t("mt.studentFile")}
-            </Button>
-          ) : (
-            <Brand />
-          )}
-          {!owner && (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              {onDiscover && (
-                <IconButton
-                  ghost
-                  icon="search-outline"
-                  label={t("nav.findTeacher")}
-                  onPress={onDiscover}
-                />
-              )}
-              <Button
-                secondary
-                size="sm"
-                icon="person-circle-outline"
-                onPress={onBack}
-              >
-                {t("mt.myAccount")}
-              </Button>
-            </View>
-          )}
-        </View>
-      )}
-      {!view && (
-        <TabStrip
-          tabs={tabs}
-          value={tab}
-          onChange={(id) => {
-            setTab(id);
-            if (id === "access") void loadLinks();
-          }}
-        />
-      )}
+      {header}
+      {strip}
       <ScrollView
         ref={scroller}
         keyboardShouldPersistTaps="handled"

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ClipboardList,
   FileText,
+  MessageCircle,
   NotebookPen,
   Send,
   UserRoundSearch,
@@ -53,6 +54,12 @@ import {
 import { SidebarAccount, Topbar } from "./shell";
 import { backend } from "@/lib/client";
 import { MyRequests, TeacherDirectory, TeacherProfileView } from "./directory";
+import {
+  CHAT_FROM_LIST,
+  chatFromSearch,
+  chatSearch,
+  useMessageThreads,
+} from "./messages";
 
 type PortalRole = "STUDENT" | "GUARDIAN";
 /** Öğretmen bul ve İsteklerim: öğretmene bağlı olmayan öğrenci de görür. */
@@ -94,6 +101,14 @@ const pages: Partial<
     subtitle: {
       STUDENT: "portal.lessonsStudent",
       GUARDIAN: "portal.lessonsGuardian",
+    },
+  },
+  messages: {
+    label: "nav.messages",
+    icon: MessageCircle,
+    subtitle: {
+      STUDENT: "chat.subtitleStudent",
+      GUARDIAN: "chat.subtitleGuardian",
     },
   },
   assignments: {
@@ -153,6 +168,11 @@ const teacherFromUrl = (search?: string) =>
   search === undefined && typeof location === "undefined"
     ? null
     : new URLSearchParams(search ?? location.search).get("teacher");
+/** Mesajlar sayfasında açık yazışma (`?view=messages&thread=`). */
+const threadFromUrl = (search?: string) =>
+  search === undefined && typeof location === "undefined"
+    ? null
+    : chatFromSearch(search ?? location.search).thread;
 
 function DiscoverNavigation({
   current,
@@ -190,10 +210,13 @@ function PortalNavigation({
   tabs,
   current,
   onNavigate,
+  unread,
 }: {
   tabs: LearningTabInfo[];
   current: PortalPage;
   onNavigate: (tab: PortalPage) => void;
+  /** Öğretmenden gelen okunmamış mesajlar. */
+  unread: number;
 }) {
   const { setOpenMobile } = useSidebar();
   if (!tabs.length)
@@ -224,6 +247,9 @@ function PortalNavigation({
             >
               <Icon />
               <span>{t(page.label)}</span>
+              {id === "messages" && unread > 0 && (
+                <span className="nav-count nav-count-marker">{unread}</span>
+              )}
             </SidebarMenuButton>
           </SidebarMenuItem>
         );
@@ -299,6 +325,11 @@ export function Portal({
     [teacher, setTeacher] = useState<string | null>(() =>
       teacherFromUrl(initialSearch),
     ),
+    [chatThread, setChatThread] = useState<string | null>(() =>
+      threadFromUrl(initialSearch),
+    ),
+    // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
+    [chatFocus, setChatFocus] = useState(0),
     [tabs, setTabs] = useState<LearningTabInfo[]>([]),
     [signoutOpen, setSignoutOpen] = useState(false),
     [requestFocus, setRequestFocus] = useState<string | null>(null),
@@ -308,6 +339,7 @@ export function Portal({
     const sync = () => {
       setTab(pageFromUrl(fallback));
       setTeacher(teacherFromUrl());
+      setChatThread(threadFromUrl());
     };
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
@@ -338,10 +370,27 @@ export function Portal({
     setOpenRequest(request);
     setPanelFocus(undefined);
     setRequestFocus(null);
+    setChatThread(null);
+    setChatFocus(0);
     window.history.pushState(
       {},
       "",
       "/?view=" + next + (teacherId ? "&teacher=" + teacherId : ""),
+    );
+  }
+  /** Mesajlar sayfasında yazışma açar (null: listeye döner). */
+  function openThread(id: string | null) {
+    const fromList = !!id && current === "messages" && !chatThread;
+    setTab("messages");
+    setTeacher(null);
+    setChatThread(id);
+    setChatFocus(0);
+    setPanelFocus(undefined);
+    setRequestFocus(null);
+    window.history.pushState(
+      fromList ? CHAT_FROM_LIST : {},
+      "",
+      "/" + chatSearch(id),
     );
   }
   // Bildirim bu öğrenciye aitse ilgili sekme açılır ve kayıt vurgulanır.
@@ -354,8 +403,21 @@ export function Portal({
       setTeacher(null);
       setRequestFocus(focus.itemId);
     } else if (
+      focus.section === "messages" &&
+      access &&
+      focus.workspaceId === access.id &&
+      focus.studentId === access.studentId
+    ) {
+      // Mesaj bildirimi: Mesajlar sayfasında o yazışma açılır.
+      setAppliedFocus(focus.at);
+      setTab("messages");
+      setTeacher(null);
+      setChatThread(focus.itemId);
+      setChatFocus(focus.at);
+      setPanelFocus(undefined);
+      setRequestFocus(null);
+    } else if (
       focus.section !== "requests" &&
-      // Mesaj bildirimi; mesajlar sayfası eklenince yazışma orada açılır.
       focus.section !== "messages" &&
       access &&
       focus.workspaceId === access.id &&
@@ -371,10 +433,23 @@ export function Portal({
     ? focus?.section
     : requestFocus
       ? "requests"
-      : undefined;
+      : chatFocus
+        ? "messages"
+        : undefined;
+  const focusedUrl =
+    focusedTab === "messages"
+      ? chatSearch(chatThread)
+      : focusedTab && "?view=" + focusedTab;
   useEffect(() => {
-    if (focusedTab) window.history.pushState({}, "", "/?view=" + focusedTab);
-  }, [focusedTab, appliedFocus]);
+    if (focusedUrl) window.history.pushState({}, "", "/" + focusedUrl);
+  }, [focusedUrl, appliedFocus]);
+  // Kenar çubuğundaki okunmamış sayacı ve Mesajlar sayfası aynı listeyi
+  // kullanır. Mesaj rotaları "lessons" iznini ister; izin yoksa istek gitmez.
+  const chat = useMessageThreads(
+    access?.studentId && tabs.some((x) => x.id === "messages")
+      ? `/portal/${access.id}/${access.studentId}/messages`
+      : null,
+  );
   // Sol menüdeki sekmeleri LearningPanel bildirir; ama öğrenci doğrudan
   // "Öğretmen bul" / "İsteklerim" sayfasında açarsa panel hiç yüklenmez ve
   // menü iskelet olarak kalırdı. O durumda izinler burada ayrıca alınır.
@@ -427,6 +502,12 @@ export function Portal({
         view={current}
         onTabs={setTabs}
         focus={panelFocus}
+        chat={{
+          store: chat,
+          thread: chatThread,
+          onOpen: openThread,
+          refreshAt: chatFocus,
+        }}
       />
     );
   return (
@@ -458,6 +539,7 @@ export function Portal({
                 tabs={tabs}
                 current={current}
                 onNavigate={navigate}
+                unread={chat.unread}
               />
             </>
           )}

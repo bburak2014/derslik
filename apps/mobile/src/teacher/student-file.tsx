@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { money, t, type MessageKey } from "@derslik/contracts";
@@ -28,11 +29,16 @@ export function StudentFile({ ctx }: { ctx: TeacherCtx }) {
     newPackage,
     newLesson,
     newPayment,
+    messageStudent,
     lessonCard,
     balance,
     studentPackages,
     remaining,
   } = ctx;
+  // Mesajlar düğmesi bağlı hesap arar; yoksa notu o öğrencinin dosyasında
+  // gösterilir (dosya başka öğrenciye geçince kaybolur).
+  const [checking, setChecking] = useState(false),
+    [noAccount, setNoAccount] = useState<string | null>(null);
   if (!student) return null;
   return (
     <>
@@ -56,6 +62,35 @@ export function StudentFile({ ctx }: { ctx: TeacherCtx }) {
       <Button icon="library-outline" onPress={() => setLearning(true)}>
         {t("mt.learningButton")}
       </Button>
+      <Button
+        secondary
+        icon="chatbubbles-outline"
+        loading={checking}
+        onPress={async () => {
+          setChecking(true);
+          setError("");
+          try {
+            if (!(await messageStudent(student))) setNoAccount(student.id);
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setChecking(false);
+          }
+        }}
+      >
+        {t("chat.messageStudent")}
+      </Button>
+      {noAccount === student.id && (
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Ionicons
+            name="information-circle-outline"
+            size={18}
+            color={colors.muted}
+            style={{ marginTop: 1 }}
+          />
+          <Text style={[styles.muted, { flex: 1 }]}>{t("chat.noAccount")}</Text>
+        </View>
+      )}
       <View style={styles.row}>
         {(
           [

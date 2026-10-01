@@ -13,6 +13,7 @@ import {
 import { dateKey, t, type StudentAccessList } from "@derslik/contracts";
 import { backend } from "@/lib/client";
 import { RefreshCw } from "lucide-react";
+import type { MessagesView } from "../messages";
 import {
   Field,
   FormSpec,
@@ -41,6 +42,9 @@ export type LearningPanelProps = {
   /** Bildirimden gelinen kayıt: görünür olunca kaydırılıp kısa süre
    *  vurgulanır. `at` her tıklamada değişir. */
   focus?: { id: string | null; at: number };
+  /** Portalın Mesajlar sekmesi: yazışma listesi ve adresteki açık yazışma.
+   *  Öğretmenin öğrenci panelinde bu sekme yoktur. */
+  chat?: Omit<React.ComponentProps<typeof MessagesView>, "base" | "teacher">;
 };
 
 /** LearningPanel'in durumu ve işlemleri; sekmeler bunu `ctx` olarak alır. */

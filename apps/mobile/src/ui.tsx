@@ -988,8 +988,15 @@ export function GridTexture() {
 }
 
 /** "derslik." yazısı. Açık yüzeyde lacivert karo + marka noktası; mürekkep
- *  zeminde (giriş ekranı) beyaz yazı + fosforlu nokta, web'deki gibi. */
-export function Brand({ inverse = false }: { inverse?: boolean }) {
+ *  zeminde (giriş ekranı) beyaz yazı + fosforlu nokta, web'deki gibi.
+ *  `compact` dar başlıklarda yalnızca karoyu çizer. */
+export function Brand({
+  inverse = false,
+  compact = false,
+}: {
+  inverse?: boolean;
+  compact?: boolean;
+}) {
   const { colors, styles, section } = useTheme();
   return (
     <View
@@ -1005,10 +1012,14 @@ export function Brand({ inverse = false }: { inverse?: boolean }) {
           <Ionicons name="book-outline" size={18} color={colors.marker} />
         </View>
       )}
-      <Text style={[styles.brand, inverse && { color: colors.onNavyStrong }]}>
-        derslik
-        <Text style={{ color: inverse ? colors.marker : colors.brand }}>.</Text>
-      </Text>
+      {!compact && (
+        <Text style={[styles.brand, inverse && { color: colors.onNavyStrong }]}>
+          derslik
+          <Text style={{ color: inverse ? colors.marker : colors.brand }}>
+            .
+          </Text>
+        </Text>
+      )}
     </View>
   );
 }

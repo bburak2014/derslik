@@ -18,8 +18,16 @@ import {
   Video,
   ClipboardList,
   Store,
+  MessageCircle,
 } from "lucide-react";
 import { ShowcaseView } from "./showcase";
+import {
+  CHAT_FROM_LIST,
+  MessagesView,
+  chatFromSearch,
+  chatSearch,
+  useMessageThreads,
+} from "./messages";
 import { SidebarAccount, Topbar } from "./shell";
 import { backend } from "@/lib/client";
 import type { Showcase } from "@derslik/contracts";
@@ -67,11 +75,12 @@ import { RecordDialog, type ModalState } from "./record-dialog";
 import { StudentDetail } from "./student-detail";
 import { useWorkspaceTools } from "./use-workspace-tools";
 
-type View = CoreView | TeachingView | "showcase";
+type View = CoreView | TeachingView | "showcase" | "messages";
 const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
   { id: "overview", label: "nav.overview", icon: LayoutDashboard },
   { id: "calendar", label: "nav.calendar", icon: CalendarDays },
   { id: "students", label: "nav.students", icon: Users },
+  { id: "messages", label: "nav.messages", icon: MessageCircle },
   { id: "payments", label: "nav.payments", icon: Wallet },
   { id: "assignments", label: "nav.assignments", icon: ClipboardList },
   { id: "files", label: "nav.files", icon: FileText },
@@ -79,6 +88,10 @@ const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
   { id: "showcase", label: "nav.showcase", icon: Store },
 ];
 const titles: Record<View, { title: MessageKey; subtitle: MessageKey }> = {
+  messages: {
+    title: "chat.title",
+    subtitle: "chat.subtitleTeacher",
+  },
   showcase: {
     title: "nav.showcase",
     subtitle: "dir.showcaseSubtitle",
@@ -134,12 +147,15 @@ function Navigation({
   onNavigate,
   count,
   requests,
+  unread,
 }: {
   view: View;
   onNavigate: (view: View) => void;
   count: number;
   /** Vitrindeki yanıt bekleyen ders istekleri. */
   requests: number;
+  /** Öğrenci ve velilerden gelen okunmamış mesajlar. */
+  unread: number;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
@@ -161,6 +177,9 @@ function Navigation({
             )}
             {id === "showcase" && requests > 0 && (
               <span className="nav-count nav-count-marker">{requests}</span>
+            )}
+            {id === "messages" && unread > 0 && (
+              <span className="nav-count nav-count-marker">{unread}</span>
             )}
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -201,7 +220,9 @@ export default function Workspace({
     [search, setSearch] = useState(""),
     [selectedDay, setSelectedDay] = useState(dateKey()),
     [studentId, setStudentId] = useState<string | null>(null),
-    [modal, setModal] = useState<ModalState | null>(null);
+    [modal, setModal] = useState<ModalState | null>(null),
+    // Mesajlar görünümünde açık yazışma ve öğrenci süzgeci (adres çubuğunda).
+    [chat, setChat] = useState(() => chatFromSearch(initialSearch));
   const [signoutOpen, setSignoutOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<{
     title: string;
@@ -236,6 +257,7 @@ export default function Workspace({
     const sync = () => {
       const v = new URLSearchParams(location.search).get("view");
       if (navigation.some((n) => n.id === v)) setView(v as View);
+      setChat(chatFromSearch(location.search));
     };
     sync();
     window.addEventListener("popstate", sync);
@@ -247,7 +269,26 @@ export default function Workspace({
     setHubFocus(null);
     setShowcaseFocus(null);
     setCalendarFocus(false);
+    setChat({ thread: null, student: null });
+    setChatFocus(0);
     window.history.pushState({}, "", "/?view=" + v);
+  }
+  /** Mesajlar görünümünde yazışma (null: liste) açar; öğrenci dosyasından
+   *  gelindiyse liste o öğrencinin yazışmalarıyla sınırlı kalır. */
+  function openChat(thread: string | null, student: string | null = null) {
+    const fromList = !!thread && view === "messages" && !chat.thread;
+    setView("messages");
+    setChat({ thread, student });
+    setSearch("");
+    setHubFocus(null);
+    setShowcaseFocus(null);
+    setCalendarFocus(false);
+    setChatFocus(0);
+    window.history.pushState(
+      fromList ? CHAT_FROM_LIST : {},
+      "",
+      "/" + chatSearch(thread, student),
+    );
   }
   // Bildirim: ödev ve videolar kendi sayfalarında o öğrenciyle açılır;
   // paylaşımlar öğrenci dosyasının "Öğrenme" sekmesinde. Prop değişince
@@ -260,7 +301,12 @@ export default function Workspace({
       at: number;
     } | null>(null),
     [calendarFocus, setCalendarFocus] = useState(false),
+    // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
+    [chatFocus, setChatFocus] = useState(0),
     [requests, setRequests] = useState(0);
+  // Kenar çubuğundaki okunmamış mesaj sayacı ve Mesajlar görünümü aynı
+  // listeyi kullanır; liste görünürken dakikada bir yenilenir.
+  const chatStore = useMessageThreads(`/workspaces/${connected.id}/messages`);
   // Kenar çubuğundaki istek sayacı sayfa açılışında bir kez alınır; vitrin
   // sayfası açıkken oradaki liste sayacı günceller.
   useEffect(() => {
@@ -292,7 +338,15 @@ export default function Workspace({
     } else if (focus.section === "myRequests") {
       // Öğrenci bildirimi; öğretmen görünümünde açılacak yeri yok.
     } else if (focus.section === "messages") {
-      // Mesaj bildirimi; mesajlar görünümü eklenince yazışma orada açılır.
+      // Mesaj bildirimi: yazışma Mesajlar görünümünde açılır.
+      setView("messages");
+      setChat({ thread: focus.itemId, student: null });
+      setChatFocus(focus.at);
+      setSearch("");
+      setHubFocus(null);
+      setShowcaseFocus(null);
+      setNotesFocus(null);
+      setStudentId(null);
     } else if (focus.section === "lessons") {
       // Ders hatırlatması: takvim o dersin gününde açılır.
       const lesson = data.lessons.find((l) => l.id === focus.itemId);
@@ -317,10 +371,28 @@ export default function Workspace({
     ? "showcase"
     : calendarFocus
       ? "calendar"
-      : hubFocus?.section;
+      : chatFocus
+        ? "messages"
+        : hubFocus?.section;
+  const focusedUrl =
+    focusedView === "messages"
+      ? chatSearch(chat.thread, chat.student)
+      : focusedView && "?view=" + focusedView;
   useEffect(() => {
-    if (focusedView) window.history.pushState({}, "", "/?view=" + focusedView);
-  }, [focusedView, appliedFocus]);
+    if (focusedUrl) window.history.pushState({}, "", "/" + focusedUrl);
+  }, [focusedUrl, appliedFocus]);
+  /** Öğrenci dosyasındaki "Mesajlar": tek yazışma doğrudan, birden çoksa o
+   *  öğrencinin listesi açılır. Bağlı hesabı yoksa false döner. */
+  async function openStudentChat(id: string) {
+    // Liste en fazla bir dakika eski; yeni kabul edilen davet de görünsün diye
+    // tıklamada yeniden alınır (alınamazsa eldeki liste kullanılır).
+    const list = (await chatStore.reload()) ?? chatStore.threads;
+    const own = list?.filter((x) => x.studentId === id);
+    if (own && !own.length) return false;
+    setStudentId(null);
+    openChat(own?.length === 1 ? own[0].linkId : null, id);
+    return true;
+  }
   const mutate: Mutate = async (command, message) => {
     if (inFlight.current) return false;
     inFlight.current = true;
@@ -417,6 +489,9 @@ export default function Workspace({
   };
   const active = data.students.filter((s) => s.active).length;
   const currentStudent = data.students.find((s) => s.id === studentId) || null;
+  // Başlıktaki "+" düğmesi; öğretim sayfaları, vitrin ve mesajlarda yok.
+  const addButton =
+    !isTeachingView(view) && view !== "showcase" && view !== "messages";
   return (
     <SidebarProvider
       style={{ "--sidebar-width": "15.5rem" } as React.CSSProperties}
@@ -438,6 +513,7 @@ export default function Workspace({
             onNavigate={navigate}
             count={active}
             requests={requests}
+            unread={chatStore.unread}
           />
           <div className="sidebar-note">
             <span className="note-flower">✳</span>
@@ -490,7 +566,7 @@ export default function Workspace({
               <h1>{t(titles[view].title)}</h1>
               <p>{t(titles[view].subtitle)}</p>
             </div>
-            {!isTeachingView(view) && view !== "showcase" && (
+            {addButton && (
               <Button
                 size="lg"
                 disabled={loading || busy}
@@ -595,6 +671,21 @@ export default function Workspace({
               {view === "payments" && (
                 <PaymentsView data={data} actions={actions} busy={busy} />
               )}
+              {view === "messages" && (
+                <MessagesView
+                  teacher
+                  store={chatStore}
+                  base={`/workspaces/${connected.id}/messages`}
+                  thread={chat.thread}
+                  student={chat.student}
+                  studentName={
+                    data.students.find((s) => s.id === chat.student)?.name
+                  }
+                  onOpen={(id) => openChat(id, chat.student)}
+                  onClearStudent={() => openChat(chat.thread)}
+                  refreshAt={chatFocus}
+                />
+              )}
               {view === "showcase" && (
                 <ShowcaseView
                   workspaceId={connected.id}
@@ -625,6 +716,12 @@ export default function Workspace({
         busy={busy}
         workspaceId={connected.id}
         focus={notesFocus}
+        onMessages={openStudentChat}
+        messagesUnread={
+          chatStore.threads
+            ?.filter((x) => x.studentId === studentId)
+            .reduce((sum, x) => sum + x.unread, 0) ?? 0
+        }
       />
       {modal && (
         <RecordDialog

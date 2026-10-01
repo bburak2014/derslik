@@ -20,6 +20,7 @@ import { StudentList } from "./teacher/student-list";
 import { CalendarSection } from "./teacher/calendar";
 import { PaymentsSection } from "./teacher/payments";
 import { InboxSection } from "./teacher/inbox";
+import { Conversation, ThreadList } from "./messages";
 import {
   useTeacherScreen,
   type TeacherScreenProps,
@@ -52,6 +53,8 @@ export function TeacherScreen(props: TeacherScreenProps) {
     setLearningFocus,
     setRequests,
     showcaseFocus,
+    messages,
+    setNoticeTick,
     load,
     student,
     title,
@@ -86,6 +89,34 @@ export function TeacherScreen(props: TeacherScreenProps) {
           focus={showcaseFocus}
         />
         {tabBar}
+      </SafeAreaView>
+    );
+  // Mesajlar: liste başlık ve alt çubukla, açık yazışma tüm ekranı alır (yazma
+  // alanı klavyenin üstünde durur). Paylaşılan ScrollView'ın içinde değil.
+  if (tab === "messages" && !student)
+    return (
+      <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
+        {messages.open ? (
+          <Conversation
+            key={messages.open}
+            path={`/workspaces/${access.id}/messages`}
+            linkId={messages.open}
+            initial={messages.threads?.find((x) => x.linkId === messages.open)}
+            onBack={() => messages.setOpen(null)}
+            onUpdate={messages.patch}
+            onRead={() => setNoticeTick((n) => n + 1)}
+          />
+        ) : (
+          <>
+            {header}
+            <ThreadList
+              messages={messages}
+              viewer="OWNER"
+              kicker={access.name}
+            />
+            {tabBar}
+          </>
+        )}
       </SafeAreaView>
     );
   if (tab === "teaching") {
