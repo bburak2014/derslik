@@ -30,9 +30,11 @@ import {
   type VideoReservation,
 } from "@derslik/api-client";
 import {
+  canCancelBooking,
   canEditSubmission,
   dateKey,
   dayLabel,
+  dayTimeLabel,
   isImageName,
   noticeIcon,
   timeAgo,
@@ -49,6 +51,7 @@ import {
   type WorkspaceLimits,
 } from "@derslik/contracts";
 import { request } from "./core";
+import { BookingSheet } from "./booking";
 import {
   Avatar,
   Badge,
@@ -215,6 +218,9 @@ export function LearningScreen({
     } | null>(null),
     [progress, setProgress] = useState<number | null>(null),
     [links, setLinks] = useState<StudentAccessList | null>(null);
+  // Ders ayarlama penceresi ve iptal düğmesinin saati (liste yenilenince ilerler).
+  const [booking, setBooking] = useState(false),
+    [clock, setClock] = useState(() => Date.now());
   // Mesajlar sekmesi yalnızca öğrenci ve velide; portal mesaj uçları Dersler
   // iznini ister. Liste dakikada bir yoklanır, sekme adında okunmamış sayısı.
   const chat = useMessages(
@@ -294,6 +300,7 @@ export function LearningScreen({
         })),
       ]);
       setData(result);
+      setClock(Date.now());
       setCapabilities(status);
       setError("");
     } catch (e) {
@@ -727,6 +734,11 @@ export function LearningScreen({
         {tab === "lessons" && (
           <>
             {/* Öğretmen kendi bağlantısını Takvim sekmesinden alır. */}
+            {student && (data as PortalData).booking?.enabled && (
+              <Button icon="add" onPress={() => setBooking(true)}>
+                {t("booking.book")}
+              </Button>
+            )}
             {!owner && <CalendarFeed />}
             {!data.lessons.length && (
               <EmptyState
@@ -773,6 +785,60 @@ export function LearningScreen({
                         {l.location || t("lesson.noLocation")}
                       </Text>
                     </View>
+                    {!!l.booked_by && (
+                      <View
+                        style={[
+                          styles.row,
+                          { gap: 8, marginTop: 4, flexWrap: "wrap" },
+                        ]}
+                      >
+                        <Badge tone="info" icon="person-outline">
+                          {student
+                            ? t("booking.bookedByYou")
+                            : t("booking.bookedByStudent")}
+                        </Badge>
+                        {student &&
+                          l.status === "SCHEDULED" &&
+                          Date.parse(l.ends_at) > clock &&
+                          (canCancelBooking(
+                            l,
+                            (data as PortalData).booking?.cancelHours ?? 0,
+                            clock,
+                          ) ? (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              icon="close"
+                              disabled={busy}
+                              onPress={() =>
+                                confirmAction(
+                                  t("booking.cancelTitle"),
+                                  t("booking.cancelBody", {
+                                    when: dayTimeLabel(l.starts_at),
+                                  }),
+                                  async () => {
+                                    try {
+                                      await request(
+                                        `${base}/booking/${l.id}/cancel`,
+                                        { version: l.version },
+                                      );
+                                    } finally {
+                                      await reload();
+                                    }
+                                  },
+                                  setError,
+                                )
+                              }
+                            >
+                              {t("booking.cancel")}
+                            </Button>
+                          ) : (
+                            <Text style={styles.caption}>
+                              {t("booking.cancelClosed")}
+                            </Text>
+                          ))}
+                      </View>
+                    )}
                   </View>
                 </View>
               </Card>
@@ -1845,6 +1911,20 @@ export function LearningScreen({
         </View>
       </Modal>
       <FormSheet form={form} onClose={() => setForm(null)} />
+      {student && (
+        <BookingSheet
+          visible={booking}
+          workspaceId={access.id}
+          studentId={studentId}
+          onClose={() => setBooking(false)}
+          onChanged={() => void reload()}
+          onMessage={
+            ((data as PortalData).permissions || []).includes("lessons")
+              ? () => setTab("messages")
+              : undefined
+          }
+        />
+      )}
       {video && (
         <MediaPlayer
           key={video.id}

@@ -134,6 +134,7 @@ export const lessons = app.table(
     version: integer("version").notNull().default(0),
     seriesId: uuid("series_id"),
     remindedAt: timestamp("reminded_at", { withTimezone: true }),
+    bookedBy: uuid("booked_by").references(() => users.id),
     createdAt: createdAt(),
   },
   (t) => [

@@ -34,6 +34,9 @@ export type Lesson = {
   version: number;
   series_id: string | null;
   makeup_for_id?: string | null;
+  /** Dersi öğretmenin boş saatinden ayarlayan öğrenci hesabı; öğretmen
+   *  planladıysa null. */
+  booked_by?: string | null;
   created_at: string;
 };
 export type Payment = {

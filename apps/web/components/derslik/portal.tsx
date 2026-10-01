@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -513,6 +514,11 @@ export function Portal({
         view={current}
         onTabs={setTabs}
         focus={panelFocus}
+        onOpenMessages={
+          tabs.some((x) => x.id === "messages")
+            ? () => openThread(null)
+            : undefined
+        }
         chat={{
           store: chat,
           thread: chatThread,
@@ -651,6 +657,7 @@ export function Portal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Toaster position="bottom-right" richColors closeButton />
     </SidebarProvider>
   );
 }

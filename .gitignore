@@ -179,3 +179,7 @@ apps/mobile/ios/
 # Kod kalitesi analiz çıktıları (pnpm quality:sonar, pnpm quality:dup)
 .scannerwork
 reports/
+
+# Claude Code worktree'leri ve plan yürütme çalışma klasörleri
+/.claude/worktrees/
+/.superpowers/

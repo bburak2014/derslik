@@ -346,10 +346,14 @@ export type PortalLesson = PortalData["lessons"][number];
 export function LessonSchedule({
   lessons,
   children,
+  extra,
 }: {
   lessons: PortalLesson[];
   /** Başlığın yanındaki düğmeler (yenile). */
   children?: React.ReactNode;
+  /** Dersin yanındaki ek öğe (ayarlama etiketi, iptal). `now` bileşenin
+   *  dakikada bir ilerleyen saatidir. */
+  extra?: (lesson: PortalLesson, now: number) => React.ReactNode;
 }) {
   // Süren dersi ve "bugün/yarın" etiketini güncel tutmak için dakikada bir
   // ilerleyen saat; öğretmen günlüğündeki ders satırlarıyla aynı yaklaşım.
@@ -403,6 +407,7 @@ export function LessonSchedule({
               key={l.id}
               lesson={l}
               day={day(l.starts_at)}
+              extra={extra?.(l, clock)}
               chip={
                 i > 0
                   ? undefined
@@ -430,7 +435,13 @@ export function LessonSchedule({
           />
           <ItemGroup className="gap-3">
             {past.map((l) => (
-              <LessonItem key={l.id} lesson={l} day={day(l.starts_at)} status />
+              <LessonItem
+                key={l.id}
+                lesson={l}
+                day={day(l.starts_at)}
+                status
+                extra={extra?.(l, clock)}
+              />
             ))}
           </ItemGroup>
         </>
@@ -444,6 +455,7 @@ export function LessonItem({
   day,
   chip,
   status = false,
+  extra,
 }: {
   lesson: PortalLesson;
   day: string;
@@ -451,6 +463,8 @@ export function LessonItem({
   chip?: string;
   /** Geçmiş derslerde durum rozeti; yaklaşanların hepsi zaten planlı. */
   status?: boolean;
+  /** Satırın sağındaki ek öğe (ör. ayarlama etiketi ve iptal). */
+  extra?: React.ReactNode;
 }) {
   return (
     <Item
@@ -479,8 +493,8 @@ export function LessonItem({
           {l.location || t("lesson.noLocation")}
         </ItemDescription>
       </ItemContent>
-      {(chip || status) && (
-        <ItemActions className="ml-auto">
+      {(chip || status || extra) && (
+        <ItemActions className="ml-auto flex-wrap justify-end">
           {chip && <span className="now-chip">{chip}</span>}
           {status && (
             <ToneBadge
@@ -501,6 +515,7 @@ export function LessonItem({
                   : t("lesson.cancelled")}
             </ToneBadge>
           )}
+          {extra}
         </ItemActions>
       )}
     </Item>

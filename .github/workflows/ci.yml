@@ -34,6 +34,8 @@ jobs:
         run: pnpm test
       - name: Media config tests
         run: node --test tests/media-config.test.mjs
+      - name: Booking rules tests
+        run: pnpm test:booking
       - name: Architecture tests
         run: pnpm test:architecture
       - name: Web build

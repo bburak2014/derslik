@@ -15,6 +15,10 @@ import type {
   TeacherRelations,
 } from "../../contracts/src/directory.ts";
 import { getLocale, t } from "../../contracts/src/i18n/index.ts";
+import type {
+  BookingPolicy,
+  BookingSettings,
+} from "../../contracts/src/booking.ts";
 
 export class ApiError extends Error {
   constructor(
@@ -198,6 +202,18 @@ export class DerslikClient {
       { method: "POST", body: decision === "decline" ? { note } : {} },
     );
   }
+  // --- Ders ayarlama (öğretmen) ----------------------------------------
+  booking(ws: string) {
+    return this.request<{ data: BookingSettings }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/booking`,
+    );
+  }
+  saveBooking(ws: string, body: BookingSettings) {
+    return this.request<{ data: BookingSettings }>(
+      `/v1/workspaces/${encodeURIComponent(ws)}/booking`,
+      { method: "PUT", body },
+    );
+  }
 }
 
 export type TeacherPage = {
@@ -297,6 +313,8 @@ export type PortalData = LearningData & {
   lessons: WorkspaceData["lessons"];
   packages: WorkspaceData["packages"];
   payments: WorkspaceData["payments"];
+  /** Öğretmenin ders ayarlama özeti; ayar hiç kaydedilmemişse null. */
+  booking: BookingPolicy;
 };
 // Media and invitation responses, as the API's `data` field returns them.
 export type MediaCapabilities = { files: boolean; videos: boolean };

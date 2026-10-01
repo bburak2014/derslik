@@ -158,7 +158,7 @@ export class LearningService {
     const result: Record<string, unknown> = {};
     const queries = {
       lessons:
-        "SELECT id,student_id,topic,starts_at,ends_at,location,status,version,makeup_for_id FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
+        "SELECT id,student_id,topic,starts_at,ends_at,location,status,version,makeup_for_id,booked_by FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
       assignments:
         "SELECT * FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 ORDER BY due_on DESC,id",
       submissions:
@@ -207,14 +207,24 @@ export class LearningService {
           )
         ).rows[0];
         if (!link) throw new ForbiddenException("api.portalAccessNotFound");
+        // Ders ayarlama özeti: "Ders ayarla" düğmesi ve iptal süresi için.
+        const policy = (
+          await tx.query(
+            "SELECT enabled,cancel_hours FROM derslik.booking_policy($1)",
+            [ws],
+          )
+        ).rows[0];
         const data = await this.read(tx, ws, student);
         return rawDto({
           ...data,
           student: person,
           ...link,
+          booking: policy
+            ? { enabled: policy.enabled, cancelHours: policy.cancel_hours }
+            : null,
           lessons: (
             await tx.query(
-              "SELECT id,student_id,topic,starts_at,ends_at,location,status,version,makeup_for_id FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
+              "SELECT id,student_id,topic,starts_at,ends_at,location,status,version,makeup_for_id,booked_by FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
               [ws, student],
             )
           ).rows,
