@@ -6,6 +6,7 @@ import { DerslikClient, ApiError, type Access } from "@derslik/api-client";
 import { isMessageKey, translate } from "@derslik/contracts";
 import { serverLocale } from "./locale";
 import { clientIp } from "./client-ip";
+import { AUTH_COOKIE, authCookieOptions } from "./auth-cookies";
 
 export function configured() {
   return !!(
@@ -109,22 +110,18 @@ export async function authClient() {
     process.env.SUPABASE_PUBLISHABLE_KEY!,
     {
       global: { headers: ip ? { "sb-forwarded-for": ip } : {} },
-      cookieOptions: {
-        httpOnly: true,
-        secure: process.env.APP_ORIGIN!.startsWith("https:"),
-        sameSite: "lax",
-        path: "/",
-      },
+      cookieOptions: authCookieOptions(),
       cookies: {
         getAll: () => jar.getAll(),
         setAll: (items) => {
-          for (const { name, value, options } of items)
-            jar.set(name, value, {
-              ...options,
-              httpOnly: true,
-              sameSite: "lax",
-              secure: process.env.APP_ORIGIN!.startsWith("https:"),
-            });
+          try {
+            for (const { name, value, options } of items)
+              jar.set(name, value, authCookieOptions(options));
+          } catch {
+            // Server Component çerez yazamaz. Sayfa isteklerinde oturum
+            // proxy.ts'de çizimden önce yenilendiği için burada yazılacak
+            // bir şey kalmaz; route handler'lar yazmaya devam eder.
+          }
         },
       },
     },
@@ -136,7 +133,7 @@ export async function authClient() {
 export async function hasSessionCookie() {
   return (await cookies())
     .getAll()
-    .some((c) => /^sb-.+-auth-token(\.\d+)?$/.test(c.name));
+    .some((c) => AUTH_COOKIE.test(c.name));
 }
 export async function serverSession() {
   const auth = await authClient();
