@@ -42,6 +42,9 @@ export type LearningPanelProps = {
   /** Bildirimden gelinen kayıt: görünür olunca kaydırılıp kısa süre
    *  vurgulanır. `at` her tıklamada değişir. */
   focus?: { id: string | null; at: number };
+  /** Portalda Mesajlar sayfasını açar; boşta hak yokken "Öğretmeninize
+   *  yazın" bağlantısı bunu kullanır. */
+  onOpenMessages?: () => void;
   /** Portalın Mesajlar sekmesi: yazışma listesi ve adresteki açık yazışma.
    *  Öğretmenin öğrenci panelinde bu sekme yoktur. */
   chat?: Omit<React.ComponentProps<typeof MessagesView>, "base" | "teacher">;

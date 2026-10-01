@@ -28,6 +28,7 @@ import {
   type LearningPanelProps,
 } from "./learning/use-learning-panel";
 import { ActionForm, ConfirmDialog, LessonSchedule } from "./learning/shared";
+import { BookButton, BookedLessonExtra } from "./learning/booking";
 
 // Dışarıdan kullanılan adlar; eski içe aktarma yolları çalışmaya devam etsin.
 export {
@@ -133,7 +134,15 @@ export function LearningPanel(props: LearningPanelProps) {
           </Alert>
         )}
       {tab === "lessons" && "lessons" in data && (
-        <LessonSchedule lessons={data.lessons}>
+        <LessonSchedule
+          lessons={data.lessons}
+          extra={(lesson, now) =>
+            lesson.booked_by ? (
+              <BookedLessonExtra ctx={ctx} lesson={lesson} now={now} />
+            ) : null
+          }
+        >
+          <BookButton ctx={ctx} onOpenMessages={props.onOpenMessages} />
           {view && refresh}
           {/* Öğretmen kendi takvimini Takvim sayfasından bağlar. */}
           {!owner && <CalendarFeedButton />}
