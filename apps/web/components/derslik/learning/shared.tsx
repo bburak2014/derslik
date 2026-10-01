@@ -251,7 +251,9 @@ export type LearningTab =
   | "videos"
   | "notes"
   | "payments"
-  | "access";
+  | "access"
+  /** Öğretmenle yazışma; yalnızca öğrenci ve velide. */
+  | "messages";
 
 export type LearningTabInfo = { id: LearningTab; title: string };
 
@@ -271,6 +273,12 @@ export function learningTabs(
           {
             id: "lessons" as const,
             title: t("nav.lessons"),
+            permission: "lessons",
+          },
+          // Mesaj rotaları portalda "lessons" iznini ister.
+          {
+            id: "messages" as const,
+            title: t("nav.messages"),
             permission: "lessons",
           },
         ]),

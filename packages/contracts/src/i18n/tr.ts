@@ -81,6 +81,11 @@ export const tr = {
     makeupPickCancelled:
       "Telafi için aynı öğrenciye ait iptal edilmiş bir ders seçin.",
     makeupSingle: "Telafi dersi tek seferlik olmalı.",
+    messageClosed: "Bu yazışmaya mesaj gönderilemez.",
+    messageInvalid: "Mesaj boş olamaz ve en fazla 2000 karakter olabilir.",
+    messageNotFound: "Yazışma bulunamadı.",
+    messageRateLimit:
+      "Çok hızlı mesaj gönderiyorsunuz. Biraz bekleyip yeniden deneyin.",
     noStudentAccess: "Bu öğrenci için erişiminiz yok.",
     noWorkspaceAccess: "Bu çalışma alanına erişiminiz yok.",
     noteChanged: "Not başka bir işlemde değişti. Güncel sürümü yükleyin.",
@@ -256,6 +261,59 @@ export const tr = {
     },
     thisWeek: "Bu haftanın dersleri",
     week: "Hafta",
+  },
+  chat: {
+    back: "Yazışmalar",
+    childThread: "{student} ile öğretmen",
+    closed: "Bu kişinin erişimi kaldırıldı; yeni mesaj gönderilemez.",
+    count: "{count} / 2000",
+    emptyPortal: "Öğretmeninizle yazışmanız burada görünür.",
+    emptyTeacherText:
+      "Bir öğrenciye ya da veliye erişim verdiğinizde onunla buradan yazışabilirsiniz.",
+    emptyTeacherTitle: "Henüz yazışabileceğiniz kimse yok",
+    emptyThread: "Henüz mesaj yok. İlk mesajı siz yazın.",
+    failed: "Mesaj gönderilemedi. Yeniden deneyin.",
+    guardianOf: "{student} velisi",
+    hideClosed: "Kapalı yazışmaları gizle",
+    messageStudent: "Mesajlar",
+    noAccount:
+      "Bu öğrencinin bağlı hesabı yok. Yazışmak için önce erişim verin.",
+    noResults: "Aramanızla eşleşen yazışma yok.",
+    older: "Önceki mesajlar",
+    onlyUnread: "Okunmamışlar",
+    pick: "Bir yazışma seçin.",
+    placeholder: "Mesajınızı yazın",
+    privacy: "Telefon numaraları paylaşılmaz.",
+    readOnly:
+      "Bu yazışma öğrenciyle öğretmen arasında; yalnızca okuyabilirsiniz.",
+    readersNone: "Bu yazışmayı yalnızca siz ve karşınızdaki kişi görür.",
+    readersStudent: {
+      one: "Velinizin hesabı da bu yazışmayı okuyabilir, önceki mesajlar dahil.",
+      other:
+        "{count} veli hesabı da bu yazışmayı okuyabilir, önceki mesajlar dahil.",
+    },
+    readersTeacher: {
+      one: "Öğrencinin velisi de bu yazışmayı okuyabilir, önceki mesajlar dahil.",
+      other:
+        "Öğrencinin {count} velisi de bu yazışmayı okuyabilir, önceki mesajlar dahil.",
+    },
+    search: "Ada göre ara",
+    send: "Gönder",
+    showClosed: {
+      one: "{count} kapalı yazışmayı göster",
+      other: "{count} kapalı yazışmayı göster",
+    },
+    someone: "Önceki katılımcı",
+    subtitleGuardian: "Öğretmenle uygulama içinden yazışın.",
+    subtitleStudent: "Öğretmeninizle uygulama içinden yazışın.",
+    subtitleTeacher:
+      "Öğrencileriniz ve velileriyle telefon numarası paylaşmadan yazışın.",
+    title: "Mesajlar",
+    unread: {
+      one: "{count} yeni mesaj",
+      other: "{count} yeni mesaj",
+    },
+    you: "Siz",
   },
   common: {
     actions: "İşlemler",
@@ -867,6 +925,7 @@ export const tr = {
     calendar: "Ders takvimi",
     files: "PDF ve dosyalar",
     lessons: "Dersler",
+    messages: "Mesajlar",
     notes: "Paylaşımlar",
     overview: "Genel bakış",
     payments: "Tahsilatlar",
@@ -882,6 +941,9 @@ export const tr = {
     answered: "Sorunuz yanıtlandı",
     answeredBody: "Video sorunuzun yanıtını görebilirsiniz.",
     assignmentNew: "Yeni ödev",
+    messageFromGuardian: "Veliden yeni mesaj",
+    messageFromStudent: "Öğrenciden yeni mesaj",
+    messageFromTeacher: "Öğretmeninizden yeni mesaj",
     question: "Videoda yeni soru",
     questionBody: "Zaman damgalı soruyu yanıtlayabilirsiniz.",
     reviewed: "Ödev değerlendirildi",

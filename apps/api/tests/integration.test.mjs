@@ -2,6 +2,7 @@ import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
 import { calendarCases } from "./calendar-cases.mjs";
+import { messagingCases } from "./messaging-cases.mjs";
 import { accessCases } from "./access-cases.mjs";
 import { securityCases } from "./security-cases.mjs";
 import { securityRegressions } from "./security-regressions.mjs";
@@ -159,6 +160,9 @@ test(
         LEMONSQUEEZY_VARIANT_ID: "456",
         LEMONSQUEEZY_WEBHOOK_SECRET: randomUUID(),
         LEMONSQUEEZY_TEST_MODE: "true",
+        // Mesaj sınırı kendi testinde, sınırlı ayrı bir uygulamayla denenir;
+        // mesajlaşma testleri bir hesaptan dakikada 30'dan fazla mesaj yollar.
+        RATE_LIMIT_MESSAGES_PER_MINUTE: "0",
         ...(fixtureOnly
           ? {
               RATE_LIMIT_USER_PER_MINUTE: "60000",
@@ -852,6 +856,16 @@ test(
         tokenB,
         sessionBody,
       });
+      await messagingCases({
+        t,
+        config,
+        admin,
+        request,
+        ok,
+        token,
+        tokenB,
+        verifiedUsers,
+      });
       await accessCases({
         t,
         app,
@@ -863,6 +877,7 @@ test(
         tokenB,
         tokenStudent,
         actorA,
+        actorStudent,
       });
       await securityCases({
         t,

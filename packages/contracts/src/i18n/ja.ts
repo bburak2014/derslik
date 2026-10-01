@@ -85,6 +85,12 @@ export const ja: Messages = {
     makeupPickCancelled:
       "振替には、同じ生徒のキャンセル済みの授業を選んでください。",
     makeupSingle: "振替授業は 1 回のみの授業にしてください。",
+    messageClosed: "このやり取りではメッセージを送信できません。",
+    messageInvalid:
+      "メッセージは空にできません。2000 文字以内で入力してください。",
+    messageNotFound: "やり取りが見つかりません。",
+    messageRateLimit:
+      "メッセージの送信が速すぎます。少し待ってから、もう一度お試しください。",
     noStudentAccess: "この生徒へのアクセス権がありません。",
     noWorkspaceAccess: "このワークスペースへのアクセス権がありません。",
     noteChanged:
@@ -262,6 +268,56 @@ export const ja: Messages = {
     },
     thisWeek: "今週の授業",
     week: "週",
+  },
+  chat: {
+    back: "やり取り一覧",
+    childThread: "{student} さんと講師",
+    closed:
+      "この方のアクセス権は削除されたため、新しいメッセージは送信できません。",
+    count: "{count} / 2000",
+    emptyPortal: "講師とのやり取りがここに表示されます。",
+    emptyTeacherText:
+      "生徒または保護者にアクセス権を付与すると、ここでメッセージをやり取りできます。",
+    emptyTeacherTitle: "まだメッセージを送れる相手がいません",
+    emptyThread:
+      "まだメッセージはありません。最初のメッセージを送ってください。",
+    failed: "メッセージを送信できませんでした。もう一度お試しください。",
+    guardianOf: "{student} さんの保護者",
+    hideClosed: "終了したやり取りを隠す",
+    messageStudent: "メッセージ",
+    noAccount:
+      "この生徒には連携済みのアカウントがまだありません。メッセージをやり取りするには、先にアクセス権を付与してください。",
+    noResults: "検索に一致するやり取りはありません。",
+    older: "以前のメッセージ",
+    onlyUnread: "未読",
+    pick: "やり取りを選択してください。",
+    placeholder: "メッセージを入力",
+    privacy: "電話番号は共有されません。",
+    readOnly: "このやり取りは生徒と講師の間のものです。閲覧のみ可能です。",
+    readersNone: "このやり取りは、あなたと相手の方だけが見られます。",
+    readersStudent: {
+      other:
+        "保護者のアカウント {count} 件もこのやり取りを閲覧できます（以前のメッセージを含む）。",
+    },
+    readersTeacher: {
+      other:
+        "生徒の保護者 {count} 名もこのやり取りを閲覧できます（以前のメッセージを含む）。",
+    },
+    search: "名前で検索",
+    send: "送信",
+    showClosed: {
+      other: "終了したやり取り {count} 件を表示",
+    },
+    someone: "以前の参加者",
+    subtitleGuardian: "アプリ内で講師とメッセージをやり取りできます。",
+    subtitleStudent: "アプリ内で講師とメッセージをやり取りできます。",
+    subtitleTeacher:
+      "電話番号を共有せずに、生徒や保護者とメッセージをやり取りできます。",
+    title: "メッセージ",
+    unread: {
+      other: "新着メッセージ {count} 件",
+    },
+    you: "あなた",
   },
   common: {
     actions: "操作",
@@ -858,6 +914,7 @@ export const ja: Messages = {
     calendar: "授業カレンダー",
     files: "PDF・ファイル",
     lessons: "授業",
+    messages: "メッセージ",
     notes: "共有",
     overview: "概要",
     payments: "入金",
@@ -873,6 +930,9 @@ export const ja: Messages = {
     answered: "質問に回答がありました",
     answeredBody: "動画への質問の回答を確認できます。",
     assignmentNew: "新しい課題",
+    messageFromGuardian: "保護者から新しいメッセージ",
+    messageFromStudent: "生徒から新しいメッセージ",
+    messageFromTeacher: "講師から新しいメッセージ",
     question: "動画に新しい質問",
     questionBody: "タイムスタンプ付きの質問に回答できます。",
     reviewed: "課題が評価されました",

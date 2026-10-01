@@ -85,6 +85,12 @@ export const en: Messages = {
     makeupPickCancelled:
       "For a makeup lesson, choose a cancelled lesson of the same student.",
     makeupSingle: "A makeup lesson must be a one-off lesson.",
+    messageClosed: "You can't send messages in this conversation.",
+    messageInvalid:
+      "A message can't be empty and can be at most 2000 characters.",
+    messageNotFound: "Conversation not found.",
+    messageRateLimit:
+      "You're sending messages too quickly. Wait a moment and try again.",
     noStudentAccess: "You don't have access to this student.",
     noWorkspaceAccess: "You don't have access to this workspace.",
     noteChanged: "The note was changed elsewhere. Load the latest version.",
@@ -264,6 +270,59 @@ export const en: Messages = {
     },
     thisWeek: "This week's lessons",
     week: "Week",
+  },
+  chat: {
+    back: "Conversations",
+    childThread: "{student} and the teacher",
+    closed: "This person no longer has access, so you can't send new messages.",
+    count: "{count} / 2000",
+    emptyPortal: "Your conversation with the teacher appears here.",
+    emptyTeacherText:
+      "Once you give a student or guardian access, you can message them here.",
+    emptyTeacherTitle: "No one to message yet",
+    emptyThread: "No messages yet. Write the first one.",
+    failed: "The message wasn't sent. Try again.",
+    guardianOf: "Guardian of {student}",
+    hideClosed: "Hide closed conversations",
+    messageStudent: "Messages",
+    noAccount:
+      "This student has no linked account yet. Give access first to start messaging.",
+    noResults: "No conversations match your search.",
+    older: "Earlier messages",
+    onlyUnread: "Unread",
+    pick: "Choose a conversation.",
+    placeholder: "Write a message",
+    privacy: "Phone numbers aren't shared.",
+    readOnly:
+      "This conversation is between the student and the teacher; you can only read it.",
+    readersNone: "Only you and the other person can see this conversation.",
+    readersStudent: {
+      one: "Your guardian's account can also read this conversation, earlier messages included.",
+      other:
+        "{count} guardian accounts can also read this conversation, earlier messages included.",
+    },
+    readersTeacher: {
+      one: "The student's guardian can also read this conversation, earlier messages included.",
+      other:
+        "{count} of the student's guardians can also read this conversation, earlier messages included.",
+    },
+    search: "Search by name",
+    send: "Send",
+    showClosed: {
+      one: "Show {count} closed conversation",
+      other: "Show {count} closed conversations",
+    },
+    someone: "Former participant",
+    subtitleGuardian: "Message the teacher inside the app.",
+    subtitleStudent: "Message your teacher inside the app.",
+    subtitleTeacher:
+      "Message your students and their guardians without sharing phone numbers.",
+    title: "Messages",
+    unread: {
+      one: "{count} new message",
+      other: "{count} new messages",
+    },
+    you: "You",
   },
   common: {
     actions: "Actions",
@@ -882,6 +941,7 @@ export const en: Messages = {
     calendar: "Lesson calendar",
     files: "PDFs and files",
     lessons: "Lessons",
+    messages: "Messages",
     notes: "Shared notes",
     overview: "Overview",
     payments: "Payments",
@@ -897,6 +957,9 @@ export const en: Messages = {
     answered: "Your question was answered",
     answeredBody: "You can now see the answer to your video question.",
     assignmentNew: "New assignment",
+    messageFromGuardian: "New message from a guardian",
+    messageFromStudent: "New message from a student",
+    messageFromTeacher: "New message from your teacher",
     question: "New question on a video",
     questionBody: "You can answer the time-stamped question.",
     reviewed: "Assignment reviewed",

@@ -22,6 +22,7 @@ import { NotesTab } from "./learning/notes-tab";
 import { VideosTab } from "./learning/videos-tab";
 import { FilesTab } from "./learning/files-tab";
 import { AssignmentsTab } from "./learning/assignments-tab";
+import { MessagesView } from "./messages";
 import {
   useLearningPanel,
   type LearningPanelProps,
@@ -144,6 +145,12 @@ export function LearningPanel(props: LearningPanelProps) {
       {tab === "notes" && <NotesTab ctx={ctx} />}
       {tab === "payments" && "packages" in data && <PaymentsTab ctx={ctx} />}
       {tab === "access" && owner && <AccessTab ctx={ctx} />}
+      {tab === "messages" && !owner && props.chat && (
+        <MessagesView
+          base={`/portal/${props.workspaceId}/${props.studentId}/messages`}
+          {...props.chat}
+        />
+      )}
       <ActionForm
         key={form?.title || "closed"}
         spec={form}

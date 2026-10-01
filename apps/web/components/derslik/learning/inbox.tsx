@@ -22,6 +22,7 @@ import {
   CheckCheck,
   ChevronRight,
   ClipboardList,
+  MessageCircle,
   MessageSquare,
   Sparkles,
   Video as VideoIcon,
@@ -66,6 +67,7 @@ const noticeIcons: Record<NoticeIcon, React.ReactNode> = {
   summary: <Sparkles />,
   assignment: <ClipboardList />,
   lesson: <CalendarDays />,
+  message: <MessageCircle />,
   other: <Bell />,
 };
 
@@ -123,17 +125,23 @@ export function AccountExtras({
   const unread = inbox.filter((n) => !n.readAt).length;
   // Zildeki sayaç için liste sayfa açılışında bir kez sessizce alınır; hata
   // olursa zil sayaçsız kalır, panel açıldığında yeniden denenir.
+  // Bir yazışma okununca mesajlar görünümü "derslik:inbox" olayı gönderir;
+  // o yazışmanın bildirimi sunucuda okundu sayıldığı için sayaç yenilenir.
   useEffect(() => {
     let alive = true;
-    backend<{ data: Notice[] }>("/inbox")
-      .then((r) => {
-        if (!alive) return;
-        setInbox(r.data);
-        setNow(Date.now());
-      })
-      .catch(() => {});
+    const load = () =>
+      backend<{ data: Notice[] }>("/inbox")
+        .then((r) => {
+          if (!alive) return;
+          setInbox(r.data);
+          setNow(Date.now());
+        })
+        .catch(() => {});
+    void load();
+    window.addEventListener("derslik:inbox", load);
     return () => {
       alive = false;
+      window.removeEventListener("derslik:inbox", load);
     };
   }, []);
   // İki istek paralel çalışır; panel son düzeni tutan bir iskeletle açılır.

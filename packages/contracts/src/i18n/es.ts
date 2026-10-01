@@ -91,6 +91,12 @@ export const es: Messages = {
     makeupPickCancelled:
       "Para recuperar, elige una clase cancelada del mismo alumno.",
     makeupSingle: "Una clase de recuperación debe ser única, no recurrente.",
+    messageClosed: "No puedes enviar mensajes en esta conversación.",
+    messageInvalid:
+      "Un mensaje no puede estar vacío y puede tener como máximo 2000 caracteres.",
+    messageNotFound: "No se encontró la conversación.",
+    messageRateLimit:
+      "Estás enviando mensajes demasiado rápido. Espera un momento y vuelve a intentarlo.",
     noStudentAccess: "No tienes acceso a este alumno.",
     noWorkspaceAccess: "No tienes acceso a este espacio de trabajo.",
     noteChanged:
@@ -274,6 +280,60 @@ export const es: Messages = {
     },
     thisWeek: "Clases de esta semana",
     week: "Semana",
+  },
+  chat: {
+    back: "Conversaciones",
+    childThread: "{student} y el profesor",
+    closed:
+      "Esta persona ya no tiene acceso; no se pueden enviar mensajes nuevos.",
+    count: "{count} / 2000",
+    emptyPortal: "Tu conversación con el profesor aparece aquí.",
+    emptyTeacherText:
+      "Cuando des acceso a un alumno o a una familia, podrás escribirle aquí.",
+    emptyTeacherTitle: "Todavía no hay nadie a quien escribir",
+    emptyThread: "Todavía no hay mensajes. Escribe el primero.",
+    failed: "No se pudo enviar el mensaje. Vuelve a intentarlo.",
+    guardianOf: "Familia de {student}",
+    hideClosed: "Ocultar conversaciones cerradas",
+    messageStudent: "Mensajes",
+    noAccount:
+      "Este alumno todavía no tiene una cuenta vinculada. Da acceso primero para empezar a escribirle.",
+    noResults: "Ninguna conversación coincide con tu búsqueda.",
+    older: "Mensajes anteriores",
+    onlyUnread: "No leídos",
+    pick: "Elige una conversación.",
+    placeholder: "Escribe un mensaje",
+    privacy: "Los números de teléfono no se comparten.",
+    readOnly:
+      "Esta conversación es entre el alumno y el profesor; solo puedes leerla.",
+    readersNone: "Esta conversación solo la ven tú y la otra persona.",
+    readersStudent: {
+      one: "La cuenta de tu familia también puede leer esta conversación, incluidos los mensajes anteriores.",
+      other:
+        "{count} cuentas de familia también pueden leer esta conversación, incluidos los mensajes anteriores.",
+    },
+    readersTeacher: {
+      one: "La familia del alumno también puede leer esta conversación, incluidos los mensajes anteriores.",
+      other:
+        "{count} cuentas de la familia del alumno también pueden leer esta conversación, incluidos los mensajes anteriores.",
+    },
+    search: "Buscar por nombre",
+    send: "Enviar",
+    showClosed: {
+      one: "Mostrar {count} conversación cerrada",
+      other: "Mostrar {count} conversaciones cerradas",
+    },
+    someone: "Antiguo participante",
+    subtitleGuardian: "Escribe al profesor desde la aplicación.",
+    subtitleStudent: "Escribe a tu profesor desde la aplicación.",
+    subtitleTeacher:
+      "Escribe a tus alumnos y a sus familias sin compartir números de teléfono.",
+    title: "Mensajes",
+    unread: {
+      one: "{count} mensaje nuevo",
+      other: "{count} mensajes nuevos",
+    },
+    you: "Tú",
   },
   common: {
     actions: "Acciones",
@@ -902,6 +962,7 @@ export const es: Messages = {
     calendar: "Calendario de clases",
     files: "PDF y archivos",
     lessons: "Clases",
+    messages: "Mensajes",
     notes: "Compartido",
     overview: "Resumen general",
     payments: "Cobros",
@@ -917,6 +978,9 @@ export const es: Messages = {
     answered: "Han respondido a tu pregunta",
     answeredBody: "Ya puedes ver la respuesta a tu pregunta sobre el vídeo.",
     assignmentNew: "Nueva tarea",
+    messageFromGuardian: "Nuevo mensaje de una familia",
+    messageFromStudent: "Nuevo mensaje de un alumno",
+    messageFromTeacher: "Nuevo mensaje de tu profesor",
     question: "Nueva pregunta en un vídeo",
     questionBody: "Puedes responder a la pregunta con marca de tiempo.",
     reviewed: "Tarea corregida",
