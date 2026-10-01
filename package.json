@@ -46,6 +46,7 @@
     "mobile:clear": "node scripts/sync-env.mjs && pnpm --filter @derslik/mobile start --clear",
     "services:check": "node scripts/check-services.mjs",
     "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
+    "test:booking": "node --experimental-strip-types --test tests/booking-rules.test.mjs",
     "quality:sonar": "node scripts/sonar.mjs",
     "quality:dup": "npx -y jscpd@4",
     "security:code": "bash scripts/security-scan.sh code",
