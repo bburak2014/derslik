@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton, Spinner } from "./loading";
+import { Spinner } from "./loading";
 import { FormError, FormSuccess } from "./feedback";
 import { ConfirmDialog, type Confirmation } from "./learning/shared";
 
@@ -46,6 +46,8 @@ export function CalendarFeedButton({
     [notice, setNotice] = useState(""),
     [copied, setCopied] = useState(false),
     [busy, setBusy] = useState(false),
+    // Bağlantı istenirken düğme döner; pencere bağlantı gelince açılır.
+    [opening, setOpening] = useState(false),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const links = url ? calendarLinks(url) : null;
@@ -92,21 +94,29 @@ export function CalendarFeedButton({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) return;
+        if (!next) {
+          setOpen(false);
+          return;
+        }
+        if (opening) return;
         setError("");
         setNotice("");
         setCopied(false);
         // Bağlantı başka bir cihazda yenilenmiş olabilir; her açılışta
         // güncelini alır (istek aynı bağlantıyı döndürür, yenisini üretmez).
-        // Eskisi o sırada gösterilmez: kopyalanamaz, yenilemeyle yarışmaz.
+        // Pencere bağlantı gelince açılır: baştan son boyutundadır, yüklenince
+        // büyüyüp kaymaz; eski bağlantı hiç gösterilmez.
         setUrl("");
-        void load();
+        setOpening(true);
+        void load().finally(() => {
+          setOpening(false);
+          setOpen(true);
+        });
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size={size}>
-          <CalendarSync /> {t("calendar.feedButton")}
+        <Button type="button" variant="outline" size={size} disabled={opening}>
+          {opening ? <Spinner /> : <CalendarSync />} {t("calendar.feedButton")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -207,14 +217,8 @@ export function CalendarFeedButton({
               </li>
             </ul>
           </div>
-        ) : error ? (
-          <FormError>{error}</FormError>
         ) : (
-          <div className="grid gap-3" aria-hidden="true">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-48" />
-          </div>
+          <FormError>{error}</FormError>
         )}
         {links && (
           <DialogFooter className="sm:justify-start">
