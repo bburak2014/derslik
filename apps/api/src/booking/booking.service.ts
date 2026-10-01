@@ -1,16 +1,47 @@
-import { ConflictException, Injectable } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import type { PoolClient } from "pg";
 import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
+import { CommandService, toDto } from "../common/command.service.js";
+import { RateLimiter } from "../common/rate-limit.js";
 import { ISTANBUL_TODAY } from "../learning/learning.service.js";
 import { istanbulDay } from "../lessons/lessons.service.js";
 import {
+  bookLessonSchema,
   bookingSettingsSchema,
+  cancelBookingSchema,
   defaultBookingSettings,
   minutesOf,
   timeOf,
   type BookingSettings,
 } from "../../../../packages/contracts/src/booking.js";
+
+/** Veritabanı fonksiyonlarının (book_lesson, cancel_booking) HINT değerleri
+ *  ve karşılıkları olan çeviri anahtarlı HTTP hataları. */
+const BOOKING_ERRORS: Record<string, () => Error> = {
+  archived: () => new ConflictException("api.studentArchived"),
+  disabled: () => new ConflictException("api.bookingDisabled"),
+  slot: () => new ConflictException("api.bookingSlotTaken"),
+  credits: () => new ConflictException("api.bookingNoCredits"),
+  notFound: () => new NotFoundException("api.lessonNotFound"),
+  notBooked: () => new ConflictException("api.bookingNotYours"),
+  state: () => new ConflictException("api.lessonStateInvalid"),
+  changed: () => new ConflictException("api.lessonChanged"),
+  deadline: () => new ConflictException("api.bookingCancelClosed"),
+};
+function bookingError(error: unknown) {
+  const { code, hint } = error as { code?: string; hint?: string };
+  if (code === "42501") return new ForbiddenException("api.noStudentAccess");
+  // Son güvence (teacher_calendar_no_overlap); takvim kilidi varken beklenmez.
+  if (code === "23P01") return new ConflictException("api.bookingSlotTaken");
+  const known = code === "P0001" && hint ? BOOKING_ERRORS[hint] : undefined;
+  return known ? known() : error;
+}
 
 /** Öğretmenin ayarları; hiç kaydedilmemişse varsayılanlar (sürüm 0).
  *  Bitişi geçmiş kapalı günler gelmez. */
@@ -53,9 +84,32 @@ async function readSettings(
   };
 }
 
+/** Boş saatler yalnızca öğrencinin kendi hesabına açılır; veli ve öğretmen
+ *  portal kontrolünden geçse de burada durur. */
+async function assertBookingStudent(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+) {
+  const allowed = (
+    await tx.query("SELECT derslik.booking_student($1,$2) AS ok", [
+      ws,
+      student,
+    ])
+  ).rows[0].ok;
+  if (!allowed) throw new ForbiddenException("api.noStudentAccess");
+}
+
 @Injectable()
 export class BookingService {
-  constructor(private readonly db: DatabaseService) {}
+  // Ders ayarlama ve iptal: kullanıcı başına dakikada 10 istek. Ayarla-iptal
+  // döngüsü öğretmenin gelen kutusunu dolduramaz.
+  private readonly limiter = new RateLimiter(10);
+
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly commands: CommandService,
+  ) {}
 
   settings(actor: Actor, ws: string) {
     return this.db.transaction(actor, ws, async (tx) => ({
@@ -129,5 +183,113 @@ export class BookingService {
       );
       return { data: await readSettings(tx, ws) };
     });
+  }
+
+  /** Öğrencinin boş saatleri, süre, yer ve boştaki hak. Ayarlama kapalıysa 409. */
+  slots(actor: Actor, ws: string, student: string) {
+    return this.db.portalTransaction(
+      actor,
+      ws,
+      student,
+      "lessons",
+      async (tx) => {
+        await assertBookingStudent(tx, ws, student);
+        const policy = (
+          await tx.query(
+            "SELECT enabled,duration_minutes,cancel_hours,location FROM derslik.booking_policy($1)",
+            [ws],
+          )
+        ).rows[0];
+        if (!policy?.enabled)
+          throw new ConflictException("api.bookingDisabled");
+        const slots = (
+          await tx.query(
+            "SELECT starts_at,ends_at FROM derslik.open_slots($1,$2)",
+            [ws, student],
+          )
+        ).rows;
+        const credits = (
+          await tx.query("SELECT derslik.free_credits($1,$2) AS n", [
+            ws,
+            student,
+          ])
+        ).rows[0].n;
+        return {
+          data: toDto({
+            duration_minutes: policy.duration_minutes,
+            location: policy.location,
+            cancel_hours: policy.cancel_hours,
+            free_credits: credits,
+            slots,
+          }),
+        };
+      },
+      true,
+    );
+  }
+
+  /** Boş saate ders ayarlar; tekrar edilen anahtar aynı dersi döndürür. */
+  book(actor: Actor, ws: string, student: string, key: string, input: unknown) {
+    this.limiter.check(actor.id);
+    const c = bookLessonSchema.parse(input);
+    return this.commands.run(
+      actor,
+      ws,
+      key,
+      { action: "lesson.book", studentId: student, startsAt: c.startsAt },
+      async (tx) => {
+        try {
+          const data = (
+            await tx.query("SELECT derslik.book_lesson($1,$2,$3) AS data", [
+              ws,
+              student,
+              c.startsAt,
+            ])
+          ).rows[0].data;
+          return { data, audit: { startsAt: data.starts_at } };
+        } catch (error) {
+          throw bookingError(error);
+        }
+      },
+      { studentId: student, permission: "lessons", write: true },
+    );
+  }
+
+  /** Öğrencinin kendi ayarladığı dersi iptal eder. */
+  cancel(
+    actor: Actor,
+    ws: string,
+    student: string,
+    lesson: string,
+    key: string,
+    input: unknown,
+  ) {
+    this.limiter.check(actor.id);
+    const c = cancelBookingSchema.parse(input);
+    return this.commands.run(
+      actor,
+      ws,
+      key,
+      {
+        action: "lesson.cancelBooking",
+        studentId: student,
+        id: lesson,
+        version: c.version,
+      },
+      async (tx) => {
+        try {
+          const data = (
+            await tx.query(
+              "SELECT derslik.cancel_booking($1,$2,$3,$4) AS data",
+              [ws, student, lesson, c.version],
+            )
+          ).rows[0].data;
+          return { data, audit: { startsAt: data.starts_at } };
+        } catch (error) {
+          throw bookingError(error);
+        }
+      },
+      { studentId: student, permission: "lessons", write: true },
+    );
   }
 }
