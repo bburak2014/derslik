@@ -3,6 +3,27 @@ import type { Messages } from "./index.js";
 
 export const de: Messages = {
   api: {
+    availabilityOrder: "Ein Zeitraum muss nach seinem Beginn enden.",
+    availabilityOverlap: "Zeiträume am selben Tag überschneiden sich.",
+    availabilityTime:
+      "Wählen Sie Zeiten in halbstündigen Schritten (z. B. 15:00, 15:30).",
+    availabilityTooMany:
+      "Es sind höchstens 50 Zeiträume und 50 geschlossene Zeiträume möglich.",
+    blockOrder: "Ein geschlossener Zeitraum kann nicht vor seinem Beginn enden.",
+    bookingCancelClosed:
+      "Die Frist zum Absagen dieser Stunde ist abgelaufen. Schreiben Sie Ihrer Lehrkraft, um abzusagen.",
+    bookingDisabled: "Ihre Lehrkraft nimmt gerade keine Buchungen an.",
+    bookingDuration:
+      "Die Stundenlänge muss zwischen 15 und 180 Minuten liegen und durch 5 teilbar sein.",
+    bookingHours: "Geben Sie einen Wert zwischen 0 und 168 Stunden ein.",
+    bookingNoCredits:
+      "Sie haben keine freien Stunden mehr. Sprechen Sie mit Ihrer Lehrkraft.",
+    bookingNotYours:
+      "Diese Stunde hat Ihre Lehrkraft geplant. Schreiben Sie Ihrer Lehrkraft, um abzusagen.",
+    bookingSettingsChanged:
+      "Die Einstellungen wurden an anderer Stelle geändert. Laden Sie neu und versuchen Sie es erneut.",
+    bookingSlotTaken:
+      "Diese Zeit ist nicht mehr frei. Bitte wählen Sie eine andere Zeit.",
     calendarNotFound: "Kalenderlink nicht gefunden oder bereits ersetzt.",
     fileStorageFull:
       "Der Dateispeicher ist voll. Löschen Sie alte Dateien, um Platz zu schaffen.",
@@ -241,6 +262,81 @@ export const de: Messages = {
     storyLabel: "Ihr Arbeitsbereich für Nachhilfe",
     storyTitle1: "Mehr Zeit für",
     storyTitle2: "jeden Schüler.",
+  },
+  booking: {
+    addClosedDays: "Geschlossene Tage hinzufügen",
+    addRange: "Zeitraum hinzufügen",
+    availability: "Verfügbarkeit",
+    back: "Zurück",
+    book: "Stunde buchen",
+    bookDescription: "Wählen Sie eine der freien Zeiten Ihrer Lehrkraft.",
+    booked: "Stunde gebucht.",
+    bookedByStudent: "Vom Schüler gebucht",
+    bookedByYou: "Von Ihnen gebucht",
+    cancel: "Stunde absagen",
+    cancelBody:
+      "Die Stunde am {when} wird abgesagt. Ihr Stundenguthaben bleibt erhalten.",
+    cancelClosed: "Schreiben Sie Ihrer Lehrkraft, um abzusagen.",
+    cancelTitle: "Stunde absagen?",
+    cancelUntil: "Absagen möglich bis {time}",
+    cancelUntilStart: "Bis zum Stundenbeginn",
+    cancelWindow: "Absagefrist",
+    cancelled: "Stunde abgesagt.",
+    closedDays: "Geschlossene Tage",
+    closedDaysHint:
+      "An Feiertagen und freien Tagen können Schüler keine Stunden buchen.",
+    confirm: "Buchen",
+    dayClosed: "Geschlossen",
+    description:
+      "Legen Sie die freien Zeiten fest, in denen Ihre Schüler Stunden buchen können.",
+    duration: "Stundenlänge",
+    enabled: "Schüler dürfen in meinen freien Zeiten Stunden buchen",
+    enabledHint:
+      "Solange dies aus ist, können Schüler keine neuen Stunden buchen; gebuchte Stunden bleiben bestehen.",
+    freeCredits: {
+      one: "{count} freie Stunde verfügbar",
+      other: "{count} freie Stunden verfügbar",
+    },
+    from: "Startdatum",
+    hours: {
+      one: "{count} Stunde",
+      other: "{count} Stunden",
+    },
+    hoursBefore: {
+      one: "{count} Stunde vorher",
+      other: "{count} Stunden vorher",
+    },
+    location: "Unterrichtsort",
+    locationPlaceholder: "Z. B. Online oder eine Adresse",
+    minutes: {
+      one: "{count} Min.",
+      other: "{count} Min.",
+    },
+    noClosedDays: "Keine geschlossenen Tage.",
+    noCredits: "Keine freien Stunden verfügbar",
+    noCreditsHint:
+      "Sprechen Sie mit Ihrer Lehrkraft, um eine neue Stunde zu buchen.",
+    noSlots: "In den nächsten 4 Wochen gibt es keine freien Zeiten",
+    noSlotsHint:
+      "Neue Zeiten erscheinen hier, sobald Ihre Lehrkraft sie freigibt.",
+    note: "Schüler können nur eine Zeit wählen, wenn sie freie Stunden haben. Stunden, die Sie selbst anlegen, belegen diese Zeiten.",
+    notice: "Mindestvorlauf",
+    noticeNone: "Kein Mindestvorlauf",
+    off: "Aus",
+    on: "An",
+    pickDay: "Tag wählen",
+    pickTime: "Uhrzeit wählen",
+    rangeEnd: "Endzeit am {day}",
+    rangeStart: "Startzeit am {day}",
+    reload: "Neu laden",
+    removeClosedDays: "Geschlossene Tage entfernen",
+    removeRange: "Zeitraum entfernen",
+    saved: "Verfügbarkeit gespeichert.",
+    title: "Verfügbarkeit und Buchung",
+    to: "Enddatum",
+    weeklyHours: "Wöchentliche Zeiten",
+    weeklyHoursHint: "Ihre freien Zeiten, die sich jede Woche wiederholen.",
+    writeTeacher: "Lehrkraft anschreiben",
   },
   calendar: {
     addLesson: "Stunde hinzufügen",
@@ -988,6 +1084,8 @@ export const de: Messages = {
     videos: "Unterrichtsvideos",
   },
   notice: {
+    lessonBooked: "Ein Schüler hat eine Stunde gebucht",
+    lessonCancelledByStudent: "Ein Schüler hat eine Stunde abgesagt",
     lessonReminder: "Anstehende Stunde",
     requestAccepted: "Ihre Unterrichtsanfrage wurde angenommen",
     requestDeclined: "Ihre Unterrichtsanfrage wurde abgelehnt",

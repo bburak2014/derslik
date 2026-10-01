@@ -3,6 +3,25 @@ import type { Messages } from "./index.js";
 
 export const es: Messages = {
   api: {
+    availabilityOrder: "Un intervalo debe terminar después de empezar.",
+    availabilityOverlap: "Hay intervalos del mismo día que se solapan.",
+    availabilityTime:
+      "Elige las horas en tramos de media hora (p. ej., 15:00, 15:30).",
+    availabilityTooMany:
+      "Puedes añadir como máximo 50 intervalos y 50 periodos cerrados.",
+    blockOrder: "Un periodo cerrado no puede terminar antes de empezar.",
+    bookingCancelClosed:
+      "Ya no puedes cancelar esta clase. Escribe a tu profesor para cancelarla.",
+    bookingDisabled: "Tu profesor no acepta reservas en este momento.",
+    bookingDuration:
+      "La duración de la clase debe estar entre 15 y 180 minutos, en múltiplos de 5.",
+    bookingHours: "Introduce un valor entre 0 y 168 horas.",
+    bookingNoCredits: "No tienes clases disponibles. Habla con tu profesor.",
+    bookingNotYours:
+      "Esta clase la programó tu profesor. Escríbele para cancelarla.",
+    bookingSettingsChanged:
+      "Estos ajustes se cambiaron en otro lugar. Recarga e inténtalo de nuevo.",
+    bookingSlotTaken: "Esta hora ya no está libre. Elige otra hora.",
     calendarNotFound:
       "No se encontró el enlace del calendario o ya se reemplazó.",
     fileStorageFull:
@@ -231,6 +250,79 @@ export const es: Messages = {
     storyLabel: "Tu espacio para clases particulares",
     storyTitle1: "Más tiempo para",
     storyTitle2: "cada alumno.",
+  },
+  booking: {
+    addClosedDays: "Añadir días cerrados",
+    addRange: "Añadir intervalo",
+    availability: "Disponibilidad",
+    back: "Atrás",
+    book: "Reservar clase",
+    bookDescription: "Elige una de las horas libres de tu profesor.",
+    booked: "Clase reservada.",
+    bookedByStudent: "Reservada por el alumno",
+    bookedByYou: "Reservada por ti",
+    cancel: "Cancelar clase",
+    cancelBody:
+      "Se cancelará la clase del {when}. No perderás la clase de tu paquete.",
+    cancelClosed: "Escribe a tu profesor para cancelarla.",
+    cancelTitle: "¿Cancelar esta clase?",
+    cancelUntil: "Puedes cancelar hasta el {time}",
+    cancelUntilStart: "Hasta que empiece la clase",
+    cancelWindow: "Plazo de cancelación",
+    cancelled: "Clase cancelada.",
+    closedDays: "Días cerrados",
+    closedDaysHint:
+      "En vacaciones y días libres los alumnos no pueden reservar clases.",
+    confirm: "Reservar",
+    dayClosed: "Cerrado",
+    description:
+      "Indica las horas libres en las que tus alumnos pueden reservar clases.",
+    duration: "Duración de la clase",
+    enabled: "Permitir que los alumnos reserven en mis horas libres",
+    enabledHint:
+      "Mientras esté desactivado, los alumnos no pueden reservar clases nuevas; las ya reservadas se mantienen.",
+    freeCredits: {
+      one: "Tienes {count} clase disponible",
+      other: "Tienes {count} clases disponibles",
+    },
+    from: "Fecha de inicio",
+    hours: {
+      one: "{count} hora",
+      other: "{count} horas",
+    },
+    hoursBefore: {
+      one: "{count} hora antes",
+      other: "{count} horas antes",
+    },
+    location: "Lugar de la clase",
+    locationPlaceholder: "P. ej., en línea o una dirección",
+    minutes: {
+      one: "{count} min",
+      other: "{count} min",
+    },
+    noClosedDays: "No hay días cerrados.",
+    noCredits: "No tienes clases disponibles",
+    noCreditsHint: "Habla con tu profesor para reservar una clase nueva.",
+    noSlots: "No hay horas libres en las próximas 4 semanas",
+    noSlotsHint: "Las nuevas horas aparecerán aquí cuando tu profesor las añada.",
+    note: "Los alumnos solo pueden elegir una hora si tienen clases disponibles. Las clases que creas tú bloquean esas horas.",
+    notice: "Antelación mínima",
+    noticeNone: "Sin mínimo",
+    off: "Desactivada",
+    on: "Activada",
+    pickDay: "Elige un día",
+    pickTime: "Elige una hora",
+    rangeEnd: "{day}: hora de fin",
+    rangeStart: "{day}: hora de inicio",
+    reload: "Recargar",
+    removeClosedDays: "Quitar días cerrados",
+    removeRange: "Quitar intervalo",
+    saved: "Disponibilidad guardada.",
+    title: "Disponibilidad y reservas",
+    to: "Fecha de fin",
+    weeklyHours: "Horario semanal",
+    weeklyHoursHint: "Tus horas libres que se repiten cada semana.",
+    writeTeacher: "Escribir a tu profesor",
   },
   calendar: {
     addLesson: "Añadir clase",
@@ -971,6 +1063,8 @@ export const es: Messages = {
     videos: "Vídeos de clase",
   },
   notice: {
+    lessonBooked: "Un alumno reservó una clase",
+    lessonCancelledByStudent: "Un alumno canceló una clase",
     lessonReminder: "Próxima clase",
     requestAccepted: "Tu solicitud de clase fue aceptada",
     requestDeclined: "Tu solicitud de clase fue rechazada",

@@ -3,6 +3,28 @@ import type { Messages } from "./index.js";
 
 export const fr: Messages = {
   api: {
+    availabilityOrder: "Une plage horaire doit se terminer après son début.",
+    availabilityOverlap: "Des plages horaires du même jour se chevauchent.",
+    availabilityTime:
+      "Choisissez les heures par tranches d'une demi-heure (p. ex. 15:00, 15:30).",
+    availabilityTooMany:
+      "Vous pouvez ajouter au maximum 50 plages horaires et 50 périodes de fermeture.",
+    blockOrder: "Une période de fermeture ne peut pas finir avant de commencer.",
+    bookingCancelClosed:
+      "Il est trop tard pour annuler ce cours. Écrivez à votre enseignant pour l'annuler.",
+    bookingDisabled:
+      "Votre enseignant n'accepte pas de réservations pour le moment.",
+    bookingDuration:
+      "La durée du cours doit être comprise entre 15 et 180 minutes, par pas de 5.",
+    bookingHours: "Saisissez une valeur entre 0 et 168 heures.",
+    bookingNoCredits:
+      "Vous n'avez plus de séance disponible. Parlez-en à votre enseignant.",
+    bookingNotYours:
+      "Ce cours a été planifié par votre enseignant. Écrivez-lui pour l'annuler.",
+    bookingSettingsChanged:
+      "Ces réglages ont été modifiés ailleurs. Rechargez puis réessayez.",
+    bookingSlotTaken:
+      "Ce créneau n'est plus libre. Veuillez en choisir un autre.",
     calendarNotFound: "Lien de calendrier introuvable ou déjà remplacé.",
     fileStorageFull:
       "L’espace de stockage des fichiers est plein. Supprimez d’anciens fichiers pour libérer de la place.",
@@ -232,6 +254,80 @@ export const fr: Messages = {
     storyLabel: "Votre espace de cours particuliers",
     storyTitle1: "Plus de temps pour",
     storyTitle2: "chaque élève.",
+  },
+  booking: {
+    addClosedDays: "Ajouter des jours de fermeture",
+    addRange: "Ajouter une plage",
+    availability: "Disponibilités",
+    back: "Retour",
+    book: "Réserver un cours",
+    bookDescription: "Choisissez l'un des créneaux libres de votre enseignant.",
+    booked: "Cours réservé.",
+    bookedByStudent: "Réservé par l'élève",
+    bookedByYou: "Réservé par vous",
+    cancel: "Annuler le cours",
+    cancelBody:
+      "Le cours du {when} sera annulé. Votre séance n'est pas décomptée.",
+    cancelClosed: "Écrivez à votre enseignant pour annuler.",
+    cancelTitle: "Annuler ce cours ?",
+    cancelUntil: "Annulation possible jusqu'au {time}",
+    cancelUntilStart: "Jusqu'au début du cours",
+    cancelWindow: "Délai d'annulation",
+    cancelled: "Cours annulé.",
+    closedDays: "Jours de fermeture",
+    closedDaysHint:
+      "Les élèves ne peuvent pas réserver pendant les vacances et les jours de repos.",
+    confirm: "Réserver",
+    dayClosed: "Fermé",
+    description:
+      "Indiquez les créneaux libres où vos élèves peuvent réserver un cours.",
+    duration: "Durée du cours",
+    enabled: "Permettre aux élèves de réserver sur mes créneaux libres",
+    enabledHint:
+      "Désactivé, les élèves ne peuvent plus réserver. Les cours déjà réservés restent en place.",
+    freeCredits: {
+      one: "{count} séance disponible",
+      other: "{count} séances disponibles",
+    },
+    from: "Date de début",
+    hours: {
+      one: "{count} heure",
+      other: "{count} heures",
+    },
+    hoursBefore: {
+      one: "{count} heure avant",
+      other: "{count} heures avant",
+    },
+    location: "Lieu du cours",
+    locationPlaceholder: "P. ex. en ligne ou une adresse",
+    minutes: {
+      one: "{count} min",
+      other: "{count} min",
+    },
+    noClosedDays: "Aucun jour de fermeture.",
+    noCredits: "Aucune séance disponible",
+    noCreditsHint: "Parlez-en à votre enseignant pour réserver un nouveau cours.",
+    noSlots: "Aucun créneau libre dans les 4 prochaines semaines",
+    noSlotsHint:
+      "Les nouveaux créneaux apparaîtront ici quand votre enseignant les ajoutera.",
+    note: "Les élèves ne peuvent choisir un créneau que s'ils ont des séances disponibles. Les cours que vous créez vous-même bloquent ces créneaux.",
+    notice: "Délai minimum de réservation",
+    noticeNone: "Aucun délai",
+    off: "Désactivé",
+    on: "Activé",
+    pickDay: "Choisissez un jour",
+    pickTime: "Choisissez une heure",
+    rangeEnd: "{day}, heure de fin",
+    rangeStart: "{day}, heure de début",
+    reload: "Recharger",
+    removeClosedDays: "Retirer les jours de fermeture",
+    removeRange: "Retirer la plage",
+    saved: "Disponibilités enregistrées.",
+    title: "Disponibilités et réservations",
+    to: "Date de fin",
+    weeklyHours: "Horaires hebdomadaires",
+    weeklyHoursHint: "Vos créneaux libres qui se répètent chaque semaine.",
+    writeTeacher: "Écrire à votre enseignant",
   },
   calendar: {
     addLesson: "Ajouter un cours",
@@ -980,6 +1076,8 @@ export const fr: Messages = {
     videos: "Vidéos de cours",
   },
   notice: {
+    lessonBooked: "Un élève a réservé un cours",
+    lessonCancelledByStudent: "Un élève a annulé un cours",
     lessonReminder: "Cours à venir",
     requestAccepted: "Votre demande de cours a été acceptée",
     requestDeclined: "Votre demande de cours a été refusée",

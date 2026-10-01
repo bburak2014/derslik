@@ -3,6 +3,25 @@ import type { Messages } from "./index.js";
 
 export const en: Messages = {
   api: {
+    availabilityOrder: "A time range must end after it starts.",
+    availabilityOverlap: "Time ranges on the same day overlap.",
+    availabilityTime: "Pick times in half-hour steps (e.g. 15:00, 15:30).",
+    availabilityTooMany:
+      "You can add up to 50 time ranges and 50 closed periods.",
+    blockOrder: "A closed period cannot end before it starts.",
+    bookingCancelClosed:
+      "It's too late to cancel this lesson. Message your teacher to cancel.",
+    bookingDisabled: "Your teacher isn't taking bookings right now.",
+    bookingDuration:
+      "Lesson length must be between 15 and 180 minutes, in steps of 5.",
+    bookingHours: "Enter a value between 0 and 168 hours.",
+    bookingNoCredits:
+      "You have no lesson credits available. Talk to your teacher.",
+    bookingNotYours:
+      "Your teacher scheduled this lesson. Message your teacher to cancel.",
+    bookingSettingsChanged:
+      "These settings were changed elsewhere. Reload and try again.",
+    bookingSlotTaken: "This time is no longer free. Please pick another time.",
     calendarNotFound: "Calendar link not found, or it has been replaced.",
     fileStorageFull: "File storage is full. Delete old files to free up space.",
     tooManyPendingUploads:
@@ -221,6 +240,77 @@ export const en: Messages = {
     storyLabel: "Your private tutoring workspace",
     storyTitle1: "More time for",
     storyTitle2: "every student.",
+  },
+  booking: {
+    addClosedDays: "Add closed days",
+    addRange: "Add range",
+    availability: "Availability",
+    back: "Back",
+    book: "Book a lesson",
+    bookDescription: "Choose one of your teacher's free times.",
+    booked: "Lesson booked.",
+    bookedByStudent: "Booked by student",
+    bookedByYou: "Booked by you",
+    cancel: "Cancel lesson",
+    cancelBody:
+      "The lesson on {when} will be cancelled. You keep your lesson credit.",
+    cancelClosed: "Message your teacher to cancel.",
+    cancelTitle: "Cancel this lesson?",
+    cancelUntil: "You can cancel until {time}",
+    cancelUntilStart: "Until the lesson starts",
+    cancelWindow: "Cancellation deadline",
+    cancelled: "Lesson cancelled.",
+    closedDays: "Closed days",
+    closedDaysHint: "Students can't book lessons on holidays and days off.",
+    confirm: "Book",
+    dayClosed: "Closed",
+    description: "Set the free times when your students can book lessons.",
+    duration: "Lesson length",
+    enabled: "Let students book lessons in my free times",
+    enabledHint:
+      "While this is off, students can't book new lessons; booked lessons stay as they are.",
+    freeCredits: {
+      one: "{count} lesson credit available",
+      other: "{count} lesson credits available",
+    },
+    from: "Start date",
+    hours: {
+      one: "{count} hour",
+      other: "{count} hours",
+    },
+    hoursBefore: {
+      one: "{count} hour before",
+      other: "{count} hours before",
+    },
+    location: "Lesson location",
+    locationPlaceholder: "E.g. Online or an address",
+    minutes: {
+      one: "{count} min",
+      other: "{count} min",
+    },
+    noClosedDays: "No closed days added.",
+    noCredits: "No lesson credits available",
+    noCreditsHint: "Talk to your teacher to book a new lesson.",
+    noSlots: "No free times in the next 4 weeks",
+    noSlotsHint: "New times will appear here when your teacher adds them.",
+    note: "Students can only pick a time if they have lesson credits available. Lessons you create yourself block those times.",
+    notice: "Minimum notice",
+    noticeNone: "No minimum",
+    off: "Off",
+    on: "On",
+    pickDay: "Choose a day",
+    pickTime: "Choose a time",
+    rangeEnd: "{day} end time",
+    rangeStart: "{day} start time",
+    reload: "Reload",
+    removeClosedDays: "Remove closed days",
+    removeRange: "Remove range",
+    saved: "Availability saved.",
+    title: "Availability and booking",
+    to: "End date",
+    weeklyHours: "Weekly hours",
+    weeklyHoursHint: "Your free times that repeat every week.",
+    writeTeacher: "Message your teacher",
   },
   calendar: {
     addLesson: "Add lesson",
@@ -950,6 +1040,8 @@ export const en: Messages = {
     videos: "Lesson videos",
   },
   notice: {
+    lessonBooked: "A student booked a lesson",
+    lessonCancelledByStudent: "A student cancelled a lesson",
     lessonReminder: "Upcoming lesson",
     requestAccepted: "Your lesson request was accepted",
     requestDeclined: "Your lesson request was declined",
