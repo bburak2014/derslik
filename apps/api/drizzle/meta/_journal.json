@@ -134,6 +134,13 @@
       "when": 1789660000000,
       "tag": "0018_lesson_booking",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789680000000,
+      "tag": "0019_booking_joined_windows",
+      "breakpoints": true
     }
   ]
 }

@@ -3,8 +3,9 @@ import { dateKey, dayLabel, timeLabel } from "./types.ts";
 
 // Öğrencinin boş saatten ders ayarlaması: öğretmen ayarlarının biçimi,
 // sınırlar ve web, mobil ile API'nin ortak yardımcıları. Boş saatleri
-// veritabanı üretir (apps/api/drizzle/0018_lesson_booking.sql,
-// derslik.open_slots); buradaki sabitler onunla aynı olmalı.
+// veritabanı üretir (derslik.open_slots; son tanımı
+// apps/api/drizzle/0019_booking_joined_windows.sql, uç uca aralıkları tek
+// aralık sayar); buradaki sabitler onunla aynı olmalı.
 
 /** Öğrencinin saat görebildiği gün sayısı, bugün dahil. */
 export const BOOKING_HORIZON_DAYS = 28;

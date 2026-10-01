@@ -60,7 +60,7 @@ Saat dilimi, uygulamanın geri kalanında olduğu gibi Europe/Istanbul'dur. Sür
 
 1. Ayarlama açıktır.
 2. `t`'nin günü bugün ile bugün + 27 gün arasındadır (28 gün).
-3. O günün haftalık aralıklarından birinde `t = aralık başlangıcı + k × 30 dk` ve `t + d ≤ aralık bitişi`.
+3. O günün haftalık aralıklarından birinde `t = aralık başlangıcı + k × 30 dk` ve `t + d ≤ aralık bitişi`. Aynı günün uç uca aralıkları (15:00–19:00 ve 19:00–21:00) tek aralık sayılır; 60 dakikalık derste 18:30 da boş saattir (`0019_booking_joined_windows`).
 4. Gün, kapalı gün aralıklarının hiçbirine düşmez.
 5. `t ≥ şimdi + en az önceden ayarlama süresi`.
 6. `[t, t + d)` aralığı, öğretmenin iptal edilmemiş (planlı ya da tamamlanmış) hiçbir dersiyle çakışmaz. Dersin hangi öğrenciye ait olduğu önemli değildir; öğrenciye yalnızca boş saatler gösterilir, dolu saatin kime ait olduğu gösterilmez.
@@ -287,7 +287,7 @@ Yeni modül: `apps/api/src/booking/` (`booking.service.ts`, `booking.controller.
 - **API entegrasyon testleri:** Yeni `apps/api/tests/booking-cases.mjs` dosyası `integration.test.mjs` içinde çağrılır. Testler PGlite'ta `pnpm test` ile koşar; mümkünse yerel Postgres'te de koşturulur.
   - *Ayarlar:* kaydetme ve okuma, varsayılanlar, sürüm çakışması, doğrulama hataları, geçmiş kapalı günlerin atılması. Öğrenci ve veli ayarları okuyamaz ve yazamaz.
   - *Saatler:*
-    - 30 dakikalık adım ve dersin aralığa sığması,
+    - 30 dakikalık adım ve dersin aralığa sığması (uç uca aralıklar tek aralık sayılır),
     - önceden ayarlama sınırı, kapalı günler, 28 günlük sınır, paketin bitiş tarihi,
     - başka öğrencinin dersi saati kapatır ama o derse ait bilgi yanıtta yer almaz,
     - iptal edilmiş ders saati kapatmaz,

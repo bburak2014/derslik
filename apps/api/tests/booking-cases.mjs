@@ -318,6 +318,26 @@ export async function bookingCases({ t, app, admin, request, ok, token }) {
   );
 
   await t.test(
+    "uç uca aralıklar tek aralık sayılır; sınırdan geçen ders de önerilir",
+    async () => {
+      // 10:00–11:00 ve 11:00–13:00: 60 dakikalık 10:30 dersi iki aralığa yayılır.
+      await configure({
+        windows: [
+          { ...main, end: "11:00" },
+          { ...main, start: "11:00" },
+        ],
+      });
+      assert.deepEqual(
+        (await slotsOf(mehmet, tokenRival)).slots.filter(
+          (s) => dayOf(s.startsAt) === D3,
+        ),
+        morning([D3]),
+      );
+      await configure();
+    },
+  );
+
+  await t.test(
     "öğrenci boş saate ders ayarlar; ders öğretmenin takvimine ve bildirimine düşer",
     async () => {
       const key = randomUUID();
