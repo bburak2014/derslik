@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import { backend } from "@/lib/client";
-import { chatDrafts } from "@/lib/chat-drafts";
+import { getChatDraft, setChatDraft } from "@/lib/chat-drafts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -729,7 +729,7 @@ function Conversation({
     [problem, setProblem] = useState(""),
     [older, setOlder] = useState(false),
     // Yarım kalan metin yazışmanın yoluna göre saklanır (oturum kapanınca silinir).
-    [draft, setDraftState] = useState(() => chatDrafts.get(path) ?? ""),
+    [draft, setDraftState] = useState(() => getChatDraft(path) ?? ""),
     [sending, setSending] = useState(false),
     // Ekran okuyucuya yalnızca yeni gelen mesajlar okunur.
     [announce, setAnnounce] = useState(""),
@@ -931,8 +931,7 @@ function Conversation({
   }
   function setDraft(value: string) {
     setDraftState(value);
-    if (value) chatDrafts.set(path, value);
-    else chatDrafts.delete(path);
+    setChatDraft(path, value);
     // Metin değişti: bekleyen anahtar artık bu metne ait değil.
     if (sendKey.current && sendKey.current.text !== cleanMessage(value))
       sendKey.current = null;
@@ -955,7 +954,7 @@ function Conversation({
     sendKey.current = attempt;
     // Gönderilen metin taslaklardan çıkar: yanıt gelmeden başka yazışmaya
     // geçilip dönülürse kutuda yeniden görünüp ikinci kez gönderilmesin.
-    chatDrafts.delete(path);
+    setChatDraft(path, "");
     setSending(true);
     setProblem("");
     try {
@@ -984,7 +983,7 @@ function Conversation({
       scroll.current = "bottom";
       setPage((p) => (p ? { ...p, messages: merge(p.messages, [mine]) } : p));
       // Gönderim sürerken yeni bir şey yazıldıysa o kutuda kalır.
-      if (!chatDrafts.has(path)) setDraftState("");
+      if (getChatDraft(path) === undefined) setDraftState("");
       input.current?.focus();
     } catch (e) {
       // Sunucu metni geri çevirdi (4xx): sonraki deneme yeni anahtarla.
@@ -996,7 +995,7 @@ function Conversation({
       )
         sendKey.current = null;
       // Metin taslaklara geri döner (bu arada yeni bir şey yazılmadıysa).
-      if (!chatDrafts.has(path)) chatDrafts.set(path, typed);
+      if (getChatDraft(path) === undefined) setChatDraft(path, typed);
       if (!alive.current) return;
       // Metin kutuda kalır; kullanıcı yeniden gönderebilir. Sunucunun açık
       // nedeni (çok hızlı, kapalı yazışma) varsa o gösterilir.

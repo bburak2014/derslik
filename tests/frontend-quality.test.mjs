@@ -480,19 +480,24 @@ test("standalone OAuth rejects credentials and preserves supported auth routes",
   assert.equal(f.authRoute("derslik://user@auth/callback"), null);
 });
 
-test("exported chat draft map holds consumer drafts and clears them on logout", () => {
-  const { chatDrafts, clearChatDrafts } = load("apps/web/lib/chat-drafts.ts");
+test("chat drafts are kept per thread, emptied text removes them, and logout clears them", () => {
+  const { getChatDraft, setChatDraft, clearChatDrafts } = load(
+    "apps/web/lib/chat-drafts.ts",
+  );
   const first = "/workspaces/fixture/messages/thread-one";
   const second = "/portal/fixture/student/messages/thread-two";
-  chatDrafts.set(first, "Unsent teacher message");
-  chatDrafts.set(second, "Unsent student message");
-  assert.equal(chatDrafts.size, 2);
-  assert.equal(chatDrafts.get(first), "Unsent teacher message");
-  assert.equal(chatDrafts.get(second), "Unsent student message");
+  assert.equal(getChatDraft(first), undefined);
+  setChatDraft(first, "Unsent teacher message");
+  setChatDraft(second, "Unsent student message");
+  assert.equal(getChatDraft(first), "Unsent teacher message");
+  assert.equal(getChatDraft(second), "Unsent student message");
+  setChatDraft(first, "");
+  assert.equal(getChatDraft(first), undefined);
+  assert.equal(getChatDraft(second), "Unsent student message");
+  setChatDraft(first, "Unsent teacher message");
   clearChatDrafts();
-  assert.equal(chatDrafts.size, 0);
-  assert.equal(chatDrafts.get(first), undefined);
-  assert.equal(chatDrafts.get(second), undefined);
+  assert.equal(getChatDraft(first), undefined);
+  assert.equal(getChatDraft(second), undefined);
 });
 
 test("actual Tailwind dark variant compiles both nesting branches under a class scoping root", async () => {

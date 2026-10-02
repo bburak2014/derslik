@@ -3,7 +3,16 @@
  *  alanını, öğrenciyi ve yazışmayı içerir). Yalnızca bu sekmenin belleğinde
  *  durur; oturum kapanınca silinir ki aynı sekmede giren başka hesap görmesin.
  *  Giriş paketine mesajlaşma kodunu taşımamak için ayrı modüldedir. */
-export const chatDrafts = new Map<string, string>();
+const chatDrafts = new Map<string, string>();
+
+/** Yazışmanın yarım kalan metni (yazışmanın API yoluna göre). */
+export const getChatDraft = (key: string) => chatDrafts.get(key);
+
+/** Yarım kalan metni saklar; boş metin kaydı siler. */
+export function setChatDraft(key: string, text: string) {
+  if (text) chatDrafts.set(key, text);
+  else chatDrafts.delete(key);
+}
 
 export function clearChatDrafts() {
   chatDrafts.clear();

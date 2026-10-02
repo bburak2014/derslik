@@ -226,7 +226,7 @@ export class MessageSocket {
     if (!this.running || this.retryTimer) return;
     const delay =
       wait ??
-      Math.min(MAX_WAIT, 1000 * 2 ** this.attempt) * (0.5 + Math.random() / 2);
+      Math.min(MAX_WAIT, 1000 * 2 ** this.attempt) * (0.5 + Math.random() / 2); // NOSONAR: yeniden bağlanma titreşimi, güvenlikle ilgisi yok
     this.attempt += 1;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;

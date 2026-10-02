@@ -44,7 +44,7 @@ function load(file, dependencies, suffix = "") {
     setTimeout,
     clearTimeout,
   });
-  runInContext(code, context, { filename: file });
+  runInContext(code, context, { filename: file }); // NOSONAR: depodaki kodu yalıtılmış vm bağlamında test eder
   return exports;
 }
 async function check(name, run, observation = false) {
