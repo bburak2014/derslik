@@ -2,50 +2,58 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Her geliştirmede kod Sonar kurallarıyla denetlenir; projede sıfır Sonar sorunu sağlanır ve sorunlu kod `main`'e gönderilmez.
+**Goal:** Her `git commit` öncesinde Sonar kapısı çalışır; projede açık Sonar sorunu varsa commit atılmaz. Projedeki bütün Sonar sorunları temizlenir ve CI aynı kapıyı uygular.
 
-**Architecture:** İki katman: ESLint'te SonarJS kuralları (saniyeler içinde, yazarken) ve yerel SonarQube kapısı (`pnpm quality:gate`, tam tarama, sorun varsa çıkış 1). Kapı yerelde birleştirmeden önce ve CI'da ayrı bir işte aynı betikle çalışır. Kapının karar ve rapor kısmı saf bir modüldedir ve birim testleriyle sınanır.
+**Architecture:** Üç katman. (1) Commit kancası `.githooks/pre-commit` uygun Node'u bulup `scripts/sonar.mjs --gate`'i çalıştırır. (2) Kapı yerel SonarQube'de çalışma kopyasını tarar, sorunları okur ve karar verir. Karar ve rapor saf bir modülde (`scripts/sonar-gate.mjs`); imajlar, worktree'lerin ortak yolları, kapsayıcının yeniden kurulma koşulu ve kilit ayrı bir modülde (`scripts/sonar-local.mjs`). Codex'in `scripts/sonar-report.mjs`'i (görev bekleme, tarayıcı çağrısı) olduğu gibi kullanılır. (3) ESLint'te SonarJS kuralları ve CI'da ayrı bir `sonar` işi.
 
-**Tech Stack:** Node 24 (betikler, `node:test`), SonarQube Community Build `26.9.0.129388` (Docker), sonar-scanner-cli `12.2.0.4256_8.1.0` (Docker), ESLint 9 düz yapılandırma ve `eslint-plugin-sonarjs`, GitHub Actions.
+**Tech Stack:** Node 24 (betikler, `node:test`), POSIX `sh` (kanca), SonarQube Community Build `26.9.0.129388` (Docker), yerel sonar-scanner `8.1.0.6389` (macOS arm64) ya da Docker'da sonar-scanner-cli `12.2.0.4256_8.1.0`, ESLint 9 ve `eslint-plugin-sonarjs`, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-10-02-sonar-quality-gate-design.md`
 
+**Çalışma yeri:** `.claude/worktrees/lesson-booking` worktree'si, dal `sonar-quality-gate` (başlangıçta `main` = `a9d98a3`).
+
+**Sıra notu:** Tasarımın "Uygulama sırası"nda ESLint katmanı (2. adım) temizlikten (3. adım) önce. Bu planda ESLint katmanı temizlikten sonra geliyor (Görev 15). Böylece temizlik boyunca `pnpm lint` kırmızıya düşmez; ESLint'te kalan ihlaller Görev 15'te düzeltilir. Sonuç aynıdır.
+
 ## Global Constraints
 
-- **İmajlar:** `sonarqube:26.9.0.129388-community` ve `sonarsource/sonar-scanner-cli:12.2.0.4256_8.1.0`. Yerelde ve CI'da aynı sabitler kullanılır (`scripts/sonar.mjs`).
-- **Kapı kuralı:** Her türden ve her önemdeki açık sorun (hata, güvenlik açığı, kod kokusu) ya da `TO_REVIEW` durumundaki her güvenlik noktası kapıyı düşürür. Kod tekrarı oranı en fazla %3 (ilk taramada %0,5; sınır Sonar'ın varsayılanı olarak kalır).
-- **Kapı kapalıyken güvenli çalışır.** API hatası, başarısız ya da işlenmemiş rapor, eksik sayfa: hiçbiri "0 sorun" sayılmaz, çıkış kodu 0 olmaz.
-- **Susturma yalnızca gerekçeyle yapılır:** `// NOSONAR: <gerekçe>`, `// eslint-disable-next-line sonarjs/<kural> -- <gerekçe>` ya da `sonar-project.properties`'te yorumla açıklanmış `sonar.issue.ignore.multicriteria`. Sunucudaki "False positive / Safe" işaretleri kullanılmaz; CI'da kalıcı değiller.
+- **Kanca:** `.githooks/pre-commit` (POSIX `sh`, çalıştırılabilir). `package.json`'daki `prepare` betiği `git config core.hooksPath .githooks` yapar; git deposu dışında hata vermez. Bağımlılık eklenmez (husky yok).
+- **Kancanın açılışı:** Kanca dosyaları commit edildikten sonra açılır (Görev 8). Görev 1–7 boyunca `pnpm install` ya da `pnpm add` çalıştırılmaz; `prepare` kancayı erken açar.
+- **Node:** `>=22.13.0` (`package.json` `engines`). PATH'teki `node` uymazsa `${NVM_DIR:-$HOME/.nvm}/versions/node/v*/bin/node` arasından uyan en yeni sürüm kullanılır. Hiçbiri yoksa commit durur.
+- **`--no-verify`:** Yalnızca kullanıcının o commit ya da o temizlik bölümü için verdiği açık onayla kullanılır. Temizlik bitene kadar temizlik commit'leri bu yolla atılır; her bölümün commit'i için ayrı onay alınır.
+- **Kapı kuralı:** Her türden ve her önemdeki açık sorun (hata, güvenlik açığı, kod kokusu) ya da `TO_REVIEW` durumundaki her güvenlik noktası kapıyı düşürür. Kod tekrarı en fazla %3. Test kapsamı kurala girmez. Sonar'ın kendi kalite kapısı ("Sonar way") bu kararda kullanılmaz.
+- **Kapı kapalıyken güvenli çalışır.** Docker yok, sunucu açılmıyor, tarama başarısız, görev FAILED/CANCELED/zaman aşımı, API hatası, eksik sayfa: hiçbiri "0 sorun" sayılmaz, çıkış kodu 0 olmaz.
+- **İmajlar:** `sonarqube:26.9.0.129388-community` ve `sonarsource/sonar-scanner-cli:12.2.0.4256_8.1.0` (`scripts/sonar-local.mjs`). Docker tarayıcısı `--platform linux/amd64` ile çalışır.
+- **Ortak yollar:** Ana checkout = `git rev-parse --path-format=absolute --git-common-dir` çıktısının üst klasörü. Parola `<ana checkout>/reports/.sonar-admin`; yerel tarayıcı `<ana checkout>/reports/quality/tool-cache/sonar-scanner-*/bin/sonar-scanner`; tarayıcı önbelleği `<ana checkout>/reports/quality/cache`. Ortam değişkenleri (`SONAR_ADMIN_PASSWORD`, `SONAR_ADMIN_FILE`, `SONAR_SCANNER_PATH`, `SONAR_USER_HOME`) önceliklidir.
+- **Kilit:** `<git ortak klasörü>/sonar-gate.lock` klasörü, içinde sahibin pid'i. Sahibi yaşamıyorsa ya da sahibi yazılmamış kilit 30 saniyeden eskiyse bayattır. Bekleme sınırı 10 dakika. Kapı nasıl biterse bitsin kilit bırakılır.
+- **Sunucu:** Tek sunucu `derslik-sonarqube`, yalnızca `127.0.0.1:9000`. Veri birimleri (`derslik-sonar-data`, `derslik-sonar-extensions`) hiçbir adımda silinmez. `derslik-quality-sonar` durdurulur, silinmez.
+- **Susturma yalnızca gerekçeyle yapılır:** `// NOSONAR: <gerekçe>`, `// eslint-disable-next-line sonarjs/<kural> -- <gerekçe>` ya da `sonar-project.properties`'te yorumla açıklanmış `sonar.issue.ignore.multicriteria`. Sunucudaki "False positive / Safe / Accept" işaretleri kullanılmaz.
 - **Temizlik davranışı değiştirmez.** Değiştirmesi gereken bir düzeltme çıkarsa testle korunur ve kullanıcıya bildirilir.
 - **ESLint:** SonarJS kuralları `error` düzeyinde ve yalnızca Sonar'ın taradığı dosyalarda uygulanır. Shadcn dosyaları (`apps/web/components/ui/**`, `apps/web/hooks/use-mobile.ts`) ve `apps/web/vendor/**` hariçtir.
-- **GitHub eylemleri** SHA'ya sabitlenir. `actions/upload-artifact` için `v4.6.2` kullanılır (`ea165f8d65b6e75b540449e92b4886f43607fa02`).
+- **GitHub eylemleri** SHA'ya sabitlenir. `actions/upload-artifact` için `v4.6.2` (`ea165f8d65b6e75b540449e92b4886f43607fa02`).
 - **Commit'ler:** Mesajlar ve yorumlar Türkçe. Commit sonuna `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` eklenir.
-- **Araç zinciri:** Komutlar nvm'deki Node 24 ve pnpm ile çalışır. Sonar komutları Docker Desktop'ın açık olmasını ister.
+- **Araç zinciri:** Komutlardan önce `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`. Sonar komutları Docker Desktop'ın açık olmasını ister. Ana checkout'a dokunan git komutları (birleştirme, push) kullanıcının terminalinde, onayıyla çalışır.
 
 ## Review Focus
 
-1. **Sayfalama ve yanıt hataları:** 500'den fazla sorunda bütün sayfalar okunmalı. HTTP hatası ya da beklenmeyen bir gövde gelirse kapı hata vermeli; "0 sorun" saymamalı (Görev 1 testleri).
-2. **Rapor yarışı:** Kapı, az önce gönderilen analiz işlenmeden sorunları okumamalı. İşlem `FAILED` ya da `CANCELED` biterse kapı düşmeli (Görev 1 testleri).
-3. **Eski kapsayıcı:** Sabitlenen sürümden farklı bir imajla çalışan `derslik-sonarqube` varsa yeniden kurulmalı. Yoksa yerel ile CI farklı kurallarla tarar (Görev 1).
-4. **CI ortamı:** Linux'ta Elasticsearch `vm.max_map_count` ister. İş bunu ayarlamazsa SonarQube açılmayabilir (Görev 12).
-5. **Gerekçesiz susturma:** `NOSONAR` ya da `eslint-disable … sonarjs/…` yorumunun gerekçesi yoksa test düşmeli (Görev 2).
+1. **Yarıda kalan kapı:** Kapı Ctrl-C ile kesilir ya da çökerse kalan kilit sonraki commit'leri bekletmemeli. Sahibi yaşamayan kilit hemen alınır (Görev 3 testi), çıkışta kilit bırakılır (Görev 4).
+2. **Aynı anda iki commit:** İki worktree aynı anda commit ederse ikincisi bekler; bir kopyanın sonucu ötekininkiyle karışmaz (Görev 3 testi).
+3. **Masaüstü uygulamasından commit:** PATH'te yalnızca Node 20 varken kanca nvm'deki Node 24'ü bulur (Görev 6 testi, Görev 8'de gerçek deneme).
+4. **Eksik ya da bozuk yanıt:** 500'den fazla sorun, HTTP hatası, işlenmemiş analiz ya da yanlış parola hiçbir zaman "geçti" sayılmaz (Görev 1 testleri, Görev 5'te gerçek deneme).
+5. **Eski kapsayıcı:** Farklı imajla ya da bütün ağ arayüzlerine açık çalışan kapsayıcı, veri korunarak yeniden kurulur (Görev 3 testi, Görev 5'te gerçek deneme).
 
 ---
 
-### Görev 1: Kapı modu ve sabit sürümler
+### Görev 1: Kapının saf kısmı
 
 **Files:**
-- Create: `scripts/sonar-gate.mjs` (saf karar ve rapor)
-- Modify: `scripts/sonar.mjs` (sabit imajlar, sürüm denetimi, `--gate`, sayfalı ve kapalıyken güvenli okuma)
-- Modify: `package.json` (`quality:gate`, `test:quality`)
-- Modify: `sonar-project.properties` (`sonar.scm.disabled=true`)
+- Create: `scripts/sonar-gate.mjs`
+- Modify: `package.json` (`test:quality`)
 - Test: `tests/sonar-gate.test.mjs`
 
 **Interfaces:**
-- Produces: `scripts/sonar-gate.mjs` → `MAX_DUPLICATION: number`, `componentPath(component: string): string`, `severityOf(issue): string`, `formatFindings(findings): string[]`, `evaluateGate({ issues, hotspots, duplication, maxDuplication? }) → { failed: boolean, issues: Finding[], hotspots: Finding[], duplication: number, maxDuplication: number, text: string[] }`, `collectPages(fetchPage: (page: number) => Promise<{ items: unknown[], total: number }>): Promise<unknown[]>`, `analysisDone(ce): "pending" | "success" | "failed"`
-- Produces: `pnpm quality:gate` (çıkış 0/1) ve `reports/sonar-gate.json` (`evaluateGate` sonucu)
+- Produces: `scripts/sonar-gate.mjs` → `MAX_DUPLICATION: number`, `componentPath(component: string): string`, `severityOf(issue): string`, `formatFindings(findings): string[]`, `evaluateGate({ issues, hotspots, duplication, maxDuplication? }) → { failed: boolean, issues: Finding[], hotspots: Finding[], duplication: number, maxDuplication: number, text: string[] }`, `collectPages(fetchPage: (page: number) => Promise<{ items: unknown[], total: number }>): Promise<unknown[]>`. `Finding = { file, line, severity, rule, message }`.
 
-- [ ] **Adım 1: Kapının saf kısmı için testleri yaz**
+- [ ] **Adım 1: Testleri yaz**
 
 `tests/sonar-gate.test.mjs`:
 
@@ -54,7 +62,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_DUPLICATION,
-  analysisDone,
   collectPages,
   componentPath,
   evaluateGate,
@@ -149,10 +156,14 @@ test("kod tekrarı sınırı aşılırsa kapı düşer, sınırda geçer", () =>
   );
 });
 
-test("tekrar oranı sayı değilse kapı hata verir (kapalıyken güvenli)", () => {
+test("tekrar oranı ya da listeler okunamazsa kapı hata verir", () => {
   assert.throws(
     () => evaluateGate({ issues: [], hotspots: [], duplication: Number.NaN }),
     /tekrar/i,
+  );
+  assert.throws(
+    () => evaluateGate({ issues: undefined, hotspots: [], duplication: 0 }),
+    /sorun listesi/i,
   );
 });
 
@@ -179,39 +190,28 @@ test("sayfalar toplam sayıya ulaşana kadar okunur", async () => {
   assert.deepEqual(seen, [1, 2, 3]);
 });
 
-test("toplam sayıdan önce boş sayfa gelirse hata verilir", async () => {
+test("toplam sayıdan önce boş sayfa ya da bozuk yanıt gelirse hata verilir", async () => {
   await assert.rejects(
     collectPages(async () => ({ items: [], total: 3 })),
     /eksik/i,
   );
+  await assert.rejects(
+    collectPages(async () => ({ items: undefined, total: 3 })),
+    /beklenmeyen/i,
+  );
 });
+```
 
-test("analiz durumu: kuyruk ya da süren iş bekler, başarısız iş düşer", () => {
-  assert.equal(analysisDone({ queue: [{}], current: null }), "pending");
-  assert.equal(
-    analysisDone({ queue: [], current: { status: "IN_PROGRESS" } }),
-    "pending",
-  );
-  assert.equal(
-    analysisDone({ queue: [], current: { status: "SUCCESS" } }),
-    "success",
-  );
-  assert.equal(
-    analysisDone({ queue: [], current: { status: "FAILED" } }),
-    "failed",
-  );
-  assert.equal(
-    analysisDone({ queue: [], current: { status: "CANCELED" } }),
-    "failed",
-  );
-  assert.equal(analysisDone({ queue: [] }), "failed");
-});
+`package.json` `scripts`:
+
+```json
+"test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs",
 ```
 
 - [ ] **Adım 2: Testleri çalıştır, kırmızı olduğunu gör**
 
 Çalıştır: `node --test tests/sonar-gate.test.mjs`
-Beklenen: FAIL. `Cannot find module '…/scripts/sonar-gate.mjs'` hatası.
+Beklenen: FAIL. `Cannot find module '…/scripts/sonar-gate.mjs'`.
 
 - [ ] **Adım 3: Saf modülü yaz**
 
@@ -250,7 +250,9 @@ export function formatFindings(findings) {
   const lines = [];
   for (const file of [...byFile.keys()].sort()) {
     lines.push(file);
-    const sorted = byFile.get(file).sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+    const sorted = byFile
+      .get(file)
+      .sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
     for (const f of sorted)
       lines.push(
         `  ${String(f.line ?? "-").padStart(5)}  ${f.severity.padEnd(8)} ${f.rule}  ${f.message}`,
@@ -286,10 +288,15 @@ export function evaluateGate({
   }));
   const tooMuchDuplication = duplication > maxDuplication;
   const failed =
-    issueFindings.length > 0 || hotspotFindings.length > 0 || tooMuchDuplication;
+    issueFindings.length > 0 ||
+    hotspotFindings.length > 0 ||
+    tooMuchDuplication;
   const text = [
     ...(issueFindings.length
-      ? [`Açık sorunlar (${issueFindings.length}):`, ...formatFindings(issueFindings)]
+      ? [
+          `Açık sorunlar (${issueFindings.length}):`,
+          ...formatFindings(issueFindings),
+        ]
       : []),
     ...(hotspotFindings.length
       ? [
@@ -326,170 +333,30 @@ export async function collectPages(fetchPage) {
       );
   }
 }
-
-/** Analiz işinin durumu (/api/ce/component yanıtı). */
-export function analysisDone(ce) {
-  if (ce.queue?.length || ce.current?.status === "IN_PROGRESS") return "pending";
-  return ce.current?.status === "SUCCESS" ? "success" : "failed";
-}
 ```
 
 - [ ] **Adım 4: Testleri çalıştır, geçtiğini gör**
 
-Çalıştır: `node --test tests/sonar-gate.test.mjs`
-Beklenen: PASS, 11/11.
+Çalıştır: `node --test tests/sonar-gate.test.mjs && pnpm test:quality`
+Beklenen: PASS. `sonar-gate` 10/10; `test:quality` toplamı 52 (önceki 42 + 10).
 
-- [ ] **Adım 5: `scripts/sonar.mjs`'i kapıya bağla**
-
-Değişiklikler (mevcut düzen korunur):
-
-```js
-// Dosyanın başına:
-import { analysisDone, collectPages, evaluateGate } from "./sonar-gate.mjs";
-
-// Sabitlerin yanına:
-// Yerelde ve CI'da aynı kurallar çalışsın diye imajlar tam sürüme sabit.
-// Yükseltme ayrı iştir; yeni kurallar yeni sorunlar getirebilir.
-const SONARQUBE_IMAGE = "sonarqube:26.9.0.129388-community";
-const SCANNER_IMAGE = "sonarsource/sonar-scanner-cli:12.2.0.4256_8.1.0";
-const gate = process.argv.includes("--gate");
-```
-
-`ensureServer()` içinde kapsayıcı varsa imajını denetle. Farklıysa kapsayıcıyı ve veri birimlerini silip yeniden kur (yerel geçmiş sıfırlanır; parola dosyası korunur, `adminAuth` aynı parolayı yeniden ayarlar):
-
-```js
-  const image = spawnSync(
-    "docker",
-    ["inspect", "-f", "{{.Config.Image}}", CONTAINER],
-    { encoding: "utf8" },
-  );
-  if (image.status === 0 && image.stdout.trim() !== SONARQUBE_IMAGE) {
-    console.log(
-      `SonarQube ${image.stdout.trim()} → ${SONARQUBE_IMAGE}: kapsayıcı yeniden kuruluyor.`,
-    );
-    docker(["rm", "-f", CONTAINER]);
-    for (const volume of ["derslik-sonar-data", "derslik-sonar-extensions"])
-      spawnSync("docker", ["volume", "rm", volume]);
-  }
-```
-
-Bu blok, mevcut `state` denetiminden önce gelir. `docker run` argümanlarındaki `"sonarqube:community"` yerine `SONARQUBE_IMAGE`, tarayıcıdaki `"sonarsource/sonar-scanner-cli"` yerine `SCANNER_IMAGE` yazılır. Tarayıcının `docker run` argümanlarına `"--platform", "linux/amd64"` eklenir: imajın arm64 sürümü yok, Apple Silicon'da öykünmeyle çalışır ve platform açıkça verilince uyarı çıkmaz.
-
-`sonar-project.properties`'e eklenir:
-
-```properties
-# Kapı bütün açık sorunlara bakar; "yeni kod" için git blame gerekmez.
-# Ayrıca worktree'lerde .git dosyası ana depoyu gösterir ve kapsayıcıya
-# bağlanmadığı için tarama "Unable to open Git repository" ile düşüyordu.
-sonar.scm.disabled=true
-```
-
-`summary()` içindeki bekleme döngüsü `waitProcessed(auth)` olarak ayrılır ve başarısız işte hata verir:
-
-```js
-async function json(pathname, auth) {
-  const res = await api("GET", pathname, auth);
-  if (!res.ok)
-    throw new Error(`SonarQube ${pathname} → HTTP ${res.status}`);
-  return res.json();
-}
-
-async function waitProcessed(auth) {
-  for (let i = 0; i < 150; i++) {
-    const state = analysisDone(
-      await json(`/api/ce/component?component=${PROJECT}`, auth),
-    );
-    if (state === "success") return;
-    if (state === "failed")
-      throw new Error("SonarQube analizi işleyemedi (FAILED/CANCELED).");
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  throw new Error("SonarQube analizi 5 dakikada işlenmedi.");
-}
-
-async function enforceGate(auth) {
-  await waitProcessed(auth);
-  const issues = await collectPages(async (p) => {
-    const r = await json(
-      `/api/issues/search?components=${PROJECT}&resolved=false&ps=500&p=${p}`,
-      auth,
-    );
-    return { items: r.issues, total: r.paging?.total ?? r.total };
-  });
-  const hotspots = await collectPages(async (p) => {
-    const r = await json(
-      `/api/hotspots/search?projectKey=${PROJECT}&status=TO_REVIEW&ps=500&p=${p}`,
-      auth,
-    );
-    return { items: r.hotspots, total: r.paging?.total };
-  });
-  const measures = await json(
-    `/api/measures/component?component=${PROJECT}&metricKeys=duplicated_lines_density`,
-    auth,
-  );
-  const duplication = Number(measures.component?.measures?.[0]?.value);
-  const result = evaluateGate({ issues, hotspots, duplication });
-  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, "reports", "sonar-gate.json"),
-    JSON.stringify(result, null, 2) + "\n",
-  );
-  for (const line of result.text) console.log(line);
-  console.log(
-    `\nAyrıntılar: ${HOST}/dashboard?id=${PROJECT} · liste: reports/sonar-gate.json`,
-  );
-  return result.failed;
-}
-```
-
-`summary()` artık `await waitProcessed(auth)` ile başlar (eski döngünün yerine). Dosyanın sonu:
-
-```js
-if (scan.status !== 0) process.exit(scan.status ?? 1);
-if (gate) {
-  // Kapı kapalıyken güvenli: okuma hatası da kapıyı düşürür.
-  const failed = await enforceGate(auth).catch((error) => {
-    console.error(error.message);
-    return true;
-  });
-  process.exit(failed ? 1 : 0);
-}
-await summary(auth);
-```
-
-`package.json` `scripts`:
-
-```json
-"quality:gate": "node scripts/sonar.mjs --gate",
-"test:quality": "node --test tests/sonar-gate.test.mjs",
-```
-
-- [ ] **Adım 6: Kapıyı gerçek sunucuda dene**
-
-Çalıştır: `pnpm quality:gate; echo "exit=$?"`
-Beklenen: Kapsayıcı sabit sürüme göre yeniden kurulur. Tarama biter ve mevcut sorunlar dosya ve satırıyla listelenir. Son satır `Sonar kapısı: GEÇMEDİ`, çıkış kodu `exit=1`, `reports/sonar-gate.json` yazılmış olur. Temizlik bitmediği için bu beklenen sonuçtur.
-
-- [ ] **Adım 7: Kapalıyken güvenli olduğunu dene**
-
-Çalıştır: `docker stop derslik-sonarqube; SONAR_ADMIN_PASSWORD=yanlis pnpm quality:gate; echo "exit=$?"; docker start derslik-sonarqube`
-Beklenen: Yönetici girişi hatası ve `exit=1`. Kapı hiçbir yolla "geçti" demez.
-
-- [ ] **Adım 8: Commit**
+- [ ] **Adım 5: Commit**
 
 ```bash
-git add scripts/sonar-gate.mjs scripts/sonar.mjs tests/sonar-gate.test.mjs package.json
-git commit -m "Sonar kapısı: quality:gate, sabit sürümler, kapalıyken güvenli okuma"
+git add scripts/sonar-gate.mjs tests/sonar-gate.test.mjs package.json
+git commit -m "Sonar kapısı: karar ve rapor modülü"
 ```
 
 ### Görev 2: Gerekçesiz susturma testi
 
 **Files:**
 - Modify: `scripts/sonar-gate.mjs` (`bareSuppressions`)
+- Modify: `package.json` (`test:quality`)
 - Test: `tests/sonar-suppressions.test.mjs`
 
 **Interfaces:**
 - Consumes: Sonar kapsamındaki klasörler (`sonar-project.properties`)
-- Produces: `scripts/sonar-gate.mjs` → `bareSuppressions(text: string): number[]` (gerekçesiz susturma yorumlarının satır numaraları); `pnpm test:quality`'nin ikinci dosyası
+- Produces: `scripts/sonar-gate.mjs` → `bareSuppressions(text: string): number[]` (gerekçesiz susturma yorumlarının 1'den başlayan satır numaraları)
 
 - [ ] **Adım 1: Testi yaz**
 
@@ -513,21 +380,24 @@ const roots = [
   "apps/web/components",
   "apps/web/hooks",
   "apps/web/lib",
+  "apps/web/proxy.ts",
   "apps/mobile/src",
+  "apps/mobile/index.ts",
   "packages/contracts/src",
   "packages/api-client/src",
   "scripts",
+  "build",
   "tests",
 ];
 // Bu dosyanın örnek satırları bilerek gerekçesizdir.
 const skip = /node_modules|\.next|components\/ui\/|sonar-suppressions\.test\.mjs$/;
-function* files(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (skip.test(full)) continue;
-    if (entry.isDirectory()) yield* files(full);
-    else if (/\.(ts|tsx|js|mjs|cjs)$/.test(entry.name)) yield full;
+function* files(entry) {
+  if (skip.test(entry)) return;
+  if (fs.statSync(entry).isFile()) {
+    if (/\.(ts|tsx|js|mjs|cjs)$/.test(entry)) yield entry;
+    return;
   }
+  for (const name of fs.readdirSync(entry)) yield* files(path.join(entry, name));
 }
 
 test("gerekçesiz susturma yakalanır, gerekçeli olan geçer", () => {
@@ -548,20 +418,26 @@ test("gerekçesiz susturma yakalanır, gerekçeli olan geçer", () => {
 
 test("Sonar kapsamında gerekçesiz susturma yok", () => {
   const offenders = [];
-  for (const dir of roots)
-    for (const file of files(path.join(root, dir)))
+  for (const entry of roots)
+    for (const file of files(path.join(root, entry)))
       for (const line of bareSuppressions(fs.readFileSync(file, "utf8")))
         offenders.push(`${path.relative(root, file)}:${line}`);
   assert.deepEqual(offenders, []);
 });
 ```
 
+`package.json`:
+
+```json
+"test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs",
+```
+
 - [ ] **Adım 2: Testi çalıştır, kırmızı olduğunu gör**
 
 Çalıştır: `node --test tests/sonar-suppressions.test.mjs`
-Beklenen: FAIL. `The requested module '../scripts/sonar-gate.mjs' does not provide an export named 'bareSuppressions'`.
+Beklenen: FAIL. `does not provide an export named 'bareSuppressions'`.
 
-- [ ] **Adım 3: `bareSuppressions`'ı `scripts/sonar-gate.mjs`'e ekle**
+- [ ] **Adım 3: `bareSuppressions`'ı `scripts/sonar-gate.mjs`'in sonuna ekle**
 
 ```js
 /** Gerekçesi olmayan Sonar susturma yorumlarının satır numaraları (1'den).
@@ -585,16 +461,10 @@ export function bareSuppressions(text) {
 }
 ```
 
-- [ ] **Adım 4: `test:quality`'ye ekle ve testleri çalıştır**
-
-`package.json`:
-
-```json
-"test:quality": "node --test tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs",
-```
+- [ ] **Adım 4: Testleri çalıştır**
 
 Çalıştır: `pnpm test:quality`
-Beklenen: PASS. `sonar-gate` 11/11 ve `sonar-suppressions` 2/2. Depoda bugün susturma yoksa ikinci test hemen geçer; birinci test deseni sınar.
+Beklenen: PASS, toplam 54. Depoda bugün hiç susturma yok; ikinci test hemen geçer, birinci test deseni sınar.
 
 - [ ] **Adım 5: Commit**
 
@@ -603,32 +473,1099 @@ git add scripts/sonar-gate.mjs tests/sonar-suppressions.test.mjs package.json
 git commit -m "Sonar: gerekçesiz susturma testi"
 ```
 
+### Görev 3: Yerel ortam: imajlar, ortak yollar, kilit
 
-### Görev 3: Kapının ilk sonucu
+**Files:**
+- Create: `scripts/sonar-local.mjs`
+- Modify: `package.json` (`test:quality`)
+- Test: `tests/sonar-local.test.mjs`
 
-**Files:** yok (yalnızca rapor)
+**Interfaces:**
+- Produces: `scripts/sonar-local.mjs` →
+  - `SONARQUBE_IMAGE: string`, `SCANNER_IMAGE: string`
+  - `gitCommonDir(cwd: string): string | null` (mutlak yol)
+  - `mainCheckoutRoot(cwd: string): string`
+  - `findNativeScanner(mainRoot: string): string | undefined`
+  - `containerNeedsRebuild({ image: string, portBindings: object | null }, expectedImage: string): boolean`
+  - `acquireLock(lockDir: string, options?: { pid?, isAlive?, now?, sleep?, timeoutMs?, pollMs?, onWait? }): Promise<() => void>` (dönen işlev kilidi bırakır)
 
-Keşif taraması (plan yazılırken, SCM kapalı, `sonarqube:community` = 26.9) 468 sorun, 0 güvenlik noktası ve %0,5 kod tekrarı buldu. Kod tekrarı sınırı %3 olarak kalır, kullanıcı kararı gerekmez. Ayrıntılar aşağıdaki temizlik görevlerinde.
+- [ ] **Adım 1: Testleri yaz**
 
-- [ ] **Adım 1: Kapıyı sabit sürümle çalıştır ve keşifle karşılaştır**
+`tests/sonar-local.test.mjs`:
 
-Çalıştır: `pnpm quality:gate > reports/gate-baseline.txt; echo "exit=$?"`
-Beklenen: `exit=1`; `reports/sonar-gate.json`'da 468 sorun, 0 güvenlik noktası, `duplication` 0.5.
+```js
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  SCANNER_IMAGE,
+  SONARQUBE_IMAGE,
+  acquireLock,
+  containerNeedsRebuild,
+  findNativeScanner,
+  gitCommonDir,
+  mainCheckoutRoot,
+} from "../scripts/sonar-local.mjs";
 
-Kurala göre sayım:
+// Yerel Sonar ortamı: imajlar, worktree'lerin ortak yolları, kapsayıcının
+// yeniden kurulması ve aynı anda tek kapıya izin veren kilit.
+function tempDir(t) {
+  const dir = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), "derslik-sonar-local-")),
+  );
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+// Kancadan ya da başka bir git işleminden sızan GIT_* değişkenleri ve
+// kullanıcının genel ayarları geçici depoları etkilemesin.
+const cleanEnv = (home) => ({
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+  ),
+  HOME: home,
+  GIT_CONFIG_NOSYSTEM: "1",
+});
+const git = (cwd, home, ...args) =>
+  execFileSync("git", args, { cwd, stdio: "pipe", env: cleanEnv(home) });
+function lockHeldBy(lock, pid) {
+  fs.mkdirSync(lock, { recursive: true });
+  fs.writeFileSync(path.join(lock, "pid"), String(pid));
+}
+
+test("imajlar tam sürüme sabit", () => {
+  assert.equal(SONARQUBE_IMAGE, "sonarqube:26.9.0.129388-community");
+  assert.equal(
+    SCANNER_IMAGE,
+    "sonarsource/sonar-scanner-cli:12.2.0.4256_8.1.0",
+  );
+});
+
+test("worktree'de ortak git klasörü ve ana checkout bulunur", (t) => {
+  const dir = tempDir(t);
+  const main = path.join(dir, "main");
+  fs.mkdirSync(main);
+  git(main, dir, "init", "-q");
+  git(main, dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "ilk");
+  const worktree = path.join(dir, "wt");
+  git(main, dir, "worktree", "add", "-q", worktree);
+  assert.equal(gitCommonDir(worktree), path.join(main, ".git"));
+  assert.equal(mainCheckoutRoot(worktree), main);
+  assert.equal(mainCheckoutRoot(main), main);
+});
+
+test("git deposu dışında ana checkout çalışılan klasördür", (t) => {
+  const dir = tempDir(t);
+  assert.equal(gitCommonDir(dir), null);
+  assert.equal(mainCheckoutRoot(dir), dir);
+});
+
+test("yerel tarayıcı ana checkout'un araç önbelleğinde aranır, en yenisi seçilir", (t) => {
+  const dir = tempDir(t);
+  assert.equal(findNativeScanner(dir), undefined);
+  const base = path.join(dir, "reports", "quality", "tool-cache");
+  fs.mkdirSync(base, { recursive: true });
+  fs.writeFileSync(path.join(base, "sonar-scanner-cli-8.1.0.6389.zip"), "");
+  for (const version of ["8.0.0.1", "8.1.0.6389"]) {
+    const bin = path.join(base, `sonar-scanner-${version}-macosx-aarch64`, "bin");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "sonar-scanner"), "#!/bin/sh\n", {
+      mode: 0o755,
+    });
+  }
+  assert.equal(
+    findNativeScanner(dir),
+    path.join(base, "sonar-scanner-8.1.0.6389-macosx-aarch64", "bin", "sonar-scanner"),
+  );
+});
+
+test("çalıştırılamayan tarayıcı dosyası seçilmez", (t) => {
+  const dir = tempDir(t);
+  const bin = path.join(dir, "reports", "quality", "tool-cache", "sonar-scanner-8.1.0.6389-macosx-aarch64", "bin");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, "sonar-scanner"), "", { mode: 0o644 });
+  assert.equal(findNativeScanner(dir), undefined);
+});
+
+test("kapsayıcı sabit imajla ve yalnızca 127.0.0.1'de değilse yeniden kurulur", () => {
+  const local = { "9000/tcp": [{ HostIp: "127.0.0.1", HostPort: "9000" }] };
+  const check = (image, portBindings) =>
+    containerNeedsRebuild({ image, portBindings }, SONARQUBE_IMAGE);
+  assert.equal(check(SONARQUBE_IMAGE, local), false);
+  assert.equal(check("sonarqube:community", local), true);
+  assert.equal(
+    check(SONARQUBE_IMAGE, { "9000/tcp": [{ HostIp: "", HostPort: "9000" }] }),
+    true,
+  );
+  assert.equal(
+    check(SONARQUBE_IMAGE, { "9000/tcp": [{ HostIp: "0.0.0.0", HostPort: "9000" }] }),
+    true,
+  );
+  assert.equal(check(SONARQUBE_IMAGE, null), true);
+});
+
+test("boş kilit hemen alınır, bırakılınca silinir", async (t) => {
+  const lock = path.join(tempDir(t), "yok", "sonar-gate.lock");
+  const release = await acquireLock(lock, { pid: 4242 });
+  assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "4242");
+  release();
+  assert.equal(fs.existsSync(lock), false);
+  release(); // ikinci bırakma zararsız
+});
+
+test("yaşayan sahibin kilidi beklenir; sahibi bırakınca alınır", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  lockHeldBy(lock, 1111);
+  const waits = [];
+  const release = await acquireLock(lock, {
+    pid: 2222,
+    isAlive: (pid) => pid === 1111,
+    onWait: (owner) => waits.push(owner),
+    sleep: async () => fs.rmSync(lock, { recursive: true, force: true }),
+  });
+  assert.deepEqual(waits, [1111]);
+  assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "2222");
+  release();
+});
+
+test("kilit süre içinde alınamazsa kapı hata verir, başkasının kilidine dokunmaz", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  lockHeldBy(lock, 1111);
+  let clock = 0;
+  await assert.rejects(
+    acquireLock(lock, {
+      pid: 2222,
+      isAlive: () => true,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+      },
+      timeoutMs: 10_000,
+      pollMs: 2000,
+    }),
+    /kilit/,
+  );
+  assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "1111");
+});
+
+test("sahibi yaşamayan bayat kilit hemen alınır", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  lockHeldBy(lock, 1111);
+  const release = await acquireLock(lock, {
+    pid: 2222,
+    isAlive: () => false,
+    timeoutMs: 0,
+  });
+  assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "2222");
+  release();
+});
+
+test("sahibi yazılmamış kilit yeniyse beklenir, 30 saniyeden eskiyse alınır", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  fs.mkdirSync(lock);
+  await assert.rejects(acquireLock(lock, { pid: 2222, timeoutMs: 0 }), /kilit/);
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(lock, old, old);
+  const release = await acquireLock(lock, { pid: 2222, timeoutMs: 0 });
+  release();
+  assert.equal(fs.existsSync(lock), false);
+});
+
+test("bırakma yalnızca kendi kilidini siler", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  const release = await acquireLock(lock, { pid: 2222 });
+  fs.writeFileSync(path.join(lock, "pid"), "3333");
+  release();
+  assert.equal(fs.existsSync(lock), true);
+});
+```
+
+`package.json`:
+
+```json
+"test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs",
+```
+
+- [ ] **Adım 2: Testleri çalıştır, kırmızı olduğunu gör**
+
+Çalıştır: `node --test tests/sonar-local.test.mjs`
+Beklenen: FAIL. `Cannot find module '…/scripts/sonar-local.mjs'`.
+
+- [ ] **Adım 3: Modülü yaz**
+
+`scripts/sonar-local.mjs`:
+
+```js
+// Yerel Sonar ortamı: sabit imajlar, ana checkout'un yolları (worktree'ler
+// parolayı, yerel tarayıcıyı ve önbelleği oradan paylaşır), kapsayıcının
+// yeniden kurulma koşulu ve aynı anda tek kapıya izin veren kilit.
+// tests/sonar-local.test.mjs ile sınanır.
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+// Yerelde ve CI'da aynı kurallar çalışsın diye imajlar tam sürüme sabit.
+// Yükseltme ayrı iştir; yeni kurallar yeni sorunlar getirebilir.
+export const SONARQUBE_IMAGE = "sonarqube:26.9.0.129388-community";
+export const SCANNER_IMAGE = "sonarsource/sonar-scanner-cli:12.2.0.4256_8.1.0";
+
+/** Bütün worktree'lerin paylaştığı git klasörü (ana checkout'un .git'i).
+ *  Git deposu değilse null. */
+export function gitCommonDir(cwd) {
+  try {
+    return execFileSync(
+      "git",
+      ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+  } catch {
+    return null;
+  }
+}
+
+/** Ana checkout'un kökü; worktree'de de ana kopya, git yoksa cwd. */
+export function mainCheckoutRoot(cwd) {
+  const common = gitCommonDir(cwd);
+  return common ? path.dirname(common) : cwd;
+}
+
+/** Ana checkout'taki yerel (native) tarayıcı. Yoksa undefined: Docker
+ *  tarayıcısı kullanılır. Birden çok sürüm varsa en yenisi. */
+export function findNativeScanner(mainRoot) {
+  const base = path.join(mainRoot, "reports", "quality", "tool-cache");
+  let names;
+  try {
+    names = fs.readdirSync(base);
+  } catch {
+    return undefined;
+  }
+  const candidates = names
+    .filter((name) => name.startsWith("sonar-scanner-"))
+    .sort()
+    .reverse();
+  for (const name of candidates) {
+    const bin = path.join(base, name, "bin", "sonar-scanner");
+    try {
+      fs.accessSync(bin, fs.constants.X_OK);
+      return bin;
+    } catch {
+      // Burada çalıştırılabilir tarayıcı yok (ör. indirilen zip).
+    }
+  }
+  return undefined;
+}
+
+/** Var olan kapsayıcı sabit imajla ve yalnızca 127.0.0.1'e bağlı çalışmıyorsa
+ *  yeniden kurulmalı. Docker "bütün arayüzler" için HostIp'i boş bırakır. */
+export function containerNeedsRebuild({ image, portBindings }, expectedImage) {
+  if (image !== expectedImage) return true;
+  const bindings = Object.values(portBindings ?? {}).flat();
+  return (
+    bindings.length === 0 ||
+    bindings.some((binding) => binding?.HostIp !== "127.0.0.1")
+  );
+}
+
+const processAlive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM: süreç var ama başka kullanıcının.
+    return error.code === "EPERM";
+  }
+};
+
+function readOwner(file) {
+  try {
+    const pid = Number(fs.readFileSync(file, "utf8").trim());
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function lockAge(lockDir, now) {
+  try {
+    return now() - fs.statSync(lockDir).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+/** Sahibi yazılmamış kilit bu süreden eskiyse bayattır (yazan süreç çöktü). */
+const OWNERLESS_STALE_MS = 30_000;
+
+/** Aynı anda tek Sonar kapısı. Kilit klasörünü alır (mkdir atomiktir) ve
+ *  bırakma işlevini döndürür. Sahibi yaşamayan kilit bayattır, alınır.
+ *  Süre içinde alınamazsa hata verir. */
+export async function acquireLock(lockDir, options = {}) {
+  const {
+    pid = process.pid,
+    isAlive = processAlive,
+    now = Date.now,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    timeoutMs = 600_000,
+    pollMs = 2000,
+    onWait = () => {},
+  } = options;
+  const ownerFile = path.join(lockDir, "pid");
+  fs.mkdirSync(path.dirname(lockDir), { recursive: true });
+  const started = now();
+  let waited = false;
+  for (;;) {
+    try {
+      fs.mkdirSync(lockDir);
+      fs.writeFileSync(ownerFile, String(pid));
+      return () => {
+        if (readOwner(ownerFile) === pid)
+          fs.rmSync(lockDir, { recursive: true, force: true });
+      };
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+    const owner = readOwner(ownerFile);
+    const stale =
+      owner === null
+        ? lockAge(lockDir, now) > OWNERLESS_STALE_MS
+        : !isAlive(owner);
+    if (stale) {
+      fs.rmSync(lockDir, { recursive: true, force: true });
+      continue;
+    }
+    if (now() - started >= timeoutMs)
+      throw new Error(
+        `Sonar kapısı: kilit ${Math.round(timeoutMs / 60_000)} dakikada alınamadı (${lockDir}).`,
+      );
+    if (!waited) {
+      onWait(owner);
+      waited = true;
+    }
+    await sleep(pollMs);
+  }
+}
+```
+
+- [ ] **Adım 4: Testleri çalıştır, geçtiğini gör**
+
+Çalıştır: `node --test tests/sonar-local.test.mjs && pnpm test:quality`
+Beklenen: PASS. `sonar-local` 12/12; `test:quality` toplamı 66.
+
+- [ ] **Adım 5: Commit**
+
+```bash
+git add scripts/sonar-local.mjs tests/sonar-local.test.mjs package.json
+git commit -m "Sonar: sabit imajlar, worktree'lerin ortak yolları ve kapı kilidi"
+```
+
+### Görev 4: `sonar.mjs`'i kapıya bağla
+
+**Files:**
+- Modify: `scripts/sonar-report.mjs` (Docker tarayıcısında sabit imaj ve platform)
+- Modify: `scripts/sonar.mjs` (ortak yollar, kapsayıcı denetimi, sabit sunucu imajı, `--gate`, kilit)
+- Modify: `sonar-project.properties` (`sonar.scm.disabled=true`)
+- Modify: `package.json` (`quality:gate`)
+- Test: `tests/sonar-report.test.mjs` (Docker tarayıcı testi)
+
+**Interfaces:**
+- Consumes: Görev 1 (`collectPages`, `evaluateGate`), Görev 3 (`SONARQUBE_IMAGE`, `SCANNER_IMAGE`, `acquireLock`, `containerNeedsRebuild`, `findNativeScanner`, `gitCommonDir`), mevcut `scripts/sonar-report.mjs` (`waitForAnalysis(request, taskId)`, `scannerTaskId(file)`, `scannerInvocation({...})`).
+- Produces: `node scripts/sonar.mjs --gate` ve `pnpm quality:gate`: çıkış 0 (geçti) ya da 0 dışı; ilk satır `Sonar kapısı: <kök> (Node <sürüm>)`; `reports/sonar-gate.json` (`evaluateGate` sonucu). `pnpm quality:sonar`'ın davranışı değişmez.
+
+- [ ] **Adım 1: Docker tarayıcı testini sabit imaja göre güncelle**
+
+`tests/sonar-report.test.mjs`'in importlarına ekle:
+
+```js
+import { SCANNER_IMAGE } from "../scripts/sonar-local.mjs";
+```
+
+"default Docker scanner preserves its container network and keeps token out of arguments" testinin sonuna (kapanış `});`'den önce) ekle:
+
+```js
+  const image = invocation.args.indexOf(SCANNER_IMAGE);
+  assert.ok(image > 0, "sabit tarayıcı imajı kullanılır");
+  assert.deepEqual(invocation.args.slice(image - 2, image), [
+    "--platform",
+    "linux/amd64",
+  ]);
+```
+
+- [ ] **Adım 2: Testi çalıştır, kırmızı olduğunu gör**
+
+Çalıştır: `node --test tests/sonar-report.test.mjs`
+Beklenen: FAIL. `sabit tarayıcı imajı kullanılır`.
+
+- [ ] **Adım 3: `scannerInvocation`'da sabit imaj ve platform**
+
+`scripts/sonar-report.mjs`'in başına:
+
+```js
+import { SCANNER_IMAGE } from "./sonar-local.mjs";
+```
+
+Docker dalındaki argümanlarda `"sonarsource/sonar-scanner-cli",` satırının yerine:
+
+```js
+      // İmajın arm64 sürümü yok; Apple Silicon'da öykünmeyle çalışır.
+      "--platform",
+      "linux/amd64",
+      SCANNER_IMAGE,
+```
+
+Çalıştır: `node --test tests/sonar-report.test.mjs`
+Beklenen: PASS 9/9.
+
+- [ ] **Adım 4: `scripts/sonar.mjs`'te ortak yollar**
+
+Başlık yorumunun ilk cümlesinden sonra ekle: `// --gate: tarar, açık sorunları listeler ve sorun varsa 1 ile çıkar (commit kancası).`
+
+Importlara ekle:
+
+```js
+import { collectPages, evaluateGate } from "./sonar-gate.mjs";
+import {
+  SONARQUBE_IMAGE,
+  acquireLock,
+  containerNeedsRebuild,
+  findNativeScanner,
+  gitCommonDir,
+} from "./sonar-local.mjs";
+```
+
+`const root = …` satırından hemen sonra:
+
+```js
+// Worktree'ler parolayı, yerel tarayıcıyı ve önbelleği ana checkout'tan
+// paylaşır. Kilit bütün kopyaların ortak git klasöründedir.
+const COMMON_DIR = gitCommonDir(root);
+const MAIN_ROOT = COMMON_DIR ? path.dirname(COMMON_DIR) : root;
+const LOCK_DIR = path.join(
+  COMMON_DIR ?? path.join(root, ".scannerwork"),
+  "sonar-gate.lock",
+);
+const gate = process.argv.includes("--gate");
+```
+
+`SCANNER_PATH` ve `SCANNER_HOME` tanımlarının yerine:
+
+```js
+const SCANNER_PATH = process.env.SONAR_SCANNER_PATH
+  ? path.resolve(root, process.env.SONAR_SCANNER_PATH)
+  : findNativeScanner(MAIN_ROOT);
+const SCANNER_HOME = process.env.SONAR_USER_HOME
+  ? path.resolve(root, process.env.SONAR_USER_HOME)
+  : path.join(MAIN_ROOT, "reports", "quality", "cache");
+```
+
+`secretFile` tanımının yerine:
+
+```js
+const secretFile = process.env.SONAR_ADMIN_FILE
+  ? path.resolve(root, process.env.SONAR_ADMIN_FILE)
+  : path.join(MAIN_ROOT, "reports", ".sonar-admin");
+```
+
+- [ ] **Adım 5: `ensureServer()`'da kapsayıcı denetimi ve sabit sunucu imajı**
+
+`ensureServer()`'da ağ bloğundan sonra, `const state = …`'ten önce:
+
+```js
+  // Sabit sürümden farklı ya da bütün ağ arayüzlerine açık bir kapsayıcı
+  // yeniden kurulur. Veri birimleri silinmez: analizler ve parola korunur.
+  const current = spawnSync(
+    "docker",
+    [
+      "inspect",
+      "-f",
+      "{{.Config.Image}}|{{json .HostConfig.PortBindings}}",
+      CONTAINER,
+    ],
+    { encoding: "utf8" },
+  );
+  if (current.status === 0) {
+    const [image, bindings] = current.stdout.trim().split("|");
+    if (
+      containerNeedsRebuild(
+        { image, portBindings: JSON.parse(bindings) },
+        SONARQUBE_IMAGE,
+      )
+    ) {
+      console.log(
+        `SonarQube kapsayıcısı ${SONARQUBE_IMAGE} ile, yalnızca 127.0.0.1'de yeniden kuruluyor (veri korunur)...`,
+      );
+      docker(["rm", "-f", CONTAINER]);
+    }
+  }
+```
+
+`docker run` argümanlarındaki `"sonarqube:community",` yerine `SONARQUBE_IMAGE,` yazılır.
+
+- [ ] **Adım 6: Kapı modu**
+
+`summary()` işlevinden sonra:
+
+```js
+async function enforceGate(auth, taskId) {
+  const request = (method, pathname) => api(method, pathname, auth);
+  // Yalnızca bu taramanın işlenmiş sonucu okunur (ceTaskId).
+  await waitForAnalysis(request, taskId);
+  const json = async (pathname) => {
+    const res = await request("GET", pathname);
+    if (!res.ok)
+      throw new Error(`SonarQube API ${res.status}: ${pathname.split("?")[0]}`);
+    return res.json();
+  };
+  const issues = await collectPages(async (p) => {
+    const r = await json(
+      `/api/issues/search?components=${PROJECT}&resolved=false&ps=500&p=${p}`,
+    );
+    return { items: r.issues, total: r.paging?.total ?? r.total };
+  });
+  const hotspots = await collectPages(async (p) => {
+    const r = await json(
+      `/api/hotspots/search?projectKey=${PROJECT}&status=TO_REVIEW&ps=500&p=${p}`,
+    );
+    return { items: r.hotspots, total: r.paging?.total };
+  });
+  const measures = await json(
+    `/api/measures/component?component=${PROJECT}&metricKeys=duplicated_lines_density`,
+  );
+  const duplication = Number(
+    measures.component?.measures?.find(
+      (m) => m.metric === "duplicated_lines_density",
+    )?.value,
+  );
+  const result = evaluateGate({ issues, hotspots, duplication });
+  const output = path.join(root, "reports", "sonar-gate.json");
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  fs.writeFileSync(output, JSON.stringify(result, null, 2) + "\n");
+  for (const line of result.text) console.log(line);
+  console.log(
+    `\nAyrıntılar: ${HOST}/dashboard?id=${PROJECT} · liste: reports/sonar-gate.json`,
+  );
+  return result.failed;
+}
+```
+
+Dosyanın sonundaki akışta `ensureDocker();` satırından önce:
+
+```js
+if (gate) {
+  console.log(`Sonar kapısı: ${root} (Node ${process.version})`);
+  const release = await acquireLock(LOCK_DIR, {
+    onWait: (owner) =>
+      console.log(`Başka bir tarama sürüyor (pid ${owner}); sıra bekleniyor...`),
+  });
+  // process.exit dahil her çıkışta kilit bırakılır; Ctrl-C de çıkış sayılır.
+  process.on("exit", release);
+  for (const signal of ["SIGINT", "SIGTERM"])
+    process.once(signal, () => process.exit(130));
+}
+```
+
+Son satır `await summary(auth, scannerTaskId(taskFile));` yerine:
+
+```js
+const taskId = scannerTaskId(taskFile);
+if (gate) {
+  // Kapı kapalıyken güvenli: okuma hatası da kapıyı düşürür.
+  const failed = await enforceGate(auth, taskId).catch((error) => {
+    console.error(`Sonar kapısı: ${error.message}`);
+    return true;
+  });
+  process.exit(failed ? 1 : 0);
+}
+await summary(auth, taskId);
+```
+
+- [ ] **Adım 7: `sonar-project.properties` ve `package.json`**
+
+`sonar-project.properties`'e:
+
+```properties
+# Kapı bütün açık sorunlara bakar; "yeni kod" için git blame gerekmez.
+# Ayrıca worktree'lerde .git bir dosyadır ve ana depoyu gösterir; Docker
+# tarayıcısına bağlanmadığı için tarama "Unable to open Git repository" ile
+# düşüyordu. Sonar kaynaklarında git'in yok saydığı dosya yok (2026-10-02).
+sonar.scm.disabled=true
+```
+
+`package.json` `scripts`'e:
+
+```json
+"quality:gate": "node scripts/sonar.mjs --gate",
+```
+
+- [ ] **Adım 8: Testleri ve tip denetimini çalıştır**
+
+Çalıştır: `pnpm test:quality && pnpm typecheck && pnpm lint`
+Beklenen: PASS; `test:quality` toplamı 66. Gerçek sunucuda deneme Görev 5'te, kullanıcı onayından sonra.
+
+- [ ] **Adım 9: Commit**
+
+```bash
+git add scripts/sonar.mjs scripts/sonar-report.mjs tests/sonar-report.test.mjs sonar-project.properties package.json
+git commit -m "Sonar kapısı: quality:gate, ortak yollar, kilit, sabit sunucu imajı"
+```
+
+### Görev 5: Sunucu düzeni ve kapının ilk sonucu
+
+**Files:** yok (bir kerelik makine düzeni ve rapor)
+
+**Interfaces:**
+- Consumes: Görev 4 (`pnpm quality:gate`)
+- Produces: tek sunucu `derslik-sonarqube` (`sonarqube:26.9.0.129388-community`, `127.0.0.1:9000`); parola `<ana checkout>/reports/.sonar-admin`; temizlik görevlerinin kullandığı `reports/sonar-gate.json` ve kurala göre sayım.
+
+- [ ] **Adım 1: Kullanıcıdan onay al**
+
+Kullanıcıya şunları göster ve açık onay iste:
+- Parola dosyası `.claude/worktrees/lesson-booking/reports/.sonar-admin` → ana checkout'ta `reports/.sonar-admin` (izin 600).
+- `docker stop derslik-quality-sonar` (Codex denetiminin sunucusu; silinmez).
+- İlk `pnpm quality:gate`, `derslik-sonarqube` kapsayıcısını `docker rm -f` ile silip sabit imajla ve yalnızca `127.0.0.1:9000`'de yeniden kurar. Veri birimleri kalır.
+
+Onay gelmeden sonraki adımlara geçilmez.
+
+- [ ] **Adım 2: Parolayı taşı, Codex sunucusunu durdur**
+
+```bash
+MAIN=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+test ! -e "$MAIN/reports/.sonar-admin" && mv reports/.sonar-admin "$MAIN/reports/.sonar-admin" && chmod 600 "$MAIN/reports/.sonar-admin"
+docker stop derslik-quality-sonar
+```
+
+Beklenen: `ls -l "$MAIN/reports/.sonar-admin"` `-rw-------` gösterir; `docker ps` listesinde `derslik-quality-sonar` yok.
+
+- [ ] **Adım 3: Kapıyı ilk kez çalıştır**
+
+Çalıştır: `pnpm quality:gate > reports/gate-baseline.txt 2>&1; echo "exit=$?"`
+Beklenen: `exit=1`. Çıktının başında `Sonar kapısı: …/lesson-booking (Node v24.21.0)` ve kapsayıcının yeniden kurulduğunu söyleyen satır; sonunda `Sonar kapısı: GEÇMEDİ`. `reports/sonar-gate.json` yazılmış olur.
+
+Çalıştır: `docker inspect -f '{{.Config.Image}} {{json .HostConfig.PortBindings}}' derslik-sonarqube`
+Beklenen: `sonarqube:26.9.0.129388-community {"9000/tcp":[{"HostIp":"127.0.0.1","HostPort":"9000"}]}`.
+
+- [ ] **Adım 4: Sayımı Codex denetimiyle karşılaştır**
 
 ```bash
 node -e 'const r=require("./reports/sonar-gate.json");const c={};for(const i of r.issues)c[i.rule]=(c[i.rule]||0)+1;console.log(r.issues.length,r.hotspots.length,r.duplication,JSON.stringify(Object.entries(c).sort((a,b)=>b[1]-a[1])))'
 ```
 
-Sayılar keşiften farklıysa (ör. sürüm farkı), fark ledger'a not edilir. Temizlik görevlerindeki listeler zaten her görevin başında yeniden çıkarıldığı için plan değişmez.
+Beklenen: yaklaşık 471 sorun (Codex denetimi; aşağıdaki temizlik görevlerinin sayıları buradan), 0 güvenlik noktası, `duplication` 0.5. Görev 1–4'te eklenen betikler birkaç yeni sorun getirmiş olabilir (ör. `javascript:S4036`); bunlar ilgili temizlik görevinin kuralları arasındadır. Sayılar ve fark kullanıcıya bildirilir.
+
+- [ ] **Adım 5: Kapalıyken güvenli olduğunu dene**
+
+Çalıştır: `SONAR_ADMIN_PASSWORD=yanlis pnpm quality:gate; echo "exit=$?"; test -e "$(git rev-parse --git-common-dir)/sonar-gate.lock" && echo "kilit kaldı" || echo "kilit bırakıldı"`
+Beklenen: yönetici girişi hatası, `exit=1`, `kilit bırakıldı`.
+
+### Görev 6: Commit kancası
+
+**Files:**
+- Create: `.githooks/pre-commit` (çalıştırılabilir)
+- Modify: `package.json` (`prepare`, `test:quality`)
+- Test: `tests/sonar-hook.test.mjs`
+
+**Interfaces:**
+- Consumes: `node scripts/sonar.mjs --gate` (Görev 4); çıkış kodu 0 = geçti.
+- Produces: `.githooks/pre-commit`; `prepare` betiği. Kanca bu görevde açılmaz (Görev 8).
+
+- [ ] **Adım 1: Testleri yaz**
+
+`tests/sonar-hook.test.mjs`:
+
+```js
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+// Commit kancası: uygun Node'u bulur, Sonar kapısını çalıştırır, kapı
+// geçmezse commit'i durdurur. Gerçek Sonar yerine sahte bir "node" çağrıyı
+// kaydeder; "-e" ile sorulan sürüm denetimine verilen yanıtla eski ya da
+// uygun Node gibi davranır.
+const root = path.resolve(import.meta.dirname, "..");
+const hook = path.join(root, ".githooks", "pre-commit");
+const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const realGit = execFileSync("sh", ["-c", "command -v git"], {
+  encoding: "utf8",
+}).trim();
+
+function fakeNode(dir, { supported }) {
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, "node");
+  fs.writeFileSync(
+    file,
+    [
+      "#!/bin/sh",
+      `if [ "$1" = "-e" ]; then exit ${supported ? 0 : 1}; fi`,
+      'printf "%s\\n" "$0" "$@" > "$CALLS"',
+      'exit "${GATE_EXIT:-0}"',
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  return file;
+}
+
+// Yalnızca sahte node'lar ve git: makinenin gerçek node'u PATH'e girmez.
+function sandbox(t) {
+  const dir = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), "derslik-hook-")),
+  );
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const tools = path.join(dir, "tools");
+  fs.mkdirSync(tools);
+  fs.symlinkSync(realGit, path.join(tools, "git"));
+  const repo = path.join(dir, "repo");
+  fs.mkdirSync(repo);
+  const box = { dir, tools, repo, calls: path.join(dir, "calls") };
+  execFileSync(realGit, ["init", "-q"], { cwd: repo, env: env(box, {}) });
+  return box;
+}
+function env(box, { pathDirs = [], nvmDir, gateExit = 0 }) {
+  return {
+    PATH: [...pathDirs, box.tools].join(":"),
+    HOME: box.dir,
+    GIT_CONFIG_NOSYSTEM: "1",
+    NVM_DIR: nvmDir ?? path.join(box.dir, "nvm-yok"),
+    CALLS: box.calls,
+    GATE_EXIT: String(gateExit),
+  };
+}
+const runHook = (box, options) =>
+  spawnSync("sh", [hook], { cwd: box.repo, encoding: "utf8", env: env(box, options) });
+const calls = (box) => fs.readFileSync(box.calls, "utf8").trim().split("\n");
+
+test("kanca dosyası çalıştırılabilir", () => {
+  assert.ok(fs.statSync(hook).mode & 0o111);
+});
+
+test("PATH'teki uygun Node kapıyı çalıştırır; kapı geçerse kanca geçer", (t) => {
+  const box = sandbox(t);
+  const bin = path.join(box.dir, "bin");
+  fakeNode(bin, { supported: true });
+  const r = runHook(box, { pathDirs: [bin] });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(calls(box).slice(1), [
+    path.join(box.repo, "scripts", "sonar.mjs"),
+    "--gate",
+  ]);
+});
+
+test("kapı geçmezse kanca commit'i durdurur", (t) => {
+  const box = sandbox(t);
+  const bin = path.join(box.dir, "bin");
+  fakeNode(bin, { supported: true });
+  const r = runHook(box, { pathDirs: [bin], gateExit: 1 });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /commit durduruldu/);
+});
+
+test("PATH'te eski Node varsa nvm'deki uygun en yeni sürüm kullanılır", (t) => {
+  const box = sandbox(t);
+  const bin = path.join(box.dir, "bin");
+  fakeNode(bin, { supported: false });
+  const nvm = path.join(box.dir, "nvm");
+  for (const [version, supported] of [
+    ["v22.12.0", false],
+    ["v22.13.1", true],
+    ["v24.21.0", true],
+  ])
+    fakeNode(path.join(nvm, "versions", "node", version, "bin"), { supported });
+  const r = runHook(box, { pathDirs: [bin], nvmDir: nvm });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(
+    calls(box)[0],
+    path.join(nvm, "versions", "node", "v24.21.0", "bin", "node"),
+  );
+});
+
+test("uygun Node yoksa commit durur ve nedeni yazılır", (t) => {
+  const box = sandbox(t);
+  const bin = path.join(box.dir, "bin");
+  fakeNode(bin, { supported: false });
+  const r = runHook(box, { pathDirs: [bin] });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Node 22\.13/);
+  assert.equal(fs.existsSync(box.calls), false);
+});
+
+test("git commit kancayı çalıştırır: kapı geçmezse commit atılmaz, geçerse atılır", (t) => {
+  const box = sandbox(t);
+  const bin = path.join(box.dir, "bin");
+  fakeNode(bin, { supported: true });
+  const commit = (gateExit) =>
+    spawnSync(
+      realGit,
+      [
+        "-c", `core.hooksPath=${path.dirname(hook)}`,
+        "-c", "user.name=t",
+        "-c", "user.email=t@t",
+        "commit", "--allow-empty", "-m", "deneme",
+      ],
+      { cwd: box.repo, encoding: "utf8", env: env(box, { pathDirs: [bin], gateExit }) },
+    );
+  const head = () =>
+    spawnSync(realGit, ["rev-parse", "--verify", "-q", "HEAD"], {
+      cwd: box.repo,
+      env: env(box, {}),
+    }).status;
+  assert.notEqual(commit(1).status, 0);
+  assert.notEqual(head(), 0, "commit atılmamalı");
+  assert.equal(commit(0).status, 0);
+  assert.equal(head(), 0, "commit atılmalı");
+});
+
+test("prepare kancayı açar, git deposu dışında hata vermez", (t) => {
+  const box = sandbox(t);
+  const prepare = pkg.scripts.prepare;
+  const inRepo = spawnSync("sh", ["-c", prepare], { cwd: box.repo, env: env(box, {}) });
+  assert.equal(inRepo.status, 0);
+  assert.equal(
+    execFileSync(realGit, ["config", "--get", "core.hooksPath"], {
+      cwd: box.repo,
+      encoding: "utf8",
+      env: env(box, {}),
+    }).trim(),
+    ".githooks",
+  );
+  const plain = path.join(box.dir, "plain");
+  fs.mkdirSync(plain);
+  assert.equal(
+    spawnSync("sh", ["-c", prepare], { cwd: plain, env: env(box, {}) }).status,
+    0,
+  );
+});
+```
+
+`package.json` `scripts`:
+
+```json
+"prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+"test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs",
+```
+
+Bu görevde `pnpm install` çalıştırılmaz: `prepare` kancayı açar ve bu görevin commit'ini kapıya takar.
+
+- [ ] **Adım 2: Testleri çalıştır, kırmızı olduğunu gör**
+
+Çalıştır: `node --test tests/sonar-hook.test.mjs`
+Beklenen: FAIL. Kanca dosyası yok (`ENOENT … .githooks/pre-commit`).
+
+- [ ] **Adım 3: Kancayı yaz**
+
+`.githooks/pre-commit`:
+
+```sh
+#!/bin/sh
+# Her commit'ten önce Sonar kapısı (pnpm quality:gate): projede açık Sonar
+# sorunu, inceleme bekleyen güvenlik noktası ya da sınırı aşan kod tekrarı
+# varsa commit atılmaz. Atlatmak (git commit --no-verify) yalnızca
+# kullanıcının açık onayıyla. Ayrıntı: AGENTS.md, docs/sonar.md.
+root=$(git rev-parse --show-toplevel) || exit 1
+
+# Node 22.13+ gerekir (package.json engines). Masaüstü uygulamalarının
+# PATH'inde eski Node olabilir; o zaman nvm'de kurulu sürümler denenir.
+supported() {
+  "$1" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)' >/dev/null 2>&1
+}
+node_bin=
+if command -v node >/dev/null 2>&1 && supported node; then
+  node_bin=node
+else
+  # Glob sırası artandır: uygun olan en yeni sürüm kalır.
+  for candidate in "${NVM_DIR:-$HOME/.nvm}"/versions/node/v*/bin/node; do
+    if [ -x "$candidate" ] && supported "$candidate"; then
+      node_bin=$candidate
+    fi
+  done
+fi
+if [ -z "$node_bin" ]; then
+  echo "Sonar kapısı: Node 22.13 ya da üstü bulunamadı (PATH ve nvm). Commit durduruldu." >&2
+  exit 1
+fi
+
+if ! "$node_bin" "$root/scripts/sonar.mjs" --gate; then
+  echo "Sonar kapısı geçmedi; commit durduruldu. Liste: reports/sonar-gate.json" >&2
+  exit 1
+fi
+```
+
+Çalıştır: `chmod +x .githooks/pre-commit`
+
+- [ ] **Adım 4: Testleri çalıştır, geçtiğini gör**
+
+Çalıştır: `node --test tests/sonar-hook.test.mjs && pnpm test:quality`
+Beklenen: PASS. `sonar-hook` 7/7; `test:quality` toplamı 73.
+
+Çalıştır: `git config --get core.hooksPath; echo "exit=$?"`
+Beklenen: çıktı yok, `exit=1` (kanca henüz kapalı).
+
+- [ ] **Adım 5: Commit**
+
+```bash
+git add .githooks/pre-commit tests/sonar-hook.test.mjs package.json
+git commit -m "Commit kancası: her commit'ten önce Sonar kapısı"
+```
+
+Çalıştır: `git ls-files -s .githooks/pre-commit`
+Beklenen: satır `100755` ile başlar.
+
+### Görev 7: Çalışma kuralı ve belge
+
+**Files:**
+- Create: `AGENTS.md`
+- Create: `CLAUDE.md`
+- Modify: `docs/sonar.md`
+
+**Interfaces:**
+- Consumes: `pnpm quality:gate`, `pnpm test:quality`, kanca, susturma biçimleri (Global Constraints)
+- Produces: her oturumun okuduğu kural dosyası
+
+- [ ] **Adım 1: `AGENTS.md`'yi yaz**
+
+```markdown
+# Derslik: çalışma kuralları
+
+Bu dosya, bu depoda çalışan herkes ve her yapay zekâ oturumu içindir.
+
+## Commit kancası
+
+Her `git commit` öncesinde `.githooks/pre-commit` Sonar kapısını
+(`pnpm quality:gate`) çalıştırır. Projede açık Sonar sorunu, inceleme
+bekleyen güvenlik noktası ya da sınırı aşan kod tekrarı varsa commit atılmaz;
+sorunlar dosya ve satırıyla listelenir. Bir commit yaklaşık 40–60 saniye
+sürer ve Docker'ın açık olmasını ister. Kanca `pnpm install` ile açılır.
+
+`git commit --no-verify` kancayı atlar. Yalnızca kullanıcının o commit için
+verdiği açık onayla kullanılır; onay bir sonraki commit'e geçmez.
+
+Kapı diskteki dosyaları tarar: commit'e eklenmemiş bir değişiklikteki sorun
+da commit'i durdurur.
+
+## Göndermeden önce
+
+`main`'e birleştirmeden ya da göndermeden önce şunların hepsi geçer:
+
+- `pnpm typecheck`
+- `pnpm mobile:typecheck`
+- `pnpm lint`
+- `pnpm test`, değişikliğe ilgili testler ve `pnpm test:quality`
+- `pnpm web:build`
+- `pnpm quality:gate` (yerel SonarQube; Docker açık olmalı)
+
+Biri kırmızıysa gönderilmez; önce düzeltilir.
+
+## Sıfır Sonar sorunu
+
+Projede açık Sonar sorunu ve inceleme bekleyen güvenlik noktası yoktur; kod
+tekrarı sınırı geçmez. Yeni kod da sorun getirmez.
+
+Gerçekten yanlış bir bulgu yalnızca gerekçeyle susturulur:
+
+- kodda `// NOSONAR: <gerekçe>`
+- ESLint'te `// eslint-disable-next-line sonarjs/<kural> -- <gerekçe>`
+- `sonar-project.properties`'te yorumuyla `sonar.issue.ignore.multicriteria`
+
+SonarQube arayüzündeki "False positive", "Safe" ya da "Accept" işaretleri
+kullanılmaz; CI'daki sunucu her çalıştırmada sıfırdan açılır.
+`pnpm test:quality` gerekçesiz susturmayı yakalar. Ayrıntı: `docs/sonar.md`.
+
+## Pencereler (modal)
+
+Pencere son boyutunda açılır; içerik gelince ya da değişince boyu değişmez,
+kaymaz.
+
+- İçerik tek seferde geliyorsa önce veri istenir, düğmede dönen gösterge
+  çıkar, pencere veri gelince açılır.
+- Pencerenin birkaç durumu varsa gövde sabit yüksekliktedir, iskelet son
+  düzenin biçimindedir, uzun listeler gövdenin içinde kayar.
+- Değişen her pencerede tarayıcıda yükseklik bütün durumlarda ölçülür.
+```
+
+`CLAUDE.md`:
+
+```markdown
+@AGENTS.md
+```
+
+- [ ] **Adım 2: `docs/sonar.md`'yi güncelle**
+
+`## SonarQube` başlığından önce bu bölüm eklenir:
+
+```markdown
+## Commit kancası ve kapı
+
+    pnpm quality:gate
+
+Kapı çalışma kopyasını yerel SonarQube'de tarar. Açık sorun, inceleme
+bekleyen güvenlik noktası ya da %3'ü aşan kod tekrarı varsa sorunları dosya ve
+satırıyla listeler (`reports/sonar-gate.json`) ve 1 ile çıkar. Test kapsamı
+kurala girmez. Her `git commit` öncesinde `.githooks/pre-commit` bu kapıyı
+çalıştırır; kapı geçmezse commit atılmaz.
+
+- Kanca `pnpm install` ile açılır (`prepare` → `git config core.hooksPath .githooks`).
+- Kanca PATH'te Node 22.13+ bulamazsa nvm'de kurulu sürümleri dener.
+- Kapı diskteki dosyaları tarar; commit'e eklenmemiş bir değişiklikteki sorun da commit'i durdurur.
+- Worktree'ler parolayı (`reports/.sonar-admin`), yerel tarayıcıyı ve önbelleği ana checkout'tan alır. Aynı anda tek kapı çalışır (`.git/sonar-gate.lock`); öteki sırasını bekler.
+- `git commit --no-verify` kancayı atlar; yalnızca kullanıcının açık onayıyla kullanılır (`AGENTS.md`).
+
+SonarQube imajı (`sonarqube:26.9.0.129388-community`) ve Docker tarayıcı
+imajı `scripts/sonar-local.mjs`'te tam sürüme sabittir. Var olan kapsayıcı
+farklı bir imajla ya da bütün ağ arayüzlerine açık çalışıyorsa veri birimleri
+korunarak yeniden kurulur.
+
+Susturma kuralı ve göndermeden önceki kontrol listesi: kökteki `AGENTS.md`.
+```
+
+Aynı dosyada iki düzeltme:
+- "`sonarqube:community` kapsayıcısı (`derslik-sonarqube`) kurulur, yönetici parolası rastgele üretilip `reports/.sonar-admin` dosyasına yazılır" cümlesinde `sonarqube:community` → `sabit sürümlü SonarQube`; `reports/.sonar-admin` → `ana checkout'taki reports/.sonar-admin`.
+- "Yeni kapsayıcı yalnızca `127.0.0.1:9000` üzerinde dinler. Önceden oluşturulmuş kapsayıcının port eşlemesi değişmez." yerine: "Kapsayıcı yalnızca `127.0.0.1:9000` üzerinde dinler; bütün arayüzlere açık eski bir kapsayıcı yeniden kurulur."
+
+- [ ] **Adım 3: Commit**
+
+```bash
+git add AGENTS.md CLAUDE.md docs/sonar.md
+git commit -m "Çalışma kuralı: commit kancası, sıfır Sonar sorunu, pencere kuralı"
+```
+
+### Görev 8: Kancayı aç ve doğrula
+
+**Files:** yok (git ayarı ve doğrulama)
+
+**Interfaces:**
+- Consumes: Görev 4–7
+- Produces: `core.hooksPath=.githooks` (repo geneli). `.githooks/pre-commit` içeren her kopyada commit'ler kapıdan geçer. `main`'de kanca, bu dal birleştirilince çalışır.
+
+- [ ] **Adım 1: Kancayı aç**
+
+Çalıştır: `git config core.hooksPath .githooks && git config --get core.hooksPath`
+Beklenen: `.githooks`.
+
+- [ ] **Adım 2: Kapı geçmezken commit engellenir**
+
+Çalıştır: `git commit --allow-empty -m "kanca denemesi"; echo "exit=$?"; git log -1 --format=%s`
+Beklenen: `Sonar kapısı: …/lesson-booking (Node v24.21.0)`, sorun listesi, `Sonar kapısı geçmedi; commit durduruldu`, `exit=1`. Son commit hâlâ Görev 7'ninki.
+
+- [ ] **Adım 3: Masaüstü PATH'iyle (Node 20) commit**
+
+Çalıştır: `env PATH=/usr/local/bin:/usr/bin:/bin git commit --allow-empty -m "kanca denemesi"; echo "exit=$?"`
+Beklenen: ilk satırda `Node v24.21.0` (nvm'den bulundu; PATH'teki `/usr/local/bin/node` v20.14), `exit=1`.
+
+- [ ] **Adım 4: Docker yokken kapı durur ve kilidi bırakır**
+
+Çalıştır: `env PATH="$(dirname "$(command -v node)")":/usr/bin:/bin node scripts/sonar.mjs --gate; echo "exit=$?"; test -e "$(git rev-parse --git-common-dir)/sonar-gate.lock" && echo "kilit kaldı" || echo "kilit bırakıldı"`
+Beklenen: `Docker çalışmıyor…`, `exit=1`, `kilit bırakıldı`.
+
+- [ ] **Adım 5: Birleştirme noktası**
+
+Kullanıcıya sor: "Kanca altyapısı hazır. Şimdi `main`'e birleştirirsem `main`'deki commit'ler de temizlik bitene kadar engellenir. Birleştireyim mi?" Kullanıcı isterse (ör. "sen birleştir"): ana checkout temiz mi bakılır, `git merge --ff-only sonar-quality-gate`, `git push`; komutlar kullanıcının terminalinde, birer birer. İstemezse temizlik bu dalda sürer ve birleştirme en sonda yapılır.
 
 ### Temizlik görevleri için ortak adımlar
 
-İlk tarama (2026-10-02, SonarQube 26.9, SCM kapalı) şunu buldu: **468 açık sorun** (445 kod kokusu, 20 güvenlik açığı, 3 hata). İnceleme bekleyen güvenlik noktası **0**. Kod tekrarı **%0,5** (10 blok; %3 sınırının altında). Yaklaşık 50,6 bin satır kod.
-
-- **Dağılım:** `apps/web` 240, `apps/mobile` 168, `apps/api` 19, `packages/contracts` 12, `packages/api-client` 3, `scripts` 26.
-- **Testler:** Test klasörlerinde sorun yok.
+Kaynak: Codex denetiminin taraması (2026-10-02, SonarQube 26.9, `daebad5`): **471 açık sorun** (449 kod kokusu, 19 güvenlik açığı, 3 hata), **0** güvenlik noktası, kod tekrarı **%0,5**. Dağılım: `apps/web` 240, `apps/mobile` 170, `apps/api` 19, `packages/contracts` 12, `packages/api-client` 3, `scripts` 25, `build` 2. Test klasörlerinde sorun yok. Görev 5'teki ilk kapı sonucu bu sayılardan farklıysa farklar görevlerin başında yeniden çıkarılır.
 
 Her temizlik görevi aynı döngüyle çalışır:
 
@@ -639,17 +1576,17 @@ Her temizlik görevi aynı döngüyle çalışır:
    ```
 
 2. Düzelt. Davranış değişmez.
-3. Doğrula: `pnpm typecheck && pnpm mobile:typecheck && pnpm lint && pnpm test`. API'ye dokunulduysa `pnpm api:test` (yerel Postgres) de çalışır.
-4. `pnpm quality:gate` çalıştır. Beklenen: görevin kurallarından hiç sorun kalmaz. Toplam sayı yalnızca azalır, yeni kural çıkmaz.
-5. Bölüm bölüm commit (`git add` ile yalnızca düzeltilen dosyalar). Görev büyükse alan alan (API, web, mobil, ortak paketler, betikler) ayrı commit'ler.
+3. Doğrula: `pnpm typecheck && pnpm mobile:typecheck && pnpm lint && pnpm test && pnpm test:quality`. API'ye dokunulduysa `pnpm api:test` (yerel Postgres) de çalışır.
+4. `pnpm quality:gate` çalıştır. Beklenen: görevin kurallarından hiç sorun kalmaz. Toplam yalnızca azalır, yeni kural çıkmaz.
+5. **Commit (kanca açık):** Kapı temizlik bitene kadar geçemez. Bölümün commit'i için kullanıcıya şunu sor: "<bölüm> düzeltmeleri hazır (<N> sorun gitti, kalan <M>). Bu commit'i `--no-verify` ile atayım mı?" Açık onay gelince: `git add <yalnızca düzeltilen dosyalar>` ve `git commit --no-verify -m "<mesaj>"`. Onay bir sonraki commit'e geçmez. Görev büyükse alan alan (API, web, mobil, ortak paketler, betikler, `build`) ayrı commit ve ayrı onay.
 
-Davranışı değiştirmesi kaçınılmaz bir düzeltme çıkarsa testle korunur ve ledger'a `Ruling:` olarak yazılır.
+Davranışı değiştirmesi kaçınılmaz bir düzeltme çıkarsa testle korunur ve kullanıcıya bildirilir.
 
-### Görev 4: Güvenlik açıkları ve hatalar (23)
+### Görev 9: Güvenlik açıkları, hatalar ve sabit IP (23)
 
 **Files:**
 - Modify: `sonar-project.properties` (gerekçeli `sonar.issue.ignore.multicriteria`)
-- Modify: `packages/api-client/src/socket.ts:196`, `scripts/mobile-security-tests.mjs:47` (gerekçeli `NOSONAR`)
+- Modify: `packages/api-client/src/socket.ts`, `scripts/mobile-security-tests.mjs`, `build/sites-vite-plugin.ts` (gerekçeli `NOSONAR`)
 - Modify: `apps/web/lib/chat-drafts.ts` ve kullanıldığı yerler
 
 **Interfaces:**
@@ -660,12 +1597,13 @@ Bulgular ve karar:
 | Kural | Yer | Karar |
 |---|---|---|
 | `typescript:S2068` ×8 | `packages/contracts/src/i18n/{es,ja,zh}.ts` | Yanlış alarm: "parola" sözcüğünün çevirisi, gerçek parola değil. Multicriteria ile i18n klasöründe susturulur. |
-| `javascript:S4036` ×8 | `scripts/{install-ci,pnpm-install,run-framework,security-zap-fixture,sonar}.mjs` | Geliştirici betikleri `docker`, `pnpm` ve `node`'u geliştiricinin PATH'iyle çağırır. Sabit yol taşınabilirliği bozar. Multicriteria ile `scripts/**`'ta susturulur. |
+| `javascript:S4036` ×7 | `scripts/{sonar,security-zap-fixture,install-ci,pnpm-install,run-framework}.mjs` (Görev 3–4'ten sonra `scripts/sonar-local.mjs` de) | Geliştirici betikleri `docker`, `git`, `pnpm` ve `node`'u geliştiricinin PATH'iyle çağırır. Sabit yol taşınabilirliği bozar. Multicriteria ile `scripts/**`'ta susturulur. Test dosyalarında çıkarsa (`tests/sonar-*.test.mjs` `git` ve `sh` çağırır) aynı gerekçeyle `tests/**` için ikinci bir ölçüt eklenir. |
 | `javascript:S5332` ×2 | `scripts/security-zap-fixture.mjs:34-35` | Yerel güvenlik taraması fikstürü `http://localhost`'ta çalışır. Multicriteria ile bu dosyada susturulur. |
-| `css:S8776` ×2 | `apps/web/app/globals.css:9,13` | Tailwind v4 `@custom-variant` sözdizimindeki `&`. Multicriteria ile bu dosyada susturulur. |
-| `typescript:S2245` ×1 | `packages/api-client/src/socket.ts:196` | Yeniden bağlanma gecikmesinin titreşimi; güvenlikle ilgisi yok. Satırda `// NOSONAR: yeniden bağlanma titreşimi, güvenlikle ilgisi yok`. |
+| `css:S8776` ×2 | `apps/web/app/globals.css:9,13` | Tailwind v4 `@custom-variant` sözdizimindeki `&`. Codex denetimi gerçek Tailwind derlemesinde doğru köke yerleştiğini gösterdi (`tests/frontend-quality.test.mjs`). Multicriteria ile bu dosyada susturulur. |
+| `typescript:S2245` ×1 | `packages/api-client/src/socket.ts` (`Math.random`, yeniden deneme gecikmesi) | Yeniden bağlanma gecikmesinin titreşimi; güvenlikle ilgisi yok. Satırda `// NOSONAR: yeniden bağlanma titreşimi, güvenlikle ilgisi yok`. |
 | `javascript:S1523` ×1 | `scripts/mobile-security-tests.mjs:47` | Güvenlik testleri depodaki mobil kodu yalıtılmış bir `vm` bağlamında çalıştırır; dış girdi yok. Satırda `// NOSONAR: depodaki kodu yalıtılmış vm bağlamında test eder`. |
-| `typescript:S4158` ×1 | `apps/web/lib/chat-drafts.ts:9` | Map başka modüllerden doldurulduğu için Sonar boş sanıyor. Map modülde gizlenir, erişim `getChatDraft` ve `setChatDraft` ile olur. Gerçek bir tasarım iyileştirmesi; susturma gerekmez. |
+| `typescript:S1313` ×1 | `build/sites-vite-plugin.ts:13` (`::ffff:127.0.0.1`) | Yerel geliştirme sunucusunun loopback izin listesi. Satırda `// NOSONAR: yerel geliştirme sunucusunun loopback izin listesi`. |
+| `typescript:S4158` ×1 | `apps/web/lib/chat-drafts.ts:9` | Map başka modüllerden doldurulduğu için Sonar boş sanıyor. Map modülde gizlenir, erişim `getChatDraft` ve `setChatDraft` ile olur. Susturma gerekmez. |
 
 - [ ] **Adım 1: `sonar-project.properties`'e gerekçeli hariçleri ekle**
 
@@ -676,7 +1614,7 @@ sonar.issue.ignore.multicriteria=i18nPassword,scriptsPath,zapHttp,tailwindVarian
 # Çeviri dosyalarında "parola" sözcüğünün çevirisi parola sanılıyor.
 sonar.issue.ignore.multicriteria.i18nPassword.ruleKey=typescript:S2068
 sonar.issue.ignore.multicriteria.i18nPassword.resourceKey=packages/contracts/src/i18n/**
-# Geliştirici betikleri docker/pnpm/node'u geliştiricinin PATH'iyle çağırır.
+# Geliştirici betikleri docker/git/pnpm/node'u geliştiricinin PATH'iyle çağırır.
 sonar.issue.ignore.multicriteria.scriptsPath.ruleKey=javascript:S4036
 sonar.issue.ignore.multicriteria.scriptsPath.resourceKey=scripts/**
 # Yerel güvenlik taraması fikstürü http://localhost'ta çalışır.
@@ -687,7 +1625,7 @@ sonar.issue.ignore.multicriteria.tailwindVariant.ruleKey=css:S8776
 sonar.issue.ignore.multicriteria.tailwindVariant.resourceKey=apps/web/app/globals.css
 ```
 
-- [ ] **Adım 2: İki gerekçeli `NOSONAR` ve `chat-drafts` düzenlemesi**
+- [ ] **Adım 2: Üç gerekçeli `NOSONAR` ve `chat-drafts` düzenlemesi**
 
 `chat-drafts.ts`'te Map dışa açılmaz:
 
@@ -704,18 +1642,18 @@ export function setChatDraft(key: string, text: string) {
 }
 ```
 
-`clearChatDrafts` aynen kalır. Kullanım yerleri (`grep -rn "chatDrafts" apps/web`) bu işlevlere geçer. Boş metni silme davranışı bugünkü kullanım yerlerinde nasılsa öyle korunur: kullanım `set` ile boş dize yazıyorsa `setChatDraft` de boş dizeyi saklamalıdır. Kodu okuyup buna göre karar ver.
+`clearChatDrafts` aynen kalır. Kullanım yerleri (`grep -rn "chatDrafts" apps/web tests`) bu işlevlere geçer. Boş metni silme davranışı bugünkü kullanım yerlerinde nasılsa öyle korunur: kullanım `set` ile boş dize yazıyorsa `setChatDraft` de boş dizeyi saklamalıdır; kodu okuyup buna göre karar ver. `tests/frontend-quality.test.mjs`'teki "exported chat draft map holds consumer drafts and clears them on logout" testi `chatDrafts` Map'ini doğrudan kullanıyor; test aynı davranışı `getChatDraft`/`setChatDraft`/`clearChatDrafts` ile sınayacak biçimde güncellenir.
 
 - [ ] **Adım 3: Doğrula ve commit**
 
-Ortak adımlar 3 ve 4. Beklenen: güvenlik açığı ve hata 0; toplam 445.
+Ortak adımlar 3–5. Beklenen: güvenlik açığı ve hata 0; toplam yaklaşık 448.
 
 ```bash
-git add sonar-project.properties packages/api-client/src/socket.ts scripts/mobile-security-tests.mjs apps/web/lib/chat-drafts.ts <kullanım yerleri>
-git commit -m "Sonar: güvenlik açıkları ve hatalar (gerekçeli susturmalar, chatDrafts erişimi)"
+git add sonar-project.properties packages/api-client/src/socket.ts scripts/mobile-security-tests.mjs build/sites-vite-plugin.ts apps/web/lib/chat-drafts.ts tests/frontend-quality.test.mjs <kullanım yerleri>
+git commit --no-verify -m "Sonar: güvenlik açıkları ve hatalar (gerekçeli susturmalar, chatDrafts erişimi)"
 ```
 
-### Görev 5: Salt okunur prop'lar (S6759, 166)
+### Görev 10: Salt okunur prop'lar (S6759, 166)
 
 **Files:** `apps/mobile/src/**` ve `apps/web/**` bileşenleri (liste ortak adım 1'den)
 
@@ -735,12 +1673,12 @@ function BookingSheet(props: Readonly<Props & { visible: boolean }>)
 
 - [ ] **Adım 1:** `typescript:S6759` örneklerini listele.
 - [ ] **Adım 2:** Her bileşenin prop tipini `Readonly<…>` ile sar.
-- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: S6759 sıfır; toplam 279.
-- [ ] **Adım 4:** Commit: `git commit -m "Sonar: bileşen prop'ları salt okunur (S6759)"` (mobil ve web ayrı commit'ler olabilir).
+- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: S6759 sıfır; toplam yaklaşık 282.
+- [ ] **Adım 4:** Ortak adım 5 ile commit: mobil ve web ayrı commit, ayrı onay. Örnek: `git commit --no-verify -m "Sonar: bileşen prop'ları salt okunur, web (S6759)"`.
 
-### Görev 6: İç içe üçlü ifadeler (S3358, 123)
+### Görev 11: İç içe üçlü ifadeler (S3358, 123)
 
-**Files:** liste ortak adım 1'den (`typescript:S3358`, `javascript:S3358`)
+**Files:** liste ortak adım 1'den (`typescript:S3358` ×122, `javascript:S3358` ×1)
 
 Kalıplar. Davranış birebir korunur.
 
@@ -775,40 +1713,41 @@ function SlotsBody({ slots }: Readonly<{ slots: Slot[] | null }>) {
 
 - [ ] **Adım 1:** Örnekleri listele; dosyaya göre grupla.
 - [ ] **Adım 2:** Dosya dosya düzelt. Her düzeltmeden sonra o dosyanın tipini denetle.
-- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: S3358 sıfır; toplam 156.
-- [ ] **Adım 4:** Alan alan commit: API, web, mobil, betikler. Örneğin `git commit -m "Sonar: iç içe üçlü ifadeler, web (S3358)"`.
+- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: S3358 sıfır; toplam yaklaşık 159.
+- [ ] **Adım 4:** Ortak adım 5 ile alan alan commit: API, web, mobil, betikler. Örnek: `git commit --no-verify -m "Sonar: iç içe üçlü ifadeler, web (S3358)"`.
 
-### Görev 7: Karmaşıklık ve derin iç içelik (S3776 ×35, S2004 ×6)
+### Görev 12: Karmaşıklık ve derin iç içelik (S3776 ×36, S2004 ×6)
 
 **Files:** liste ortak adım 1'den (`typescript:S3776`, `javascript:S3776`, `typescript:S2004`)
 
 - **Bilişsel karmaşıklık (sınır 15):** İşlevin içindeki bağımsız adımlar adlı yardımcılara çıkarılır: doğrulama, eşleme, hata çevirisi gibi. Erken dönüşle `else` derinliği azaltılır. Davranış birebir korunur.
-- **API servisleri:** Mevcut entegrasyon testleri kapsıyor. Her servis düzeltmesinden sonra `pnpm test` ve `pnpm api:test` çalışır. Testlerin kapsamadığı bir dal değişiyorsa önce o dalı sınayan test eklenir; RED değil, karakterizasyon testi olarak önce geçtiği görülür.
+- **API servisleri:** Mevcut entegrasyon testleri kapsıyor. Her servis düzeltmesinden sonra `pnpm test` ve `pnpm api:test` çalışır. Testlerin kapsamadığı bir dal değişiyorsa önce o dalı sınayan test eklenir; karakterizasyon testi olarak önce geçtiği görülür.
 - **Arayüz bileşenleri:** Uzun bileşenden alt bileşen çıkarılır (prop'ları `Readonly`). Durum (state) üst bileşende kalır.
-- **Derin iç içe işlev (S2004, 5 seviyeden derin):** İç içe geri çağırmalar adlı işlevlere çıkarılır, örneğin `mobile/src/teacher/availability.tsx:226`.
+- **Derin iç içe işlev (S2004, 5 seviyeden derin):** İç içe geri çağırmalar adlı işlevlere çıkarılır, örneğin `apps/mobile/src/teacher/availability.tsx`.
+- **`build/sites-vite-plugin.ts` ara katmanı (32):** İstek dalları (ön yükleme, giriş/çıkış, yönlendirme) adlı işlevlere bölünür. `node --experimental-strip-types --test tests/site-build.test.mjs` ve `pnpm build` önce ve sonra geçer.
 - **`scripts/legacy-preflight.mjs` (50):** Adımlar ayrı işlevlere bölünür. Çıktısı `node scripts/legacy-preflight.mjs` ile önce ve sonra karşılaştırılır.
 
 - [ ] **Adım 1:** Örnekleri listele (mesajdaki "from N" değeriyle).
 - [ ] **Adım 2:** İşlev işlev düzelt, her biri sonrası ilgili test.
-- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: S3776 ve S2004 sıfır; toplam 115.
-- [ ] **Adım 4:** Alan alan commit.
+- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: S3776 ve S2004 sıfır; toplam yaklaşık 117.
+- [ ] **Adım 4:** Ortak adım 5 ile alan alan commit.
 
-### Görev 8: Küçük kurallar (~70)
+### Görev 13: Küçük kurallar (80)
 
 **Files:** liste ortak adım 1'den
 
 | Kural | Adet | Düzeltme |
 |---|---|---|
-| `typescript:S7758` | 11 | `charCodeAt(i)` → `codePointAt(i)`. BMP dışı karakterlerde (emoji) değer değişir; yalnızca karakter karşılaştırma ya da renk ve karma hesabında kullanılıyorsa kabul edilir. Davranış önemliyse kalıp korunur, ledger'a not düşülür. |
+| `typescript:S7758` | 11 | `charCodeAt(i)` → `codePointAt(i)`. BMP dışı karakterlerde (emoji) değer değişir; yalnızca karakter karşılaştırma ya da renk ve karma hesabında kullanılıyorsa kabul edilir. Davranış önemliyse kalıp korunur, gerekçeli `NOSONAR` yazılır ve kullanıcıya bildirilir. |
 | `typescript:S7755` | 7 | `a[a.length - 1]` → `a.at(-1)` |
 | `typescript:S6819` | 7 | `role="status"` taşıyan öğe → `<output>`. `<output>` satır içidir; düzen bozulmasın diye öğedeki görünüm sınıfları korunur, gerekirse `block`/`flex` eklenir. Tarayıcıda bakılır. |
+| `S7780` (ts ×4, js ×6) | 10 | Ters bölü kaçışlı dizeler `String.raw\`…\`` |
 | `typescript:S7781` | 5 | `replace(/x/g, y)` → `replaceAll(…)` (düzenli ifade kalabilir: `replaceAll(/x/g, y)`) |
-| `typescript:S6582` | 5 | `a && a.b` → `a?.b`. Yalnızca `a` null/undefined ya da nesne olabiliyorsa; `0`/`""` olabiliyorsa dokunulmaz, susturma gerekçesiyle |
+| `typescript:S6582` | 5 | `a && a.b` → `a?.b`. Yalnızca `a` null/undefined ya da nesne olabiliyorsa; `0`/`""` olabiliyorsa dokunulmaz, gerekçeli susturma |
 | `typescript:S6754` | 5 | `useState` dönüşü `[değer, setDeğer]` olarak adlandırılır |
-| `S7780` (ts ×4, js ×4) | 8 | Ters bölü kaçışlı dizeler `String.raw\`…\`` |
 | `typescript:S6479` | 4 | Dizi sırası anahtar olarak kullanılmaz; içerikten kararlı anahtar |
 | `typescript:S3735` | 3 | `void` işleci kaldırılır: söz (promise) ise `.catch` ile ya da `async` işlevle, değilse doğrudan çağrı |
-| `S7722`/`S7723` | 5 | `Error()` → `new Error("…")`, mesajla |
+| `S7722`/`S7723` (ts ×2, js ×6) | 8 | `Error()` → `new Error("…")`, mesajla |
 | `typescript:S6571` | 2 | Birleşimde `string` ile gereksizleşen dize sabitleri sadeleştirilir |
 | `typescript:S6551` | 2 | `reader.result` için tip denetimi (`typeof … === "string"`) |
 | `typescript:S3863` | 2 | Aynı modülden iki import birleştirilir (`import { a, type B } from …`) |
@@ -816,18 +1755,18 @@ function SlotsBody({ slots }: Readonly<{ slots: Slot[] | null }>) {
 | `typescript:S6594` | 1 | `str.match(re)` → `re.exec(str)` |
 | `typescript:S7765` | 1 | `.some(x => x === v)` → `.includes(v)` |
 | `typescript:S7776` | 1 | `routes` dizisi → `Set`, `.has()` |
-| `typescript:S6478` | 1 | `learning-panel.tsx:139`'daki iç bileşen dışarı taşınır, veri prop'la gelir |
+| `typescript:S6478` | 1 | `learning-panel.tsx`'teki iç bileşen dışarı taşınır, veri prop'la gelir |
 | `typescript:S7763` | 1 | `loading.tsx`: `export { Skeleton } from "@/components/ui/skeleton"` |
-| `typescript:S4084` | 1 | `video-player.tsx:106`: Öğretmenin yüklediği videoların altyazı dosyası yok. Gerekçeli `NOSONAR` ile susturulur, ledger'a `Ruling:` yazılır ve kullanıcıya bildirilir (altyazı desteği ayrı iş). |
+| `typescript:S4084` | 1 | `video-player.tsx:106`: Öğretmenin yüklediği videoların altyazı dosyası yok. Gerekçeli `NOSONAR` ile susturulur ve kullanıcıya bildirilir (altyazı desteği ayrı iş). |
 | `javascript:S2094` | 1 | `scripts/mobile-security-tests.mjs:281` boş sınıf kaldırılır ya da amacına göre doldurulur |
 | `javascript:S1940` | 1 | `!(a > b)` → `a <= b` |
 
 - [ ] **Adım 1:** Kural kural listele ve düzelt.
-- [ ] **Adım 2:** `S6819` ve `S6479` değişikliklerinin göründüğü ekranları not et (Görev 13'te tarayıcıda bakılır).
-- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: toplam 37 (yalnızca CSS kaldı).
-- [ ] **Adım 4:** Commit: `git commit -m "Sonar: küçük kurallar (S7758, S7755, S6819 …)"`.
+- [ ] **Adım 2:** `S6819` ve `S6479` değişikliklerinin göründüğü ekranları not et (Görev 17'de tarayıcıda bakılır).
+- [ ] **Adım 3:** Ortak adımlar 3–4. Beklenen: toplam yaklaşık 37 (yalnızca CSS kaldı).
+- [ ] **Adım 4:** Ortak adım 5 ile commit: `git commit --no-verify -m "Sonar: küçük kurallar (S7758, S7755, S6819 …)"`.
 
-### Görev 9: CSS'te tekrarlanan seçiciler (css:S4666, 37)
+### Görev 14: CSS'te tekrarlanan seçiciler (css:S4666, 37)
 
 **Files:** `apps/web/app/globals.css`
 
@@ -863,18 +1802,27 @@ Sonuçlar `reports/css-before/<sayfa>-<tema>.json` dosyalarına kaydedilir. Öğ
 - [ ] **Adım 2:** Tekrarları listele (`css:S4666`, mesajdaki "first used at line N" ile) ve kurala göre birleştir.
 - [ ] **Adım 3:** Aynı sayfa ve temalarda özet yeniden alınır (`reports/css-after/`) ve karşılaştırılır. Beklenen: fark yok. Fark çıkarsa birleştirme konumu düzeltilir.
 - [ ] **Adım 4:** Ortak adımlar 3–4. Beklenen: toplam 0, `Sonar kapısı: geçti`.
-- [ ] **Adım 5:** Commit: `git commit -m "Sonar: CSS'te tekrarlanan seçiciler birleştirildi (görsel fark yok)"`.
+- [ ] **Adım 5: Commit (kapı artık geçer)**
 
-### Görev 10: ESLint'te Sonar katmanı
+```bash
+git add apps/web/app/globals.css
+git commit -m "Sonar: CSS'te tekrarlanan seçiciler birleştirildi (görsel fark yok)"
+```
+
+Beklenen: kanca çalışır, `Sonar kapısı: geçti`, commit `--no-verify` olmadan atılır. Geçmezse kalan sorunlar düzeltilir; `--no-verify` kullanılmaz.
+
+### Görev 15: ESLint'te Sonar katmanı
 
 **Files:**
 - Modify: `package.json` (`eslint-plugin-sonarjs` 4.2.2, `test:quality`)
+- Modify: `pnpm-lock.yaml`
 - Modify: `eslint.config.mjs`
+- Modify: `docs/sonar.md`
 - Test: `tests/sonar-lint.test.mjs`
 
 **Interfaces:**
-- Consumes: temizlenmiş kod (önceki görevler); `sonar-project.properties`'teki kapsam
-- Produces: `pnpm lint` SonarJS kurallarını hata düzeyinde çalıştırır; `pnpm test:quality` üç dosya
+- Consumes: temizlenmiş kod (Görev 9–14); `sonar-project.properties`'teki kapsam
+- Produces: `pnpm lint` SonarJS kurallarını hata düzeyinde çalıştırır
 
 - [ ] **Adım 1: Lint katmanı için testi yaz**
 
@@ -911,12 +1859,14 @@ async function sonarMessages(file) {
 }
 
 test("Sonar kapsamındaki dosyada SonarJS ihlali hata olur", async () => {
-  const found = await sonarMessages("apps/web/lib/__sonar_probe__.ts");
-  assert.ok(
-    found.some(([rule]) => rule === "sonarjs/no-all-duplicated-branches"),
-    JSON.stringify(found),
-  );
-  assert.ok(found.every(([, severity]) => severity === 2));
+  for (const file of ["apps/web/lib/__sonar_probe__.ts", "build/__sonar_probe__.ts"]) {
+    const found = await sonarMessages(file);
+    assert.ok(
+      found.some(([rule]) => rule === "sonarjs/no-all-duplicated-branches"),
+      `${file}: ${JSON.stringify(found)}`,
+    );
+    assert.ok(found.every(([, severity]) => severity === 2));
+  }
 });
 
 test("shadcn dosyalarında SonarJS kuralları uygulanmaz", async () => {
@@ -927,7 +1877,11 @@ test("shadcn dosyalarında SonarJS kuralları uygulanmaz", async () => {
 });
 ```
 
-`package.json` `test:quality`'ye `tests/sonar-lint.test.mjs` eklenir.
+`package.json`:
+
+```json
+"test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs tests/sonar-lint.test.mjs",
+```
 
 - [ ] **Adım 2: Testi çalıştır, kırmızı olduğunu gör**
 
@@ -936,7 +1890,7 @@ Beklenen: FAIL. Birinci testte `found` boş (`[]`), çünkü SonarJS henüz yap�
 
 - [ ] **Adım 3: Eklentiyi kur ve yapılandır**
 
-Çalıştır: `pnpm add -D -w eslint-plugin-sonarjs@4.2.2`
+Çalıştır: `pnpm add -D -w eslint-plugin-sonarjs@4.2.2` (kanca zaten açık; `prepare` yeniden çalışır, zararsız).
 
 `eslint.config.mjs`:
 
@@ -964,12 +1918,19 @@ ve `defineConfig([...])` dizisine, en sona:
     files: [
       "apps/api/src/**/*.{ts,js,mjs}",
       "apps/api/tests/**/*.{ts,js,mjs}",
+      "apps/api/drizzle.config.ts",
       "apps/web/{app,components,hooks,lib}/**/*.{ts,tsx,js,mjs}",
+      "apps/web/{proxy,next.config}.ts",
+      "apps/web/postcss.config.mjs",
       "apps/mobile/src/**/*.{ts,tsx}",
       "apps/mobile/index.ts",
+      "apps/mobile/metro.config.cjs",
       "packages/*/src/**/*.{ts,tsx}",
       "scripts/**/*.{js,mjs,cjs,ts}",
+      "build/**/*.ts",
       "tests/**/*.{js,mjs,ts}",
+      "{next,vite,drizzle}.config.ts",
+      "{eslint,postcss}.config.mjs",
     ],
     // Shadcn'den olduğu gibi kopyalanan dosyalar Sonar'da da hariç.
     ignores: [
@@ -982,13 +1943,15 @@ ve `defineConfig([...])` dizisine, en sona:
   },
 ```
 
+`docs/sonar.md`'deki "Commit kancası ve kapı" bölümünün sonuna: "ESLint'te SonarJS kuralları da vardır (`pnpm lint`); sorunların çoğunu saniyeler içinde, kapıdan önce gösterir."
+
 - [ ] **Adım 4: Lint testini ve lint'i çalıştır**
 
 Çalıştır: `node --test tests/sonar-lint.test.mjs`
 Beklenen: PASS 2/2.
 
 Çalıştır: `pnpm lint 2>&1 | grep -c "sonarjs/"`
-Beklenen: Temizlik görevlerinden sonra kalan yalnızca ESLint'te çıkan ihlaller (çoğu 0 olmalı). Kalan her ihlal, temizlik görevlerindeki kurallarla düzeltilir. Yanlış alarm ise gerekçeli `eslint-disable-next-line sonarjs/<kural> -- <gerekçe>` ile susturulur. Bir kural Next ya da React Native ile sistematik çakışıyorsa `sonarRules` üzerine gerekçeli bir `"off"` eklenir ve ledger'a `Ruling:` yazılır. Sonunda `pnpm lint` çıkış 0 olur.
+Beklenen: Temizlikten sonra kalan yalnızca ESLint'te çıkan ihlaller (çoğu 0 olmalı). Kalan her ihlal temizlik görevlerindeki kalıplarla düzeltilir. Yanlış alarm ise gerekçeli `eslint-disable-next-line sonarjs/<kural> -- <gerekçe>` ile susturulur. Bir kural Next ya da React Native ile sistematik çakışıyorsa `sonarRules` üzerine gerekçeli bir `"off"` eklenir ve kullanıcıya bildirilir. Sonunda `pnpm lint` çıkış 0 olur.
 
 - [ ] **Adım 5: Testler ve commit**
 
@@ -996,121 +1959,23 @@ Beklenen: Temizlik görevlerinden sonra kalan yalnızca ESLint'te çıkan ihlall
 Beklenen: hepsi PASS.
 
 ```bash
-git add package.json pnpm-lock.yaml eslint.config.mjs tests/sonar-lint.test.mjs <düzeltilen dosyalar>
+git add package.json pnpm-lock.yaml eslint.config.mjs tests/sonar-lint.test.mjs docs/sonar.md <düzeltilen dosyalar>
 git commit -m "Sonar: ESLint'te SonarJS kuralları (hata düzeyinde)"
 ```
 
-### Görev 11: Çalışma kuralı ve belge
+Beklenen: kanca geçer.
 
-**Files:**
-- Create: `AGENTS.md`
-- Create: `CLAUDE.md`
-- Modify: `docs/sonar.md`
-
-**Interfaces:**
-- Consumes: `pnpm quality:gate`, `pnpm test:quality`, susturma biçimleri (Global Constraints)
-- Produces: her oturumun okuduğu kural dosyası
-
-- [ ] **Adım 1: `AGENTS.md`'yi yaz**
-
-```markdown
-# Derslik: çalışma kuralları
-
-Bu dosya, bu depoda çalışan herkes ve her yapay zekâ oturumu içindir.
-
-## Göndermeden önce
-
-`main`'e birleştirmeden ya da göndermeden önce şunların hepsi geçer:
-
-- `pnpm typecheck`
-- `pnpm mobile:typecheck`
-- `pnpm lint` (Sonar kuralları dahil)
-- `pnpm test`, değişikliğe ilgili testler ve `pnpm test:quality`
-- `pnpm web:build`
-- `pnpm quality:gate` (yerel SonarQube; Docker açık olmalı)
-
-Biri kırmızıysa gönderilmez; önce düzeltilir.
-
-## Sıfır Sonar sorunu
-
-Projede açık Sonar sorunu ve inceleme bekleyen güvenlik noktası yoktur; kod
-tekrarı sınırı geçmez. Yeni kod da sorun getirmez.
-
-Gerçekten yanlış bir bulgu yalnızca gerekçeyle susturulur:
-
-- kodda `// NOSONAR: <gerekçe>`
-- ESLint'te `// eslint-disable-next-line sonarjs/<kural> -- <gerekçe>`
-- `sonar-project.properties`'te yorumuyla `sonar.issue.ignore.multicriteria`
-
-SonarQube arayüzündeki "False positive" ya da "Safe" işaretleri kullanılmaz;
-CI'daki sunucu her çalıştırmada sıfırdan açılır. `pnpm test:quality`
-gerekçesiz susturmayı yakalar. Ayrıntı: `docs/sonar.md`.
-
-## Pencereler (modal)
-
-Pencere son boyutunda açılır; içerik gelince ya da değişince boyu değişmez,
-kaymaz.
-
-- İçerik tek seferde geliyorsa önce veri istenir, düğmede dönen gösterge
-  çıkar, pencere veri gelince açılır.
-- Pencerenin birkaç durumu varsa gövde sabit yüksekliktedir, iskelet son
-  düzenin biçimindedir, uzun listeler gövdenin içinde kayar.
-- Değişen her pencerede tarayıcıda yükseklik bütün durumlarda ölçülür.
-```
-
-`CLAUDE.md`:
-
-```markdown
-@AGENTS.md
-```
-
-- [ ] **Adım 2: `docs/sonar.md`'yi güncelle**
-
-"SonarQube" bölümünün başına kapıyı, CI'ı ve susturma kuralını anlatan bir bölüm eklenir:
-
-```markdown
-## Kapı: göndermeden önce sıfır sorun
-
-    pnpm quality:gate
-
-Taramayı yapar, sonra açık sorunları ve inceleme bekleyen güvenlik
-noktalarını dosya ve satırıyla listeler (`reports/sonar-gate.json`). Tek bir
-sorun ya da sınırı aşan kod tekrarı varsa çıkış kodu 1'dir. Aynı kapı CI'da
-"Sonar" işinde çalışır. SonarQube ve tarayıcı imajları `scripts/sonar.mjs`'te
-tam sürüme sabittir; sabitten farklı bir kapsayıcı yeniden kurulur.
-
-ESLint'te SonarJS kuralları da vardır (`pnpm lint`); sorunların çoğunu
-saniyeler içinde, kapıdan önce gösterir.
-
-Susturma kuralı ve göndermeden önceki kontrol listesi: kökteki `AGENTS.md`.
-```
-
-- [ ] **Adım 3: Commit**
-
-```bash
-git add AGENTS.md CLAUDE.md docs/sonar.md
-git commit -m "Çalışma kuralı: göndermeden önce sıfır Sonar sorunu, pencere kuralı"
-```
-
-### Görev 12: CI işi
+### Görev 16: CI işi
 
 **Files:**
 - Modify: `.github/workflows/ci.yml`
+- Modify: `docs/sonar.md`
 
 **Interfaces:**
-- Consumes: `pnpm quality:gate`, `pnpm test:quality`
-- Produces: CI'da `sonar` işi; `checks` işinde "Quality tooling tests" adımı
+- Consumes: `pnpm quality:gate`
+- Produces: CI'da `sonar` işi. `checks` işindeki "Quality reporting tests" adımı (`pnpm test:quality`) zaten var; yeni testleri o çalıştırır.
 
-- [ ] **Adım 1: `checks` işine kalite araçlarının testini ekle**
-
-"Architecture tests" adımından sonra:
-
-```yaml
-      - name: Quality tooling tests
-        run: pnpm test:quality
-```
-
-- [ ] **Adım 2: `sonar` işini ekle**
+- [ ] **Adım 1: `sonar` işini ekle**
 
 `jobs:` altında, `checks` ile aynı seviyede:
 
@@ -1141,27 +2006,30 @@ git commit -m "Çalışma kuralı: göndermeden önce sıfır Sonar sorunu, penc
           if-no-files-found: ignore
 ```
 
-- [ ] **Adım 3: Yerelde aynı adımları doğrula**
+`docs/sonar.md`'deki "Commit kancası ve kapı" bölümüne: "Aynı kapı CI'da \"Sonar\" işinde çalışır; CI'da yerel tarayıcı olmadığı için Docker tarayıcısı kullanılır."
+
+- [ ] **Adım 2: Yerelde aynı adımları doğrula**
 
 Çalıştır: `pnpm test:quality && pnpm quality:gate; echo "exit=$?"`
 Beklenen: `exit=0`, son satır `Sonar kapısı: geçti`.
 
-- [ ] **Adım 4: Commit**
+- [ ] **Adım 3: Commit**
 
 ```bash
-git add .github/workflows/ci.yml
-git commit -m "CI: Sonar kapısı işi ve kalite araçlarının testleri"
+git add .github/workflows/ci.yml docs/sonar.md
+git commit -m "CI: Sonar kapısı işi"
 ```
 
-### Görev 13: Son doğrulama
+### Görev 17: Son doğrulama
 
 **Files:** yok (doğrulama)
 
-- [ ] **Adım 1: Kapının sorun yakaladığını göster**
+- [ ] **Adım 1: Kapı ve kanca sorunu yakalar**
 
-Geçici bir dosya oluştur: `apps/web/lib/__sonar_probe__.ts`, içine Görev 10'deki örnek. Çalıştır: `pnpm quality:gate; echo "exit=$?"`.
+Geçici dosya oluştur: `apps/web/lib/__sonar_probe__.ts`, içine Görev 15'teki örnek. Çalıştır: `pnpm quality:gate; echo "exit=$?"`.
 Beklenen: `exit=1`, listede `apps/web/lib/__sonar_probe__.ts` ve kural `typescript:S3923`.
-Dosyayı sil, yeniden çalıştır. Beklenen: `exit=0`. İki çıktı da ledger'a kaydedilir. Dosya commit'lenmez.
+Çalıştır: `git commit --allow-empty -m "kanca denemesi"; echo "exit=$?"`. Beklenen: `exit=1` (dosya stage edilmemiş olsa da kapı onu görür).
+Dosyayı sil, `pnpm quality:gate` yeniden çalıştır. Beklenen: `exit=0`. Dosya commit'lenmez; iki çıktı kullanıcıya gösterilir.
 
 - [ ] **Adım 2: Bütün CI adımları**
 
@@ -1176,10 +2044,10 @@ Temizlik çok sayıda ekran dosyasına dokunur: iç içe ifadeler, alt bileşenl
 - **Öğrenci:** dersler, ders ayarla, mesajlar. Öğrenci için kullanıcı hesap değiştirir.
 - **Her ekranda:** konsolda hata olmadığı doğrulanır.
 - **Pencereler:** Ders ayarla, Müsaitlik ve Takvime bağla pencerelerinde yükseklik bütün durumlarda ölçülür (bellek: modal-no-layout-shift).
-- **Görev 8:** Not edilen `<output>` ve anahtar değişikliklerinin ekranlarına ayrıca bakılır.
+- **Görev 13:** Not edilen `<output>` ve anahtar değişikliklerinin ekranlarına ayrıca bakılır.
 
 Mobilde `pnpm mobile:typecheck` ve `pnpm mobile:security-test` yeterlidir; simülatör denemesi kullanıcı isterse yapılır.
 
-- [ ] **Adım 4: Gönder ve CI'ı gör**
+- [ ] **Adım 4: Birleştir, gönder ve CI'ı gör**
 
-Dalı gönder (`git push -u origin sonar-quality-gate`). Kullanıcı birleştirmeyi isteyince `main`'e ileri sarılarak birleştirilir ve gönderilir. Ardından `main` commit'inin GitHub kontrolleri (`/repos/bburak2014/derslik/commits/<sha>/check-runs`) bir kez okunur. `checks` ve `sonar` işlerinin `success` olduğu görülür.
+Kullanıcı birleştirmeyi isteyince `main`'e ileri sarılarak birleştirilir ve gönderilir (kullanıcının terminalinde, birer birer). Ardından `main` commit'inin GitHub kontrolleri (`/repos/bburak2014/derslik/commits/<sha>/check-runs`) bir kez okunur. `checks` ve `sonar` işlerinin `success` olduğu görülür.
