@@ -2,6 +2,29 @@
 
 Hesap veya bulut gerekmez; her şey bu makinede, Docker içinde çalışır.
 
+## Commit kancası ve kapı
+
+    pnpm quality:gate
+
+Kapı çalışma kopyasını yerel SonarQube'de tarar. Açık sorun, inceleme
+bekleyen güvenlik noktası ya da %3'ü aşan kod tekrarı varsa sorunları dosya ve
+satırıyla listeler (`reports/sonar-gate.json`) ve 1 ile çıkar. Test kapsamı
+kurala girmez. Her `git commit` öncesinde `.githooks/pre-commit` bu kapıyı
+çalıştırır; kapı geçmezse commit atılmaz.
+
+- Kanca `pnpm install` ile açılır (`prepare` → `git config core.hooksPath .githooks`).
+- Kanca PATH'te Node 22.13+ bulamazsa nvm'de kurulu sürümleri dener.
+- Kapı diskteki dosyaları tarar; commit'e eklenmemiş bir değişiklikteki sorun da commit'i durdurur.
+- Worktree'ler parolayı (`reports/.sonar-admin`), yerel tarayıcıyı ve önbelleği ana checkout'tan alır. Aynı anda tek kapı çalışır (`.git/sonar-gate.lock`); öteki sırasını bekler.
+- `git commit --no-verify` kancayı atlar; yalnızca kullanıcının açık onayıyla kullanılır (`AGENTS.md`).
+
+SonarQube imajı (`sonarqube:26.9.0.129388-community`) ve Docker tarayıcı
+imajı `scripts/sonar-local.mjs`'te tam sürüme sabittir. Var olan kapsayıcı
+farklı bir imajla ya da bütün ağ arayüzlerine açık çalışıyorsa veri birimleri
+korunarak yeniden kurulur.
+
+Susturma kuralı ve göndermeden önceki kontrol listesi: kökteki `AGENTS.md`.
+
 ## SonarQube
 
 ```bash
@@ -9,8 +32,8 @@ pnpm install          # tür bilgisi için bağımlılıklar kurulu olmalı
 pnpm quality:sonar
 ```
 
-İlk çalıştırmada `sonarqube:community` kapsayıcısı (`derslik-sonarqube`) kurulur,
-yönetici parolası rastgele üretilip `reports/.sonar-admin` dosyasına yazılır
+İlk çalıştırmada sabit sürümlü SonarQube kapsayıcısı (`derslik-sonarqube`) kurulur,
+yönetici parolası rastgele üretilip `ana checkout'taki reports/.sonar-admin` dosyasına yazılır
 (git'e girmez). Sonraki çalıştırmalar aynı kapsayıcıyı kullanır, geçmiş
 analizler kaybolmaz. Sonuçlar: http://localhost:9000/dashboard?id=derslik
 (kullanıcı `admin`, parola o dosyada).
@@ -25,8 +48,7 @@ olmadığında komut başarısız olur. Testlerin başarılı olması test kapsa
 Sonar'ın bir kapsam metriği döndürüp döndürmediğini ifade eder; otomatik sıfır
 kapsam değeri test raporu aktarımı olarak kabul edilmez.
 
-Yeni kapsayıcı yalnızca `127.0.0.1:9000` üzerinde dinler. Önceden oluşturulmuş
-kapsayıcının port eşlemesi değişmez.
+Kapsayıcı yalnızca `127.0.0.1:9000` üzerinde dinler; bütün arayüzlere açık eski bir kapsayıcı yeniden kurulur.
 
 Mevcut yerel sunucudan bağımsız bir analiz ortamı açmak için:
 
