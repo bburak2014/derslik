@@ -16,12 +16,12 @@ export type CalendarEvent = {
 export function escapeText(value: string) {
   return (
     value
-      .replace(/\\/g, "\\\\")
-      .replace(/;/g, "\\;")
-      .replace(/,/g, "\\,")
-      .replace(/\r\n|\r|\n/g, "\\n")
+      .replaceAll("\\", String.raw`\\`)
+      .replaceAll(";", String.raw`\;`)
+      .replaceAll(",", String.raw`\,`)
+      .replaceAll(/\r\n|\r|\n/g, String.raw`\n`)
       // Diğer denetim karakterlerine iCalendar metninde yer yok.
-      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")
+      .replaceAll(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")
   );
 }
 

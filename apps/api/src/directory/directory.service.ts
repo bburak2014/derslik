@@ -43,7 +43,7 @@ const uuid = z.string().uuid();
 
 // Arama: Türkçe büyük/küçük harf farkı (İ/I/ı) gözetilmez.
 const fold = (text: string) =>
-  text.normalize("NFC").toLocaleLowerCase("tr").replace(/ı/g, "i");
+  text.normalize("NFC").toLocaleLowerCase("tr").replaceAll("ı", "i");
 const FOLD_SQL = (column: string) =>
   `translate(lower(translate(${column},'İIÇĞÖŞÜ','iiçğöşü')),'ı','i')`;
 // Branş, seviye ve ders şekli sabit anahtarlarla saklanır; arama kutusuna
@@ -197,7 +197,8 @@ export class DirectoryService {
           .map((n) => n.key);
         if (!keys.length) continue;
         values.push(keys);
-        where[where.length - 1] = where[where.length - 1].replace(
+        const last = where.length - 1;
+        where[last] = where[last].replace(
           /\)$/,
           ` OR ${group.column} && $${values.length}::text[])`,
         );

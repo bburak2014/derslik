@@ -52,7 +52,7 @@ export class CommandService {
             [ws, actor.id, key],
           )
         ).rows[0];
-        if (!previous || previous.request_hash !== hash)
+        if (previous?.request_hash !== hash)
           throw new ConflictException("api.idempotencyKeyReused");
         return { ...previous.response, replayed: true };
       }

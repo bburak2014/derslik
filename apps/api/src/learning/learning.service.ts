@@ -120,7 +120,7 @@ export async function notify(
     /** Çeviri anahtarı; okuyan kişi kendi dilinde görür. */
     title: MessageKey;
     /** Çeviri anahtarı ya da ödev/video adı gibi serbest metin. */
-    body: MessageKey | string;
+    body: string;
     kind: NoticeKind;
     /** The assignment, video or summary the notification opens. */
     targetId: string;

@@ -116,12 +116,12 @@ export class MessagesService {
         !!(
           await tx.query(
             "SELECT 1 FROM derslik.message_thread($1,$2::uuid,$3,$4,$5,1)",
-            [ws, student, link, side, page[page.length - 1].created_at],
+            [ws, student, link, side, page.at(-1).created_at],
           )
         ).rowCount;
-      return {
-        data: toDto({ thread, messages: page.reverse(), more }),
-      };
+      // Sayfa yeniden eskiye gelir; istemciye eskiden yeniye gider.
+      page.reverse();
+      return { data: toDto({ thread, messages: page, more }) };
     });
   }
 
