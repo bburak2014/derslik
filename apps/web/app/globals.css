@@ -242,6 +242,8 @@
     font-family: var(--font-sans);
     font-size: 16px;
     line-height: 1.5;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
   }
   button,
   a,
@@ -264,6 +266,7 @@
     font-size: 31px;
     letter-spacing: -1.8px;
     color: var(--sidebar-accent-foreground);
+    font-weight: 800;
   }
   .brand > svg {
     width: 29px;
@@ -322,6 +325,8 @@
     padding: 0 40px;
     font-size: 14px;
     color: var(--muted-foreground);
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
   }
   .workspace-tag {
     display: flex;
@@ -348,9 +353,12 @@
     margin-bottom: 30px;
   }
   .eyebrow {
-    font-size: 10px;
-    font-weight: 700;
     margin-bottom: 9px;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    font-weight: 650;
+    color: var(--brand);
+    letter-spacing: 0.12em;
   }
   h1 {
     font-size: 32px;
@@ -361,6 +369,8 @@
   .page-heading p:not(.eyebrow) {
     color: var(--muted-foreground);
     margin-top: 8px;
+    font-size: 1rem;
+    line-height: 1.6;
   }
   .section-heading {
     display: flex;
@@ -368,6 +378,7 @@
     justify-content: space-between;
     gap: 15px;
     padding: 23px 26px;
+    border-bottom: 1px solid var(--line);
   }
   h2 {
     font-size: 18px;
@@ -433,9 +444,6 @@
     .section-heading {
       padding: 20px;
     }
-    .page-heading p:not(.eyebrow) {
-      font-size: 14px;
-    }
   }
   .nav-label {
     font-size: 10px;
@@ -450,6 +458,7 @@
     background: var(--navy-soft);
     font-size: 11px;
     color: var(--sidebar-accent-foreground);
+    border-radius: 999px;
   }
   .sidebar-note {
     margin: 75px 12px 20px;
@@ -459,6 +468,7 @@
   .note-flower {
     font-size: 38px;
     line-height: 1;
+    color: var(--marker);
   }
   .sidebar-note p {
     font-size: 20px;
@@ -494,9 +504,15 @@
     align-items: center;
     gap: 7px;
     color: var(--sidebar-foreground);
+    margin-top: 2px;
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: var(--radius-action);
+    transition: background 0.15s ease;
   }
   .signout:hover {
     color: white;
+    background: var(--sidebar-accent);
   }
   .skip-link {
     position: absolute;
@@ -532,6 +548,17 @@
   .error-banner {
     justify-content: space-between;
     margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--control-radius);
+    border: 1px solid transparent;
+    font-size: 13.5px;
+    line-height: 1.55;
+    background: var(--danger-soft);
+    border-color: var(--danger-line);
+    color: var(--danger);
   }
   .sample-banner {
     display: flex;
@@ -585,6 +612,7 @@
     min-height: 126px;
     padding: 23px 24px;
     border-bottom: 1px solid var(--border);
+    padding-block: 14px;
   }
   .lesson-row:last-child {
     border-bottom: 0;
@@ -648,6 +676,7 @@
   .student-name:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
+    color: var(--brand);
   }
   .student-name > svg {
     color: var(--muted-foreground);
@@ -821,6 +850,7 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 7px;
+    background: var(--brand-soft);
   }
   .empty-state button {
     margin-top: 6px;
@@ -860,6 +890,7 @@
     justify-content: center;
     gap: 6px;
     color: var(--text-subtle);
+    border-radius: var(--radius-action);
   }
   .day-button > span {
     font-size: 11px;
@@ -923,7 +954,7 @@
   }
   .finance-stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -931,7 +962,8 @@
     padding: 24px 0;
   }
   .finance-stats > div {
-    padding: 0 30px;
+    min-width: 0;
+    padding: 0 clamp(12px, 2vw, 30px);
     border-right: 1px solid var(--border);
   }
   .finance-stats > div:last-child {
@@ -946,6 +978,7 @@
   }
   .finance-stats strong {
     display: block;
+    overflow-wrap: anywhere;
     font-size: 30px;
     font-weight: 600;
     letter-spacing: -1px;
@@ -967,6 +1000,7 @@
   }
   .due-item .student-name {
     font-size: 13px;
+    overflow-wrap: anywhere;
   }
   .due-item small {
     display: block;
@@ -1173,6 +1207,7 @@
     .lesson-row {
       gap: 12px;
       padding: 21px 18px;
+      padding-block: 14px;
     }
     .lesson-row > .avatar {
       display: none;
@@ -1244,8 +1279,10 @@
     }
     .lesson-row {
       padding: 20px 16px;
+      padding-block: 14px;
       gap: 11px;
       flex-wrap: wrap;
+      min-height: 140px;
     }
     .lesson-row > .avatar {
       display: none;
@@ -1274,9 +1311,6 @@
     .lesson-time {
       align-self: flex-start;
       padding-top: 8px;
-    }
-    .lesson-row {
-      min-height: 140px;
     }
     .lesson-actions .complete-button {
       height: 32px;
@@ -1321,7 +1355,6 @@
       gap: 2px;
     }
     .day-button {
-      border-radius: 8px;
       min-height: 88px;
     }
     .day-button strong {
@@ -1413,10 +1446,20 @@
   .auth-page {
     min-height: 100vh;
     display: grid;
+    grid-template-columns: minmax(340px, 0.95fr) minmax(440px, 1.05fr);
+    background: var(--canvas);
   }
   .auth-story {
     display: flex;
     flex-direction: column;
+    color: var(--sidebar-accent-foreground);
+    padding: clamp(32px, 5vw, 76px);
+    justify-content: space-between;
+    gap: 56px;
+    background: var(--navy);
+    background-color: var(--navy);
+    background-image: var(--grid-texture);
+    background-size: 22px 22px;
   }
   .auth-story > .brand {
     margin-bottom: 15vh;
@@ -1429,13 +1472,26 @@
     align-self: center;
     width: 100%;
     margin: auto;
+    max-width: 540px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+    padding: 40px;
   }
   .auth-card h2 {
     letter-spacing: -0.04em;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 12px 0;
+    color: var(--ink);
   }
   .auth-card > p {
     line-height: 1.6;
     margin-bottom: 2rem;
+    font-size: 1rem;
+    color: var(--text-muted);
   }
   .connection-state {
     min-height: 100vh;
@@ -1475,15 +1531,6 @@
   }
 
   /* Derslik v6: crisp work surfaces, deep navy navigation, emerald actions. */
-  .auth-page {
-    grid-template-columns: minmax(340px, 0.95fr) minmax(440px, 1.05fr);
-  }
-  .auth-story {
-    color: var(--sidebar-accent-foreground);
-    padding: clamp(32px, 5vw, 76px);
-    justify-content: space-between;
-    gap: 56px;
-  }
   .auth-story .brand {
     color: white;
     margin: 0;
@@ -1495,11 +1542,14 @@
     font-size: 0.75rem;
     font-weight: 650;
     letter-spacing: 0.14em;
+    color: var(--marker);
   }
   .auth-story h1 {
     font-size: clamp(2.4rem, 4vw, 4.3rem);
     letter-spacing: -0.045em;
     margin: 22px 0;
+    font-weight: 800;
+    line-height: 1.12;
   }
   .auth-story-content > p {
     color: var(--sidebar-foreground);
@@ -1543,18 +1593,6 @@
     font-size: 0.875rem;
     color: var(--sidebar-foreground);
   }
-  .auth-card {
-    max-width: 540px;
-  }
-  .auth-card h2 {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.2;
-    margin: 12px 0;
-  }
-  .auth-card > p {
-    font-size: 1rem;
-  }
   .auth-card > .auth-footnote {
     display: flex;
     gap: 8px;
@@ -1575,10 +1613,8 @@
   }
   .page-heading h1 {
     letter-spacing: -0.035em;
-  }
-  .page-heading p:not(.eyebrow) {
-    font-size: 1rem;
-    line-height: 1.6;
+    font-weight: 800;
+    text-wrap: balance;
   }
   .section-heading p,
   .table-secondary {
@@ -1591,9 +1627,6 @@
     .auth-story {
       padding: 32px;
     }
-    .auth-card {
-      padding: 36px 28px;
-    }
   }
   @media (max-width: 760px) {
     .auth-page {
@@ -1605,7 +1638,6 @@
       display: flex;
       padding: 24px;
       gap: 0;
-      background: var(--navy);
     }
     .auth-story-content,
     .auth-story-footer {
@@ -1616,7 +1648,6 @@
       font-size: 26px;
     }
     .auth-card {
-      padding: 32px 24px;
       max-width: 520px;
     }
     .auth-card h2 {
@@ -1628,20 +1659,9 @@
    Derslik v7 — one design system for every surface.
    ================================================================== */
 
-  body {
-    color: var(--text);
-    -webkit-font-smoothing: antialiased;
-  }
-
   /* ------------------------------------------------------------------
    Focus: one visible, consistent treatment everywhere.
    ------------------------------------------------------------------ */
-  button:focus-visible,
-  a:focus-visible,
-  [role="button"]:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
 
   .auth-card small {
     font-size: 12.5px;
@@ -1659,47 +1679,17 @@
    ------------------------------------------------------------------ */
   button:disabled {
     box-shadow: none;
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 
   /* ------------------------------------------------------------------
    Messages
    ------------------------------------------------------------------ */
-  .error-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: var(--control-radius);
-    border: 1px solid transparent;
-    font-size: 13.5px;
-    line-height: 1.55;
-    background: var(--danger-soft);
-    border-color: var(--danger-line);
-    color: var(--danger);
-  }
 
   /* ------------------------------------------------------------------
    Auth screen
    ------------------------------------------------------------------ */
-  .auth-page {
-    background: var(--canvas);
-  }
-  .auth-story {
-    background: var(--navy);
-  }
-  .auth-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-card);
-    padding: 40px;
-  }
-  .auth-card h2 {
-    color: var(--ink);
-  }
-  .auth-card > p {
-    color: var(--text-muted);
-  }
   .auth-card a {
     color: var(--brand);
   }
@@ -1707,18 +1697,13 @@
   /* ------------------------------------------------------------------
    Workspace shell
    ------------------------------------------------------------------ */
-  .topbar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-  }
   .panel {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--panel-radius);
     box-shadow: 0 1px 2px rgb(15 34 49 / 0.04);
-  }
-  .section-heading {
-    border-bottom: 1px solid var(--line);
+    border-color: var(--line);
+    overflow: visible;
   }
 
   @media (max-width: 640px) {
@@ -1744,15 +1729,9 @@
   .day-button.selected > small {
     color: var(--on-brand);
   }
-  .student-name:hover {
-    color: var(--brand);
-  }
   .empty-state svg,
   .empty-icon {
     color: var(--brand);
-  }
-  .empty-icon {
-    background: var(--brand-soft);
   }
   .skip-link:focus {
     top: 10px;
@@ -1837,6 +1816,10 @@
   }
   [data-slot="sidebar-footer"] .theme-toggle button {
     color: var(--sidebar-foreground);
+    flex: 1;
+    justify-content: center;
+    padding-inline: 0;
+    min-width: 0;
   }
   [data-slot="sidebar-footer"] .theme-toggle button[data-active="true"] {
     background: var(--sidebar);
@@ -1847,12 +1830,6 @@
    bağlam seçicisi kullanılıyor. Erişilebilir ad aria-label ile korunuyor. */
   [data-slot="sidebar-footer"] .theme-toggle button span {
     display: none;
-  }
-  [data-slot="sidebar-footer"] .theme-toggle button {
-    flex: 1;
-    justify-content: center;
-    padding-inline: 0;
-    min-width: 0;
   }
   /* Dar ekranda da yalnızca ikon kalsın. */
   @media (max-width: 400px) {
@@ -1876,18 +1853,8 @@
     border-radius: var(--radius-surface);
     box-shadow: var(--shadow-card);
   }
-  .panel {
-    border-color: var(--line);
-  }
 
   /* Sayaç rozeti tam yuvarlak; shadcn Badge ile aynı. */
-  .nav-count {
-    border-radius: 999px;
-  }
-
-  .day-button {
-    border-radius: var(--radius-action);
-  }
 
   /* --- 4: sayı ve etiket ayrımı --- */
   .finance-stats strong,
@@ -1896,7 +1863,6 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
-  .eyebrow,
   .nav-label,
   .sidebar-kicker,
   .auth-story-label,
@@ -1909,9 +1875,6 @@
   }
 
   /* --- Yoğunluk: 30 öğrenciyi tarayan öğretmen iki kat kaydırmasın --- */
-  .lesson-row {
-    padding-block: 14px;
-  }
   /* ==================================================================
    Genel bakış — "bugün" odaklı yerleşim
 
@@ -1926,6 +1889,7 @@
     border: 1px solid var(--line);
     margin-bottom: 20px;
     overflow: hidden;
+    border-radius: 18px;
   }
   .day-panel-head {
     display: flex;
@@ -1934,6 +1898,11 @@
     flex-wrap: wrap;
     padding: 18px 22px;
     border-bottom: 1px solid var(--line);
+    background-color: var(--stat-feature-bg);
+    background-image: var(--grid-texture);
+    background-size: 20px 20px;
+    color: var(--stat-feature-fg);
+    border-bottom-color: var(--stat-feature-line);
   }
   .day-panel-date {
     display: flex;
@@ -2029,6 +1998,9 @@
     flex: 1;
     min-width: 0;
   }
+  .attention-body .student-name {
+    overflow-wrap: anywhere;
+  }
   .attention-body small {
     display: block;
     font-size: 12.5px;
@@ -2111,6 +2083,20 @@
     .student-row {
       padding-inline: 16px;
     }
+    .attention-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+    .attention-body {
+      grid-column: 2 / -1;
+    }
+    .attention-row > [data-slot="badge"] {
+      grid-column: 1 / 3;
+      justify-self: start;
+    }
+    .attention-row > button {
+      grid-column: 3;
+    }
     .day-empty {
       padding: 16px;
     }
@@ -2127,17 +2113,10 @@
   [data-slot="sidebar-menu-button"] {
     cursor: pointer;
   }
-  button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
 
   /* 2) Tablolar: shadcn kabı overflow-x taşıyor ama .panel'in overflow:hidden'ı
    kaydırma çubuğunu kırpıyordu ve grid/flex içinde min-width:auto daralmayı
    engelliyordu. Üçü birden çözülür. */
-  .panel {
-    overflow: visible;
-  }
   [data-slot="table-container"] {
     width: 100%;
     max-width: 100%;
@@ -2174,16 +2153,6 @@
   [data-slot="sidebar-footer"] .profile {
     padding-bottom: 14px;
     border-bottom: 1px solid var(--sidebar-border);
-  }
-  .signout {
-    margin-top: 2px;
-    min-height: 40px;
-    padding: 8px 10px;
-    border-radius: var(--radius-action);
-    transition: background 0.15s ease;
-  }
-  .signout:hover {
-    background: var(--sidebar-accent);
   }
 
   /* ---- Üst şerit: dar ekranda tek satıra sığsın ---------------------------
@@ -2336,14 +2305,6 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
-  .page-heading h1 {
-    font-weight: 800;
-    text-wrap: balance;
-  }
-  .eyebrow {
-    color: var(--brand);
-    letter-spacing: 0.12em;
-  }
 
   /* Fosforlu kalem çizgisi: metnin alt yarısında, satır kırılsa da sürer. */
   .ink-mark {
@@ -2376,29 +2337,13 @@
   [data-slot="sidebar-container"] {
     border-right-color: var(--navy) !important;
   }
-  .brand {
-    font-weight: 800;
-  }
   .brand-dot {
     color: var(--marker);
   }
   /* Etkin sayfa, defter ayracı gibi kağıda bağlanır: sağ kenara kadar uzanır
    ve zemin rengini alır. */
-  .note-flower {
-    color: var(--marker);
-  }
 
   /* ---- Bugün kartı: başlık şeridi mürekkep --------------------------------- */
-  .day-panel {
-    border-radius: 18px;
-  }
-  .day-panel-head {
-    background-color: var(--stat-feature-bg);
-    background-image: var(--grid-texture);
-    background-size: 20px 20px;
-    color: var(--stat-feature-fg);
-    border-bottom-color: var(--stat-feature-line);
-  }
   .day-panel-head h2,
   .day-panel-head dd {
     color: var(--stat-feature-fg);
@@ -2464,23 +2409,11 @@
   }
 
   /* ---- Giriş ekranı --------------------------------------------------------- */
-  .auth-story {
-    background-color: var(--navy);
-    background-image: var(--grid-texture);
-    background-size: 22px 22px;
-  }
-  .auth-story h1 {
-    font-weight: 800;
-    line-height: 1.12;
-  }
   .auth-story .ink-mark {
     background: var(--marker);
     color: var(--marker-ink);
     border-radius: 6px;
     padding-inline: 0.12em;
-  }
-  .auth-story-label {
-    color: var(--marker);
   }
   /* Bildirimden açılan kayıt: fosforlu kalemle kısa bir işaret. */
   [data-notice-target] {

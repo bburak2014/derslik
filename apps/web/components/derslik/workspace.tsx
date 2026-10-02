@@ -149,6 +149,27 @@ export type Actions = {
 };
 export type Mutate = (command: Command, message: string) => Promise<boolean>;
 
+/** Form değişse de kapanışta ilk açan öğeye dön; yeni forma odak çalma. */
+function useRecordModal() {
+  const [modal, setModal] = useState<ModalState | null>(null);
+  const trigger = useRef<HTMLElement | null>(null),
+    open = useRef(false);
+  function changeModal(next: ModalState | null) {
+    if (next && !open.current) {
+      const active = document.activeElement;
+      trigger.current = active instanceof HTMLElement ? active : null;
+    }
+    open.current = next !== null;
+    setModal(next);
+  }
+  function restoreFocus(event: Event) {
+    event.preventDefault();
+    if (!open.current && trigger.current?.isConnected)
+      trigger.current.focus({ preventScroll: true });
+  }
+  return { modal, setModal: changeModal, restoreFocus };
+}
+
 function Navigation({
   view,
   onNavigate,
@@ -228,7 +249,6 @@ export default function Workspace({
     [search, setSearch] = useState(""),
     [selectedDay, setSelectedDay] = useState(dateKey()),
     [studentId, setStudentId] = useState<string | null>(null),
-    [modal, setModal] = useState<ModalState | null>(null),
     // Mesajlar görünümünde açık yazışma ve öğrenci süzgeci (adres çubuğunda).
     [chat, setChat] = useState(() =>
       chatFromSearch(clientSearch(initialSearch)),
@@ -236,6 +256,7 @@ export default function Workspace({
     // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
     [chatFocus, setChatFocus] = useState(0);
   const [signoutOpen, setSignoutOpen] = useState(false);
+  const { modal, setModal, restoreFocus } = useRecordModal();
   const [confirmation, setConfirmation] = useState<{
     title: string;
     description: string;
@@ -730,6 +751,7 @@ export default function Workspace({
           data={data}
           onClose={() => setModal(null)}
           onSwitch={setModal}
+          onCloseAutoFocus={restoreFocus}
           mutate={mutate}
           busy={busy}
         />
