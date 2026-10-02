@@ -7,7 +7,7 @@ import { client } from "../core";
 import { AvailabilitySheet } from "./availability";
 import { type TeacherCtx } from "./use-teacher-screen";
 
-export function CalendarSection({ ctx }: { ctx: TeacherCtx }) {
+export function CalendarSection({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
   const { styles, data, day, setDay, newLesson, lessonCard, access } = ctx;
   const [availability, setAvailability] = useState(false),
     [enabled, setEnabled] = useState<boolean | null>(null);

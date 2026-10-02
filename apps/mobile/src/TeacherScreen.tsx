@@ -26,7 +26,7 @@ import {
   type TeacherScreenProps,
 } from "./teacher/use-teacher-screen";
 
-export function TeacherScreen(props: TeacherScreenProps) {
+export function TeacherScreen(props: Readonly<TeacherScreenProps>) {
   const ctx = useTeacherScreen(props);
   const {
     data,

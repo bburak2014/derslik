@@ -64,11 +64,11 @@ export function Turnstile({
   round,
   onToken,
   onError,
-}: {
+}: Readonly<{
   round: number;
   onToken: (token: string) => void;
   onError: () => void;
-}) {
+}>) {
   const { scheme } = useTheme();
   const html = useMemo(
     () => buildHtml(configuration.captchaSiteKey, scheme),

@@ -89,7 +89,9 @@ const statusTone: Record<RequestStatus, BadgeTone> = {
   CANCELLED: "neutral",
   EXPIRED: "neutral",
 };
-export function RequestStatusBadge({ status }: { status: RequestStatus }) {
+export function RequestStatusBadge({
+  status,
+}: Readonly<{ status: RequestStatus }>) {
   return (
     <Badge tone={statusTone[status]} dot>
       {label(`dir.status.${status}`)}
@@ -102,12 +104,12 @@ export function TeacherPhoto({
   version,
   name,
   size = 56,
-}: {
+}: Readonly<{
   id: string;
   version: number | null;
   name: string;
   size?: number;
-}) {
+}>) {
   const { colors } = useTheme();
   const [failed, setFailed] = useState(false);
   const uri = photoUri(id, version);
@@ -127,7 +129,10 @@ export function TeacherPhoto({
   );
 }
 
-function Stars({ value, size = 14 }: { value: number | null; size?: number }) {
+function Stars({
+  value,
+  size = 14,
+}: Readonly<{ value: number | null; size?: number }>) {
   const { colors } = useTheme();
   const v = value ?? 0;
   return (
@@ -153,7 +158,7 @@ function Stars({ value, size = 14 }: { value: number | null; size?: number }) {
   );
 }
 
-function Rating({ teacher }: { teacher: PublicTeacher }) {
+function Rating({ teacher }: Readonly<{ teacher: PublicTeacher }>) {
   const { styles } = useTheme();
   if (!teacher.ratingCount)
     return <Badge tone="info">{t("dir.newTeacher")}</Badge>;
@@ -168,7 +173,7 @@ function Rating({ teacher }: { teacher: PublicTeacher }) {
   );
 }
 
-function Price({ teacher }: { teacher: PublicTeacher }) {
+function Price({ teacher }: Readonly<{ teacher: PublicTeacher }>) {
   const { styles } = useTheme();
   const price = priceText(teacher);
   if (!price)
@@ -185,14 +190,14 @@ function TeacherCard({
   onPress,
   onRequest,
   state = null,
-}: {
+}: Readonly<{
   teacher: PublicTeacher;
   onPress: () => void;
   /** "İstek gönder": profil, istek formu açık açılır. */
   onRequest: () => void;
   /** İstek gönderilemiyorsa düğme yerine bu durum görünür. */
   state?: CardState | null;
-}) {
+}>) {
   const { styles } = useTheme();
   return (
     <Card onPress={onPress}>
@@ -271,13 +276,13 @@ export function DirectoryScreen({
   onOpenWorkspace,
   tab: initialTab = "teachers",
   teacher: initialTeacher = null,
-}: {
+}: Readonly<{
   onBack: () => void;
   /** Kabul edilen isteğin öğretmeninin derslerine geçer. */
   onOpenWorkspace: (workspaceId: string) => void;
   tab?: DirectoryTab;
   teacher?: string | null;
-}) {
+}>) {
   const { styles } = useTheme();
   const [tab, setTab] = useState<DirectoryTab>(initialTab),
     [teacher, setTeacher] = useState<string | null>(initialTeacher),
@@ -396,9 +401,9 @@ function requestForm(
 
 function TeacherList({
   onOpen,
-}: {
+}: Readonly<{
   onOpen: (id: string, request?: boolean) => void;
-}) {
+}>) {
   const { styles } = useTheme();
   const [filter, setFilter] = useState<TeacherFilter>({}),
     [query, setQuery] = useState(""),
@@ -637,7 +642,7 @@ function TeacherList({
 }
 
 /** Öğretmenin reddederken yazdığı not; öğrencinin gördüğü haliyle. */
-function TeacherNote({ note }: { note: string }) {
+function TeacherNote({ note }: Readonly<{ note: string }>) {
   const { styles } = useTheme();
   return (
     <View style={{ gap: 4 }}>
@@ -651,12 +656,12 @@ function TeacherProfile({
   id,
   onOpenWorkspace,
   openRequest = false,
-}: {
+}: Readonly<{
   id: string;
   onOpenWorkspace: (workspaceId: string) => void;
   /** Karttaki "İstek gönder"den gelindi: gönderilebiliyorsa form açık başlar. */
   openRequest?: boolean;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   const [teacher, setTeacher] = useState<PublicTeacher | null>(null),
     [reviews, setReviews] = useState<PublicReview[]>([]),
@@ -895,10 +900,10 @@ function TeacherProfile({
 function ReviewList({
   reviews,
   empty,
-}: {
+}: Readonly<{
   reviews: PublicReview[];
   empty: string;
-}) {
+}>) {
   const { styles } = useTheme();
   if (!reviews.length) return <Text style={styles.muted}>{empty}</Text>;
   return (
@@ -930,11 +935,11 @@ function ReviewForm({
   teacherId,
   review,
   onSaved,
-}: {
+}: Readonly<{
   teacherId: string;
   review: PublicReview | null;
   onSaved: () => Promise<void>;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   const [rating, setRating] = useState(review?.rating ?? 0),
     [comment, setComment] = useState(review?.comment ?? ""),
@@ -1039,11 +1044,11 @@ function MyRequests({
   onOpen,
   onBrowse,
   onOpenWorkspace,
-}: {
+}: Readonly<{
   onOpen: (id: string) => void;
   onBrowse: () => void;
   onOpenWorkspace: (workspaceId: string) => void;
-}) {
+}>) {
   const { styles } = useTheme();
   const [rows, setRows] = useState<MyLessonRequest[] | null>(null),
     [error, setError] = useState(""),
@@ -1184,7 +1189,7 @@ export function ShowcaseView({
   onPending,
   onAccepted,
   focus,
-}: {
+}: Readonly<{
   workspaceId: string;
   /** Bekleyen istek sayısı (vitrin simgesindeki sayaç). */
   onPending: (count: number) => void;
@@ -1192,7 +1197,7 @@ export function ShowcaseView({
   onAccepted: (studentId: string | null) => void;
   /** Bildirimden gelinen istek. */
   focus?: string | null;
-}) {
+}>) {
   const { styles } = useTheme();
   const [data, setData] = useState<Showcase | null>(null),
     [tab, setTab] = useState<ShowcaseTab>("requests"),
@@ -1383,11 +1388,11 @@ function RequestCard({
   request: r,
   highlight = false,
   onDecide,
-}: {
+}: Readonly<{
   request: LessonRequest;
   highlight?: boolean;
   onDecide: (r: LessonRequest, decision: "accept" | "decline") => void;
-}) {
+}>) {
   const { styles } = useTheme();
   return (
     <Card tone={highlight ? "brand" : "plain"}>
@@ -1476,11 +1481,11 @@ function ProfileEditor({
   workspaceId,
   showcase,
   onSaved,
-}: {
+}: Readonly<{
   workspaceId: string;
   showcase: Showcase;
   onSaved: (message: string) => Promise<void>;
-}) {
+}>) {
   const { styles } = useTheme();
   const saved = showcase.profile;
   const [v, setV] = useState({

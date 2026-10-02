@@ -6,7 +6,7 @@ import Svg, { Path } from "react-native-svg";
 // kılavuzlarına uymuyordu. Web tarafındaki provider-icons.tsx ile aynı yollar.
 // Çok renkli işaretlerin renkleri sabittir, temaya göre değişmez.
 
-export function GoogleMark({ size = 20 }: { size?: number }) {
+export function GoogleMark({ size = 20 }: Readonly<{ size?: number }>) {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
       <Path
@@ -31,7 +31,10 @@ export function GoogleMark({ size = 20 }: { size?: number }) {
 
 /** Apple işareti tek renklidir; kendi kılavuzu açık zeminde siyah, koyu
  *  zeminde beyaz der. Bu yüzden rengi dışarıdan alır. */
-export function AppleMark({ size = 20, color }: { size?: number; color: string }) {
+export function AppleMark({
+  size = 20,
+  color,
+}: Readonly<{ size?: number; color: string }>) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path
@@ -42,7 +45,7 @@ export function AppleMark({ size = 20, color }: { size?: number; color: string }
   );
 }
 
-export function MicrosoftMark({ size = 20 }: { size?: number }) {
+export function MicrosoftMark({ size = 20 }: Readonly<{ size?: number }>) {
   return (
     <Svg width={size} height={size} viewBox="0 0 23 23">
       <Path fill="#F25022" d="M1 1h10v10H1z" />
@@ -53,7 +56,7 @@ export function MicrosoftMark({ size = 20 }: { size?: number }) {
   );
 }
 
-export function WhatsappMark({ size = 18 }: { size?: number }) {
+export function WhatsappMark({ size = 18 }: Readonly<{ size?: number }>) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Path

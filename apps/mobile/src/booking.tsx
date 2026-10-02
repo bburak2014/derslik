@@ -62,7 +62,7 @@ function BookingBody({
   onClose,
   onChanged,
   onMessage,
-}: Props) {
+}: Readonly<Props>) {
   const { colors, styles, section, type } = useTheme();
   const base = `/portal/${workspaceId}/${studentId}/booking`;
   const [slots, setSlots] = useState<BookingSlots | null>(null),

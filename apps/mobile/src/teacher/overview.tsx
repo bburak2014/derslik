@@ -13,7 +13,7 @@ import {
 } from "../ui";
 import { type TeacherCtx } from "./use-teacher-screen";
 
-export function Overview({ ctx }: { ctx: TeacherCtx }) {
+export function Overview({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
   const {
     colors,
     styles,

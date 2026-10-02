@@ -86,11 +86,11 @@ export function PdfViewer({
   name,
   url,
   onClose,
-}: {
+}: Readonly<{
   name: string;
   url: string;
   onClose: () => void;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   const [failed, setFailed] = useState(false);
   const html = useMemo(

@@ -72,7 +72,7 @@ export function AvailabilitySheet({
   );
 }
 
-function AvailabilityBody({ workspaceId, onClose, onSaved }: Props) {
+function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
   const { colors, styles, section } = useTheme();
   const [form, setForm] = useState<BookingSettings | null>(null),
     [issues, setIssues] = useState<Record<string, string>>({}),
@@ -253,7 +253,9 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Props) {
                             onPress={() =>
                               edit((f) => ({
                                 ...f,
-                                windows: f.windows.filter((_, i) => i !== index),
+                                windows: f.windows.filter(
+                                  (_, i) => i !== index,
+                                ),
                               }))
                             }
                           />
@@ -363,8 +365,13 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Props) {
                 <Picker
                   label={t("booking.notice")}
                   value={String(form.noticeHours)}
-                  options={numberOptions(NOTICE_PRESETS, form.noticeHours, (n) =>
-                    n ? t("booking.hours", { count: n }) : t("booking.noticeNone"),
+                  options={numberOptions(
+                    NOTICE_PRESETS,
+                    form.noticeHours,
+                    (n) =>
+                      n
+                        ? t("booking.hours", { count: n })
+                        : t("booking.noticeNone"),
                   )}
                   onChange={(v) =>
                     edit((f) => ({ ...f, noticeHours: Number(v) }))
@@ -375,10 +382,13 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Props) {
                 <Picker
                   label={t("booking.cancelWindow")}
                   value={String(form.cancelHours)}
-                  options={numberOptions(CANCEL_PRESETS, form.cancelHours, (n) =>
-                    n
-                      ? t("booking.hoursBefore", { count: n })
-                      : t("booking.cancelUntilStart"),
+                  options={numberOptions(
+                    CANCEL_PRESETS,
+                    form.cancelHours,
+                    (n) =>
+                      n
+                        ? t("booking.hoursBefore", { count: n })
+                        : t("booking.cancelUntilStart"),
                   )}
                   onChange={(v) =>
                     edit((f) => ({ ...f, cancelHours: Number(v) }))

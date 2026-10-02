@@ -21,14 +21,14 @@ export function MediaPlayer({
   canAsk,
   onClose,
   action,
-}: {
+}: Readonly<{
   video: Video;
   path: string;
   initialTime: number;
   canAsk: boolean;
   onClose: () => void;
   action: (body: unknown) => Promise<void>;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   const player = useVideoPlayer(null, (p) => {
       p.timeUpdateEventInterval = 1;

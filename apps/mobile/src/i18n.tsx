@@ -52,7 +52,9 @@ const LocaleContext = createContext<{
  * cihazda saklanır. Dil değişince ekran ağacı yeniden kurulur, böylece bütün
  * metinler ve tarih biçimleri yeni dille çizilir.
  */
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
+export function LocaleProvider({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const { colors } = useTheme();
   const [locale, setState] = useState<Locale | null>(null);
   useEffect(() => {
@@ -89,7 +91,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
 
 /** Dil seçimi; her dil kendi adıyla listelenir. */
 /** Dilin bayrağı (web ile aynı SVG yolları). */
-export function Flag({ locale }: { locale: Locale }) {
+export function Flag({ locale }: Readonly<{ locale: Locale }>) {
   const { colors } = useTheme();
   const flag = localeFlags[locale];
   return (

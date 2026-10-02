@@ -69,10 +69,10 @@ type Mode = keyof typeof copy;
 export function AuthScreen({
   reset = false,
   onDone,
-}: {
+}: Readonly<{
   reset?: boolean;
   onDone?: () => void;
-}) {
+}>) {
   const { colors, styles, type } = useTheme();
   const auth = useMemo(() => makeAuth(colors, type), [colors, type]);
   const [mode, setMode] = useState<Mode>(reset ? "password" : "signin"),

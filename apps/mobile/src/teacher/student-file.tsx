@@ -14,7 +14,7 @@ import {
 } from "../ui";
 import { type TeacherCtx } from "./use-teacher-screen";
 
-export function StudentFile({ ctx }: { ctx: TeacherCtx }) {
+export function StudentFile({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
   const {
     colors,
     styles,

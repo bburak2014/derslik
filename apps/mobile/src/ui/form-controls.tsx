@@ -86,13 +86,13 @@ export function Field({
   error,
   required,
   children,
-}: {
+}: Readonly<{
   label: string;
   hint?: string;
   error?: string;
   required?: boolean;
   children: React.ReactNode;
-}) {
+}>) {
   const { styles, section } = useTheme();
   return (
     <View style={styles.field}>
@@ -116,12 +116,12 @@ export function Segmented({
   value,
   onChange,
   label,
-}: {
+}: Readonly<{
   options: { value: string; label: string; icon?: IconName }[];
   value: string;
   onChange: (value: string) => void;
   label?: string;
-}) {
+}>) {
   const { colors, section } = useTheme();
   return (
     <View
@@ -172,13 +172,13 @@ export function ChipGroup({
   onChange,
   label,
   max,
-}: {
+}: Readonly<{
   options: { value: string; label: string }[];
   value: string[];
   onChange: (value: string[]) => void;
   label?: string;
   max?: number;
-}) {
+}>) {
   const { colors, type } = useTheme();
   const full = max !== undefined && value.length >= max;
   return (
@@ -242,13 +242,13 @@ export function Toggle({
   value,
   onChange,
   disabled = false,
-}: {
+}: Readonly<{
   label: string;
   hint?: string;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -277,11 +277,11 @@ export function TabStrip({
   tabs,
   value,
   onChange,
-}: {
+}: Readonly<{
   tabs: { id: string; label: string }[];
   value: string;
   onChange: (id: string) => void;
-}) {
+}>) {
   const { colors, section } = useTheme();
   return (
     <ScrollView
@@ -340,7 +340,7 @@ export function Picker({
   label,
   placeholder = t("common.choose"),
   pill,
-}: {
+}: Readonly<{
   value: string;
   options: {
     value: string;
@@ -354,7 +354,7 @@ export function Picker({
   /** Filtre hapı: "Etiket: seçim" yazan yuvarlak düğme; boş değer dışında
    *  bir seçim yapılınca marka tonuna geçer. */
   pill?: { icon: IconName };
-}) {
+}>) {
   const { colors, styles, section, type } = useTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

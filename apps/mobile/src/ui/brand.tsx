@@ -51,10 +51,10 @@ export function GridTexture() {
 export function Brand({
   inverse = false,
   compact = false,
-}: {
+}: Readonly<{
   inverse?: boolean;
   compact?: boolean;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   return (
     <View
@@ -86,10 +86,10 @@ export function Brand({
 export function InkPanel({
   children,
   style,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-}) {
+}>) {
   const { colors, section } = useTheme();
   return (
     <View
@@ -113,11 +113,11 @@ export function BottomTabs({
   items,
   value,
   onChange,
-}: {
+}: Readonly<{
   items: { id: string; label: string; icon: IconName }[];
   value: string;
   onChange: (id: string) => void;
-}) {
+}>) {
   const { colors, section } = useTheme();
   const insets = useSafeAreaInsets();
   return (

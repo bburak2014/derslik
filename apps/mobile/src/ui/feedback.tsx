@@ -14,12 +14,12 @@ export function EmptyState({
   title,
   description,
   action,
-}: {
+}: Readonly<{
   icon?: IconName;
   title: string;
   description?: string;
   action?: React.ReactNode;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   return (
     <View style={section.empty}>

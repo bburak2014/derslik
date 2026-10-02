@@ -32,13 +32,13 @@ export function Card({
   onPress,
   style,
   onLayout,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   tone?: "plain" | "brand" | "muted";
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   onLayout?: ViewProps["onLayout"];
-}) {
+}>) {
   const { colors, styles } = useTheme();
   const toned =
     tone === "brand"
@@ -78,10 +78,10 @@ export function Card({
 export function CloseButton({
   onPress,
   disabled,
-}: {
+}: Readonly<{
   onPress: () => void;
   disabled?: boolean;
-}) {
+}>) {
   const { colors, section } = useTheme();
   return (
     <Pressable
@@ -106,10 +106,10 @@ export function CloseButton({
 export function PackageCard({
   pack,
   children,
-}: {
+}: Readonly<{
   pack: Pick<LessonPackage, "name" | "remaining" | "granted" | "price_minor">;
   children?: React.ReactNode;
-}) {
+}>) {
   const { styles } = useTheme();
   const low = pack.remaining <= 2;
   return (
@@ -139,11 +139,11 @@ export function SectionHeading({
   title,
   description,
   action,
-}: {
+}: Readonly<{
   title: string;
   description?: string;
   action?: React.ReactNode;
-}) {
+}>) {
   const { styles, section } = useTheme();
   return (
     <View style={section.wrap}>
@@ -166,11 +166,11 @@ export function Kicker({
   children,
   muted = false,
   style,
-}: {
+}: Readonly<{
   children: string;
   muted?: boolean;
   style?: StyleProp<TextStyle>;
-}) {
+}>) {
   const { styles } = useTheme();
   return (
     <Text style={[muted ? styles.label2 : styles.kicker, style]}>
@@ -187,12 +187,12 @@ export function Badge({
   tone = "neutral",
   dot = false,
   icon,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   tone?: BadgeTone;
   dot?: boolean;
   icon?: IconName;
-}) {
+}>) {
   const { colors, section } = useTheme();
   const palette = {
     neutral: { bg: colors.sunken, fg: colors.muted },
@@ -222,11 +222,11 @@ export function Badge({
 export function LessonStatus({
   status,
   endsAt,
-}: {
+}: Readonly<{
   status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   /** Verilirse, bitişi geçmiş ama hâlâ planlı ders "onay bekliyor" görünür. */
   endsAt?: string;
-}) {
+}>) {
   // Ekran açıldığı andaki saat yeterli; liste yenilenince yeniden bakılır.
   const [now] = useState(() => Date.now());
   if (status === "SCHEDULED" && endsAt && Date.parse(endsAt) < now)
@@ -252,7 +252,10 @@ export function LessonStatus({
 
 /** Baş harfli avatar. Renk web'deki StudentAvatar ile aynı hesaplanır; aynı
  *  öğrenci iki uygulamada da aynı tonda görünür. */
-export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+export function Avatar({
+  name,
+  size = 40,
+}: Readonly<{ name: string; size?: number }>) {
   const { colors, section } = useTheme();
   const index =
     Array.from(name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4;
@@ -295,7 +298,7 @@ export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
 }
 
 /** Tarih karosu: ay kısaltması ve gün. Bugün fosforlu kalemle işaretli. */
-export function DateTile({ date }: { date: string }) {
+export function DateTile({ date }: Readonly<{ date: string }>) {
   const { colors, section } = useTheme();
   const today = dateKey(date) === dateKey();
   return (
@@ -317,11 +320,11 @@ export function Metric({
   label,
   value,
   warn = false,
-}: {
+}: Readonly<{
   label: string;
   value: React.ReactNode;
   warn?: boolean;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   return (
     <View
@@ -348,7 +351,7 @@ export function Metric({
 }
 
 /** Gruplu liste kabı; satırlar ListRow ile eklenir. */
-export function List({ children }: { children: React.ReactNode }) {
+export function List({ children }: Readonly<{ children: React.ReactNode }>) {
   const { section } = useTheme();
   return <View style={section.list}>{children}</View>;
 }
@@ -359,12 +362,12 @@ export function ListRow({
   onPress,
   divider = false,
   accessibilityLabel,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   onPress?: () => void;
   divider?: boolean;
   accessibilityLabel?: string;
-}) {
+}>) {
   const { colors, section } = useTheme();
   const line = divider && { borderTopWidth: 1, borderTopColor: colors.line };
   if (!onPress) return <View style={[section.listRow, line]}>{children}</View>;
@@ -388,9 +391,9 @@ export function ListRow({
 /** Mürekkep paneldeki sayı ızgarası: iki sütun, büyük harf etiketler. */
 export function InkFigures({
   items,
-}: {
+}: Readonly<{
   items: { label: string; value: React.ReactNode }[];
-}) {
+}>) {
   const { section } = useTheme();
   return (
     <View style={section.figures}>
@@ -418,12 +421,12 @@ export function Meter({
   used,
   limit,
   unit,
-}: {
+}: Readonly<{
   label: string;
   used: number;
   limit: number;
   unit?: string;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   const percent = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   const full = percent >= 90;

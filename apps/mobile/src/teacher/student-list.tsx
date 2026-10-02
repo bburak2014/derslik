@@ -4,7 +4,7 @@ import { money, lower, t } from "@derslik/contracts";
 import { Avatar, Badge, Button, EmptyState, Input, List, ListRow } from "../ui";
 import { type TeacherCtx } from "./use-teacher-screen";
 
-export function StudentList({ ctx }: { ctx: TeacherCtx }) {
+export function StudentList({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
   const {
     colors,
     styles,

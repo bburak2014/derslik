@@ -44,10 +44,10 @@ export type FormSpec = {
 export function FormSheet({
   form,
   onClose,
-}: {
+}: Readonly<{
   form: FormSpec | null;
   onClose: () => void;
-}) {
+}>) {
   return (
     <Modal
       visible={!!form}
@@ -68,7 +68,10 @@ export function FormSheet({
 const pickFromList = (options: { label: string }[]) =>
   options.length > 3 || options.some((o) => o.label.length > 18);
 
-function FormBody({ form, onClose }: { form: FormSpec; onClose: () => void }) {
+function FormBody({
+  form,
+  onClose,
+}: Readonly<{ form: FormSpec; onClose: () => void }>) {
   const { colors, styles, section } = useTheme();
   const [values, setValues] = useState(
       Object.fromEntries(

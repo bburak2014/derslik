@@ -240,10 +240,10 @@ export type MessagesState = ReturnType<typeof useMessages>;
 function ThreadAvatar({
   thread,
   size = 40,
-}: {
+}: Readonly<{
   thread: MessageThread;
   size?: number;
-}) {
+}>) {
   const { colors } = useTheme();
   if (thread.viewer === "OWNER" && thread.role === "GUARDIAN")
     return (
@@ -286,12 +286,12 @@ function ThreadRow({
   now,
   divider,
   onPress,
-}: {
+}: Readonly<{
   thread: MessageThread;
   now: number;
   divider: boolean;
   onPress: () => void;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   const title = threadTitle(thread),
     email = guardianEmail(thread),
@@ -359,11 +359,11 @@ function FilterChip({
   label,
   value,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: boolean;
   onChange: (value: boolean) => void;
-}) {
+}>) {
   const { colors, section, type } = useTheme();
   return (
     <Pressable
@@ -402,7 +402,10 @@ function FilterChip({
 
 /** Öğrenci süzgeci: öğrencinin adını taşıyan çip; dokununca süzgeç kalkar.
  *  Görünen yükseklik 36 px, dokunma alanı hitSlop ile 44 px. */
-function StudentChip({ name, onClear }: { name: string; onClear: () => void }) {
+function StudentChip({
+  name,
+  onClear,
+}: Readonly<{ name: string; onClear: () => void }>) {
   const { colors, section, type } = useTheme();
   return (
     <Pressable
@@ -461,14 +464,14 @@ export function ThreadList({
   viewer,
   kicker,
   inset = false,
-}: {
+}: Readonly<{
   messages: MessagesState;
   viewer: "OWNER" | "STUDENT" | "GUARDIAN";
   /** Öğretmende başlığın üstündeki çalışma alanı adı. */
   kicker?: string;
   /** Altında sekme çubuğu yoksa alt güvenli alan kadar boşluk bırakılır. */
   inset?: boolean;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false),
@@ -751,7 +754,7 @@ export function Conversation({
   onBack,
   onUpdate,
   onRead,
-}: {
+}: Readonly<{
   /** Liste adresi: `/workspaces/:ws/messages` ya da
    *  `/portal/:ws/:student/messages`. */
   path: string;
@@ -764,7 +767,7 @@ export function Conversation({
   onUpdate?: (thread: MessageThread) => void;
   /** Okundu bildirildikten sonra (zil sayacı yenilenir). */
   onRead?: () => void;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   const insets = useSafeAreaInsets();
   const url = `${path}/${linkId}`;
@@ -1303,10 +1306,10 @@ export function Conversation({
 export function PortalMessages({
   messages,
   viewer,
-}: {
+}: Readonly<{
   messages: MessagesState;
   viewer: "STUDENT" | "GUARDIAN";
-}) {
+}>) {
   const { colors } = useTheme();
   const { threads, open, path, error } = messages;
   if (!path) return null;

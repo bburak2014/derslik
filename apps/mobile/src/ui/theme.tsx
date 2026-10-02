@@ -64,7 +64,9 @@ const ThemeContext = createContext<ThemeValue>({
  * Seçim cihazda saklanır; web'deki tema düğmesiyle aynı davranış. Yazı
  * tipleri de burada yüklenir; yüklenene kadar yalnızca tuval çizilir.
  */
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const device = useColorScheme();
   const [fontsReady, fontError] = useFonts(fontFiles);
   const [mode, setModeState] = useState<ThemeMode>("system");

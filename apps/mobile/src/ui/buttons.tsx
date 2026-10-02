@@ -41,7 +41,7 @@ export function Button({
   loading = false,
   disabled = false,
   style,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   onPress: () => void;
   /** Eski çağrılar için; variant="secondary" ile aynı (shadcn outline). */
@@ -53,7 +53,7 @@ export function Button({
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   const kind: ButtonVariant = variant || (secondary ? "secondary" : "primary");
   const inactive = disabled || loading;
@@ -134,12 +134,12 @@ export function TextLink({
   onPress,
   disabled = false,
   icon,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   onPress: () => void;
   disabled?: boolean;
   icon?: IconName;
-}) {
+}>) {
   const { colors, styles } = useTheme();
   return (
     <Pressable
@@ -171,7 +171,7 @@ export function IconButton({
   ghost = false,
   selected = false,
   count = 0,
-}: {
+}: Readonly<{
   icon: IconName;
   label: string;
   onPress: () => void;
@@ -180,7 +180,7 @@ export function IconButton({
   ghost?: boolean;
   selected?: boolean;
   count?: number;
-}) {
+}>) {
   const { colors, section } = useTheme();
   return (
     <Pressable

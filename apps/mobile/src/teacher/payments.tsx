@@ -11,7 +11,7 @@ import {
 } from "../ui";
 import { type TeacherCtx } from "./use-teacher-screen";
 
-export function PaymentsSection({ ctx }: { ctx: TeacherCtx }) {
+export function PaymentsSection({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
   const {
     colors,
     styles,

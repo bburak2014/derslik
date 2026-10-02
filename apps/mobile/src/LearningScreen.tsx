@@ -107,14 +107,14 @@ export function PortalScreen({
   focus,
   onNotice,
   onDiscover,
-}: {
+}: Readonly<{
   access: Access;
   onAccount: () => void;
   focus?: NoticeFocus | null;
   onNotice?: (target: NoticeTarget) => void;
   /** Öğretmen vitrinini açar (yalnızca öğrenci). */
   onDiscover?: () => void;
-}) {
+}>) {
   return (
     <LearningScreen
       access={access}
@@ -163,7 +163,7 @@ export function LearningScreen({
   focus,
   onNotice,
   onDiscover,
-}: {
+}: Readonly<{
   access: Access;
   studentId: string;
   studentName: string;
@@ -177,7 +177,7 @@ export function LearningScreen({
   /** Bildirimler sekmesinde bir bildirime dokunulunca. */
   onNotice?: (target: NoticeTarget) => void;
   onDiscover?: () => void;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   const owner = access.role === "OWNER",
     student = access.role === "STUDENT";
@@ -1948,7 +1948,7 @@ export function LearningScreen({
 }
 
 /** Dosya, erişim ve davet satırlarının başındaki simge karosu. */
-function FileIcon({ icon }: { icon: IconName }) {
+function FileIcon({ icon }: Readonly<{ icon: IconName }>) {
   const { colors, section } = useTheme();
   return (
     <View style={section.fileIcon}>
@@ -1973,12 +1973,12 @@ export function Inbox({
   workspaceId,
   onUnread,
   onOpen,
-}: {
+}: Readonly<{
   workspaceId?: string;
   onUnread?: (count: number) => void;
   /** Bildirime dokununca ilgili ekranı açar. */
   onOpen?: (target: NoticeTarget) => void;
-}) {
+}>) {
   const { colors, styles, section } = useTheme();
   const [rows, setRows] = useState<Notice[] | null>(null),
     [limits, setLimits] = useState<WorkspaceLimits | null>(null),
