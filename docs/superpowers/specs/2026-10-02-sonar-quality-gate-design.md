@@ -1,7 +1,7 @@
 # Sonar kalite kapısı: tasarım
 
 - Tarih: 2026-10-02 (aynı gün güncellendi: commit kancası eklendi)
-- Durum: Güncelleme onaylandı, yazılı tasarımın gözden geçirilmesi bekleniyor. Uygulama planı bu tasarıma göre yenilenecek.
+- Durum: Tasarım (commit kancası güncellemesiyle) onaylandı. `docs/superpowers/plans/2026-10-02-sonar-quality-gate.md` bu güncellemeden önce yazıldı; uygulamadan önce bu tasarıma göre yenilenecek.
 - Dal: `sonar-quality-gate`
 
 ## Amaç
