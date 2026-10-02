@@ -47,7 +47,7 @@
     "services:check": "node scripts/check-services.mjs",
     "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
     "test:booking": "node --experimental-strip-types --test tests/booking-rules.test.mjs",
-    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs",
+    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs",
     "quality:sonar": "node scripts/sonar.mjs",
     "quality:dup": "npx -y jscpd@4",
     "security:code": "bash scripts/security-scan.sh code",
