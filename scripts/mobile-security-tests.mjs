@@ -278,7 +278,11 @@ function storageFixture() {
       },
     },
     "@derslik/api-client": {
-      DerslikClient: class {},
+      DerslikClient: class {
+        constructor(options) {
+          this.options = options;
+        }
+      },
       ApiError: class extends Error {},
     },
   });

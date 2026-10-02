@@ -17,10 +17,16 @@ const IMPACT_ORDER = ["BLOCKER", "HIGH", "MEDIUM", "LOW", "INFO"];
 
 /** Sorunun önemi: yeni API'de en yüksek etki (impacts), eskide severity. */
 export function severityOf(issue) {
-  const levels = (issue.impacts ?? []).map((i) => i.severity);
-  for (const level of IMPACT_ORDER) if (levels.includes(level)) return level;
+  const levels = new Set((issue.impacts ?? []).map((i) => i.severity));
+  for (const level of IMPACT_ORDER) if (levels.has(level)) return level;
   return issue.severity ?? "-";
 }
+
+/** Kod birimi sırasıyla karşılaştırır (yerel ayardan bağımsız, kararlı). */
+const compareText = (a, b) => {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+};
 
 /** Dosyaya göre gruplanmış, satıra göre sıralı rapor satırları. */
 export function formatFindings(findings) {
@@ -28,7 +34,7 @@ export function formatFindings(findings) {
   for (const f of findings)
     byFile.set(f.file, [...(byFile.get(f.file) ?? []), f]);
   const lines = [];
-  for (const file of [...byFile.keys()].sort()) {
+  for (const file of [...byFile.keys()].sort(compareText)) {
     lines.push(file);
     const sorted = byFile
       .get(file)

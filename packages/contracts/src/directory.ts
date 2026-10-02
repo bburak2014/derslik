@@ -259,7 +259,7 @@ export type Showcase = {
 export function shortName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return parts[0] ?? "";
-  const last = parts[parts.length - 1];
+  const last = parts.at(-1) ?? "";
   return `${parts.slice(0, -1).join(" ")} ${last.charAt(0).toLocaleUpperCase("tr")}.`;
 }
 

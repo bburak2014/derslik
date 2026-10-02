@@ -85,6 +85,22 @@ test("yerel tarayıcı ana checkout'un araç önbelleğinde aranır, en yenisi s
   );
 });
 
+test("sürümler sayısal sıralanır: 8.10, 8.9'dan yeni sayılır", (t) => {
+  const dir = tempDir(t);
+  const base = path.join(dir, "reports", "quality", "tool-cache");
+  for (const version of ["8.9.0.1", "8.10.0.1"]) {
+    const bin = path.join(base, `sonar-scanner-${version}-macosx-aarch64`, "bin");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "sonar-scanner"), "#!/bin/sh\n", {
+      mode: 0o755,
+    });
+  }
+  assert.equal(
+    findNativeScanner(dir),
+    path.join(base, "sonar-scanner-8.10.0.1-macosx-aarch64", "bin", "sonar-scanner"),
+  );
+});
+
 test("çalıştırılamayan tarayıcı dosyası seçilmez", (t) => {
   const dir = tempDir(t);
   const bin = path.join(dir, "reports", "quality", "tool-cache", "sonar-scanner-8.1.0.6389-macosx-aarch64", "bin");

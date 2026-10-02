@@ -178,8 +178,8 @@ export function groupSlotsByDay(slots: readonly BookingSlot[]) {
   const days: { day: string; slots: BookingSlot[] }[] = [];
   for (const slot of slots) {
     const key = dateKey(slot.startsAt);
-    const last = days[days.length - 1];
-    if (last && last.day === key) last.slots.push(slot);
+    const last = days.at(-1);
+    if (last?.day === key) last.slots.push(slot);
     else days.push({ day: key, slots: [slot] });
   }
   return days;

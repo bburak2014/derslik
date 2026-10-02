@@ -85,7 +85,7 @@ export async function merge(file, values) {
     .filter(
       (line) =>
         !Object.keys(values).some((key) =>
-          new RegExp(`^(?:export\\s+)?${key}\\s*=`).test(line),
+          new RegExp(String.raw`^(?:export\s+)?${key}\s*=`).test(line),
         ),
     );
   const contents =

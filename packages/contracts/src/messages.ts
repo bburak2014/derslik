@@ -15,7 +15,7 @@ export const MESSAGE_MAX = 2000;
 export function cleanMessage(text: string): string {
   let out = "";
   for (const c of text.replace(/\r\n?/g, "\n")) {
-    const code = c.charCodeAt(0);
+    const code = c.codePointAt(0) ?? 0;
     if (code === 9 || code === 10 || (code > 31 && (code < 127 || code > 159)))
       out += c;
   }

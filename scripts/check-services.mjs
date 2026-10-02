@@ -18,7 +18,7 @@ await check("Sosyal giriş", async () => {
     headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY },
     signal: AbortSignal.timeout(10000),
   });
-  if (!r.ok) throw Error();
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const settings = await r.json();
   const enabled = ["google", "apple", "azure"].filter(
     (p) => settings.external?.[p] === true,
@@ -49,7 +49,7 @@ await check("PDF ve dosyalar", async () => {
   );
   if (r.status === 404)
     return "Depolama alanı yok. pnpm storage:setup çalıştırın.";
-  if (!r.ok) throw Error();
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const bucket = await r.json();
   return bucket.public === false
     ? "Özel depolama alanına erişildi."
@@ -67,7 +67,7 @@ await check("Video", async () => {
       signal: AbortSignal.timeout(10000),
     },
   );
-  if (!r.ok || !(await r.json()).success) throw Error();
+  if (!r.ok || !(await r.json()).success) throw new Error(`HTTP ${r.status}`);
   return env.CLOUDFLARE_STREAM_WEBHOOK_SECRET
     ? "Hesaba erişildi. Webhook teslimini gerçek yükleme ile doğrulayın."
     : "Hesaba erişildi. Yerelde Durumu yenile kullanılabilir; üretimde webhook secret gerekli.";

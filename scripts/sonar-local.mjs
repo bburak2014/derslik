@@ -43,8 +43,7 @@ export function findNativeScanner(mainRoot) {
   }
   const candidates = names
     .filter((name) => name.startsWith("sonar-scanner-"))
-    .sort()
-    .reverse();
+    .sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
   for (const name of candidates) {
     const bin = path.join(base, name, "bin", "sonar-scanner");
     try {

@@ -69,7 +69,7 @@ export class InstallProgress {
   }
 
   counts(success) {
-    if (!success || !this.complete || !(this.added > 0) || this.invalid ||
+    if (!success || !this.complete || (this.added ?? 0) <= 0 || this.invalid ||
         this.reused.size + this.downloaded.size === 0) return {};
     return { packages_reused: this.reused.size, packages_downloaded: this.downloaded.size };
   }

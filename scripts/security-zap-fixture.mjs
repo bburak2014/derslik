@@ -28,11 +28,11 @@ const requests = seeds.filter((s) => s.actor === "owner" && (mode === "api" || s
 }));
 if (mode === "web") requests.unshift(...["/", "/teachers", "/reset-password", "/api/session", "/api/auth/providers"].map((path) => ({ url: target + path, method: "GET" })));
 const plan = {
-  env: { contexts: [{ name: "local-fixture", urls: [target], includePaths: [target.replaceAll(".", "\\.") + "/.*"], excludePaths: mode === "web" ? [target + "/api/auth/signout.*"] : [] }], parameters: { failOnError: true, failOnWarning: false, progressToStdout: true } },
+  env: { contexts: [{ name: "local-fixture", urls: [target], includePaths: [target.replaceAll(".", String.raw`\.`) + "/.*"], excludePaths: mode === "web" ? [target + "/api/auth/signout.*"] : [] }], parameters: { failOnError: true, failOnWarning: false, progressToStdout: true } },
   jobs: [
     ...(mode === "web" ? [{ type: "replacer", rules: [
-      { description: "Local fixture origin", url: "http://host\\.docker\\.internal:3100/.*", matchType: "req_header", matchString: "Origin", replacementString: "http://127.0.0.1:3100" },
-      { description: "Local fixture client", url: "http://host\\.docker\\.internal:3100/.*", matchType: "req_header", matchString: "X-Derslik-Client", replacementString: "web" },
+      { description: "Local fixture origin", url: String.raw`http://host\.docker\.internal:3100/.*`, matchType: "req_header", matchString: "Origin", replacementString: "http://127.0.0.1:3100" },
+      { description: "Local fixture client", url: String.raw`http://host\.docker\.internal:3100/.*`, matchType: "req_header", matchString: "X-Derslik-Client", replacementString: "web" },
     ] }] : []),
     { type: "passiveScan-config", parameters: { scanOnlyInScope: true, maxAlertsPerRule: 20 } },
     { type: "requestor", requests },

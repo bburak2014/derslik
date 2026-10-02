@@ -95,13 +95,17 @@ export class MessageSocket {
 
   subscribe(listener: (event: MessageSocketEvent) => void) {
     this.listeners.add(listener);
-    return () => void this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   /** `live` değişince çağrılır (React'te useSyncExternalStore için). */
   onLive(listener: () => void) {
     this.liveListeners.add(listener);
-    return () => void this.liveListeners.delete(listener);
+    return () => {
+      this.liveListeners.delete(listener);
+    };
   }
 
   start() {
