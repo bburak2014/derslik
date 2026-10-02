@@ -112,6 +112,7 @@ export async function acquireLock(lockDir, options = {}) {
     onWait = () => {},
   } = options;
   const ownerFile = path.join(lockDir, "pid");
+  const reclaimDir = `${lockDir}.reclaim`;
   fs.mkdirSync(path.dirname(lockDir), { recursive: true });
   const started = now();
   let waited = false;
@@ -132,7 +133,47 @@ export async function acquireLock(lockDir, options = {}) {
         ? lockAge(lockDir, now) > OWNERLESS_STALE_MS
         : !isAlive(owner);
     if (stale) {
-      fs.rmSync(lockDir, { recursive: true, force: true });
+      // İki bekleyici aynı anda bayat kilidi silip almasın diye geri alma muteksi kullan.
+      // Muteks başkası tarafından tutuluyorsa, onu da kontrol et.
+      try {
+        fs.mkdirSync(reclaimDir);
+      } catch (reclaimError) {
+        if (reclaimError.code === "EEXIST") {
+          // Başkası geri almaya çalışıyor. Onun kilidi eski mi kontrol et.
+          if (lockAge(reclaimDir, now) > OWNERLESS_STALE_MS) {
+            // Çökmüş geri alıcı; onun mutex'ini temizle.
+            fs.rmSync(reclaimDir, { recursive: true, force: true });
+          }
+          // Bu tur atla, normal timeout/bekleme yoluna dön.
+          if (now() - started >= timeoutMs)
+            throw new Error(
+              `Sonar kapısı: kilit ${Math.round(timeoutMs / 60_000)} dakikada alınamadı (${lockDir}).`,
+            );
+          if (!waited) {
+            onWait(owner);
+            waited = true;
+          }
+          await sleep(pollMs);
+          continue;
+        }
+        throw reclaimError;
+      }
+      // Geri alma muteksi tutuldu.
+      try {
+        // Bayat kararını yeniden kontrol et.
+        const currentOwner = readOwner(ownerFile);
+        const currentStale =
+          currentOwner === null
+            ? lockAge(lockDir, now) > OWNERLESS_STALE_MS
+            : !isAlive(currentOwner);
+        if (currentStale && currentOwner === owner) {
+          // Hala bayat ve değişmedi; sil.
+          fs.rmSync(lockDir, { recursive: true, force: true });
+        }
+        // Devam et (mkdir yeniden denene).
+      } finally {
+        fs.rmSync(reclaimDir, { recursive: true, force: true });
+      }
       continue;
     }
     if (now() - started >= timeoutMs)

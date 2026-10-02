@@ -184,3 +184,47 @@ test("bırakma yalnızca kendi kilidini siler", async (t) => {
   release();
   assert.equal(fs.existsSync(lock), true);
 });
+
+test("bayat sayılan kilidi bu arada başkası aldıysa silinmez", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  lockHeldBy(lock, 1111);
+  await assert.rejects(
+    acquireLock(lock, {
+      pid: 2222,
+      isAlive: (pid) => {
+        if (pid === 1111) {
+          // Başkası kilidi aldı.
+          fs.writeFileSync(path.join(lock, "pid"), "3333");
+          return false;
+        }
+        return true;
+      },
+      timeoutMs: 0,
+    }),
+    /kilit/,
+  );
+  // Başkasının kilidi hala orada.
+  assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "3333");
+  // Geri alma mutex'i temizlenmiş.
+  assert.equal(fs.existsSync(`${lock}.reclaim`), false);
+});
+
+test("çökmüş geri alma kilidi 30 saniye sonra temizlenir", async (t) => {
+  const lock = path.join(tempDir(t), "sonar-gate.lock");
+  lockHeldBy(lock, 1111);
+  const reclaimDir = `${lock}.reclaim`;
+  fs.mkdirSync(reclaimDir);
+  // Mutex 60 saniye önce oluşturulmuş (çökmüş).
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(reclaimDir, old, old);
+
+  const release = await acquireLock(lock, {
+    pid: 2222,
+    isAlive: () => false,
+    sleep: async () => {},
+    timeoutMs: 5_000,
+  });
+  assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "2222");
+  release();
+  assert.equal(fs.existsSync(lock), false);
+});
