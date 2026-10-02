@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { calendarDaySchema, timestampSchema } from "./dates.ts";
 
 // Hata iletileri çeviri anahtarıdır; API yanıtı isteğin dilinde yazar.
 const id = z.string().uuid();
@@ -7,14 +8,7 @@ const amount = z
   .string()
   .regex(/^\d{1,10}$/)
   .refine((x) => Number(x) > 0 && Number(x) <= 999999999, "api.invalidAmount");
-const day = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine(
-    (x) =>
-      !Number.isNaN(Date.parse(x)) && new Date(x).toISOString().startsWith(x),
-    "api.invalidDate",
-  );
+const day = calendarDaySchema;
 const version = z.number().int().min(0);
 const fields = {
   name: short,
@@ -41,7 +35,7 @@ export const commandSchema = z.discriminatedUnion("action", [
     studentId: id,
     packageId: id,
     topic: short,
-    startsAt: z.string().datetime({ offset: true }),
+    startsAt: timestampSchema,
     duration: z.number().int().min(15).max(180),
     location: z.string().trim().max(100),
     makeupForId: id.optional(),
@@ -54,7 +48,7 @@ export const commandSchema = z.discriminatedUnion("action", [
     action: z.literal("lesson.reschedule"),
     id,
     version,
-    startsAt: z.string().datetime({ offset: true }),
+    startsAt: timestampSchema,
     duration: z.number().int().min(15).max(180),
   }),
   z.object({

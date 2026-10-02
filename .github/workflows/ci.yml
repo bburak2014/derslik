@@ -38,6 +38,8 @@ jobs:
         run: pnpm test:booking
       - name: Architecture tests
         run: pnpm test:architecture
+      - name: Quality reporting tests
+        run: pnpm test:quality
       - name: Web build
         run: pnpm web:build
       - name: Web tests

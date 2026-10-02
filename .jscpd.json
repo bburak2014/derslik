@@ -4,7 +4,18 @@
   "maxSize": "2mb",
   "maxLines": 100000,
   "format": ["typescript", "tsx", "javascript", "css"],
-  "path": ["apps", "packages", "scripts"],
+  "path": [
+    "apps",
+    "packages",
+    "scripts",
+    "tests",
+    "build",
+    "next.config.ts",
+    "vite.config.ts",
+    "drizzle.config.ts",
+    "eslint.config.mjs",
+    "postcss.config.mjs"
+  ],
   "ignore": [
     "**/node_modules/**",
     "**/.next/**",
@@ -16,7 +27,7 @@
     "**/vendor/**",
     "**/i18n/**"
   ],
-  "reporters": ["console", "html"],
+  "reporters": ["console", "json", "html"],
   "output": "reports/jscpd",
   "gitignore": true
 }

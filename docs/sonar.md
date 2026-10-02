@@ -15,10 +15,53 @@ yönetici parolası rastgele üretilip `reports/.sonar-admin` dosyasına yazıl�
 analizler kaybolmaz. Sonuçlar: http://localhost:9000/dashboard?id=derslik
 (kullanıcı `admin`, parola o dosyada).
 
+Script scanner'ın ürettiği `ceTaskId` ile bu taramanın işlenmesini bekler;
+başarısız, iptal edilmiş ve zaman aşımına uğramış görevlerde hata verir.
+Kalite kapısını tamamlanan analizin `analysisId` değeriyle sorgular ve sonuçları
+`reports/quality/sonar-summary.json` dosyasına yazar. Kalite kapısı `OK`
+olmadığında komut başarısız olur. Testlerin başarılı olması test kapsamının
+ölçüldüğü anlamına gelmez: LCOV raporu içeri alınmadığı için kapsam ayrıca
+`coverageReportImported: false` alanıyla belirtilir. `coverageMeasured` yalnızca
+Sonar'ın bir kapsam metriği döndürüp döndürmediğini ifade eder; otomatik sıfır
+kapsam değeri test raporu aktarımı olarak kabul edilmez.
+
+Yeni kapsayıcı yalnızca `127.0.0.1:9000` üzerinde dinler. Önceden oluşturulmuş
+kapsayıcının port eşlemesi değişmez.
+
+Mevcut yerel sunucudan bağımsız bir analiz ortamı açmak için:
+
+```bash
+SONAR_CONTAINER=derslik-quality-sonar \
+SONAR_NETWORK=derslik-quality-sonar \
+SONAR_PORT=9001 \
+SONAR_ADMIN_FILE=reports/quality/.sonar-admin \
+pnpm quality:sonar
+```
+
+Bu adlandırma farklı veri ve eklenti volume'ları oluşturur. Gerekirse
+`SONAR_DATA_VOLUME`, `SONAR_EXTENSIONS_VOLUME` ve yerel API adresi için
+`SONAR_HOST_URL` ayrı belirlenebilir.
+
+Tarayıcı Node heap sınırı varsayılan olarak 3072 MiB, Java heap sınırı 512 MiB'dır.
+`SONAR_NODE_MAXSPACE=2048` ve `SONAR_SCANNER_JAVA_OPTS=-Xmx1024m` ile
+makinenin belleğine göre ayarlanabilir. Tarayıcı başarısız olursa script
+hata kodunu aktarır; önceki analiz sonuçları başarı olarak gösterilmez.
+
+Apple Silicon gibi ortamlarda Docker scanner emülasyonu yerine resmi platform
+CLI'si kullanılabilir. İndirilen executable yolunu `SONAR_SCANNER_PATH` ile
+verin. Sunucu Docker'da kalır, scanner yerelde çalışır; token yalnızca ortam
+değişkeniyle iletilir. Varsayılan yerel cache `reports/quality/cache`, farklı
+konum için `SONAR_USER_HOME` kullanılabilir. Yerel scanner mevcut native Node
+executable'ını kullanır.
+
+Resmi platform paketleri: [SonarScanner CLI indirme ve kurulum](https://docs.sonarsource.com/sonarqube-server/analyzing-source-code/scanners/sonarscanner).
+
 Ne analiz edildiği `sonar-project.properties` içinde:
 
 - Dahil: `apps/api/src`, `apps/web` (app, components, hooks, lib),
-  `apps/mobile/src`, `packages/*/src`, `scripts`; testler ayrı sayılır.
+  `apps/mobile/src`, `packages/*/src`, `scripts`; ayrıca web `proxy.ts`,
+  API/Web/Metro yapılandırmaları, `build/sites-vite-plugin.ts` ve root
+  Next/Vite/Drizzle/ESLint/PostCSS yapılandırmaları. Testler ayrı sayılır.
 - Hariç: derleme çıktısı, `apps/mobile/android`, eski v4 migration'ları
   (`drizzle/`, `apps/api/drizzle/`) ve `apps/web/components/ui` (shadcn'den
   olduğu gibi kopyalanan bileşenler, bilerek değiştirilmiyor).
@@ -43,4 +86,7 @@ pnpm quality:dup
 ```
 
 Ayarlar `.jscpd.json` içinde (en az 5 satır / 50 belirteç; shadcn, çeviriler
-ve derleme çıktısı hariç). HTML rapor `reports/jscpd/html/index.html`.
+ve derleme çıktısı hariç). Uygulama, paket, script ve `tests` kaynakları
+ile `build` plugin ve root kod yapılandırmaları analiz edilir. HTML rapor
+`reports/jscpd/html/index.html`, makine tarafından
+okunabilir rapor `reports/jscpd/jscpd-report.json`.

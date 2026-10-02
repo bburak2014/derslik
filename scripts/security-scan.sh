@@ -38,7 +38,8 @@ case "${1:-}" in
       "$semgrep_image" \
       semgrep scan --config auto --json --output /reports/semgrep.json \
       --exclude '.env*' --exclude '**/.env*' \
-      --exclude '**/node_modules/**' --exclude 'reports/**' .
+      --exclude '**/node_modules/**' --exclude 'reports/**' \
+      --exclude '.claude/worktrees/**' .
     echo "Semgrep report: $report_dir/semgrep.json"
     ;;
   dependencies)
@@ -51,6 +52,7 @@ case "${1:-}" in
       fs --scanners vuln,misconfig,secret --include-dev-deps \
       --skip-files '/work/.env*' --skip-files '/work/**/.env*' \
       --skip-dirs '**/node_modules' --skip-dirs '**/.git' \
+      --skip-dirs '/work/.claude/worktrees' \
       --skip-dirs '**/reports' --skip-dirs '**/.api-build' \
       --skip-dirs '**/.sites-runtime' --skip-dirs '**/.expo' \
       --skip-dirs '**/.vinext' --skip-dirs '**/.wrangler' \

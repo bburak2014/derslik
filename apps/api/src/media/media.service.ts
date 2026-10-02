@@ -634,7 +634,14 @@ export class MediaService {
             [mapping.workspace_id, e.uid],
           )
         ).rows[0];
-        if (!v || v.status === "DELETED" || v.delete_requested)
+        // FAILED has already released its reservation. Delayed provider events
+        // cannot revive it after another upload has claimed the freed quota.
+        if (
+          !v ||
+          v.status === "DELETED" ||
+          v.status === "FAILED" ||
+          v.delete_requested
+        )
           return { received: true };
         if (
           !(

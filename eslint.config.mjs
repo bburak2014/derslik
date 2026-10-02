@@ -5,15 +5,20 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // eslint-config-next itself ignores build/**; restore the maintained plugin.
+  globalIgnores(["!build/", "!build/sites-vite-plugin.ts"]),
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
-    "build/**",
+    // build/sites-vite-plugin.ts is maintained source, not generated output.
+    "build/Release/**",
     "next-env.d.ts",
     // Generated output: the compiled API, framework builds and Expo state.
-    ".api-build/**",
+    "**/.api-build/**",
+    // Alternate checkouts are linted in their own workspace.
+    ".claude/worktrees/**",
     // Kod kalitesi analiz çıktıları (pnpm quality:sonar, pnpm quality:dup).
     "reports/**",
     ".scannerwork/**",
@@ -38,9 +43,9 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // The web app navigates with plain anchors and location.assign on purpose:
-    // it never uses next/link, and full loads reset session and view state.
-    files: ["apps/web/**/*.{ts,tsx}"],
+    // The web app intentionally uses anchors/location.assign to reset session
+    // and view state. This Next-only rule also searches for a root pages/
+    // directory in API, mobile and scripts, where it is inapplicable.
     rules: { "@next/next/no-html-link-for-pages": "off" },
   },
   {

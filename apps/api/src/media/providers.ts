@@ -159,8 +159,16 @@ export class MediaProviders {
     const reader = r.body?.getReader();
     if (!reader) return Buffer.alloc(0);
     try {
-      const first = await reader.read();
-      return Buffer.from(first.value || []).subarray(0, 16);
+      const chunks: Buffer[] = [];
+      let size = 0;
+      while (size < 16) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = Buffer.from(value.subarray(0, 16 - size));
+        chunks.push(chunk);
+        size += chunk.length;
+      }
+      return Buffer.concat(chunks, size);
     } finally {
       await reader.cancel();
     }

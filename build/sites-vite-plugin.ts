@@ -178,6 +178,9 @@ export function sites({ mockAuth = true } = {}): Plugin {
       const drizzleSource = resolve(root, "drizzle");
 
       await rm(outputDirectory, { recursive: true, force: true });
+      // Portable checkouts can build without the local hosting metadata.
+      // Remove a previous build's metadata even when that file is absent.
+      if (!(await exists(hostingConfig))) return;
       await mkdir(outputDirectory, { recursive: true });
 
       await cp(hostingConfig, resolve(outputDirectory, "hosting.json"));

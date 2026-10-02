@@ -77,15 +77,20 @@ export class DerslikClient {
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       },
     );
-    const payload = (await res.json().catch(() => ({}))) as {
+    const payload = (await res.json().catch(() => null)) as {
       error?: { message?: string; requestId?: string };
-    };
+    } | null;
     if (!res.ok)
       throw new ApiError(
         res.status,
-        payload.error?.message || t("common.failed"),
-        payload.error?.requestId,
+        (typeof payload?.error?.message === "string" &&
+          payload.error.message) ||
+          t("common.failed"),
+        typeof payload?.error?.requestId === "string"
+          ? payload.error.requestId
+          : undefined,
       );
+    if (payload === null) throw new ApiError(502, t("common.failed"));
     return payload as T;
   }
   access() {

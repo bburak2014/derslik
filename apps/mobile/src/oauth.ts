@@ -24,8 +24,10 @@ export function authRedirect(route: AuthRoute) {
 // Accepts the address shapes the two clients produce and returns the auth route
 // it points at. Foreign schemes and unrelated paths are rejected.
 export function authRoute(value: string): AuthRoute | null {
-  let link;
+  let link, ownUrl, url;
   try {
+    url = new URL(value);
+    ownUrl = new URL(Linking.createURL(""));
     link = Linking.parse(value);
   } catch {
     return null;
@@ -34,7 +36,10 @@ export function authRoute(value: string): AuthRoute | null {
   // same Expo Go server (`exp://<host>:8081`) during development.
   const own = Linking.parse(Linking.createURL(""));
   if (!link.scheme || link.scheme !== own.scheme) return null;
-  if (own.hostname && link.hostname !== own.hostname) return null;
+  if (url.username || url.password) return null;
+  // Linking.parse drops the port; another development server on the same
+  // hostname must not be accepted as this client's OAuth callback.
+  if (own.hostname && url.host !== ownUrl.host) return null;
   const segments = [link.hostname || "", link.path || ""]
     .join("/")
     .split("/")

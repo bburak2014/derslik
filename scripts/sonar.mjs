@@ -8,15 +8,59 @@ import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  collectAnalysisReport,
+  scannerTaskId,
+  scannerInvocation,
+  waitForAnalysis,
+} from "./sonar-report.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const HOST = "http://localhost:9000";
-const CONTAINER = "derslik-sonarqube";
-const NETWORK = "derslik-sonar";
+const PORT = process.env.SONAR_PORT ?? "9000";
+if (!/^\d+$/.test(PORT) || Number(PORT) < 1 || Number(PORT) > 65535) {
+  throw new Error("SONAR_PORT 1-65535 aralığında bir port olmalı.");
+}
+const HOST = process.env.SONAR_HOST_URL ?? `http://127.0.0.1:${PORT}`;
+const NODE_MAXSPACE = process.env.SONAR_NODE_MAXSPACE ?? "3072";
+if (
+  !/^\d+$/.test(NODE_MAXSPACE) ||
+  Number(NODE_MAXSPACE) < 128 ||
+  Number(NODE_MAXSPACE) > 65536
+) {
+  throw new Error(
+    "SONAR_NODE_MAXSPACE 128-65536 aralığında bir MiB değeri olmalı.",
+  );
+}
+const SCANNER_JAVA_OPTS = process.env.SONAR_SCANNER_JAVA_OPTS ?? "-Xmx512m";
+const SCANNER_PATH = process.env.SONAR_SCANNER_PATH
+  ? path.resolve(root, process.env.SONAR_SCANNER_PATH)
+  : undefined;
+const SCANNER_HOME = path.resolve(
+  root,
+  process.env.SONAR_USER_HOME ?? "reports/quality/cache",
+);
+if (SCANNER_PATH) {
+  fs.accessSync(SCANNER_PATH, fs.constants.X_OK);
+  fs.mkdirSync(SCANNER_HOME, { recursive: true });
+}
+const CONTAINER = process.env.SONAR_CONTAINER ?? "derslik-sonarqube";
+const NETWORK = process.env.SONAR_NETWORK ?? "derslik-sonar";
+const DATA_VOLUME =
+  process.env.SONAR_DATA_VOLUME ??
+  (CONTAINER === "derslik-sonarqube"
+    ? "derslik-sonar-data"
+    : `${CONTAINER}-data`);
+const EXTENSIONS_VOLUME =
+  process.env.SONAR_EXTENSIONS_VOLUME ??
+  (CONTAINER === "derslik-sonarqube"
+    ? "derslik-sonar-extensions"
+    : `${CONTAINER}-extensions`);
 const PROJECT = "derslik";
 // Yerel kapsayıcının yönetici parolası: ilk kurulumda rastgele üretilir ve
 // git'e girmeyen reports/ klasöründe saklanır.
-const secretFile = path.join(root, "reports", ".sonar-admin");
+const secretFile = process.env.SONAR_ADMIN_FILE
+  ? path.resolve(root, process.env.SONAR_ADMIN_FILE)
+  : path.join(root, "reports", ".sonar-admin");
 function adminPassword() {
   if (process.env.SONAR_ADMIN_PASSWORD) return process.env.SONAR_ADMIN_PASSWORD;
   if (fs.existsSync(secretFile))
@@ -60,16 +104,16 @@ function ensureServer() {
       "--network",
       NETWORK,
       "-p",
-      "9000:9000",
+      `127.0.0.1:${PORT}:9000`,
       "-e",
       "SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true",
       // Disk doluluğu %90'ı geçince gömülü Elasticsearch açılmayı reddediyor.
       "-e",
       "SONAR_SEARCH_JAVAADDITIONALOPTS=-Dcluster.routing.allocation.disk.threshold_enabled=false",
       "-v",
-      "derslik-sonar-data:/opt/sonarqube/data",
+      `${DATA_VOLUME}:/opt/sonarqube/data`,
       "-v",
-      "derslik-sonar-extensions:/opt/sonarqube/extensions",
+      `${EXTENSIONS_VOLUME}:/opt/sonarqube/extensions`,
       "sonarqube:community",
     ]);
   } else if (state.stdout.trim() !== "true") {
@@ -83,6 +127,7 @@ async function api(method, pathname, auth) {
     try {
       return await fetch(HOST + pathname, {
         method,
+        signal: AbortSignal.timeout(15_000),
         headers: {
           Authorization: "Basic " + Buffer.from(auth).toString("base64"),
         },
@@ -97,7 +142,9 @@ async function api(method, pathname, auth) {
 async function waitUp() {
   for (let i = 0; i < 120; i++) {
     try {
-      const res = await fetch(`${HOST}/api/system/status`);
+      const res = await fetch(`${HOST}/api/system/status`, {
+        signal: AbortSignal.timeout(10_000),
+      });
       if (res.ok && (await res.json()).status === "UP") return;
     } catch {
       // sunucu henüz dinlemiyor
@@ -135,42 +182,49 @@ async function adminAuth() {
 }
 
 async function freshToken(auth) {
-  await api("POST", "/api/user_tokens/revoke?name=derslik-scan", auth);
+  const revoked = await api(
+    "POST",
+    "/api/user_tokens/revoke?name=derslik-scan",
+    auth,
+  );
+  if (!revoked.ok)
+    throw new Error(
+      `SonarQube tarama tokenı iptal edilemedi: ${revoked.status}`,
+    );
   const res = await api(
     "POST",
     "/api/user_tokens/generate?name=derslik-scan",
     auth,
   );
-  return (await res.json()).token;
+  if (!res.ok)
+    throw new Error(`SonarQube tarama tokenı üretilemedi: ${res.status}`);
+  const { token } = await res.json();
+  if (!token) throw new Error("SonarQube tarama tokenını döndürmedi.");
+  return token;
 }
 
-async function summary(auth) {
-  // Rapor sunucuda işlenene kadar bekle.
-  for (let i = 0; i < 60; i++) {
-    const ce = await (
-      await api("GET", `/api/ce/component?component=${PROJECT}`, auth)
-    ).json();
-    if (!ce.queue?.length && ce.current?.status !== "IN_PROGRESS") break;
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  const keys = [
-    "ncloc",
-    "bugs",
-    "vulnerabilities",
-    "code_smells",
-    "security_hotspots",
-    "duplicated_lines_density",
-    "cognitive_complexity",
-    "sqale_index",
-  ];
-  const res = await api(
-    "GET",
-    `/api/measures/component?component=${PROJECT}&metricKeys=${keys.join(",")}`,
-    auth,
+async function summary(auth, taskId) {
+  const request = (method, pathname) => api(method, pathname, auth);
+  const analysisId = await waitForAnalysis(request, taskId);
+  const report = await collectAnalysisReport(
+    request,
+    PROJECT,
+    taskId,
+    analysisId,
   );
-  const measures = (await res.json()).component?.measures ?? [];
-  for (const m of measures) console.log(`  ${m.metric}: ${m.value}`);
+  const output = path.join(root, "reports", "quality", "sonar-summary.json");
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  fs.writeFileSync(output, JSON.stringify(report, null, 2) + "\n");
+  for (const [metric, value] of Object.entries(report.metrics))
+    console.log(`  ${metric}: ${value}`);
+  console.log(`  Quality gate: ${report.qualityGate.status}`);
+  if (!report.coverageReportImported)
+    console.log(
+      "  Test kapsamı ölçülmedi: Sonar'a coverage raporu aktarılmıyor.",
+    );
+  console.log(`  JSON rapor: ${output}`);
   console.log(`\nAyrıntılar: ${HOST}/dashboard?id=${PROJECT}`);
+  if (report.qualityGate.status !== "OK") process.exitCode = 1;
 }
 
 ensureDocker();
@@ -180,25 +234,21 @@ const auth = await adminAuth();
 const token = await freshToken(auth);
 
 console.log("Analiz çalışıyor...");
-const scan = spawnSync(
-  "docker",
-  [
-    "run",
-    "--rm",
-    "--network",
-    NETWORK,
-    "-e",
-    `SONAR_HOST_URL=http://${CONTAINER}:9000`,
-    "-e",
-    `SONAR_TOKEN=${token}`,
-    "-e",
-    "NODE_OPTIONS=--max-old-space-size=6144",
-    "-v",
-    `${root}:/usr/src`,
-    "sonarsource/sonar-scanner-cli",
-    "-Dsonar.javascript.node.maxspace=6144",
-  ],
-  { stdio: "inherit" },
-);
+const taskFile = path.join(root, ".scannerwork", "report-task.txt");
+// Önceki taramanın task kimliği yeni sonuç sanılmasın.
+fs.rmSync(taskFile, { force: true });
+const invocation = scannerInvocation({
+  root,
+  host: HOST,
+  container: CONTAINER,
+  network: NETWORK,
+  token,
+  nodeMaxspace: NODE_MAXSPACE,
+  javaOpts: SCANNER_JAVA_OPTS,
+  scannerPath: SCANNER_PATH,
+  userHome: SCANNER_HOME,
+});
+const scan = spawnSync(invocation.command, invocation.args, invocation.options);
+if (scan.error) throw scan.error;
 if (scan.status !== 0) process.exit(scan.status ?? 1);
-await summary(auth);
+await summary(auth, scannerTaskId(taskFile));

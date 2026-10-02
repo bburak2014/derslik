@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { calendarDaySchema, timestampSchema } from "./dates.ts";
 import { dateKey, dayLabel, timeLabel } from "./types.ts";
 
 // Öğrencinin boş saatten ders ayarlaması: öğretmen ayarlarının biçimi,
@@ -103,14 +104,7 @@ export const presetOptions = (presets: readonly number[], current: number) =>
   [...new Set([...presets, current])].sort((a, b) => a - b);
 
 const HHMM = /^(([01]\d|2[0-3]):(00|30)|24:00)$/;
-const day = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "api.invalidDate")
-  .refine(
-    (v) =>
-      !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v),
-    "api.invalidDate",
-  );
+const day = calendarDaySchema;
 const windowSchema = z
   .object({
     weekday: z.number().int().min(1).max(7),
@@ -160,7 +154,7 @@ export const bookingSettingsSchema = z
       });
   });
 export const bookLessonSchema = z
-  .object({ startsAt: z.string().datetime({ offset: true }) })
+  .object({ startsAt: timestampSchema })
   .strict();
 export const cancelBookingSchema = z
   .object({ version: z.number().int().min(0) })

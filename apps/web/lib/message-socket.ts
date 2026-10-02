@@ -9,10 +9,11 @@ import { MessageSocket, type MessageSocketEvent } from "@derslik/api-client";
 let socket: MessageSocket | null = null;
 let users = 0;
 
-async function ticket() {
+async function ticket(signal: AbortSignal) {
   const r = await fetch("/api/socket", {
     method: "POST",
     cache: "no-store",
+    signal,
     headers: { "Content-Type": "application/json", "X-Derslik-Client": "web" },
     body: "{}",
   });

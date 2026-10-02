@@ -3,6 +3,7 @@ import { learningCases } from "./learning-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
 import { calendarCases } from "./calendar-cases.mjs";
 import { bookingCases } from "./booking-cases.mjs";
+import { backendQualityCases } from "./backend-quality-cases.mjs";
 import { messagingCases } from "./messaging-cases.mjs";
 import { realtimeCases } from "./realtime-cases.mjs";
 import { accessCases } from "./access-cases.mjs";
@@ -411,6 +412,17 @@ test(
           );
         },
       );
+
+      await backendQualityCases({
+        t,
+        config,
+        request,
+        ws,
+        student,
+        pack,
+        lesson,
+        sessionBody,
+      });
 
       await t.test(
         "concurrent same-key completion, stale versions, reversal and recompletion",

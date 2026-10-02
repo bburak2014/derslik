@@ -8,14 +8,32 @@ import { DerslikClient, ApiError } from "@derslik/api-client";
 const options = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
+type StorageManifest = { generation: string; count: number };
+function storageManifest(raw: string | null): StorageManifest | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<StorageManifest> | null;
+    return value &&
+      typeof value.generation === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value.generation,
+      ) &&
+      typeof value.count === "number" &&
+      Number.isInteger(value.count) &&
+      value.count >= 1 &&
+      value.count <= 128
+      ? (value as StorageManifest)
+      : null;
+  } catch {
+    return null;
+  }
+}
 // Large auth sessions are split into bounded Keychain/Keystore values. The
 // manifest is replaced last, so readers never observe half-written sessions.
 const rawSecureStorage = {
   async getItem(key: string) {
-    const raw = await SecureStore.getItemAsync(key, options);
-    if (!raw) return null;
-    const m = JSON.parse(raw) as { generation: string; count: number };
-    if (!Number.isInteger(m.count) || m.count < 1 || m.count > 128) return null;
+    const m = storageManifest(await SecureStore.getItemAsync(key, options));
+    if (!m) return null;
     const chunks = await Promise.all(
       Array.from({ length: m.count }, (_, i) =>
         SecureStore.getItemAsync(`${key}.${m.generation}.${i}`, options),
@@ -24,7 +42,7 @@ const rawSecureStorage = {
     return chunks.some((x) => x === null) ? null : chunks.join("");
   },
   async setItem(key: string, value: string) {
-    const old = await SecureStore.getItemAsync(key, options),
+    const old = storageManifest(await SecureStore.getItemAsync(key, options)),
       generation = Crypto.randomUUID(),
       parts = value.match(/[\s\S]{1,500}/g) || [""];
     if (parts.length > 128) throw new Error("Oturum boyutu sınırı aşıldı.");
@@ -52,22 +70,20 @@ const rawSecureStorage = {
       throw error;
     }
     if (old) {
-      const m = JSON.parse(old);
-      for (let i = 0; i < m.count; i++)
+      for (let i = 0; i < old.count; i++)
         await SecureStore.deleteItemAsync(
-          `${key}.${m.generation}.${i}`,
+          `${key}.${old.generation}.${i}`,
           options,
         );
     }
   },
   async removeItem(key: string) {
-    const old = await SecureStore.getItemAsync(key, options);
+    const old = storageManifest(await SecureStore.getItemAsync(key, options));
     await SecureStore.deleteItemAsync(key, options);
     if (old) {
-      const m = JSON.parse(old);
-      for (let i = 0; i < m.count; i++)
+      for (let i = 0; i < old.count; i++)
         await SecureStore.deleteItemAsync(
-          `${key}.${m.generation}.${i}`,
+          `${key}.${old.generation}.${i}`,
           options,
         );
     }
@@ -130,6 +146,7 @@ export async function request<T = unknown>(
   path: string,
   body?: unknown,
   idempotencyKey?: string,
+  signal?: AbortSignal,
 ): Promise<T> {
   const own = !!idempotencyKey,
     signature = path + JSON.stringify(body),
@@ -140,6 +157,7 @@ export async function request<T = unknown>(
       method: body === undefined ? "GET" : "POST",
       body,
       key: body === undefined ? undefined : key,
+      signal,
     });
     if (!own) retryKeys.delete(signature);
     return result;

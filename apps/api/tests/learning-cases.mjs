@@ -57,6 +57,21 @@ export async function learningCases({
     fileObjects = new Map();
   let reservations = 0,
     deleted = 0;
+  async function webhook(
+    body,
+    time = Math.floor(Date.now() / 1000),
+    secret = config.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
+  ) {
+    const sig = createHmac("sha256", secret)
+      .update(time + "." + JSON.stringify(body))
+      .digest("hex");
+    return request("/v1/webhooks/stream", {
+      method: "POST",
+      body,
+      auth: null,
+      headers: { "Webhook-Signature": `time=${time},sig1=${sig}` },
+    });
+  }
   providers.stream = async (path, init = {}) => {
     if (path === "?direct_user=true") {
       assert.match(init.headers["Upload-Metadata"], /requiresignedurls/);
@@ -962,21 +977,6 @@ export async function learningCases({
         requireSignedURLs: true,
         duration: 120.2,
       };
-      async function webhook(
-        body,
-        time = Math.floor(Date.now() / 1000),
-        secret = config.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
-      ) {
-        const sig = createHmac("sha256", secret)
-          .update(time + "." + JSON.stringify(body))
-          .digest("hex");
-        return request("/v1/webhooks/stream", {
-          method: "POST",
-          body,
-          auth: null,
-          headers: { "Webhook-Signature": `time=${time},sig1=${sig}` },
-        });
-      }
       assert.equal(
         (await webhook(ready, Math.floor(Date.now() / 1000), "wrong")).status,
         401,
@@ -1084,6 +1084,88 @@ export async function learningCases({
         "UPDATE derslik.workspace_limits SET video_seconds=36000 WHERE workspace_id=$1",
         [ws],
       );
+    },
+  );
+  await t.test(
+    "failed video reservations stay released when delayed provider events arrive",
+    async () => {
+      const used = Number(
+        (
+          await admin.query(
+            "SELECT COALESCE(sum(COALESCE(duration_seconds,reserved_seconds)),0) AS n FROM derslik.videos WHERE workspace_id=$1 AND status NOT IN ('FAILED','DELETED')",
+            [ws],
+          )
+        ).rows[0].n,
+      );
+      const previousLimit = (
+        await admin.query(
+          "SELECT video_seconds FROM derslik.workspace_limits WHERE workspace_id=$1",
+          [ws],
+        )
+      ).rows[0].video_seconds;
+      await admin.query(
+        "UPDATE derslik.workspace_limits SET video_seconds=$2 WHERE workspace_id=$1",
+        [ws, used + 60],
+      );
+      try {
+        const body = {
+          title: "Failed upload",
+          lessonId: null,
+          sizeBytes: 1000,
+          maxDurationSeconds: 60,
+        };
+        const failed = (await ok(media + "/videos", body)).data;
+        const uid = (
+          await admin.query(
+            "SELECT provider_uid FROM derslik.videos WHERE id=$1",
+            [failed.id],
+          )
+        ).rows[0].provider_uid;
+        assert.equal(
+          (await webhook({ uid, status: { state: "error" } })).status,
+          200,
+        );
+        const replacement = (
+          await ok(media + "/videos", { ...body, title: "Replacement upload" })
+        ).data;
+        for (const event of [
+          { uid, status: { state: "inprogress" } },
+          {
+            uid,
+            status: { state: "ready" },
+            readyToStream: true,
+            requireSignedURLs: true,
+            duration: 60,
+          },
+        ])
+          assert.equal((await webhook(event)).status, 200);
+        const rows = (
+          await admin.query(
+            "SELECT id,status FROM derslik.videos WHERE id=ANY($1::uuid[])",
+            [[failed.id, replacement.id]],
+          )
+        ).rows;
+        assert.equal(rows.find((row) => row.id === failed.id).status, "FAILED");
+        const currentUsed = Number(
+          (
+            await admin.query(
+              "SELECT COALESCE(sum(COALESCE(duration_seconds,reserved_seconds)),0) AS n FROM derslik.videos WHERE workspace_id=$1 AND status NOT IN ('FAILED','DELETED')",
+              [ws],
+            )
+          ).rows[0].n,
+        );
+        assert.equal(currentUsed, used + 60);
+        assert.equal(
+          (await request(media + `/videos/${failed.id}/playback`)).status,
+          404,
+        );
+        await ok(media + `/videos/${replacement.id}/delete`, {});
+      } finally {
+        await admin.query(
+          "UPDATE derslik.workspace_limits SET video_seconds=$2 WHERE workspace_id=$1",
+          [ws, previousLimit],
+        );
+      }
     },
   );
   await t.test(

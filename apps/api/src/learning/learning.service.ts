@@ -13,6 +13,7 @@ import { rawDto } from "../workspaces/snapshot.service.js";
 import { lockStudent } from "../students/students.service.js";
 import { apiText } from "../common/i18n.js";
 import type { MessageKey } from "../../../../packages/contracts/src/i18n/index.js";
+import { calendarDaySchema } from "../../../../packages/contracts/src/dates.js";
 
 // Due dates are calendar days in the workspace timezone (fixed to Istanbul).
 export const ISTANBUL_TODAY = "(now() AT TIME ZONE 'Europe/Istanbul')::date";
@@ -20,13 +21,7 @@ export const ISTANBUL_TODAY = "(now() AT TIME ZONE 'Europe/Istanbul')::date";
 const id = z.string().uuid(),
   short = z.string().trim().min(1).max(150),
   body = z.string().trim().min(1).max(5000);
-const day = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine(
-    (v) =>
-      !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v),
-  );
+const day = calendarDaySchema;
 const schema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("assignment.create"),

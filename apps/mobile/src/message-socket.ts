@@ -24,12 +24,17 @@ function socketUrl() {
   }
 }
 
-async function ticket() {
+async function ticket(signal: AbortSignal) {
   const url = socketUrl();
   if (!url || !supabase) return null;
   if (!(await supabase.auth.getSession()).data.session) return null;
   try {
-    const r = await request<{ data: { ticket: string } }>("/socket/ticket", {});
+    const r = await request<{ data: { ticket: string } }>(
+      "/socket/ticket",
+      {},
+      undefined,
+      signal,
+    );
     return { ticket: r.data.ticket, url };
   } catch (e) {
     // Oturum geçersiz: uzun aralıkla denenir. Diğer hatalar geçicidir.

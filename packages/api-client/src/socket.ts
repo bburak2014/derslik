@@ -75,9 +75,12 @@ export class MessageSocket {
   private readonly listeners = new Set<(event: MessageSocketEvent) => void>();
   private readonly liveListeners = new Set<() => void>();
   private running = false;
+  /** Every start/stop invalidates ticket requests from an earlier session. */
+  private generation = 0;
   private attempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private cancelTicket: (() => void) | null = null;
   /** Bağlantı açık mı? Açıkken yoklama seyrekleşir. */
   live = false;
 
@@ -85,7 +88,7 @@ export class MessageSocket {
     private readonly options: {
       /** Yeni bilet ve soket adresi. Soket kullanılamıyorsa (ayarlanmamış,
        *  oturum yok) null döner, geçici hatada fırlatır. */
-      ticket: () => Promise<SocketTicket | null>;
+      ticket: (signal: AbortSignal) => Promise<SocketTicket | null>;
       WebSocket?: SocketFactory;
     },
   ) {}
@@ -104,27 +107,54 @@ export class MessageSocket {
   start() {
     if (this.running) return;
     this.running = true;
+    this.generation += 1;
     this.attempt = 0;
     void this.connect();
   }
 
   stop() {
     this.running = false;
+    this.generation += 1;
+    this.cancelTicket?.();
+    this.cancelTicket = null;
     this.clearTimers();
     this.drop(1000);
   }
 
   private async connect() {
     if (!this.running || this.socket) return;
+    const generation = this.generation;
+    const controller = new AbortController();
+    let onAbort: (() => void) | undefined;
+    const interrupted = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new Error("Socket ticket request cancelled"));
+      controller.signal.addEventListener("abort", onAbort, { once: true });
+    });
+    const deadline = setTimeout(() => controller.abort(), SILENCE);
+    const cancel = () => {
+      clearTimeout(deadline);
+      controller.abort();
+    };
+    this.cancelTicket = cancel;
     let ticket: SocketTicket | null;
     try {
-      ticket = await this.options.ticket();
+      // The ticket provider may never settle (or may ignore cancellation).
+      // Bound this phase as well as the WebSocket handshake itself.
+      ticket = await Promise.race([
+        this.options.ticket(controller.signal),
+        interrupted,
+      ]);
     } catch {
       // Geçici hata (ağ, sunucu): artan aralıkla yeniden denenir.
-      if (this.running && !this.socket) this.schedule();
+      if (this.running && generation === this.generation && !this.socket)
+        this.schedule();
       return;
+    } finally {
+      clearTimeout(deadline);
+      if (onAbort) controller.signal.removeEventListener("abort", onAbort);
+      if (this.cancelTicket === cancel) this.cancelTicket = null;
     }
-    if (!this.running || this.socket) return;
+    if (!this.running || generation !== this.generation || this.socket) return;
     if (!ticket) return this.schedule(UNAVAILABLE);
     const Factory =
       this.options.WebSocket ??
@@ -140,6 +170,9 @@ export class MessageSocket {
       return this.schedule();
     }
     this.socket = socket;
+    // A handshake can hang without an open/close event; it needs the same
+    // deadline as an established connection.
+    this.heard();
     socket.onopen = () => {
       if (this.socket !== socket) return;
       this.attempt = 0;
@@ -210,7 +243,13 @@ export class MessageSocket {
   private setLive(live: boolean) {
     if (this.live === live) return;
     this.live = live;
-    for (const listener of this.liveListeners) listener();
+    for (const listener of this.liveListeners) {
+      try {
+        listener();
+      } catch {
+        // Bir dinleyicinin hatası bağlantıyı ve ötekileri durdurmaz.
+      }
+    }
   }
 
   private emit(event: MessageSocketEvent) {

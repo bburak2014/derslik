@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { timestampSchema } from "../../../../packages/contracts/src/dates.js";
 import type { Actor } from "../auth/auth.guard.js";
 import { CONFIG, type ApiConfig } from "../config.js";
 import { DatabaseService } from "../db/database.service.js";
@@ -233,9 +234,9 @@ export class SubscriptionService {
                 "paused",
               ]),
               test_mode: z.boolean(),
-              updated_at: z.string().datetime({ offset: true }),
-              ends_at: z.string().datetime({ offset: true }).nullable(),
-              renews_at: z.string().datetime({ offset: true }).nullable(),
+              updated_at: timestampSchema,
+              ends_at: timestampSchema.nullable(),
+              renews_at: timestampSchema.nullable(),
             })
             .passthrough(),
         }),

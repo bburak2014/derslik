@@ -12,7 +12,7 @@ export async function webRequest<T = unknown>(
   idempotencyKey?: string,
 ): Promise<T> {
   const own = !!idempotencyKey,
-    signature = path + JSON.stringify(body),
+    signature = method + ":" + path + JSON.stringify(body),
     key = idempotencyKey || retries.get(signature) || crypto.randomUUID();
   if (body !== undefined && !own) retries.set(signature, key);
   const r = await fetch(path, {
@@ -25,14 +25,20 @@ export async function webRequest<T = unknown>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = (await r.json()) as T & { error?: string; message?: string };
+  const data = (await r.json().catch(() => null)) as
+    (T & { error?: string; message?: string }) | null;
   if (!r.ok) {
     if (r.status < 500 && !own) retries.delete(signature);
     throw new ApiError(
       r.status,
-      data.error || data.message || t("common.failed"),
+      (typeof data?.error === "string" && data.error) ||
+        (typeof data?.message === "string" && data.message) ||
+        t("common.failed"),
     );
   }
+  // A successful HTTP status with an unreadable payload is not a confirmed
+  // mutation result; keep its retry key until a valid response arrives.
+  if (data === null) throw new ApiError(502, t("common.failed"));
   if (!own) retries.delete(signature);
   return data;
 }

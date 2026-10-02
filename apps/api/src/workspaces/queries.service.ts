@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { z } from "zod";
+import { timestampSchema } from "../../../../packages/contracts/src/dates.js";
 import { DatabaseService } from "../db/database.service.js";
 import type { Actor } from "../auth/auth.guard.js";
 import { toDto } from "../common/command.service.js";
@@ -24,8 +24,8 @@ export class QueriesService {
     const { limit, offset, studentId, from, to } = paging
       .extend({
         studentId: uuid.optional(),
-        from: z.string().datetime({ offset: true }).optional(),
-        to: z.string().datetime({ offset: true }).optional(),
+        from: timestampSchema.optional(),
+        to: timestampSchema.optional(),
       })
       .parse(input);
     return this.database.transaction(actor, ws, async (tx) => {
