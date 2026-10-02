@@ -710,6 +710,84 @@ function TeacherNote({ note }: Readonly<{ note: string }>) {
   );
 }
 
+/** Profil kartındaki eylem alanı: öğrencinin ilişkisine göre değişir. */
+function ProfileAction({
+  relation,
+  note,
+  busy,
+  onOpenWorkspace,
+  onSendForm,
+  onCancel,
+}: Readonly<{
+  relation: TeacherRelation | null;
+  note: React.ReactNode;
+  busy: boolean;
+  onOpenWorkspace: () => void;
+  onSendForm: () => void;
+  onCancel: (requestId: string) => void;
+}>) {
+  const { colors, styles } = useTheme();
+  if (!relation) return null;
+  if (relation.isOwn)
+    return <Text style={styles.muted}>{t("dir.ownProfile")}</Text>;
+  if (relation.isTeacherAccount)
+    return <Text style={styles.muted}>{t("dir.teacherAccountNote")}</Text>;
+  if (relation.isStudent)
+    return (
+      <>
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+          <Ionicons name="checkmark-circle" size={18} color={colors.ok} />
+          <Text style={[styles.text, { flex: 1 }]}>
+            {t("dir.alreadyStudent")}
+          </Text>
+        </View>
+        <Button icon="school-outline" onPress={onOpenWorkspace}>
+          {t("dir.openLessons")}
+        </Button>
+      </>
+    );
+  const request = relation.request;
+  if (request?.status === "PENDING")
+    return (
+      <>
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+          <Ionicons name="time-outline" size={18} color={colors.warn} />
+          <Text style={[styles.text, { flex: 1 }]}>
+            {t("dir.pendingState")}
+          </Text>
+        </View>
+        <Text style={styles.caption}>
+          {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
+        </Text>
+        <Button secondary loading={busy} onPress={() => onCancel(request.id)}>
+          {t("dir.cancelRequest")}
+        </Button>
+      </>
+    );
+  if (relation.retryAfter)
+    return (
+      <>
+        <Text style={styles.muted}>
+          {t("dir.declinedState", { date: shortDate(relation.retryAfter) })}
+        </Text>
+        {note}
+      </>
+    );
+  return (
+    <>
+      {request?.status === "EXPIRED" && (
+        <Text style={styles.muted}>
+          {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
+        </Text>
+      )}
+      {note}
+      <Button icon="paper-plane-outline" onPress={onSendForm}>
+        {t("dir.sendRequest")}
+      </Button>
+    </>
+  );
+}
+
 function TeacherProfile({
   id,
   onOpenWorkspace,
@@ -720,7 +798,7 @@ function TeacherProfile({
   /** Karttaki "İstek gönder"den gelindi: gönderilebiliyorsa form açık başlar. */
   openRequest?: boolean;
 }>) {
-  const { colors, styles } = useTheme();
+  const { styles } = useTheme();
   const [teacher, setTeacher] = useState<PublicTeacher | null>(null),
     [reviews, setReviews] = useState<PublicReview[]>([]),
     [relation, setRelation] = useState<TeacherRelation | null>(null),
@@ -767,6 +845,18 @@ function TeacherProfile({
         await load();
       }),
     );
+  async function cancelRequest(requestId: string) {
+    setBusy(true);
+    try {
+      await client.cancelLessonRequest(requestId);
+      setNotice(t("dir.cancelled"));
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const canRequest =
     !!relation &&
     !relation.isOwn &&
@@ -783,81 +873,6 @@ function TeacherProfile({
     request?.status === "DECLINED" && request.decisionNote ? (
       <TeacherNote note={request.decisionNote} />
     ) : null;
-  let action: React.ReactNode;
-  if (!relation) action = null;
-  else if (relation.isOwn)
-    action = <Text style={styles.muted}>{t("dir.ownProfile")}</Text>;
-  else if (relation.isTeacherAccount)
-    action = <Text style={styles.muted}>{t("dir.teacherAccountNote")}</Text>;
-  else if (relation.isStudent)
-    action = (
-      <>
-        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-          <Ionicons name="checkmark-circle" size={18} color={colors.ok} />
-          <Text style={[styles.text, { flex: 1 }]}>
-            {t("dir.alreadyStudent")}
-          </Text>
-        </View>
-        <Button icon="school-outline" onPress={() => onOpenWorkspace(id)}>
-          {t("dir.openLessons")}
-        </Button>
-      </>
-    );
-  else if (request?.status === "PENDING")
-    action = (
-      <>
-        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-          <Ionicons name="time-outline" size={18} color={colors.warn} />
-          <Text style={[styles.text, { flex: 1 }]}>
-            {t("dir.pendingState")}
-          </Text>
-        </View>
-        <Text style={styles.caption}>
-          {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
-        </Text>
-        <Button
-          secondary
-          loading={busy}
-          onPress={async () => {
-            setBusy(true);
-            try {
-              await client.cancelLessonRequest(request.id);
-              setNotice(t("dir.cancelled"));
-              await load();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {t("dir.cancelRequest")}
-        </Button>
-      </>
-    );
-  else if (relation.retryAfter)
-    action = (
-      <>
-        <Text style={styles.muted}>
-          {t("dir.declinedState", { date: shortDate(relation.retryAfter) })}
-        </Text>
-        {note}
-      </>
-    );
-  else
-    action = (
-      <>
-        {request?.status === "EXPIRED" && (
-          <Text style={styles.muted}>
-            {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
-          </Text>
-        )}
-        {note}
-        <Button icon="paper-plane-outline" onPress={sendForm}>
-          {t("dir.sendRequest")}
-        </Button>
-      </>
-    );
   const facts: [string, string[]][] = [
     [t("dir.subjects"), teacher.subjects.map(subjectName)],
     [t("dir.levels"), teacher.levels.map(levelName)],
@@ -910,7 +925,14 @@ function TeacherProfile({
         </View>
         <Card>
           <Price teacher={teacher} />
-          {action}
+          <ProfileAction
+            relation={relation}
+            note={note}
+            busy={busy}
+            onOpenWorkspace={() => onOpenWorkspace(id)}
+            onSendForm={sendForm}
+            onCancel={(requestId) => void cancelRequest(requestId)}
+          />
           <ErrorText message={error} />
           <SuccessText message={notice} />
         </Card>

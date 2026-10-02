@@ -762,6 +762,72 @@ function readersText(thread: MessageThread) {
   return t("chat.readersNone");
 }
 
+type SendKey = { text: string; key: string };
+
+/** Sunucunun reddettiği istek (4xx): yeniden deneme yeni anahtarla gider. */
+const isRejected = (e: unknown): e is ApiError =>
+  e instanceof ApiError && e.status < 500;
+/** Yazışma kapandı ya da erişim kalktı (403/404). */
+const isThreadGone = (e: unknown) =>
+  e instanceof ApiError && (e.status === 403 || e.status === 404);
+
+/** Sayfanın en eski mesajı elde yoksa arada mesaj kalmış olabilir. */
+function hasGap(page: ThreadPage["data"], known: Set<string>) {
+  const oldest = page.messages[0];
+  return page.more && !!oldest && !known.has(oldest.id);
+}
+
+/** Mesajları bilinenler kümesine ekler. */
+function remember(known: Set<string>, list: ChatMessage[]) {
+  for (const m of list) known.add(m.id);
+}
+
+/** Gelen mesajları ekran okuyuculara duyurur; tek mesajsa içeriğiyle. */
+function announceIncoming(incoming: ChatMessage[], thread: MessageThread) {
+  if (!incoming.length) return;
+  const last = incoming[incoming.length - 1];
+  AccessibilityInfo.announceForAccessibility(
+    incoming.length === 1
+      ? t("chat.preview", {
+          name: senderLabel(last, thread),
+          text: last.body,
+        })
+      : t("chat.unread", { count: incoming.length }),
+  );
+}
+
+/** Aynı metnin yeniden denemesi aynı anahtarla, yeni metin yeni anahtarla. */
+const sendAttempt = (pending: SendKey | null, text: string): SendKey =>
+  pending?.text === text ? pending : { text, key: Crypto.randomUUID() };
+
+/** Bekleyen anahtar hâlâ bu denemeye aitse bırakılır. */
+function releaseKey(
+  pending: React.RefObject<SendKey | null>,
+  attempt: SendKey,
+) {
+  if (pending.current === attempt) pending.current = null;
+}
+
+/** Gönderilen mesajın, sunucu yanıtıyla hemen eklenen kendi satırı. */
+function ownMessage(
+  thread: MessageThread,
+  sent: { id: string; createdAt: string },
+  body: string,
+): ChatMessage {
+  return {
+    id: sent.id,
+    senderRole: thread.viewer === "OWNER" ? "OWNER" : thread.role,
+    mine: true,
+    body,
+    createdAt: sent.createdAt,
+  };
+}
+
+/** Sunucunun açıkladığı hatalar (çok hızlı, kapalı yazışma) olduğu gibi,
+ *  bağlantı hataları genel metinle gösterilir. */
+const sendErrorText = (e: unknown) =>
+  isRejected(e) ? e.message : t("chat.failed");
+
 /**
  * Bir yazışma: başlık, eskiden yeniye mesajlar, altta klavyenin üstünde
  * duran yazma alanı. Açılınca, karşı taraftan yeni mesaj gelince ve okunmamış
@@ -826,7 +892,7 @@ export function Conversation({
     // yeniden denemesi aynı anahtarla gider (sunucu ikinci kez kaydetmez).
     // Gönderilince ya da metin değişince bırakılır; aynı metin ("Tamam")
     // sonradan ayrı bir mesaj olarak gönderilebilir.
-    sendKey = useRef<{ text: string; key: string } | null>(null),
+    sendKey = useRef<SendKey | null>(null),
     sendLock = useRef(false),
     olderLock = useRef(false),
     scroller = useRef<ScrollView>(null),
@@ -903,15 +969,14 @@ export function Conversation({
         return;
       }
       const fresh = page.messages.filter((m) => !known.current.has(m.id)),
-        oldest = page.messages[0],
-        gap = page.more && !!oldest && !known.current.has(oldest.id);
+        gap = hasGap(page, known.current);
       if (gap) {
         known.current = new Set(page.messages.map((m) => m.id));
         show(page.messages);
         setMore(true);
         smooth.current = true;
       } else if (fresh.length) {
-        for (const m of fresh) known.current.add(m.id);
+        remember(known.current, fresh);
         show(byTime([...shown.current, ...fresh]));
         if (atBottom.current) smooth.current = true;
       }
@@ -920,26 +985,12 @@ export function Conversation({
       // yeniden denenir.
       if (incoming.length || page.thread.unread > 0)
         void markRead(page.thread, newest);
-      if (incoming.length) {
-        const last = incoming[incoming.length - 1];
-        AccessibilityInfo.announceForAccessibility(
-          incoming.length === 1
-            ? t("chat.preview", {
-                name: senderLabel(last, page.thread),
-                text: last.body,
-              })
-            : t("chat.unread", { count: incoming.length }),
-        );
-      }
+      announceIncoming(incoming, page.thread);
     } catch (e) {
       if (!alive.current || mine !== seq.current) return;
       // Yoklama hatası (bağlantı) eldeki mesajları korur, uyarı göstermez;
       // ilk yükleme hatası ve yazışmanın kapanması (403/404) gösterilir.
-      if (
-        !loaded.current ||
-        (e instanceof ApiError && (e.status === 403 || e.status === 404))
-      )
-        setError((e as Error).message);
+      if (!loaded.current || isThreadGone(e)) setError((e as Error).message);
     }
   }, [url, markRead, show]);
   useEffect(() => {
@@ -1014,11 +1065,7 @@ export function Conversation({
     const raw = draft,
       text = body;
     if (!thread?.canSend || !text || tooLong || sendLock.current) return;
-    // Aynı metnin yeniden denemesi aynı anahtarla, yeni metin yeni anahtarla.
-    const attempt =
-      sendKey.current?.text === text
-        ? sendKey.current
-        : { text, key: Crypto.randomUUID() };
+    const attempt = sendAttempt(sendKey.current, text);
     sendKey.current = attempt;
     // Çift dokunuşta ikinci gönderim burada durur; düğme de kapanır.
     sendLock.current = true;
@@ -1030,7 +1077,7 @@ export function Conversation({
         { body: text },
         attempt.key,
       );
-      if (sendKey.current === attempt) sendKey.current = null;
+      releaseKey(sendKey, attempt);
       if (!alive.current) return;
       // Gönderim sürerken yazılan ek metin silinmez.
       setDraft((current) =>
@@ -1040,13 +1087,7 @@ export function Conversation({
       );
       if (!known.current.has(r.data.id)) {
         known.current.add(r.data.id);
-        const own: ChatMessage = {
-          id: r.data.id,
-          senderRole: thread.viewer === "OWNER" ? "OWNER" : thread.role,
-          mine: true,
-          body: text,
-          createdAt: r.data.createdAt,
-        };
+        const own = ownMessage(thread, r.data, text);
         show(byTime([...shown.current, own]));
       }
       smooth.current = true;
@@ -1055,22 +1096,13 @@ export function Conversation({
       // Sunucu metni geri çevirdiyse (4xx) sonraki deneme yeni anahtarla
       // gider. Bağlantı ya da sunucu hatasında anahtar korunur: metin belki
       // kaydedildi, aynı metnin yeniden denemesi ikinci kez kaydedilmez.
-      if (
-        e instanceof ApiError &&
-        e.status < 500 &&
-        sendKey.current === attempt
-      )
-        sendKey.current = null;
+      if (isRejected(e)) releaseKey(sendKey, attempt);
       if (!alive.current) return;
-      // Taslak yerinde kalır. Sunucunun açıkladığı hatalar (çok hızlı, kapalı
-      // yazışma) olduğu gibi, bağlantı hataları genel metinle gösterilir.
-      setSendError(
-        e instanceof ApiError && e.status < 500 ? e.message : t("chat.failed"),
-      );
+      // Taslak yerinde kalır.
+      setSendError(sendErrorText(e));
       // Yazışma kapandıysa ya da erişim kalktıysa yazma alanı hemen kapalı
       // yazışma notuna döner.
-      if (e instanceof ApiError && (e.status === 403 || e.status === 404))
-        void refresh();
+      if (isThreadGone(e)) void refresh();
     } finally {
       sendLock.current = false;
       if (alive.current) setSending(false);

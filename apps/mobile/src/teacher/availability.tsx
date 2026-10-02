@@ -50,6 +50,24 @@ const ENDS = TIMES.slice(1).map((v) => ({ value: v, label: v }));
 const issueText = (message: string) =>
   isMessageKey(message) ? t(message) : t("api.invalidFields");
 
+type BookingWindow = BookingSettings["windows"][number];
+/** Verilen satırdaki saat aralığını değiştirir; diğer satırlar aynen kalır. */
+const patchWindow = (
+  form: BookingSettings,
+  index: number,
+  patch: Partial<BookingWindow>,
+): BookingSettings => ({
+  ...form,
+  windows: form.windows.map((w, i) => (i === index ? { ...w, ...patch } : w)),
+});
+const removeWindow = (
+  form: BookingSettings,
+  index: number,
+): BookingSettings => ({
+  ...form,
+  windows: form.windows.filter((_, i) => i !== index),
+});
+
 type Props = {
   workspaceId: string;
   onClose: () => void;
@@ -212,12 +230,7 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                               value={window.start}
                               options={STARTS}
                               onChange={(start) =>
-                                edit((f) => ({
-                                  ...f,
-                                  windows: f.windows.map((w, i) =>
-                                    i === index ? { ...w, start } : w,
-                                  ),
-                                }))
+                                edit((f) => patchWindow(f, index, { start }))
                               }
                             />
                           </View>
@@ -228,12 +241,7 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                               value={window.end}
                               options={ENDS}
                               onChange={(end) =>
-                                edit((f) => ({
-                                  ...f,
-                                  windows: f.windows.map((w, i) =>
-                                    i === index ? { ...w, end } : w,
-                                  ),
-                                }))
+                                edit((f) => patchWindow(f, index, { end }))
                               }
                             />
                           </View>
@@ -241,14 +249,7 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                             icon="close"
                             ghost
                             label={t("booking.removeRange")}
-                            onPress={() =>
-                              edit((f) => ({
-                                ...f,
-                                windows: f.windows.filter(
-                                  (_, i) => i !== index,
-                                ),
-                              }))
-                            }
+                            onPress={() => edit((f) => removeWindow(f, index))}
                           />
                         </View>
                         {rowIssue(`windows.${index}`)}

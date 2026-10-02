@@ -196,11 +196,7 @@ export function LearningScreen({
     [selectedTab, setTab] = useState(
       view ?? (owner ? "assignments" : "lessons"),
     ),
-    [invite, setInvite] = useState<{
-      url: string;
-      email: string;
-      emailed: boolean;
-    } | null>(null),
+    [invite, setInvite] = useState<Invite | null>(null),
     [copied, setCopied] = useState(false),
     // Görsel önizlemesi uygulama içinde açılır; PDF'i Android tarayıcısı
     // çizemediği için o sistem görüntüleyicisine gider.
@@ -224,11 +220,7 @@ export function LearningScreen({
     [clock, setClock] = useState(() => Date.now());
   // Mesajlar sekmesi yalnızca öğrenci ve velide; portal mesaj uçları Dersler
   // iznini ister. Liste dakikada bir yoklanır, sekme adında okunmamış sayısı.
-  const chat = useMessages(
-    !owner && ((data as PortalData).permissions || []).includes("lessons")
-      ? `/portal/${access.id}/${studentId}/messages`
-      : null,
-  );
+  const chat = useMessages(messagesPath(owner, data, access.id, studentId));
   const inFlight = useRef(false),
     fileReservations = useRef(
       new Map<string, { id: string; uploadUrl?: string | null }>(),
@@ -240,20 +232,19 @@ export function LearningScreen({
     pending = useRef<string | null>(null),
     [appliedFocus, setAppliedFocus] = useState(0),
     [highlight, setHighlight] = useState<string | null>(null);
-  if (
-    focus &&
-    focus.at !== appliedFocus &&
-    focus.workspaceId === access.id &&
-    focus.studentId === studentId
-  ) {
-    setAppliedFocus(focus.at);
-    // İstek bildirimleri vitrin ekranlarına aittir; burada dersler açık kalır.
-    // Mesaj bildirimi Mesajlar sekmesinde o yazışmayı açar.
-    if (focus.section !== "requests" && focus.section !== "myRequests") {
-      if (!view) setTab(focus.section);
-      if (focus.section === "messages") chat.setOpen(focus.itemId);
-      else setHighlight(focus.itemId);
-    }
+  // İstek bildirimleri vitrin ekranlarına aittir; burada dersler açık kalır.
+  // Mesaj bildirimi Mesajlar sekmesinde o yazışmayı açar.
+  function openFocus(target: NoticeFocus) {
+    if (target.section === "requests" || target.section === "myRequests")
+      return;
+    if (!view) setTab(target.section);
+    if (target.section === "messages") chat.setOpen(target.itemId);
+    else setHighlight(target.itemId);
+  }
+  const arrived = arrivedFocus(focus, appliedFocus, access.id, studentId);
+  if (arrived) {
+    setAppliedFocus(arrived.at);
+    openFocus(arrived);
   }
   useEffect(() => {
     if (!highlight) return;
@@ -341,39 +332,10 @@ export function LearningScreen({
         await action(convert(v));
       },
     });
-  const permissions = owner
-    ? ["assignments", "lessons", "videos", "notes", "payments"]
-    : (data as PortalData).permissions || [];
-  const tabs = [
-    { id: "lessons", label: t("nav.lessons"), permission: "lessons" },
-    ...(owner
-      ? []
-      : [
-          {
-            id: "messages",
-            label: t("nav.messages") + (chat.badge ? ` (${chat.badge})` : ""),
-            permission: "lessons",
-          },
-        ]),
-    {
-      id: "assignments",
-      label: t("nav.assignments"),
-      permission: "assignments",
-    },
-    { id: "files", label: t("nav.files"), permission: "assignments" },
-    { id: "videos", label: t("mt.videos"), permission: "videos" },
-    { id: "notes", label: t("nav.notes"), permission: "notes" },
-    ...(owner
-      ? [{ id: "access", label: t("learn.tabAccess"), permission: "lessons" }]
-      : [{ id: "payments", label: t("ml.balance"), permission: "payments" }]),
-    { id: "inbox", label: t("inbox.title"), permission: "lessons" },
-  ].filter((x) => permissions.includes(x.permission));
+  const tabs = learningTabs(owner, data, chat.badge);
   // Fall back to the first permitted tab when the selected one is not allowed
   // (a tab opened through `view` is kept as is).
-  const tab =
-    view || tabs.some((x) => x.id === selectedTab)
-      ? selectedTab
-      : (tabs[0]?.id ?? selectedTab);
+  const tab = activeTab(view, tabs, selectedTab);
   async function loadLinks() {
     try {
       setLinks(
@@ -586,52 +548,20 @@ export function LearningScreen({
     if (a.due_on && a.due_on < dateKey()) return ["danger", t("learn.late")];
     return ["warning", t("learn.awaiting")];
   };
+  function chooseTab(id: string) {
+    setTab(id);
+    if (id === "access") void loadLinks();
+  }
   // Ekranın başlığı ve sekme şeridi; Mesajlar sekmesi de aynılarını çizer.
-  const header = !view && (
-    <View style={styles.header}>
-      {owner ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          icon="chevron-back"
-          onPress={onBack}
-          style={{ marginLeft: -10 }}
-        >
-          {t("mt.studentFile")}
-        </Button>
-      ) : (
-        <Brand />
-      )}
-      {!owner && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {onDiscover && (
-            <IconButton
-              ghost
-              icon="search-outline"
-              label={t("nav.findTeacher")}
-              onPress={onDiscover}
-            />
-          )}
-          <Button
-            secondary
-            size="sm"
-            icon="person-circle-outline"
-            onPress={onBack}
-          >
-            {t("mt.myAccount")}
-          </Button>
-        </View>
-      )}
-    </View>
-  );
-  const strip = !view && (
-    <TabStrip
+  const header = (
+    <LearningHeader
+      view={view}
+      owner={owner}
       tabs={tabs}
-      value={tab}
-      onChange={(id) => {
-        setTab(id);
-        if (id === "access") void loadLinks();
-      }}
+      tab={tab}
+      onBack={onBack}
+      onDiscover={onDiscover}
+      onTab={chooseTab}
     />
   );
   // Mesajlar sekmesi kaydırma alanının yerine çizilir: yazışmanın yazma alanı
@@ -640,7 +570,6 @@ export function LearningScreen({
     return (
       <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
         {header}
-        {strip}
         <PortalMessages
           messages={chat}
           viewer={student ? "STUDENT" : "GUARDIAN"}
@@ -653,7 +582,6 @@ export function LearningScreen({
       edges={view ? ["left", "right"] : ["top", "left", "right"]}
     >
       {header}
-      {strip}
       <ScrollView
         ref={scroller}
         keyboardShouldPersistTaps="handled"
@@ -695,35 +623,13 @@ export function LearningScreen({
             {t("ml.reload")}
           </Button>
         )}
-        {(owner || student) &&
-          ((tab === "videos" && !capabilities?.videos) ||
-            (["assignments", "files"].includes(tab) &&
-              !capabilities?.files)) && (
-            <Card tone="muted">
-              <View style={[styles.row, { gap: 8 }]}>
-                <Ionicons
-                  name="cloud-offline-outline"
-                  size={18}
-                  color={colors.muted}
-                />
-                <Text style={styles.h2}>
-                  {tab === "videos"
-                    ? t("ml.videoNotReady")
-                    : t("ml.fileNotReady")}
-                </Text>
-              </View>
-              <Text style={styles.muted}>{t("learn.uploadServiceDown")}</Text>
-              <Button
-                secondary
-                size="sm"
-                icon="refresh-outline"
-                style={{ alignSelf: "flex-start" }}
-                onPress={() => void reload()}
-              >
-                {t("learn.checkAgain")}
-              </Button>
-            </Card>
-          )}
+        <UploadNotice
+          owner={owner}
+          student={student}
+          tab={tab}
+          capabilities={capabilities}
+          onRetry={() => void reload()}
+        />
         {tab === "lessons" && (
           <>
             {/* Öğretmen kendi bağlantısını Takvim sekmesinden alır. */}
@@ -1660,51 +1566,11 @@ export function LearningScreen({
               {t("learn.inviteTitle")}
             </Button>
             {invite && (
-              <Card tone="brand">
-                <View style={[styles.row, { gap: 6 }]}>
-                  <Ionicons
-                    name={invite.emailed ? "mail-outline" : "link-outline"}
-                    size={16}
-                    color={colors.brand}
-                  />
-                  <Text style={styles.label}>
-                    {invite.emailed ? t("ml.inviteSent") : t("ml.inviteReady")}
-                  </Text>
-                </View>
-                <Text style={styles.muted}>
-                  {invite.emailed
-                    ? t("ml.inviteEmailed", { email: invite.email })
-                    : t("ml.inviteNoEmail")}
-                </Text>
-                <Text style={styles.caption} numberOfLines={2}>
-                  {invite.url}
-                </Text>
-                <View style={styles.row}>
-                  <Button
-                    secondary
-                    size="sm"
-                    icon={copied ? "checkmark" : "copy-outline"}
-                    onPress={async () => {
-                      await setStringAsync(invite.url);
-                      setCopied(true);
-                    }}
-                  >
-                    {copied ? t("ml.copied") : t("learn.copy")}
-                  </Button>
-                  <Button
-                    secondary
-                    size="sm"
-                    icon="share-outline"
-                    onPress={() =>
-                      void Share.share({
-                        message: t("ml.shareInvite", { url: invite.url }),
-                      })
-                    }
-                  >
-                    {t("ml.send")}
-                  </Button>
-                </View>
-              </Card>
+              <InviteCard
+                invite={invite}
+                copied={copied}
+                onCopied={() => setCopied(true)}
+              />
             )}
             {!!links && !links.data?.length && !links.invitations?.length && (
               <EmptyState
@@ -1955,6 +1821,244 @@ function invitationState(
   if (inv.revokedAt) return ["neutral", t("lesson.cancelled")];
   if (expired) return ["neutral", t("learn.expired")];
   return ["warning", t("learn.invitePending")];
+}
+
+type Invite = { url: string; email: string; emailed: boolean };
+type TabSpec = { id: string; label: string; permission: string };
+
+/** Portal kullanıcısının izinleri (öğretmende bu liste kullanılmaz). */
+const portalPermissions = (data: LearningData | PortalData) =>
+  (data as PortalData).permissions || [];
+
+/** Mesaj uçları yalnızca portal kullanıcısında ve Dersler iznindeyse vardır. */
+function messagesPath(
+  owner: boolean,
+  data: LearningData | PortalData,
+  workspaceId: string,
+  studentId: string,
+) {
+  if (owner || !portalPermissions(data).includes("lessons")) return null;
+  return `/portal/${workspaceId}/${studentId}/messages`;
+}
+
+/** Bu ekrana yönelik, henüz uygulanmamış bildirim hedefi; yoksa null. */
+function arrivedFocus(
+  focus: NoticeFocus | null | undefined,
+  appliedFocus: number,
+  workspaceId: string,
+  studentId: string,
+) {
+  if (!focus || focus.at === appliedFocus) return null;
+  const here =
+    focus.workspaceId === workspaceId && focus.studentId === studentId;
+  return here ? focus : null;
+}
+
+/** İzinlerin izin verdiği sekmeler; sahipte Erişim, portalda Bakiye bulunur. */
+function learningTabs(
+  owner: boolean,
+  data: LearningData | PortalData,
+  chatBadge: number,
+): TabSpec[] {
+  const permissions = owner
+    ? ["assignments", "lessons", "videos", "notes", "payments"]
+    : portalPermissions(data);
+  return [
+    { id: "lessons", label: t("nav.lessons"), permission: "lessons" },
+    ...(owner
+      ? []
+      : [
+          {
+            id: "messages",
+            label: t("nav.messages") + (chatBadge ? ` (${chatBadge})` : ""),
+            permission: "lessons",
+          },
+        ]),
+    {
+      id: "assignments",
+      label: t("nav.assignments"),
+      permission: "assignments",
+    },
+    { id: "files", label: t("nav.files"), permission: "assignments" },
+    { id: "videos", label: t("mt.videos"), permission: "videos" },
+    { id: "notes", label: t("nav.notes"), permission: "notes" },
+    ...(owner
+      ? [{ id: "access", label: t("learn.tabAccess"), permission: "lessons" }]
+      : [{ id: "payments", label: t("ml.balance"), permission: "payments" }]),
+    { id: "inbox", label: t("inbox.title"), permission: "lessons" },
+  ].filter((x) => permissions.includes(x.permission));
+}
+
+function activeTab(
+  view: TeachingView | undefined,
+  tabs: TabSpec[],
+  selectedTab: string,
+) {
+  if (view || tabs.some((x) => x.id === selectedTab)) return selectedTab;
+  return tabs[0]?.id ?? selectedTab;
+}
+
+/** Ekranın başlığı ve sekme şeridi; gömülü `view` modunda çizilmez. */
+function LearningHeader({
+  view,
+  owner,
+  tabs,
+  tab,
+  onBack,
+  onDiscover,
+  onTab,
+}: Readonly<{
+  view?: TeachingView;
+  owner: boolean;
+  tabs: TabSpec[];
+  tab: string;
+  onBack: () => void;
+  onDiscover?: () => void;
+  onTab: (id: string) => void;
+}>) {
+  const { styles } = useTheme();
+  if (view) return null;
+  return (
+    <>
+      <View style={styles.header}>
+        {owner ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="chevron-back"
+            onPress={onBack}
+            style={{ marginLeft: -10 }}
+          >
+            {t("mt.studentFile")}
+          </Button>
+        ) : (
+          <Brand />
+        )}
+        {!owner && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {onDiscover && (
+              <IconButton
+                ghost
+                icon="search-outline"
+                label={t("nav.findTeacher")}
+                onPress={onDiscover}
+              />
+            )}
+            <Button
+              secondary
+              size="sm"
+              icon="person-circle-outline"
+              onPress={onBack}
+            >
+              {t("mt.myAccount")}
+            </Button>
+          </View>
+        )}
+      </View>
+      <TabStrip tabs={tabs} value={tab} onChange={onTab} />
+    </>
+  );
+}
+
+/** Dosya ya da video yükleyen sekmede yükleme hizmeti hazır değilse uyarı. */
+function UploadNotice({
+  owner,
+  student,
+  tab,
+  capabilities,
+  onRetry,
+}: Readonly<{
+  owner: boolean;
+  student: boolean;
+  tab: string;
+  capabilities: { files: boolean; videos: boolean } | null;
+  onRetry: () => void;
+}>) {
+  const { colors, styles } = useTheme();
+  const down =
+    (tab === "videos" && !capabilities?.videos) ||
+    (["assignments", "files"].includes(tab) && !capabilities?.files);
+  if (!(owner || student) || !down) return null;
+  return (
+    <Card tone="muted">
+      <View style={[styles.row, { gap: 8 }]}>
+        <Ionicons name="cloud-offline-outline" size={18} color={colors.muted} />
+        <Text style={styles.h2}>
+          {tab === "videos" ? t("ml.videoNotReady") : t("ml.fileNotReady")}
+        </Text>
+      </View>
+      <Text style={styles.muted}>{t("learn.uploadServiceDown")}</Text>
+      <Button
+        secondary
+        size="sm"
+        icon="refresh-outline"
+        style={{ alignSelf: "flex-start" }}
+        onPress={onRetry}
+      >
+        {t("learn.checkAgain")}
+      </Button>
+    </Card>
+  );
+}
+
+/** Oluşturulan davetin özeti: bağlantı, kopyala ve gönder düğmeleri. */
+function InviteCard({
+  invite,
+  copied,
+  onCopied,
+}: Readonly<{
+  invite: Invite;
+  copied: boolean;
+  onCopied: () => void;
+}>) {
+  const { colors, styles } = useTheme();
+  return (
+    <Card tone="brand">
+      <View style={[styles.row, { gap: 6 }]}>
+        <Ionicons
+          name={invite.emailed ? "mail-outline" : "link-outline"}
+          size={16}
+          color={colors.brand}
+        />
+        <Text style={styles.label}>
+          {invite.emailed ? t("ml.inviteSent") : t("ml.inviteReady")}
+        </Text>
+      </View>
+      <Text style={styles.muted}>
+        {invite.emailed
+          ? t("ml.inviteEmailed", { email: invite.email })
+          : t("ml.inviteNoEmail")}
+      </Text>
+      <Text style={styles.caption} numberOfLines={2}>
+        {invite.url}
+      </Text>
+      <View style={styles.row}>
+        <Button
+          secondary
+          size="sm"
+          icon={copied ? "checkmark" : "copy-outline"}
+          onPress={async () => {
+            await setStringAsync(invite.url);
+            onCopied();
+          }}
+        >
+          {copied ? t("ml.copied") : t("learn.copy")}
+        </Button>
+        <Button
+          secondary
+          size="sm"
+          icon="share-outline"
+          onPress={() =>
+            void Share.share({
+              message: t("ml.shareInvite", { url: invite.url }),
+            })
+          }
+        >
+          {t("ml.send")}
+        </Button>
+      </View>
+    </Card>
+  );
 }
 
 /** Dosya, erişim ve davet satırlarının başındaki simge karosu. */

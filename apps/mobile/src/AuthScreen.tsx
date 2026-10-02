@@ -116,66 +116,41 @@ export function AuthScreen({
     setPassword("");
     setVisible(false);
   };
+  async function startSocial(id: SocialProvider) {
+    setBusy(id);
+    setError("");
+    try {
+      await socialSignIn(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
   async function submit() {
     if (busy) return;
     setError("");
     setMessage("");
-    if ((mode === "signup" || mode === "password") && password.length < 10) {
-      setError(t("web.passwordTooShort"));
-      return;
-    }
-    if (mode === "signin" && !password) {
-      setError(t("mobile.authPasswordRequired"));
-      return;
-    }
-    if (captcha && !captchaToken) {
-      setError(t("auth.captchaRequired"));
+    const issue = formIssue(mode, password, captcha, captchaToken);
+    if (issue) {
+      setError(issue);
       return;
     }
     const captchaOptions = captcha ? { captchaToken } : {};
     setBusy("email");
     try {
       if (mode === "password") {
-        const { error } = await supabase!.auth.updateUser({ password });
-        if (error) throw error;
+        await savePassword(password);
         onDone?.();
         return;
       }
-      if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email.trim()))
-        throw new Error(t("mobile.authEmailInvalid"));
-      if (mode === "recover") {
-        const { error } = await supabase!.auth.resetPasswordForEmail(
-          email.trim(),
-          { ...captchaOptions, redirectTo: authRedirect("recovery") },
-        );
-        if (error) throw error;
-        setMessage(t("mobile.authResetSent"));
-      } else if (mode === "signup") {
-        const { data, error } = await supabase!.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            ...captchaOptions,
-            emailRedirectTo: authRedirect("confirm"),
-          },
-        });
-        if (error) throw error;
-        if (!data.session) setMessage(t("mobile.authVerifyEmail"));
-      } else {
-        const { error } = await supabase!.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-          options: captchaOptions,
-        });
-        if (error)
-          throw new Error(
-            t(
-              error.code === "captcha_failed"
-                ? "auth.captchaFailed"
-                : "web.signinFailed",
-            ),
-          );
-      }
+      const note = await emailAuth(
+        mode,
+        email.trim(),
+        password,
+        captchaOptions,
+      );
+      if (note) setMessage(note);
     } catch (e) {
       setError(
         (e as { code?: string }).code === "captcha_failed"
@@ -243,123 +218,36 @@ export function AuthScreen({
             </View>
 
             {(mode === "signin" || mode === "signup") && (
-              <>
-                <View style={auth.socialRow}>
-                  {providers.map((p) => {
-                    const off = !enabled.includes(p.id);
-                    return (
-                      <Pressable
-                        key={p.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={t("auth.continueWith", {
-                          name: p.name,
-                        })}
-                        accessibilityState={{ disabled: !!busy || off }}
-                        disabled={!!busy || off}
-                        onPress={async () => {
-                          setBusy(p.id);
-                          setError("");
-                          try {
-                            await socialSignIn(p.id);
-                          } catch (e) {
-                            setError((e as Error).message);
-                          } finally {
-                            setBusy(null);
-                          }
-                        }}
-                        style={({ pressed }) => [
-                          auth.social,
-                          pressed && !off && auth.socialPressed,
-                          { opacity: off || busy ? 0.5 : 1 },
-                        ]}
-                      >
-                        {socialMark(p.id, colors.ink)}
-                        <Text style={auth.socialLabel} numberOfLines={1}>
-                          {busy === p.id ? t("auth.opening") : p.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {!!providerNotice && (
-                  <Text style={styles.hint}>{providerNotice}</Text>
-                )}
-                <View style={auth.separator}>
-                  <View style={auth.line} />
-                  <Text style={auth.separatorText}>{t("auth.orEmail")}</Text>
-                  <View style={auth.line} />
-                </View>
-              </>
+              <SocialProviders
+                auth={auth}
+                enabled={enabled}
+                busy={busy}
+                notice={providerNotice}
+                onSelect={(id) => void startSocial(id)}
+              />
             )}
 
             {mode !== "password" && (
-              <Field label={t("auth.email")}>
-                <Input
-                  accessibilityLabel={t("auth.email")}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder={t("auth.emailPlaceholder")}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="email"
-                  editable={!busy}
-                  maxLength={200}
-                  returnKeyType={mode === "recover" ? "go" : "next"}
-                  onSubmitEditing={
-                    mode === "recover" ? () => void submit() : undefined
-                  }
-                />
-              </Field>
+              <EmailField
+                mode={mode}
+                value={email}
+                busy={busy}
+                onChange={setEmail}
+                onSubmit={() => void submit()}
+              />
             )}
 
             {mode !== "recover" && (
-              <Field
-                label={t("auth.password")}
-                hint={
-                  mode === "signin" ? undefined : t("mobile.authPasswordHint")
-                }
-              >
-                <View>
-                  <Input
-                    accessibilityLabel={t("auth.password")}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder={
-                      mode === "signin"
-                        ? t("auth.passwordPlaceholder")
-                        : t("auth.passwordMin")
-                    }
-                    secureTextEntry={!visible}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete={
-                      mode === "signin" ? "current-password" : "new-password"
-                    }
-                    editable={!busy}
-                    maxLength={128}
-                    returnKeyType="go"
-                    onSubmitEditing={() => void submit()}
-                    style={{ paddingRight: 52 }}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      visible ? t("auth.hidePassword") : t("auth.showPassword")
-                    }
-                    accessibilityState={{ selected: visible }}
-                    onPress={() => setVisible(!visible)}
-                    hitSlop={6}
-                    style={auth.reveal}
-                  >
-                    <Ionicons
-                      name={visible ? "eye-off-outline" : "eye-outline"}
-                      size={19}
-                      color={colors.muted}
-                    />
-                  </Pressable>
-                </View>
-              </Field>
+              <PasswordField
+                auth={auth}
+                mode={mode}
+                value={password}
+                visible={visible}
+                busy={busy}
+                onChange={setPassword}
+                onToggleVisible={() => setVisible(!visible)}
+                onSubmit={() => void submit()}
+              />
             )}
 
             {mode === "signin" && (
@@ -405,21 +293,12 @@ export function AuthScreen({
             )}
 
             {!reset && mode !== "recover" && (
-              <View style={auth.switch}>
-                <Text style={styles.muted}>
-                  {mode === "signin"
-                    ? t("auth.noAccount")
-                    : t("auth.haveAccount")}
-                </Text>
-                <TextLink
-                  disabled={!!busy}
-                  onPress={() =>
-                    changeMode(mode === "signin" ? "signup" : "signin")
-                  }
-                >
-                  {mode === "signin" ? t("auth.signUp") : t("auth.signIn")}
-                </TextLink>
-              </View>
+              <ModeSwitch
+                auth={auth}
+                mode={mode}
+                busy={busy}
+                onChange={changeMode}
+              />
             )}
           </View>
 
@@ -437,6 +316,273 @@ export function AuthScreen({
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+type AuthStyles = ReturnType<typeof makeAuth>;
+/** CAPTCHA açıkken istekle giden belirteç; kapalıyken boş nesne. */
+type CaptchaOptions = { captchaToken?: string };
+
+/** Gönderimden önceki form denetimi; sorun yoksa null, varsa gösterilecek ileti. */
+function formIssue(
+  mode: Mode,
+  password: string,
+  captcha: boolean,
+  captchaToken: string,
+): string | null {
+  if ((mode === "signup" || mode === "password") && password.length < 10)
+    return t("web.passwordTooShort");
+  if (mode === "signin" && !password) return t("mobile.authPasswordRequired");
+  if (captcha && !captchaToken) return t("auth.captchaRequired");
+  return null;
+}
+
+/** Açık oturumda yeni şifreyi kaydeder. */
+async function savePassword(password: string) {
+  const { error } = await supabase!.auth.updateUser({ password });
+  if (error) throw error;
+}
+
+/** E-postaya sıfırlama bağlantısı gönderir; gösterilecek iletiyi döndürür. */
+async function requestReset(email: string, captchaOptions: CaptchaOptions) {
+  const { error } = await supabase!.auth.resetPasswordForEmail(email, {
+    ...captchaOptions,
+    redirectTo: authRedirect("recovery"),
+  });
+  if (error) throw error;
+  return t("mobile.authResetSent");
+}
+
+/** Hesap açar; oturum hemen gelmediyse doğrulama iletisini döndürür. */
+async function createAccount(
+  email: string,
+  password: string,
+  captchaOptions: CaptchaOptions,
+) {
+  const { data, error } = await supabase!.auth.signUp({
+    email,
+    password,
+    options: {
+      ...captchaOptions,
+      emailRedirectTo: authRedirect("confirm"),
+    },
+  });
+  if (error) throw error;
+  if (!data.session) return t("mobile.authVerifyEmail");
+}
+
+async function signInWithEmail(
+  email: string,
+  password: string,
+  captchaOptions: CaptchaOptions,
+) {
+  const { error } = await supabase!.auth.signInWithPassword({
+    email,
+    password,
+    options: captchaOptions,
+  });
+  if (error)
+    throw new Error(
+      t(
+        error.code === "captcha_failed"
+          ? "auth.captchaFailed"
+          : "web.signinFailed",
+      ),
+    );
+}
+
+/** E-posta tabanlı modlar (sıfırlama, kayıt, giriş); varsa gösterilecek ileti döner.
+ *  Bilerek `async` değil: geçersiz e-posta hatası, `submit`'teki ilk `await`'ten
+ *  önce eşzamanlı fırlar (tek çizim, `busy` hiç "email" görünmez). */
+function emailAuth(
+  mode: Exclude<Mode, "password">,
+  email: string,
+  password: string,
+  captchaOptions: CaptchaOptions,
+) {
+  if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email))
+    throw new Error(t("mobile.authEmailInvalid"));
+  if (mode === "recover") return requestReset(email, captchaOptions);
+  if (mode === "signup") return createAccount(email, password, captchaOptions);
+  return signInWithEmail(email, password, captchaOptions);
+}
+
+function SocialProviders({
+  auth,
+  enabled,
+  busy,
+  notice,
+  onSelect,
+}: Readonly<{
+  auth: AuthStyles;
+  enabled: SocialProvider[];
+  busy: string | null;
+  notice: string;
+  onSelect: (id: SocialProvider) => void;
+}>) {
+  const { colors, styles } = useTheme();
+  return (
+    <>
+      <View style={auth.socialRow}>
+        {providers.map((p) => {
+          const off = !enabled.includes(p.id);
+          return (
+            <Pressable
+              key={p.id}
+              accessibilityRole="button"
+              accessibilityLabel={t("auth.continueWith", {
+                name: p.name,
+              })}
+              accessibilityState={{ disabled: !!busy || off }}
+              disabled={!!busy || off}
+              onPress={() => onSelect(p.id)}
+              style={({ pressed }) => [
+                auth.social,
+                pressed && !off && auth.socialPressed,
+                { opacity: off || busy ? 0.5 : 1 },
+              ]}
+            >
+              {socialMark(p.id, colors.ink)}
+              <Text style={auth.socialLabel} numberOfLines={1}>
+                {busy === p.id ? t("auth.opening") : p.name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {!!notice && <Text style={styles.hint}>{notice}</Text>}
+      <View style={auth.separator}>
+        <View style={auth.line} />
+        <Text style={auth.separatorText}>{t("auth.orEmail")}</Text>
+        <View style={auth.line} />
+      </View>
+    </>
+  );
+}
+
+function EmailField({
+  mode,
+  value,
+  busy,
+  onChange,
+  onSubmit,
+}: Readonly<{
+  mode: Mode;
+  value: string;
+  busy: string | null;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}>) {
+  return (
+    <Field label={t("auth.email")}>
+      <Input
+        accessibilityLabel={t("auth.email")}
+        value={value}
+        onChangeText={onChange}
+        placeholder={t("auth.emailPlaceholder")}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        editable={!busy}
+        maxLength={200}
+        returnKeyType={mode === "recover" ? "go" : "next"}
+        onSubmitEditing={mode === "recover" ? onSubmit : undefined}
+      />
+    </Field>
+  );
+}
+
+function PasswordField({
+  auth,
+  mode,
+  value,
+  visible,
+  busy,
+  onChange,
+  onToggleVisible,
+  onSubmit,
+}: Readonly<{
+  auth: AuthStyles;
+  mode: Mode;
+  value: string;
+  visible: boolean;
+  busy: string | null;
+  onChange: (value: string) => void;
+  onToggleVisible: () => void;
+  onSubmit: () => void;
+}>) {
+  const { colors } = useTheme();
+  return (
+    <Field
+      label={t("auth.password")}
+      hint={mode === "signin" ? undefined : t("mobile.authPasswordHint")}
+    >
+      <View>
+        <Input
+          accessibilityLabel={t("auth.password")}
+          value={value}
+          onChangeText={onChange}
+          placeholder={
+            mode === "signin"
+              ? t("auth.passwordPlaceholder")
+              : t("auth.passwordMin")
+          }
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete={mode === "signin" ? "current-password" : "new-password"}
+          editable={!busy}
+          maxLength={128}
+          returnKeyType="go"
+          onSubmitEditing={onSubmit}
+          style={{ paddingRight: 52 }}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            visible ? t("auth.hidePassword") : t("auth.showPassword")
+          }
+          accessibilityState={{ selected: visible }}
+          onPress={onToggleVisible}
+          hitSlop={6}
+          style={auth.reveal}
+        >
+          <Ionicons
+            name={visible ? "eye-off-outline" : "eye-outline"}
+            size={19}
+            color={colors.muted}
+          />
+        </Pressable>
+      </View>
+    </Field>
+  );
+}
+
+function ModeSwitch({
+  auth,
+  mode,
+  busy,
+  onChange,
+}: Readonly<{
+  auth: AuthStyles;
+  mode: Mode;
+  busy: string | null;
+  onChange: (next: Mode) => void;
+}>) {
+  const { styles } = useTheme();
+  return (
+    <View style={auth.switch}>
+      <Text style={styles.muted}>
+        {mode === "signin" ? t("auth.noAccount") : t("auth.haveAccount")}
+      </Text>
+      <TextLink
+        disabled={!!busy}
+        onPress={() => onChange(mode === "signin" ? "signup" : "signin")}
+      >
+        {mode === "signin" ? t("auth.signUp") : t("auth.signIn")}
+      </TextLink>
+    </View>
   );
 }
 
