@@ -71,22 +71,11 @@ export function PublicDirectory({
           </div>
         )}
         {teacherId ? (
-          signedIn === null ? null : (
-            <TeacherProfileView
-              id={teacherId}
-              signedIn={signedIn}
-              backHref="/teachers"
-              // Davetle bağlanan öğrencinin "İsteklerim" sayfası boş kalır;
-              // düğme o öğretmendeki dersleri açar.
-              onOpenLessons={(id) =>
-                // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
-                void openStudentWorkspace(id).catch(() => location.assign("/"))
-              }
-              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
-              onEditProfile={() => location.assign("/?view=showcase")}
-              openRequest={openRequest}
-            />
-          )
+          <PublicProfile
+            teacherId={teacherId}
+            signedIn={signedIn}
+            openRequest={openRequest}
+          />
         ) : (
           <TeacherDirectory
             signedIn={!!signedIn}
@@ -97,5 +86,34 @@ export function PublicDirectory({
         )}
       </main>
     </div>
+  );
+}
+
+/** Oturum durumu bilinene kadar profil çizilmez. */
+function PublicProfile({
+  teacherId,
+  signedIn,
+  openRequest,
+}: Readonly<{
+  teacherId: string;
+  signedIn: boolean | null;
+  openRequest: boolean;
+}>) {
+  if (signedIn === null) return null;
+  return (
+    <TeacherProfileView
+      id={teacherId}
+      signedIn={signedIn}
+      backHref="/teachers"
+      // Davetle bağlanan öğrencinin "İsteklerim" sayfası boş kalır;
+      // düğme o öğretmendeki dersleri açar.
+      onOpenLessons={(id) =>
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
+        void openStudentWorkspace(id).catch(() => location.assign("/"))
+      }
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- tam sayfa yüklemesi bilerek: oturum bağlamı ve uygulama kabuğu baştan kurulur.
+      onEditProfile={() => location.assign("/?view=showcase")}
+      openRequest={openRequest}
+    />
   );
 }

@@ -129,13 +129,7 @@ export function RecordDialog({
     [granted, setGranted] = useState("8"),
     [price, setPrice] = useState(""),
     [expires, setExpires] = useState("");
-  const [date, setDate] = useState(
-    lesson
-      ? dateKey(lesson.starts_at)
-      : modal.type === "lesson"
-        ? modal.date || dateKey()
-        : dateKey(),
-  );
+  const [date, setDate] = useState(initialDate(modal, lesson));
   const [time, setTime] = useState(
       lesson ? timeLabel(lesson.starts_at) : "15:00",
     ),
@@ -168,30 +162,8 @@ export function RecordDialog({
     [method, setMethod] = useState("TRANSFER"),
     [reference, setReference] = useState(""),
     [error, setError] = useState("");
-  const title =
-    modal.type === "student"
-      ? existing
-        ? t("record.editStudent")
-        : t("record.newStudent")
-      : modal.type === "package"
-        ? t("record.addPackage")
-        : modal.type === "lesson"
-          ? modal.makeupForId
-            ? t("lesson.planMakeup")
-            : t("record.newLesson")
-          : modal.type === "payment"
-            ? t("record.recordPayment")
-            : t("record.reschedule");
-  const description =
-    modal.type === "student"
-      ? t("record.studentHint")
-      : modal.type === "package"
-        ? t("record.packageHint")
-        : modal.type === "lesson"
-          ? t("record.lessonHint")
-          : modal.type === "payment"
-            ? t("record.paymentHint")
-            : t("record.rescheduleHint");
+  const title = recordTitle(modal, existing);
+  const description = recordDescription(modal);
   const needsStudent = modal.type !== "student" && modal.type !== "reschedule";
   const noStudents = needsStudent && activeStudents.length === 0;
   const noPackage = modal.type === "lesson" && !selectedPackage && !noStudents;
@@ -637,10 +609,8 @@ export function RecordDialog({
                 <>
                   <Spinner /> {t("common.saving")}
                 </>
-              ) : modal.type === "lesson" ? (
-                t("record.planSubmit")
               ) : (
-                t("common.save")
+                saveLabel(modal)
               )}
             </Button>
           </DialogFooter>
@@ -648,4 +618,44 @@ export function RecordDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function initialDate(modal: ModalState, lesson: Lesson | undefined) {
+  if (lesson) return dateKey(lesson.starts_at);
+  if (modal.type === "lesson") return modal.date || dateKey();
+  return dateKey();
+}
+
+function recordTitle(modal: ModalState, existing: Student | undefined) {
+  switch (modal.type) {
+    case "student":
+      return existing ? t("record.editStudent") : t("record.newStudent");
+    case "package":
+      return t("record.addPackage");
+    case "lesson":
+      return modal.makeupForId ? t("lesson.planMakeup") : t("record.newLesson");
+    case "payment":
+      return t("record.recordPayment");
+    default:
+      return t("record.reschedule");
+  }
+}
+
+function recordDescription(modal: ModalState) {
+  switch (modal.type) {
+    case "student":
+      return t("record.studentHint");
+    case "package":
+      return t("record.packageHint");
+    case "lesson":
+      return t("record.lessonHint");
+    case "payment":
+      return t("record.paymentHint");
+    default:
+      return t("record.rescheduleHint");
+  }
+}
+
+function saveLabel(modal: ModalState) {
+  return modal.type === "lesson" ? t("record.planSubmit") : t("common.save");
 }

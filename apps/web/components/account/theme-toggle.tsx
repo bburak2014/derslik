@@ -20,11 +20,9 @@ function subscribe(onChange: () => void) {
 }
 function readTheme(): Theme {
   const root = document.documentElement.classList;
-  return root.contains("dark")
-    ? "dark"
-    : root.contains("light")
-      ? "light"
-      : "system";
+  if (root.contains("dark")) return "dark";
+  if (root.contains("light")) return "light";
+  return "system";
 }
 
 // Kept at module scope: it writes to document, which the React compiler

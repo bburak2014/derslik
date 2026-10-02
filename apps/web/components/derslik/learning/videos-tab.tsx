@@ -1,5 +1,9 @@
 "use client";
-import { uploadTus, type VideoReservation } from "@derslik/api-client";
+import {
+  uploadTus,
+  type Video,
+  type VideoReservation,
+} from "@derslik/api-client";
 import { dayLabel, t } from "@derslik/contracts";
 import { backend, formText } from "@/lib/client";
 import { Button } from "@/components/ui/button";
@@ -274,11 +278,7 @@ export function VideosTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
                         : "warn"
                     }
                   >
-                    {v.delete_requested
-                      ? t("learn.deletePending")
-                      : v.status === "FAILED"
-                        ? t("learn.videoFailed")
-                        : t("learn.videoPreparing")}
+                    {videoPendingLabel(v)}
                   </ToneBadge>
                 )}
                 {v.status === "READY" && !v.delete_requested && (
@@ -399,4 +399,10 @@ export function VideosTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
       </ItemGroup>
     </>
   );
+}
+
+function videoPendingLabel(v: Video) {
+  if (v.delete_requested) return t("learn.deletePending");
+  if (v.status === "FAILED") return t("learn.videoFailed");
+  return t("learn.videoPreparing");
 }

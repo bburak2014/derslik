@@ -352,11 +352,7 @@ function ThreadRow({
               x.unread > 0 && "text-foreground",
             )}
           >
-            {x.lastBody
-              ? x.lastMine
-                ? t("chat.preview", { name: t("chat.you"), text: x.lastBody })
-                : x.lastBody
-              : " "}
+            {threadPreview(x)}
           </ItemDescription>
           {x.unread > 0 && (
             <Badge
@@ -374,6 +370,13 @@ function ThreadRow({
       </ItemContent>
     </Item>
   );
+}
+
+function threadPreview(x: MessageThread) {
+  if (!x.lastBody) return "\u00a0";
+  if (x.lastMine)
+    return t("chat.preview", { name: t("chat.you"), text: x.lastBody });
+  return x.lastBody;
 }
 
 function ListSkeleton() {
@@ -642,17 +645,8 @@ export function MessagesView({
               onBack={listPane ? back : undefined}
               refreshAt={refreshAt}
             />
-          ) : !threads ? (
-            <ListSkeleton />
           ) : (
-            <Empty className="text-muted-foreground">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <MessageCircle />
-                </EmptyMedia>
-                <EmptyDescription>{t("chat.pick")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <PickPlaceholder loading={!threads} />
           )}
         </div>
       </div>
@@ -661,6 +655,21 @@ export function MessagesView({
         {t("chat.privacy")}
       </p>
     </section>
+  );
+}
+
+/** Yazışma seçilmediğinde: liste yüklenirken iskelet, yüklenince "seçin" notu. */
+function PickPlaceholder({ loading }: Readonly<{ loading: boolean }>) {
+  if (loading) return <ListSkeleton />;
+  return (
+    <Empty className="text-muted-foreground">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <MessageCircle />
+        </EmptyMedia>
+        <EmptyDescription>{t("chat.pick")}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
@@ -1125,24 +1134,8 @@ function Conversation({
             el.scrollHeight - el.scrollTop - el.clientHeight < 64;
         }}
       >
-        {error && !page ? (
-          <div className="grid justify-items-start gap-3 p-1">
-            <FormError>{error}</FormError>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void latest(true)}
-            >
-              {t("common.retry")}
-            </Button>
-          </div>
-        ) : !page ? (
-          <div className="grid gap-3 p-1" aria-busy="true" aria-hidden="true">
-            <Skeleton className="h-12 w-3/5 rounded-2xl" />
-            <Skeleton className="h-16 w-2/3 justify-self-end rounded-2xl" />
-            <Skeleton className="h-10 w-1/2 rounded-2xl" />
-          </div>
+        {!page ? (
+          <PageFallback error={error} onRetry={() => void latest(true)} />
         ) : (
           <>
             {error && <FormError>{error}</FormError>}
@@ -1181,24 +1174,8 @@ function Conversation({
           {announce}
         </p>
       </div>
-      {!info ? (
-        // Yazışmanın türü henüz bilinmiyor (veli yalnızca okuyabilir, yazışma
-        // kapalı olabilir): yazma kutusu yerine yer tutucu.
-        !error && (
-          <div className="border-t p-3" aria-hidden="true">
-            <Skeleton className="h-11 w-full rounded-md" />
-          </div>
-        )
-      ) : info.viewer === "GUARDIAN_READ" ? (
-        <p className="text-muted-foreground flex items-start gap-2 border-t px-4 py-3 text-sm">
-          <Eye className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {t("chat.readOnly")}
-        </p>
-      ) : !canWrite ? (
-        <p className="text-muted-foreground flex items-start gap-2 border-t px-4 py-3 text-sm">
-          <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {t("chat.closed")}
-        </p>
+      {!info || !canWrite ? (
+        <ComposerNote info={info} error={error} />
       ) : (
         <form
           className="bg-card grid grid-cols-[minmax(0,1fr)] gap-2 border-t p-3"
@@ -1258,5 +1235,59 @@ function Conversation({
         </form>
       )}
     </>
+  );
+}
+
+/** Mesaj listesi gelene kadar: yükleme hatası (yeniden dene) ya da iskelet. */
+function PageFallback({
+  error,
+  onRetry,
+}: Readonly<{ error: string; onRetry: () => void }>) {
+  if (error)
+    return (
+      <div className="grid justify-items-start gap-3 p-1">
+        <FormError>{error}</FormError>
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          {t("common.retry")}
+        </Button>
+      </div>
+    );
+  return (
+    <div className="grid gap-3 p-1" aria-busy="true" aria-hidden="true">
+      <Skeleton className="h-12 w-3/5 rounded-2xl" />
+      <Skeleton className="h-16 w-2/3 justify-self-end rounded-2xl" />
+      <Skeleton className="h-10 w-1/2 rounded-2xl" />
+    </div>
+  );
+}
+
+/** Yazma kutusunun yerine geçen not: tür bilinmiyorsa yer tutucu, veli
+ *  yalnızca okuyabiliyorsa ya da yazışma kapalıysa açıklama. */
+function ComposerNote({
+  info,
+  error,
+}: Readonly<{ info: MessageThread | null; error: string }>) {
+  if (!info) {
+    // Yazışmanın türü henüz bilinmiyor (veli yalnızca okuyabilir, yazışma
+    // kapalı olabilir): yazma kutusu yerine yer tutucu.
+    if (error) return null;
+    return (
+      <div className="border-t p-3" aria-hidden="true">
+        <Skeleton className="h-11 w-full rounded-md" />
+      </div>
+    );
+  }
+  if (info.viewer === "GUARDIAN_READ")
+    return (
+      <p className="text-muted-foreground flex items-start gap-2 border-t px-4 py-3 text-sm">
+        <Eye className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        {t("chat.readOnly")}
+      </p>
+    );
+  return (
+    <p className="text-muted-foreground flex items-start gap-2 border-t px-4 py-3 text-sm">
+      <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      {t("chat.closed")}
+    </p>
   );
 }

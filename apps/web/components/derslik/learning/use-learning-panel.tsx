@@ -197,11 +197,7 @@ export function useLearningPanel({
         media + "/files",
         {
           assignmentId,
-          purpose: owner
-            ? assignmentId
-              ? "ASSIGNMENT"
-              : "RESOURCE"
-            : "SUBMISSION",
+          purpose: filePurpose(owner, assignmentId),
           name: file.name,
           mimeType: file.type,
           sizeBytes: file.size,
@@ -404,5 +400,9 @@ export function useLearningPanel({
     today,
     refresh,
   };
+}
+function filePurpose(owner: boolean, assignmentId: string | null) {
+  if (!owner) return "SUBMISSION";
+  return assignmentId ? "ASSIGNMENT" : "RESOURCE";
 }
 export type LearningCtx = ReturnType<typeof useLearningPanel>;

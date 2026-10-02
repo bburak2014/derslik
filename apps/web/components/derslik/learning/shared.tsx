@@ -72,7 +72,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FormError, ToneBadge } from "../feedback";
+import { FormError, ToneBadge, type Tone } from "../feedback";
 
 export type Field = {
   name: string;
@@ -136,42 +136,7 @@ export function ActionForm({
             {spec.fields.map((f) => (
               <div className="grid gap-2" key={f.name}>
                 <Label htmlFor={"field-" + f.name}>{f.label}</Label>
-                {f.options ? (
-                  // Radix Root, name verildiğinde form gönderimi için gizli bir
-                  // yerel select basar; FormData okuması bozulmaz.
-                  <Select name={f.name} defaultValue={f.value}>
-                    <SelectTrigger id={"field-" + f.name} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {f.options.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : f.type === "textarea" ? (
-                  <Textarea
-                    id={"field-" + f.name}
-                    name={f.name}
-                    defaultValue={f.value}
-                    required={f.required !== false}
-                    maxLength={5000}
-                    rows={5}
-                    className="min-h-28"
-                  />
-                ) : (
-                  <Input
-                    id={"field-" + f.name}
-                    name={f.name}
-                    type={f.type || "text"}
-                    defaultValue={f.value}
-                    required={f.required !== false}
-                    maxLength={f.type === "email" ? 200 : 150}
-                    min={f.type === "number" ? 0 : undefined}
-                  />
-                )}
+                <FieldInput f={f} />
               </div>
             ))}
             {error && <FormError>{error}</FormError>}
@@ -190,6 +155,49 @@ export function ActionForm({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function FieldInput({ f }: Readonly<{ f: Field }>) {
+  if (f.options)
+    return (
+      // Radix Root, name verildiğinde form gönderimi için gizli bir
+      // yerel select basar; FormData okuması bozulmaz.
+      <Select name={f.name} defaultValue={f.value}>
+        <SelectTrigger id={"field-" + f.name} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {f.options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  if (f.type === "textarea")
+    return (
+      <Textarea
+        id={"field-" + f.name}
+        name={f.name}
+        defaultValue={f.value}
+        required={f.required !== false}
+        maxLength={5000}
+        rows={5}
+        className="min-h-28"
+      />
+    );
+  return (
+    <Input
+      id={"field-" + f.name}
+      name={f.name}
+      type={f.type || "text"}
+      defaultValue={f.value}
+      required={f.required !== false}
+      maxLength={f.type === "email" ? 200 : 150}
+      min={f.type === "number" ? 0 : undefined}
+    />
   );
 }
 
@@ -372,11 +380,9 @@ export function LessonSchedule({
     tomorrow = addDays(today, 1);
   const day = (iso: string) => {
     const key = dateKey(iso);
-    return key === today
-      ? t("common.today")
-      : key === tomorrow
-        ? t("common.tomorrow")
-        : dayLabel(iso, { weekday: "long" });
+    if (key === today) return t("common.today");
+    if (key === tomorrow) return t("common.tomorrow");
+    return dayLabel(iso, { weekday: "long" });
   };
   if (!lessons.length)
     return (
@@ -408,13 +414,7 @@ export function LessonSchedule({
               lesson={l}
               day={day(l.starts_at)}
               extra={extra?.(l, clock)}
-              chip={
-                i > 0
-                  ? undefined
-                  : Date.parse(l.starts_at) <= clock
-                    ? t("lesson.now")
-                    : t("learn.next")
-              }
+              chip={nextChip(l.starts_at, i, clock)}
             />
           ))
         ) : (
@@ -448,6 +448,11 @@ export function LessonSchedule({
       )}
     </>
   );
+}
+
+function nextChip(startsAt: string, index: number, clock: number) {
+  if (index > 0) return undefined;
+  return Date.parse(startsAt) <= clock ? t("lesson.now") : t("learn.next");
 }
 
 export function LessonItem({
@@ -497,22 +502,10 @@ export function LessonItem({
         <ItemActions className="ml-auto flex-wrap justify-end">
           {chip && <span className="now-chip">{chip}</span>}
           {status && (
-            <ToneBadge
-              tone={
-                l.status === "SCHEDULED"
-                  ? "warn"
-                  : l.status === "COMPLETED"
-                    ? "ok"
-                    : "muted"
-              }
-            >
+            <ToneBadge tone={lessonTone(l.status)}>
               {/* Geçmişte kalıp hâlâ planlı görünen ders, öğretmenin
                   tamamlandı ya da iptal demesini bekliyor. */}
-              {l.status === "SCHEDULED"
-                ? t("lesson.awaitingConfirmation")
-                : l.status === "COMPLETED"
-                  ? t("lesson.completed")
-                  : t("lesson.cancelled")}
+              {lessonStatusLabel(l.status)}
             </ToneBadge>
           )}
           {extra}
@@ -520,6 +513,18 @@ export function LessonItem({
       )}
     </Item>
   );
+}
+
+function lessonTone(status: PortalLesson["status"]): Tone {
+  if (status === "SCHEDULED") return "warn";
+  if (status === "COMPLETED") return "ok";
+  return "muted";
+}
+
+function lessonStatusLabel(status: PortalLesson["status"]) {
+  if (status === "SCHEDULED") return t("lesson.awaitingConfirmation");
+  if (status === "COMPLETED") return t("lesson.completed");
+  return t("lesson.cancelled");
 }
 
 export function EmptyNote({
@@ -613,13 +618,7 @@ export function IconAction({
             type="button"
             size={outline ? "icon" : "icon-sm"}
             variant={outline ? "outline" : "ghost"}
-            className={
-              danger
-                ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                : outline
-                  ? ""
-                  : "text-muted-foreground"
-            }
+            className={iconActionClass(danger, outline)}
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
@@ -631,6 +630,12 @@ export function IconAction({
       </Tooltip>
     </TooltipProvider>
   );
+}
+
+function iconActionClass(danger?: boolean, outline?: boolean) {
+  if (danger)
+    return "text-muted-foreground hover:bg-destructive/10 hover:text-destructive";
+  return outline ? "" : "text-muted-foreground";
 }
 
 /**

@@ -353,15 +353,7 @@ export function Portal({
     return () => window.removeEventListener("popstate", sync);
   }, [fallback]);
   // Adresteki sayfaya izin yoksa (ör. ödeme bilgisi gizli) ilk izinli sayfa açılır.
-  const current: PortalPage = isDiscover(tab)
-    ? canDiscover
-      ? tab
-      : fallback
-    : !access
-      ? "teachers"
-      : tabs.length && !tabs.some((x) => x.id === tab)
-        ? tabs[0].id
-        : tab;
+  const current = currentPage(tab, canDiscover, fallback, !!access, tabs);
   const heading = isDiscover(current)
     ? { label: discover[current].label, subtitle: discover[current].subtitle }
     : {
@@ -441,13 +433,12 @@ export function Portal({
     }
   }
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
-  const focusedTab = panelFocus
-    ? focus?.section
-    : requestFocus
-      ? "requests"
-      : chatFocus
-        ? "messages"
-        : undefined;
+  const focusedTab = focusedTabOf(
+    panelFocus,
+    focus?.section,
+    requestFocus,
+    chatFocus,
+  );
   const focusedUrl =
     focusedTab === "messages"
       ? chatSearch(chatThread)
@@ -660,4 +651,31 @@ export function Portal({
       <Toaster position="bottom-right" richColors closeButton />
     </SidebarProvider>
   );
+}
+
+/** Adresteki sayfa izinli değilse (ör. sekmeler yüklendi ve o sekme yok)
+ *  geri düşülen sayfa. */
+function currentPage(
+  tab: PortalPage,
+  canDiscover: boolean,
+  fallback: PortalPage,
+  hasAccess: boolean,
+  tabs: readonly LearningTabInfo[],
+): PortalPage {
+  if (isDiscover(tab)) return canDiscover ? tab : fallback;
+  if (!hasAccess) return "teachers";
+  if (tabs.length && !tabs.some((x) => x.id === tab)) return tabs[0].id;
+  return tab;
+}
+
+/** Bildirim vurgusunun adresi: hangi sayfanın açık olduğu. */
+function focusedTabOf(
+  panelFocus: { id: string | null; at: number } | undefined,
+  section: NoticeFocus["section"] | undefined,
+  requestFocus: string | null,
+  chatFocus: number,
+) {
+  if (panelFocus) return section;
+  if (requestFocus) return "requests";
+  return chatFocus ? "messages" : undefined;
 }

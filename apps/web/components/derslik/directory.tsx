@@ -316,26 +316,38 @@ export function TeacherCard({
       <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
         <Price teacher={teacher} />
         {/* Kartın tamamı profile gider; düğme onun üstünde ayrı tıklanır. */}
-        {state ? (
-          <CardStateBadge state={state} />
-        ) : requestHref ? (
-          <Button asChild size="sm" className="relative z-10">
-            <a href={requestHref}>
-              <Send /> {t("dir.requestShort")}
-            </a>
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            size="sm"
-            className="relative z-10"
-            onClick={onRequest ?? onOpen}
-          >
-            <Send /> {t("dir.requestShort")}
-          </Button>
-        )}
+        <CardAction
+          state={state}
+          requestHref={requestHref}
+          onClick={onRequest ?? onOpen}
+        />
       </div>
     </Card>
+  );
+}
+
+function CardAction({
+  state,
+  requestHref,
+  onClick,
+}: Readonly<{
+  state: CardState | null;
+  requestHref?: string;
+  onClick?: () => void;
+}>) {
+  if (state) return <CardStateBadge state={state} />;
+  if (requestHref)
+    return (
+      <Button asChild size="sm" className="relative z-10">
+        <a href={requestHref}>
+          <Send /> {t("dir.requestShort")}
+        </a>
+      </Button>
+    );
+  return (
+    <Button type="button" size="sm" className="relative z-10" onClick={onClick}>
+      <Send /> {t("dir.requestShort")}
+    </Button>
   );
 }
 
@@ -1280,23 +1292,7 @@ export function TeacherProfileView({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleyici durumu yalnızca istek bitince yazar.
     void reload();
   }, [reload]);
-  const back = backHref ? (
-    <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
-      <a href={backHref}>
-        <ArrowLeft /> {t("dir.back")}
-      </a>
-    </Button>
-  ) : onBack ? (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="w-fit -ml-2"
-      onClick={onBack}
-    >
-      <ArrowLeft /> {t("dir.back")}
-    </Button>
-  ) : null;
+  const back = <BackLink href={backHref} onBack={onBack} />;
   if (loading)
     return (
       <section className="grid gap-6">
@@ -1404,6 +1400,32 @@ export function TeacherProfileView({
       </div>
       {error && <FormError>{error}</FormError>}
     </section>
+  );
+}
+
+function BackLink({
+  href,
+  onBack,
+}: Readonly<{ href?: string; onBack?: () => void }>) {
+  if (href)
+    return (
+      <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
+        <a href={href}>
+          <ArrowLeft /> {t("dir.back")}
+        </a>
+      </Button>
+    );
+  if (!onBack) return null;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="w-fit -ml-2"
+      onClick={onBack}
+    >
+      <ArrowLeft /> {t("dir.back")}
+    </Button>
   );
 }
 

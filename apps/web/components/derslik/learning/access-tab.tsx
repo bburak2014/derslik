@@ -1,5 +1,5 @@
 "use client";
-import { t } from "@derslik/contracts";
+import { t, type AccessInvitation } from "@derslik/contracts";
 import { backend } from "@/lib/client";
 import { Button } from "@/components/ui/button";
 import { Copy, Mail, UserCheck, UserPlus } from "lucide-react";
@@ -16,7 +16,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Label } from "@/components/ui/label";
-import { FormSuccess, ToneBadge } from "../feedback";
+import { FormSuccess, ToneBadge, type Tone } from "../feedback";
 import { type LearningCtx } from "./use-learning-panel";
 import {
   SectionHeading,
@@ -185,22 +185,8 @@ export function AccessTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
                 </ItemDescription>
               </ItemContent>
               <ItemActions className="ml-auto">
-                <ToneBadge
-                  tone={
-                    a.acceptedAt
-                      ? "ok"
-                      : a.revokedAt || expired
-                        ? "muted"
-                        : "warn"
-                  }
-                >
-                  {a.acceptedAt
-                    ? t("learn.accepted")
-                    : a.revokedAt
-                      ? t("lesson.cancelled")
-                      : expired
-                        ? t("learn.expired")
-                        : t("learn.invitePending")}
+                <ToneBadge tone={inviteTone(a, expired)}>
+                  {inviteLabel(a, expired)}
                 </ToneBadge>
                 {!a.acceptedAt && !a.revokedAt && (
                   <Button
@@ -230,4 +216,17 @@ export function AccessTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
       </ItemGroup>
     </>
   );
+}
+
+function inviteTone(a: AccessInvitation, expired: boolean): Tone {
+  if (a.acceptedAt) return "ok";
+  if (a.revokedAt || expired) return "muted";
+  return "warn";
+}
+
+function inviteLabel(a: AccessInvitation, expired: boolean) {
+  if (a.acceptedAt) return t("learn.accepted");
+  if (a.revokedAt) return t("lesson.cancelled");
+  if (expired) return t("learn.expired");
+  return t("learn.invitePending");
 }

@@ -1,4 +1,9 @@
 "use client";
+import {
+  type Assignment,
+  type Material,
+  type Submission,
+} from "@derslik/api-client";
 import { dayLabel, dateKey, canEditSubmission, t } from "@derslik/contracts";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,18 +91,7 @@ export function AssignmentsTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
         )}
         {data.assignments.map((a) => {
           const sub = data.submissions.find((s) => s.assignment_id === a.id);
-          const state: [Tone, string] =
-            a.status === "CANCELLED"
-              ? ["muted", t("lesson.cancelled")]
-              : a.status === "COMPLETED"
-                ? ["ok", t("lesson.completed")]
-                : sub
-                  ? sub.status === "REVIEWED"
-                    ? ["ok", t("learn.reviewed")]
-                    : ["info", t("learn.submitted")]
-                  : a.due_on && a.due_on < today
-                    ? ["danger", t("learn.late")]
-                    : ["warn", t("learn.awaiting")];
+          const state = assignmentState(a, sub, today);
           const files = data.materials.filter((m) => m.assignment_id === a.id);
           const editable = canEditSubmission(a, !!sub, today);
           return (
@@ -168,11 +162,7 @@ export function AssignmentsTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
                           <Paperclip />
                           <span className="truncate">{m.name}</span>
                           <span className="text-muted-foreground font-normal">
-                            {m.status !== "READY"
-                              ? t("learn.uploadPending")
-                              : m.purpose === "SUBMISSION"
-                                ? t("learn.fileSubmission")
-                                : t("learn.fileResource")}
+                            {fileLabel(m)}
                           </span>
                         </Button>
                       ))}
@@ -332,4 +322,27 @@ export function AssignmentsTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
       </ItemGroup>
     </>
   );
+}
+
+function assignmentState(
+  a: Assignment,
+  sub: Submission | undefined,
+  today: string,
+): [Tone, string] {
+  if (a.status === "CANCELLED") return ["muted", t("lesson.cancelled")];
+  if (a.status === "COMPLETED") return ["ok", t("lesson.completed")];
+  if (sub) return submissionState(sub);
+  if (a.due_on && a.due_on < today) return ["danger", t("learn.late")];
+  return ["warn", t("learn.awaiting")];
+}
+
+function submissionState(sub: Submission): [Tone, string] {
+  if (sub.status === "REVIEWED") return ["ok", t("learn.reviewed")];
+  return ["info", t("learn.submitted")];
+}
+
+function fileLabel(m: Material) {
+  if (m.status !== "READY") return t("learn.uploadPending");
+  if (m.purpose === "SUBMISSION") return t("learn.fileSubmission");
+  return t("learn.fileResource");
 }

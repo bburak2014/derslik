@@ -395,21 +395,7 @@ export function StudentDetail({
                             count: p.granted,
                           })}
                         </span>
-                        <span>
-                          {p.expires_on
-                            ? t(
-                                p.expires_on < dateKey()
-                                  ? "detail.expiredOn"
-                                  : "detail.lastDay",
-                                {
-                                  date: dayLabel(
-                                    p.expires_on + "T12:00:00+03:00",
-                                    { year: "numeric", month: "short" },
-                                  ),
-                                },
-                              )
-                            : t("detail.noExpiry")}
-                        </span>
+                        <span>{expiryLabel(p.expires_on)}</span>
                       </div>
                     </div>
                   ))
@@ -522,24 +508,12 @@ export function StudentDetail({
                   <LearningPanel
                     // Kısayoldan gelindiğinde panel yeniden kurulsun ki
                     // "Davetler" sekmesi ve form açılış anında gelsin.
-                    key={
-                      current.invite
-                        ? "invite-" + current.invite
-                        : focus?.at === current.notice
-                          ? "notice-" + current.notice
-                          : "normal"
-                    }
+                    key={learningKey(current, focus?.at)}
                     workspaceId={workspaceId}
                     studentId={student.id}
                     studentName={student.name}
                     studentPhone={student.phone}
-                    initialTab={
-                      current.invite
-                        ? "access"
-                        : focus?.at === current.notice
-                          ? "notes"
-                          : undefined
-                    }
+                    initialTab={learningTab(current, focus?.at)}
                     autoInvite={current.invite > 0}
                     focus={
                       !current.invite && focus?.at === current.notice
@@ -555,4 +529,32 @@ export function StudentDetail({
       </SheetContent>
     </Sheet>
   );
+}
+
+function expiryLabel(expiresOn: string | null) {
+  if (!expiresOn) return t("detail.noExpiry");
+  return t(expiresOn < dateKey() ? "detail.expiredOn" : "detail.lastDay", {
+    date: dayLabel(expiresOn + "T12:00:00+03:00", {
+      year: "numeric",
+      month: "short",
+    }),
+  });
+}
+
+/** Öğrenme panelinin anahtarı: kısayoldan gelindiğinde panel yeniden kurulur. */
+function learningKey(
+  current: { invite: number; notice: number },
+  focusAt: number | undefined,
+) {
+  if (current.invite) return "invite-" + current.invite;
+  if (focusAt === current.notice) return "notice-" + current.notice;
+  return "normal";
+}
+
+function learningTab(
+  current: { invite: number; notice: number },
+  focusAt: number | undefined,
+) {
+  if (current.invite) return "access";
+  return focusAt === current.notice ? "notes" : undefined;
 }

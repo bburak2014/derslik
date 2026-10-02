@@ -97,12 +97,7 @@ export function Subscription({
         </CardContent>
       </Card>
     );
-  const known = statuses[data.status];
-  const status: [Tone, string] | null = data.providerId
-    ? known
-      ? [known[0], t(known[1])]
-      : ["muted", data.status]
-    : null;
+  const status = providerStatus(data);
   return (
     <Card className="gap-5 py-5">
       <CardHeader className="px-5">
@@ -169,4 +164,11 @@ export function Subscription({
       )}
     </Card>
   );
+}
+
+function providerStatus(data: SubscriptionState): [Tone, string] | null {
+  if (!data.providerId) return null;
+  const known = statuses[data.status];
+  if (!known) return ["muted", data.status];
+  return [known[0], t(known[1])];
 }

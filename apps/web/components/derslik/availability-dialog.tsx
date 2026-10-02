@@ -170,20 +170,7 @@ function AvailabilityDialog({
           <DialogDescription>{t("booking.description")}</DialogDescription>
         </DialogHeader>
         {!form ? (
-          error ? (
-            <div className="grid gap-3">
-              <FormError>{error}</FormError>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void load()}
-              >
-                {t("common.retry")}
-              </Button>
-            </div>
-          ) : (
-            <PageLoader />
-          )
+          <LoadFallback error={error} onRetry={() => void load()} />
         ) : (
           <form onSubmit={save} className="grid gap-6">
             <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
@@ -455,6 +442,21 @@ function AvailabilityDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LoadFallback({
+  error,
+  onRetry,
+}: Readonly<{ error: string; onRetry: () => void }>) {
+  if (!error) return <PageLoader />;
+  return (
+    <div className="grid gap-3">
+      <FormError>{error}</FormError>
+      <Button type="button" variant="outline" onClick={onRetry}>
+        {t("common.retry")}
+      </Button>
+    </div>
   );
 }
 

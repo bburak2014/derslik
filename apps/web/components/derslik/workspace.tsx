@@ -383,13 +383,12 @@ export default function Workspace({
     }
   }
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
-  const focusedView = showcaseFocus
-    ? "showcase"
-    : calendarFocus
-      ? "calendar"
-      : chatFocus
-        ? "messages"
-        : hubFocus?.section;
+  const focusedView = focusedViewOf(
+    showcaseFocus,
+    calendarFocus,
+    chatFocus,
+    hubFocus?.section,
+  );
   const focusedUrl =
     focusedView === "messages"
       ? chatSearch(chat.thread, chat.student)
@@ -586,20 +585,10 @@ export default function Workspace({
               <Button
                 size="lg"
                 disabled={loading || busy}
-                onClick={() =>
-                  view === "students"
-                    ? setModal({ type: "student" })
-                    : view === "payments"
-                      ? actions.newPayment()
-                      : actions.newLesson()
-                }
+                onClick={() => addRecord(view, actions, setModal)}
               >
                 <Plus />
-                {view === "students"
-                  ? t("ws.addStudent")
-                  : view === "payments"
-                    ? t("ws.addPayment")
-                    : t("ws.planLesson")}
+                {addLabel(view)}
               </Button>
             )}
           </div>
@@ -814,4 +803,34 @@ export default function Workspace({
       <Toaster position="bottom-right" richColors closeButton />
     </SidebarProvider>
   );
+}
+
+/** Adres çubuğuna yazılacak görünüm: açık bildirim vurgusunun sayfası. */
+function focusedViewOf(
+  showcaseFocus: { id: string | null; at: number } | null,
+  calendarFocus: boolean,
+  chatFocus: number,
+  hubSection: NoticeFocus["section"] | undefined,
+) {
+  if (showcaseFocus) return "showcase";
+  if (calendarFocus) return "calendar";
+  if (chatFocus) return "messages";
+  return hubSection;
+}
+
+/** Üstteki ekle düğmesi: görünüme göre öğrenci, ödeme ya da ders formu. */
+function addRecord(
+  view: View,
+  actions: Actions,
+  setModal: (modal: ModalState) => void,
+) {
+  if (view === "students") setModal({ type: "student" });
+  else if (view === "payments") actions.newPayment();
+  else actions.newLesson();
+}
+
+function addLabel(view: View) {
+  if (view === "students") return t("ws.addStudent");
+  if (view === "payments") return t("ws.addPayment");
+  return t("ws.planLesson");
 }

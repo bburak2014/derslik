@@ -890,20 +890,8 @@ export function StudentsView({
       ) : (
         <Empty
           icon={search ? Search : Users}
-          title={
-            search
-              ? t("students.noMatch")
-              : filter === "archive"
-                ? t("students.archiveEmpty")
-                : t("students.startTitle")
-          }
-          text={
-            search
-              ? t("students.noMatchHint")
-              : filter === "archive"
-                ? t("students.archiveEmptyHint")
-                : t("students.startHint")
-          }
+          title={noStudentsTitle(search, filter)}
+          text={noStudentsText(search, filter)}
           action={
             !search && filter === "active" ? (
               <Button onClick={onAdd}>
@@ -915,6 +903,18 @@ export function StudentsView({
       )}
     </section>
   );
+}
+
+function noStudentsTitle(search: string, filter: string) {
+  if (search) return t("students.noMatch");
+  if (filter === "archive") return t("students.archiveEmpty");
+  return t("students.startTitle");
+}
+
+function noStudentsText(search: string, filter: string) {
+  if (search) return t("students.noMatchHint");
+  if (filter === "archive") return t("students.archiveEmptyHint");
+  return t("students.startHint");
 }
 
 export function PaymentsView({

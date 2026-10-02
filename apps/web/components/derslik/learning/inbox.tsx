@@ -184,19 +184,10 @@ export function AccountExtras({
     setOpen(false);
     onOpen?.(target);
   }
-  const list = loading ? (
-    <div className="grid gap-4 p-4" aria-hidden="true">
-      {[0, 1, 2].map((i) => (
-        <div className="flex gap-3" key={i}>
-          <Skeleton className="size-8 rounded-full" />
-          <div className="grid flex-1 gap-2">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-3 w-full" />
-          </div>
-        </div>
-      ))}
-    </div>
-  ) : inbox.length ? (
+  const placeholder = loading || !inbox.length;
+  const list = placeholder ? (
+    <InboxPlaceholder loading={loading} />
+  ) : (
     <ul className="divide-y">
       {inbox.map((n) => {
         const target = onOpen ? noticeTarget(n) : null;
@@ -280,16 +271,6 @@ export function AccountExtras({
         );
       })}
     </ul>
-  ) : (
-    <Empty className="py-16">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <BellOff />
-        </EmptyMedia>
-        <EmptyTitle className="text-base">{t("inbox.empty")}</EmptyTitle>
-        <EmptyDescription>{t("inbox.emptyHint")}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
   );
   const usage = (
     <div className="grid gap-4 p-4">
@@ -453,5 +434,34 @@ export function AccountExtras({
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+/** Liste yüklenirken iskelet, yüklenince boşsa boş durum. */
+function InboxPlaceholder({ loading }: Readonly<{ loading: boolean }>) {
+  if (loading)
+    return (
+      <div className="grid gap-4 p-4" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <div className="flex gap-3" key={i}>
+            <Skeleton className="size-8 rounded-full" />
+            <div className="grid flex-1 gap-2">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  return (
+    <Empty className="py-16">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <BellOff />
+        </EmptyMedia>
+        <EmptyTitle className="text-base">{t("inbox.empty")}</EmptyTitle>
+        <EmptyDescription>{t("inbox.emptyHint")}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

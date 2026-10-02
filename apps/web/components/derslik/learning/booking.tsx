@@ -175,11 +175,7 @@ function BookingDialog({
             genişletmesin. */}
         <div className="flex h-80 min-w-0 flex-col gap-3">
           {!slots ? (
-            error ? (
-              <FormError>{error}</FormError>
-            ) : (
-              <BookingSkeleton />
-            )
+            <BookingPending error={error} />
           ) : (
             <>
               <p className="text-muted-foreground line-clamp-2 flex-none text-sm">
@@ -189,145 +185,270 @@ function BookingDialog({
                   t("booking.freeCredits", { count: slots.freeCredits }),
                 ].join(" · ")}
               </p>
-              {slots.freeCredits < 1 ? (
-                <EmptyNote icon={Wallet} title={t("booking.noCredits")}>
-                  {t("booking.noCreditsHint")}
-                  {onOpenMessages && (
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 ps-1"
-                      onClick={() => {
-                        onClose();
-                        onOpenMessages();
-                      }}
-                    >
-                      {t("booking.writeTeacher")}
-                    </Button>
-                  )}
-                </EmptyNote>
-              ) : !current ? (
-                <EmptyNote icon={CalendarDays} title={t("booking.noSlots")}>
-                  {t("booking.noSlotsHint")}
-                </EmptyNote>
-              ) : chosen ? (
-                <div className="flex min-h-0 flex-1 flex-col gap-4">
-                  <Item variant="outline">
-                    <ItemMedia variant="icon">
-                      <CalendarDays />
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle>
-                        {dayLabel(chosen.startsAt, { weekday: "long" })}
-                        {" · "}
-                        {timeLabel(chosen.startsAt)}–{timeLabel(chosen.endsAt)}
-                      </ItemTitle>
-                      <ItemDescription>
-                        {slots.location || t("lesson.noLocation")}
-                      </ItemDescription>
-                    </ItemContent>
-                  </Item>
-                  <p className="text-muted-foreground text-sm">
-                    {until
-                      ? t("booking.cancelUntil", {
-                          time: dayTimeLabel(until.toISOString()),
-                        })
-                      : t("booking.cancelNotAllowed")}
-                  </p>
-                  {error && <FormError>{error}</FormError>}
-                  <DialogFooter className="mt-auto">
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => setChosen(null)}
-                    >
-                      {t("booking.back")}
-                    </Button>
-                    <Button disabled={busy} onClick={() => void book()}>
-                      {t("booking.confirm")}
-                    </Button>
-                  </DialogFooter>
-                </div>
-              ) : (
-                <>
-                  <div
-                    role="group"
-                    aria-label={t("booking.pickDay")}
-                    className="flex flex-none gap-2 overflow-x-auto pb-1"
-                  >
-                    {days.map((d) => {
-                      const on = d.day === current.day,
-                        hasLesson = booked.has(d.day);
-                      return (
-                        <Button
-                          key={d.day}
-                          type="button"
-                          size="sm"
-                          className={cn(
-                            "flex-none",
-                            hasLesson &&
-                              !on &&
-                              "border-(--warn-line) bg-(--warn-soft) text-(--warn) hover:bg-(--warn-soft) hover:text-(--warn)",
-                          )}
-                          variant={on ? "default" : "outline"}
-                          aria-pressed={on}
-                          onClick={() => setDay(d.day)}
-                        >
-                          {dayLabel(d.day + "T12:00:00+03:00", {
-                            weekday: "short",
-                            month: "short",
-                          })}
-                          {hasLesson && (
-                            <span className="sr-only">
-                              {" · "}
-                              {t("booking.hasLesson")}
-                            </span>
-                          )}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  {dayLessons && (
-                    <p className="flex flex-none items-start gap-2 rounded-md border border-(--warn-line) bg-(--warn-soft) px-3 py-2 text-sm text-(--warn)">
-                      <TriangleAlert
-                        className="mt-0.5 size-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      {t("booking.dayHasLessons", {
-                        times: dayLessons.join(", "),
-                      })}
-                    </p>
-                  )}
-                  {/* Gün değişince alan baştan açılır (kaydırma sıfırlanır). */}
-                  <div
-                    key={current.day}
-                    role="group"
-                    aria-label={t("booking.pickTime")}
-                    className="min-h-0 flex-1 overflow-y-auto"
-                  >
-                    <div className="grid grid-cols-3 gap-2 p-0.5 sm:grid-cols-4">
-                      {current.slots.map((s) => (
-                        <Button
-                          key={s.startsAt}
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setChosen(s);
-                            setChosenAt(Date.now());
-                          }}
-                        >
-                          {timeLabel(s.startsAt)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  {error && <FormError>{error}</FormError>}
-                </>
-              )}
+              <BookingStep
+                slots={slots}
+                days={days}
+                current={current}
+                chosen={chosen}
+                until={until}
+                booked={booked}
+                dayLessons={dayLessons}
+                error={error}
+                busy={busy}
+                onClose={onClose}
+                onOpenMessages={onOpenMessages}
+                onDay={setDay}
+                onPick={(slot) => {
+                  setChosen(slot);
+                  setChosenAt(Date.now());
+                }}
+                onBack={() => setChosen(null)}
+                onConfirm={() => void book()}
+              />
             </>
           )}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Saatler gelene kadar: yükleme hatası ya da iskelet. */
+function BookingPending({ error }: Readonly<{ error: string }>) {
+  if (error) return <FormError>{error}</FormError>;
+  return <BookingSkeleton />;
+}
+
+type SlotDay = { day: string; slots: BookingSlot[] };
+
+/** Gövdenin adımı: hak yok, boş saat yok, onay ya da gün ve saat seçimi. */
+function BookingStep({
+  slots,
+  days,
+  current,
+  chosen,
+  until,
+  booked,
+  dayLessons,
+  error,
+  busy,
+  onClose,
+  onOpenMessages,
+  onDay,
+  onPick,
+  onBack,
+  onConfirm,
+}: Readonly<{
+  slots: BookingSlots;
+  days: readonly SlotDay[];
+  current: SlotDay | undefined;
+  chosen: BookingSlot | null;
+  until: Date | null;
+  booked: ReadonlyMap<string, string[]>;
+  dayLessons: string[] | undefined;
+  error: string;
+  busy: boolean;
+  onClose: () => void;
+  onOpenMessages?: () => void;
+  onDay: (day: string) => void;
+  onPick: (slot: BookingSlot) => void;
+  onBack: () => void;
+  onConfirm: () => void;
+}>) {
+  if (slots.freeCredits < 1)
+    return (
+      <EmptyNote icon={Wallet} title={t("booking.noCredits")}>
+        {t("booking.noCreditsHint")}
+        {onOpenMessages && (
+          <Button
+            variant="link"
+            className="h-auto p-0 ps-1"
+            onClick={() => {
+              onClose();
+              onOpenMessages();
+            }}
+          >
+            {t("booking.writeTeacher")}
+          </Button>
+        )}
+      </EmptyNote>
+    );
+  if (!current)
+    return (
+      <EmptyNote icon={CalendarDays} title={t("booking.noSlots")}>
+        {t("booking.noSlotsHint")}
+      </EmptyNote>
+    );
+  if (chosen)
+    return (
+      <BookingConfirm
+        chosen={chosen}
+        location={slots.location}
+        until={until}
+        error={error}
+        busy={busy}
+        onBack={onBack}
+        onConfirm={onConfirm}
+      />
+    );
+  return (
+    <SlotPicker
+      days={days}
+      current={current}
+      booked={booked}
+      dayLessons={dayLessons}
+      error={error}
+      onDay={onDay}
+      onPick={onPick}
+    />
+  );
+}
+
+/** Seçilen saatin onayı: saat, konum ve iptal süresi notu. */
+function BookingConfirm({
+  chosen,
+  location,
+  until,
+  error,
+  busy,
+  onBack,
+  onConfirm,
+}: Readonly<{
+  chosen: BookingSlot;
+  location: string;
+  until: Date | null;
+  error: string;
+  busy: boolean;
+  onBack: () => void;
+  onConfirm: () => void;
+}>) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <Item variant="outline">
+        <ItemMedia variant="icon">
+          <CalendarDays />
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle>
+            {dayLabel(chosen.startsAt, { weekday: "long" })}
+            {" · "}
+            {timeLabel(chosen.startsAt)}–{timeLabel(chosen.endsAt)}
+          </ItemTitle>
+          <ItemDescription>
+            {location || t("lesson.noLocation")}
+          </ItemDescription>
+        </ItemContent>
+      </Item>
+      <p className="text-muted-foreground text-sm">
+        {until
+          ? t("booking.cancelUntil", {
+              time: dayTimeLabel(until.toISOString()),
+            })
+          : t("booking.cancelNotAllowed")}
+      </p>
+      {error && <FormError>{error}</FormError>}
+      <DialogFooter className="mt-auto">
+        <Button variant="outline" disabled={busy} onClick={onBack}>
+          {t("booking.back")}
+        </Button>
+        <Button disabled={busy} onClick={onConfirm}>
+          {t("booking.confirm")}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+/** Gün düğmeleri ve seçili günün saatleri. */
+function SlotPicker({
+  days,
+  current,
+  booked,
+  dayLessons,
+  error,
+  onDay,
+  onPick,
+}: Readonly<{
+  days: readonly SlotDay[];
+  current: SlotDay;
+  booked: ReadonlyMap<string, string[]>;
+  dayLessons: string[] | undefined;
+  error: string;
+  onDay: (day: string) => void;
+  onPick: (slot: BookingSlot) => void;
+}>) {
+  return (
+    <>
+      <div
+        role="group"
+        aria-label={t("booking.pickDay")}
+        className="flex flex-none gap-2 overflow-x-auto pb-1"
+      >
+        {days.map((d) => {
+          const on = d.day === current.day,
+            hasLesson = booked.has(d.day);
+          return (
+            <Button
+              key={d.day}
+              type="button"
+              size="sm"
+              className={cn(
+                "flex-none",
+                hasLesson &&
+                  !on &&
+                  "border-(--warn-line) bg-(--warn-soft) text-(--warn) hover:bg-(--warn-soft) hover:text-(--warn)",
+              )}
+              variant={on ? "default" : "outline"}
+              aria-pressed={on}
+              onClick={() => onDay(d.day)}
+            >
+              {dayLabel(d.day + "T12:00:00+03:00", {
+                weekday: "short",
+                month: "short",
+              })}
+              {hasLesson && (
+                <span className="sr-only">
+                  {" · "}
+                  {t("booking.hasLesson")}
+                </span>
+              )}
+            </Button>
+          );
+        })}
+      </div>
+      {dayLessons && (
+        <p className="flex flex-none items-start gap-2 rounded-md border border-(--warn-line) bg-(--warn-soft) px-3 py-2 text-sm text-(--warn)">
+          <TriangleAlert
+            className="mt-0.5 size-4 shrink-0"
+            aria-hidden="true"
+          />
+          {t("booking.dayHasLessons", {
+            times: dayLessons.join(", "),
+          })}
+        </p>
+      )}
+      {/* Gün değişince alan baştan açılır (kaydırma sıfırlanır). */}
+      <div
+        key={current.day}
+        role="group"
+        aria-label={t("booking.pickTime")}
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
+        <div className="grid grid-cols-3 gap-2 p-0.5 sm:grid-cols-4">
+          {current.slots.map((s) => (
+            <Button
+              key={s.startsAt}
+              type="button"
+              variant="outline"
+              onClick={() => onPick(s)}
+            >
+              {timeLabel(s.startsAt)}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {error && <FormError>{error}</FormError>}
+    </>
   );
 }
 

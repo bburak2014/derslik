@@ -135,22 +135,8 @@ export function AuthForm({
           <span className="eyebrow">{upper(t("auth.account"))}</span>
           <LanguageSelect className="w-auto" />
         </div>
-        <h2 id="auth-title">
-          {mode === "signin"
-            ? t("auth.signinTitle")
-            : mode === "signup"
-              ? t("auth.signupTitle")
-              : mode === "recover"
-                ? t("auth.recoverTitle")
-                : t("auth.passwordTitle")}
-        </h2>
-        <p>
-          {mode === "signin"
-            ? t("auth.signinText")
-            : mode === "signup"
-              ? t("auth.signupText")
-              : t("auth.recoverText")}
-        </p>
+        <h2 id="auth-title">{authTitle(mode)}</h2>
+        <p>{authText(mode)}</p>
         <div className="grid gap-6">
           {(mode === "signin" || mode === "signup") && (
             <>
@@ -335,15 +321,7 @@ export function AuthForm({
             {message && <FormSuccess>{message}</FormSuccess>}
             <Button type="submit" className="w-full" disabled={!!busy}>
               {busy === "email" && <Spinner />}
-              {busy === "email"
-                ? t("auth.processing")
-                : mode === "signin"
-                  ? t("auth.signIn")
-                  : mode === "signup"
-                    ? t("auth.signUp")
-                    : mode === "recover"
-                      ? t("auth.sendReset")
-                      : t("auth.savePassword")}
+              {busy === "email" ? t("auth.processing") : submitLabel(mode)}
               {busy !== "email" && <ArrowRight />}
             </Button>
           </form>
@@ -379,4 +357,24 @@ export function AuthForm({
       </section>
     </main>
   );
+}
+
+function authTitle(mode: string) {
+  if (mode === "signin") return t("auth.signinTitle");
+  if (mode === "signup") return t("auth.signupTitle");
+  if (mode === "recover") return t("auth.recoverTitle");
+  return t("auth.passwordTitle");
+}
+
+function authText(mode: string) {
+  if (mode === "signin") return t("auth.signinText");
+  if (mode === "signup") return t("auth.signupText");
+  return t("auth.recoverText");
+}
+
+function submitLabel(mode: string) {
+  if (mode === "signin") return t("auth.signIn");
+  if (mode === "signup") return t("auth.signUp");
+  if (mode === "recover") return t("auth.sendReset");
+  return t("auth.savePassword");
 }
