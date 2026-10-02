@@ -103,7 +103,7 @@ export function VideoPlayer({
   }, [video.id, mediaPath]);
   return (
     <div>
-      <video
+      <video // NOSONAR: öğretmenin yüklediği videoların altyazı dosyası yok; altyazı desteği ayrı bir iş.
         ref={ref}
         controls
         playsInline
@@ -119,9 +119,9 @@ export function VideoPlayer({
         }}
       />
       {!ready && !error && (
-        <p role="status" className="player-loading">
+        <output className="player-loading">
           <Spinner /> {t("video.opening")}
-        </p>
+        </output>
       )}
       {error && <FormError>{error}</FormError>}
       {canAsk && (

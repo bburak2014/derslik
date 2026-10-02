@@ -20,8 +20,8 @@ export function Flag({
         className,
       )}
     >
-      {flag.shapes.map((shape, i) => (
-        <path key={i} d={shape.d} fill={shape.fill} />
+      {flag.shapes.map((shape) => (
+        <path key={shape.d} d={shape.d} fill={shape.fill} />
       ))}
     </svg>
   );

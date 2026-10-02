@@ -107,8 +107,8 @@ export function VideosTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
                       file.name,
                       file.size,
                       file.lastModified,
-                      f.get("title"),
-                      f.get("duration"),
+                      formText(f, "title"),
+                      formText(f, "duration"),
                       lesson,
                       studentId,
                     ].join(":");

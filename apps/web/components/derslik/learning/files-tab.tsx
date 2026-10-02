@@ -194,7 +194,7 @@ export function FilesTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
                   }
                   icon={<Trash2 />}
                   disabled={busy}
-                  onClick={() => void remove(file)}
+                  onClick={() => remove(file)}
                 />
               )}
             </ItemActions>

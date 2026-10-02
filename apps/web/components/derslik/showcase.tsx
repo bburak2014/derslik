@@ -106,7 +106,7 @@ async function squarePhoto(file: File) {
       const bytes = new Uint8Array(await blob.arrayBuffer());
       let binary = "";
       for (let i = 0; i < bytes.length; i += 0x8000)
-        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        binary += String.fromCodePoint(...bytes.subarray(i, i + 0x8000));
       return btoa(binary);
     }
   }

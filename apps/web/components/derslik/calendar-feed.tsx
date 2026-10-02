@@ -148,13 +148,10 @@ export function CalendarFeedButton({
                 </Button>
               </div>
               {copied && (
-                <p
-                  role="status"
-                  className="flex items-center gap-1.5 text-xs text-(--ok)"
-                >
+                <output className="flex items-center gap-1.5 text-xs text-(--ok)">
                   <Check className="size-3.5 shrink-0" />
                   {t("calendar.feedCopied")}
-                </p>
+                </output>
               )}
             </div>
             {notice && <FormSuccess>{notice}</FormSuccess>}

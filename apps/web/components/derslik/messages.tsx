@@ -262,7 +262,10 @@ function ChatAvatar({ thread }: Readonly<{ thread: MessageThread }>) {
   const name =
     thread.viewer === "SELF" ? thread.teacherName : thread.studentName;
   const tint =
-    tints[Array.from(name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4];
+    tints[
+      Array.from(name).reduce((sum, ch) => sum + (ch.codePointAt(0) ?? 0), 0) %
+        4
+    ];
   if (thread.viewer === "OWNER" && thread.role === "GUARDIAN")
     return (
       <span className="avatar lavender" aria-hidden="true">
@@ -840,7 +843,7 @@ function Conversation({
     [problem, setProblem] = useState(""),
     [older, setOlder] = useState(false),
     // Yarım kalan metin yazışmanın yoluna göre saklanır (oturum kapanınca silinir).
-    [draft, setDraftState] = useState(() => getChatDraft(path) ?? ""),
+    [draft, setDraft] = useState(() => getChatDraft(path) ?? ""),
     [sending, setSending] = useState(false),
     // Ekran okuyucuya yalnızca yeni gelen mesajlar okunur.
     [announce, setAnnounce] = useState(""),
@@ -887,7 +890,7 @@ function Conversation({
     async (shown: Page) => {
       if (!alive.current || reading.current) return;
       reading.current = true;
-      const upTo = shown.messages[shown.messages.length - 1]?.createdAt;
+      const upTo = shown.messages.at(-1)?.createdAt;
       try {
         await backend(path + "/read", upTo ? { upTo } : {});
         upsert(linkId, { ...shown.thread, unread: 0 });
@@ -1015,8 +1018,8 @@ function Conversation({
       if (alive.current) setOlder(false);
     }
   }
-  function setDraft(value: string) {
-    setDraftState(value);
+  function changeDraft(value: string) {
+    setDraft(value);
     setChatDraft(path, value);
     // Metin değişti: bekleyen anahtar artık bu metne ait değil.
     if (sendKey.current && sendKey.current.text !== cleanMessage(value))
@@ -1060,7 +1063,7 @@ function Conversation({
       scroll.current = "bottom";
       setPage((p) => (p ? { ...p, messages: merge(p.messages, [mine]) } : p));
       // Gönderim sürerken yeni bir şey yazıldıysa o kutuda kalır.
-      if (getChatDraft(path) === undefined) setDraftState("");
+      if (getChatDraft(path) === undefined) setDraft("");
       input.current?.focus();
     } catch (e) {
       failSend(e, attempt, typed);
@@ -1163,7 +1166,7 @@ function Conversation({
               ref={input}
               rows={1}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => changeDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (
                   e.key !== "Enter" ||

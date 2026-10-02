@@ -1,12 +1,12 @@
 "use client";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { t } from "@derslik/contracts";
 
 // Yüklenme göstergeleri tek yerden gelsin diye burada toplandı: sayfa ve
 // bölümler PageLoader, butonlar ve satır içi durumlar Spinner kullanır.
 // Böylece her ekranda aynı simge ve aynı ritim görünür.
-export { Skeleton, Spinner };
+export { Skeleton } from "@/components/ui/skeleton";
+export { Spinner };
 
 /**
  * Sayfa ya da bölüm yüklenirken alanın ortasında dönen simge.
@@ -16,12 +16,11 @@ export function PageLoader({
   compact = false,
 }: Readonly<{ compact?: boolean }>) {
   return (
-    <div
+    <output
       className={"loading-state" + (compact ? " is-compact" : "")}
-      role="status"
       aria-label={t("common.loading")}
     >
       <Spinner className="loading-spinner" />
-    </div>
+    </output>
   );
 }

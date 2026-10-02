@@ -309,7 +309,10 @@ function AvailabilityDialog({
                 </p>
               )}
               {form.blocks.map((block, index) => (
-                <div key={index} className="grid gap-1">
+                <div
+                  key={index} // NOSONAR: kapalı gün satırlarının kimliği yok ve alanları düzenlenebilir; içerikten anahtar yazarken satırı yeniden kurup odağı düşürür. Liste kontrollü, yalnızca ekle/sil ile değişir.
+                  className="grid gap-1"
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <Input
                       type="date"

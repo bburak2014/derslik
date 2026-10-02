@@ -32,11 +32,13 @@ function loadTurnstile() {
     script.src = SCRIPT;
     script.async = true;
     script.onload = () =>
-      window.turnstile ? resolve(window.turnstile) : reject(new Error());
+      window.turnstile
+        ? resolve(window.turnstile)
+        : reject(new Error("Turnstile betiği yüklenemedi."));
     script.onerror = () => {
       loading = null;
       script.remove();
-      reject(new Error());
+      reject(new Error("Turnstile betiği yüklenemedi."));
     };
     document.head.appendChild(script);
   });

@@ -1,7 +1,7 @@
 "use client";
 import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras, type NoticeFocus } from "./learning-panel";
-import { t, upper, type MessageKey } from "@derslik/contracts";
+import { t, upper, type MessageKey, type Showcase } from "@derslik/contracts";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { workspaceResponse } from "@/lib/workspace-prefetch";
 import {
@@ -30,7 +30,6 @@ import {
 } from "./messages";
 import { SidebarAccount, Topbar } from "./shell";
 import { backend } from "@/lib/client";
-import type { Showcase } from "@derslik/contracts";
 import { Button } from "@/components/ui/button";
 import { PageLoader, Spinner } from "@/components/derslik/loading";
 import {

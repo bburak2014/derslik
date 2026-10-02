@@ -119,7 +119,7 @@ export function TeacherPhoto({
       />
     );
   const idx =
-    Array.from(name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4;
+    Array.from(name).reduce((sum, ch) => sum + (ch.codePointAt(0) ?? 0), 0) % 4;
   return (
     <span className={`avatar ${tint[idx]}`} style={style} aria-hidden="true">
       {name
@@ -555,10 +555,9 @@ export function TeacherDirectory({
         </div>
         {/* Tek satır, gerekirse yana kayar: seçici metinleri sayfa açıldıktan
             sonra dolunca satır ikiye bölünüp kartları aşağı itmesin (CLS). */}
-        <div
-          role="group"
+        <fieldset
           aria-label={t("dir.filters")}
-          className="bg-muted/40 flex items-center gap-2 overflow-x-auto border-t px-4 py-3 sm:px-5"
+          className="bg-muted/40 flex min-w-0 items-center gap-2 overflow-x-auto border-t px-4 py-3 sm:px-5"
         >
           {pill(
             <BookOpen />,
@@ -634,7 +633,7 @@ export function TeacherDirectory({
               <X /> {t("dir.clearFilters")}
             </Button>
           )}
-        </div>
+        </fieldset>
       </Card>
       {error && <FormError>{error}</FormError>}
       {relations?.teacherAccount && (

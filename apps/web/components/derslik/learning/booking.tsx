@@ -379,10 +379,9 @@ function SlotPicker({
 }>) {
   return (
     <>
-      <div
-        role="group"
+      <fieldset
         aria-label={t("booking.pickDay")}
-        className="flex flex-none gap-2 overflow-x-auto pb-1"
+        className="flex min-w-0 flex-none gap-2 overflow-x-auto pb-1"
       >
         {days.map((d) => {
           const on = d.day === current.day,
@@ -415,7 +414,7 @@ function SlotPicker({
             </Button>
           );
         })}
-      </div>
+      </fieldset>
       {dayLessons && (
         <p className="flex flex-none items-start gap-2 rounded-md border border-(--warn-line) bg-(--warn-soft) px-3 py-2 text-sm text-(--warn)">
           <TriangleAlert
@@ -428,11 +427,10 @@ function SlotPicker({
         </p>
       )}
       {/* Gün değişince alan baştan açılır (kaydırma sıfırlanır). */}
-      <div
+      <fieldset
         key={current.day}
-        role="group"
         aria-label={t("booking.pickTime")}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto"
       >
         <div className="grid grid-cols-3 gap-2 p-0.5 sm:grid-cols-4">
           {current.slots.map((s) => (
@@ -446,7 +444,7 @@ function SlotPicker({
             </Button>
           ))}
         </div>
-      </div>
+      </fieldset>
       {error && <FormError>{error}</FormError>}
     </>
   );
@@ -455,9 +453,8 @@ function SlotPicker({
 /** Saatler gelene kadar gövdenin son düzeni: özet, gün düğmeleri, saatler. */
 function BookingSkeleton() {
   return (
-    <div
+    <output
       className="grid content-start gap-3"
-      role="status"
       aria-label={t("common.loading")}
     >
       <Skeleton className="h-5 w-56 max-w-full" />
@@ -471,7 +468,7 @@ function BookingSkeleton() {
           <Skeleton key={i} className="h-9" />
         ))}
       </div>
-    </div>
+    </output>
   );
 }
 

@@ -404,9 +404,8 @@ export function Portal({
       setChatFocus(0);
     } else if (
       target.section === "messages" &&
-      access &&
-      target.workspaceId === access.id &&
-      target.studentId === access.studentId
+      access?.id === target.workspaceId &&
+      access.studentId === target.studentId
     ) {
       // Mesaj bildirimi: Mesajlar sayfasında o yazışma açılır.
       setAppliedFocus(target.at);
@@ -419,9 +418,8 @@ export function Portal({
     } else if (
       target.section !== "requests" &&
       target.section !== "messages" &&
-      access &&
-      target.workspaceId === access.id &&
-      target.studentId === access.studentId
+      access?.id === target.workspaceId &&
+      access.studentId === target.studentId
     ) {
       setAppliedFocus(target.at);
       setTab(target.section);

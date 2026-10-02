@@ -73,7 +73,9 @@ export function useLearningPanel({
     [loading, setLoading] = useState(true),
     [confirmation, setConfirmation] = useState<Confirmation | null>(null),
     [error, setError] = useState(""),
-    [selectedTab, setTab] = useState(view ?? initialTab ?? "assignments"),
+    [selectedTab, setSelectedTab] = useState(
+      view ?? initialTab ?? "assignments",
+    ),
     [shownView, setShownView] = useState(view),
     // Davet kısayolu formu ilk render'da açar; effect ile açmak fazladan bir
     // render turu ve yanıp sönme demek olurdu.
@@ -98,7 +100,7 @@ export function useLearningPanel({
   // render instead of in an effect avoids a second render pass).
   if (view !== shownView) {
     setShownView(view);
-    if (view) setTab(view);
+    if (view) setSelectedTab(view);
   }
   // Aynı bildirim ikinci kez kaydırmasın diye işlenen tıklamanın zamanı.
   const focused = useRef(0),
@@ -359,7 +361,7 @@ export function useLearningPanel({
     error,
     setError,
     selectedTab,
-    setTab,
+    setTab: setSelectedTab,
     shownView,
     setShownView,
     form,

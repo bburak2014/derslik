@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 async function owner() {
   const { client } = await serverSession();
   const { active } = await selectedAccess(client);
-  if (!active || active.role !== "OWNER")
+  if (active?.role !== "OWNER")
     throw new HttpError(403, "web.teacherWorkspaceRequired");
   return { client, workspaceId: active.id };
 }

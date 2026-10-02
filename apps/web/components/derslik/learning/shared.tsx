@@ -354,14 +354,14 @@ export type PortalLesson = PortalData["lessons"][number];
 export function LessonSchedule({
   lessons,
   children,
-  extra,
+  renderExtra,
 }: Readonly<{
   lessons: PortalLesson[];
   /** Başlığın yanındaki düğmeler (yenile). */
   children?: React.ReactNode;
   /** Dersin yanındaki ek öğe (ayarlama etiketi, iptal). `now` bileşenin
    *  dakikada bir ilerleyen saatidir. */
-  extra?: (lesson: PortalLesson, now: number) => React.ReactNode;
+  renderExtra?: (lesson: PortalLesson, now: number) => React.ReactNode;
 }>) {
   // Süren dersi ve "bugün/yarın" etiketini güncel tutmak için dakikada bir
   // ilerleyen saat; öğretmen günlüğündeki ders satırlarıyla aynı yaklaşım.
@@ -413,7 +413,7 @@ export function LessonSchedule({
               key={l.id}
               lesson={l}
               day={day(l.starts_at)}
-              extra={extra?.(l, clock)}
+              extra={renderExtra?.(l, clock)}
               chip={nextChip(l.starts_at, i, clock)}
             />
           ))
@@ -440,7 +440,7 @@ export function LessonSchedule({
                 lesson={l}
                 day={day(l.starts_at)}
                 status
-                extra={extra?.(l, clock)}
+                extra={renderExtra?.(l, clock)}
               />
             ))}
           </ItemGroup>

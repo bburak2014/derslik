@@ -15,7 +15,8 @@ type ModelContext = {
       description: string;
       inputSchema: object;
       annotations: { readOnlyHint: boolean; untrustedContentHint: boolean };
-      execute: (input: unknown) => unknown | Promise<unknown>;
+      /** Düz değer ya da söz (Promise) döndürebilir. */
+      execute: (input: unknown) => unknown;
     },
     options: { signal: AbortSignal },
   ) => void | Promise<void>;

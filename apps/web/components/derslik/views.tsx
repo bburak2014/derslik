@@ -108,7 +108,10 @@ export function StudentAvatar({
 }>) {
   const colors = ["sage", "peach", "lavender", "blue"];
   const idx =
-    Array.from(student.name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4;
+    Array.from(student.name).reduce(
+      (sum, ch) => sum + (ch.codePointAt(0) ?? 0),
+      0,
+    ) % 4;
   return (
     <span className={`avatar ${colors[idx]} ${large ? "avatar-large" : ""}`}>
       {student.name

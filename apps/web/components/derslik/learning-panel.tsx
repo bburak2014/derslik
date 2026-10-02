@@ -136,7 +136,7 @@ export function LearningPanel(props: Readonly<LearningPanelProps>) {
       {tab === "lessons" && "lessons" in data && (
         <LessonSchedule
           lessons={data.lessons}
-          extra={(lesson, now) =>
+          renderExtra={(lesson, now) =>
             lesson.booked_by ? (
               <BookedLessonExtra ctx={ctx} lesson={lesson} now={now} />
             ) : null
