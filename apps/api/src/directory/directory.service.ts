@@ -8,7 +8,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
-import type { PoolClient } from "pg";
+import type { PoolClient, QueryResultRow } from "pg";
 import { z } from "zod";
 import type { Actor } from "../auth/auth.guard.js";
 import { confirmedEmail } from "../auth/confirmed-email.js";
@@ -101,6 +101,63 @@ function imageMatches(bytes: Buffer, mime: string) {
     bytes.subarray(0, 4).toString("latin1") === "RIFF" &&
     bytes.subarray(8, 12).toString("latin1") === "WEBP"
   );
+}
+
+/** Kabul: isteyen öğretmen değilse bağlantıyı kuran SQL işlevi çalışır. */
+async function acceptRequest(
+  tx: PoolClient,
+  request: string,
+  row: QueryResultRow,
+): Promise<Record<string, unknown>> {
+  // İsteyen aynı anda çalışma alanı açıyorsa ikisi sıraya girer.
+  const requesterId = (
+    await tx.query("SELECT user_id FROM derslik.lesson_requests WHERE id=$1", [
+      request,
+    ])
+  ).rows[0].user_id as string;
+  await lockAccountRole(tx, requesterId);
+  const requester = (
+    await tx.query("SELECT derslik.is_teacher_account($1) AS teacher", [
+      requesterId,
+    ])
+  ).rows[0];
+  if (requester.teacher) throw new ConflictException("api.requesterIsTeacher");
+  const label = /^[a-z]+$/.test(row.subject)
+    ? apiText(`dir.subject.${row.subject}` as never)
+    : row.subject;
+  try {
+    // Aynı işlem içindeki hata tüm işlemi geri alır; savepoint gerekmez.
+    return (
+      await tx.query("SELECT derslik.accept_lesson_request($1,$2) AS data", [
+        request,
+        label,
+      ])
+    ).rows[0].data;
+  } catch (error) {
+    const hint = (error as { hint?: string }).hint;
+    if (hint === "limit")
+      throw new ConflictException("api.studentLimitReached");
+    if (hint === "decided") throw new ConflictException("api.requestDecided");
+    throw error;
+  }
+}
+
+/** Ret: yalnızca hâlâ bekleyen istek reddedilir. */
+async function declineRequest(
+  tx: PoolClient,
+  ws: string,
+  request: string,
+  note: string,
+): Promise<Record<string, unknown>> {
+  const declined = (
+    await tx.query(
+      `UPDATE derslik.lesson_requests SET status='DECLINED',decision_note=$3,decided_at=now()
+             WHERE workspace_id=$1 AND id=$2 AND status='PENDING' RETURNING id`,
+      [ws, request, note],
+    )
+  ).rows[0];
+  if (!declined) throw new ConflictException("api.requestDecided");
+  return { id: request };
 }
 
 @Injectable()
@@ -558,53 +615,10 @@ export class DirectoryService {
       if (!row) throw new NotFoundException("api.requestNotFound");
       if (row.status !== "PENDING")
         throw new ConflictException("api.requestDecided");
-      let result: Record<string, unknown>;
-      if (decision === "accept") {
-        // İsteyen aynı anda çalışma alanı açıyorsa ikisi sıraya girer.
-        const requesterId = (
-          await tx.query(
-            "SELECT user_id FROM derslik.lesson_requests WHERE id=$1",
-            [request],
-          )
-        ).rows[0].user_id as string;
-        await lockAccountRole(tx, requesterId);
-        const requester = (
-          await tx.query("SELECT derslik.is_teacher_account($1) AS teacher", [
-            requesterId,
-          ])
-        ).rows[0];
-        if (requester.teacher)
-          throw new ConflictException("api.requesterIsTeacher");
-        const label = /^[a-z]+$/.test(row.subject)
-          ? apiText(`dir.subject.${row.subject}` as never)
-          : row.subject;
-        try {
-          // Aynı işlem içindeki hata tüm işlemi geri alır; savepoint gerekmez.
-          result = (
-            await tx.query(
-              "SELECT derslik.accept_lesson_request($1,$2) AS data",
-              [request, label],
-            )
-          ).rows[0].data;
-        } catch (error) {
-          const hint = (error as { hint?: string }).hint;
-          if (hint === "limit")
-            throw new ConflictException("api.studentLimitReached");
-          if (hint === "decided")
-            throw new ConflictException("api.requestDecided");
-          throw error;
-        }
-      } else {
-        const declined = (
-          await tx.query(
-            `UPDATE derslik.lesson_requests SET status='DECLINED',decision_note=$3,decided_at=now()
-             WHERE workspace_id=$1 AND id=$2 AND status='PENDING' RETURNING id`,
-            [ws, request, note],
-          )
-        ).rows[0];
-        if (!declined) throw new ConflictException("api.requestDecided");
-        result = { id: request };
-      }
+      const result =
+        decision === "accept"
+          ? await acceptRequest(tx, request, row)
+          : await declineRequest(tx, ws, request, note);
       const teacher = (
         await tx.query(
           "SELECT COALESCE(p.display_name,w.name) AS name FROM derslik.workspaces w LEFT JOIN derslik.teacher_profiles p ON p.workspace_id=w.id WHERE w.id=$1",

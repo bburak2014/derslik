@@ -837,6 +837,67 @@ test(
           assert.equal((await request(path("students?limit=101"))).status, 400);
         },
       );
+
+      await t.test(
+        "restoring a student checks the archived state, the version and the active student limit",
+        async () => {
+          const s = (
+            await ok(path("students"), { ...studentBody, name: "Geri dönen" })
+          ).data;
+          const restore = (version) =>
+            request(path("commands"), {
+              method: "POST",
+              body: { action: "student.restore", id: s.id, version },
+            });
+          const setLimit = (limit) =>
+            admin.query(
+              "UPDATE derslik.workspace_limits SET student_limit=$2 WHERE workspace_id=$1",
+              [ws, limit],
+            );
+          const alreadyActive = await restore(s.version);
+          assert.equal(alreadyActive.status, 409);
+          assert.match(alreadyActive.body.error.message, /zaten aktif/);
+          const archived = (
+            await ok(path(`students/${s.id}/archive`), { version: s.version })
+          ).data;
+          assert.equal(archived.active, false);
+          const stale = await restore(s.version);
+          assert.equal(stale.status, 409);
+          assert.match(stale.body.error.message, /değişmiş/);
+          // Arşivden dönen öğrenci yeniden sınıra dahil olur.
+          const limit = (
+            await admin.query(
+              "SELECT student_limit FROM derslik.workspace_limits WHERE workspace_id=$1",
+              [ws],
+            )
+          ).rows[0].student_limit;
+          const active = Number(
+            (
+              await admin.query(
+                "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1 AND active",
+                [ws],
+              )
+            ).rows[0].n,
+          );
+          await setLimit(active);
+          try {
+            const full = await restore(archived.version);
+            assert.equal(full.status, 409);
+            assert.match(full.body.error.message, /sınırına ulaşıldı/);
+          } finally {
+            await setLimit(limit);
+          }
+          const restored = (
+            await ok(path("commands"), {
+              action: "student.restore",
+              id: s.id,
+              version: archived.version,
+            })
+          ).data;
+          assert.equal(restored.active, true);
+          assert.equal(restored.version, archived.version + 1);
+        },
+      );
       await learningCases({
         t,
         app,

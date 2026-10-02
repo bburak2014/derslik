@@ -8,7 +8,10 @@ import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { Actor } from "../auth/auth.guard.js";
 import { DatabaseService } from "../db/database.service.js";
-import { CommandService } from "../common/command.service.js";
+import {
+  CommandService,
+  type MutationResult,
+} from "../common/command.service.js";
 import { rawDto } from "../workspaces/snapshot.service.js";
 import { lockStudent } from "../students/students.service.js";
 import { apiText } from "../common/i18n.js";
@@ -143,6 +146,321 @@ export async function notify(
   );
 }
 
+type LearningInput = z.infer<typeof schema>;
+type LearningAction<A extends LearningInput["action"]> = Extract<
+  LearningInput,
+  { action: A }
+>;
+
+async function createAssignment(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"assignment.create">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "INSERT INTO derslik.assignments(workspace_id,student_id,title,instructions,due_on) VALUES($1,$2,$3,$4,$5) RETURNING *",
+      [ws, student, c.title, c.instructions, c.dueOn],
+    )
+  ).rows[0];
+  await notify(tx, ws, student, {
+    title: "notice.assignmentNew",
+    body: c.title,
+    kind: "ASSIGNMENT",
+    targetId: data.id,
+  });
+  return { data };
+}
+
+async function updateAssignment(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"assignment.update">,
+): Promise<MutationResult> {
+  await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+    ws + ":" + c.assignmentId,
+  ]);
+  const data = (
+    await tx.query(
+      "UPDATE derslik.assignments SET title=$4,instructions=$5,due_on=$6,status=$7,version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$8 RETURNING *",
+      [
+        ws,
+        student,
+        c.assignmentId,
+        c.title,
+        c.instructions,
+        c.dueOn,
+        c.status,
+        c.version,
+      ],
+    )
+  ).rows[0];
+  if (!data) throw new ConflictException("api.assignmentChanged");
+  return { data };
+}
+
+async function submitAssignment(
+  tx: PoolClient,
+  actor: Actor,
+  ws: string,
+  student: string,
+  c: LearningAction<"assignment.submit">,
+): Promise<MutationResult> {
+  await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+    ws + ":" + c.assignmentId,
+  ]);
+  const assignment = (
+    await tx.query(
+      `SELECT id,status,due_on IS NOT NULL AND due_on<${ISTANBUL_TODAY} AS past_due
+               FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3`,
+      [ws, student, c.assignmentId],
+    )
+  ).rows[0];
+  if (!assignment) throw new NotFoundException("api.assignmentNotFound");
+  if (assignment.status !== "OPEN")
+    throw new ConflictException("api.assignmentClosed");
+  const previous = (
+    await tx.query(
+      "SELECT * FROM derslik.submissions WHERE workspace_id=$1 AND assignment_id=$2 FOR UPDATE",
+      [ws, c.assignmentId],
+    )
+  ).rows[0];
+  // A late first hand-in is still accepted; changing it is not.
+  if (previous && assignment.past_due)
+    throw new ConflictException("api.dueDatePassedSubmission");
+  if ((previous?.version ?? 0) !== c.version)
+    throw new ConflictException("api.submissionChanged");
+  // Editing a reviewed hand-in sends it back to the teacher's queue.
+  const data = (
+    await tx.query(
+      `INSERT INTO derslik.submissions(workspace_id,student_id,assignment_id,user_id,body) VALUES($1,$2,$3,$4,$5)
+     ON CONFLICT(workspace_id,assignment_id) DO UPDATE SET body=EXCLUDED.body,status='SUBMITTED',version=submissions.version+1 RETURNING *`,
+      [ws, student, c.assignmentId, actor.id, c.body],
+    )
+  ).rows[0];
+  await notify(tx, ws, student, {
+    title: previous ? "notice.submissionUpdated" : "notice.submissionNew",
+    body: previous
+      ? "notice.submissionUpdatedBody"
+      : "notice.submissionNewBody",
+    kind: "SUBMISSION",
+    targetId: data.assignment_id,
+    ownerOnly: true,
+  });
+  return { data };
+}
+
+async function reviewAssignment(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"assignment.review">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "UPDATE derslik.submissions SET feedback=$4,status='REVIEWED',version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$5 RETURNING *",
+      [ws, student, c.submissionId, c.feedback, c.version],
+    )
+  ).rows[0];
+  if (!data) throw new ConflictException("api.submissionNotFound");
+  await notify(tx, ws, student, {
+    title: "notice.reviewed",
+    body: "notice.reviewedBody",
+    kind: "REVIEW",
+    targetId: data.assignment_id,
+  });
+  return { data };
+}
+
+async function publishNote(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"note.publish">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "INSERT INTO derslik.shared_notes(workspace_id,student_id,body,audience) VALUES($1,$2,$3,$4) RETURNING *",
+      [ws, student, c.body, c.audience],
+    )
+  ).rows[0];
+  return { data, audit: { audience: c.audience } };
+}
+
+async function askQuestion(
+  tx: PoolClient,
+  actor: Actor,
+  ws: string,
+  student: string,
+  c: LearningAction<"question.create">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "INSERT INTO derslik.video_questions(workspace_id,student_id,video_id,user_id,at_seconds,body) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
+      [ws, student, c.videoId, actor.id, c.atSeconds, c.body],
+    )
+  ).rows[0];
+  await notify(tx, ws, student, {
+    title: "notice.question",
+    body: "notice.questionBody",
+    kind: "QUESTION",
+    targetId: c.videoId,
+    ownerOnly: true,
+  });
+  return { data };
+}
+
+async function saveProgress(
+  tx: PoolClient,
+  actor: Actor,
+  ws: string,
+  student: string,
+  c: LearningAction<"video.progress">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "INSERT INTO derslik.video_progress(workspace_id,student_id,video_id,user_id,seconds) VALUES($1,$2,$3,$4,$5) ON CONFLICT(workspace_id,video_id,user_id) DO UPDATE SET seconds=EXCLUDED.seconds,updated_at=now() RETURNING *",
+      [ws, student, c.videoId, actor.id, c.seconds],
+    )
+  ).rows[0];
+  return { data };
+}
+
+// Soru ve ilerleme oynatılabilir bir videoya ve videonun süresi içindeki bir
+// ana bağlanır.
+async function recordVideoEvent(
+  tx: PoolClient,
+  actor: Actor,
+  ws: string,
+  student: string,
+  c: LearningAction<"question.create" | "video.progress">,
+): Promise<MutationResult> {
+  const video = (
+    await tx.query(
+      "SELECT id,duration_seconds FROM derslik.videos WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='READY' AND NOT delete_requested",
+      [ws, student, c.videoId],
+    )
+  ).rows[0];
+  if (!video) throw new NotFoundException("api.playableVideoNotFound");
+  const at = c.action === "question.create" ? c.atSeconds : c.seconds;
+  if (at > (video.duration_seconds ?? 0))
+    throw new ConflictException("api.timeBeyondVideo");
+  return c.action === "question.create"
+    ? askQuestion(tx, actor, ws, student, c)
+    : saveProgress(tx, actor, ws, student, c);
+}
+
+async function answerQuestion(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"question.answer">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "UPDATE derslik.video_questions SET answer=$4,resolved=$5,version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$6 RETURNING *",
+      [ws, student, c.questionId, c.answer, c.resolved, c.version],
+    )
+  ).rows[0];
+  if (!data) throw new ConflictException("api.questionNotFound");
+  await notify(tx, ws, student, {
+    title: "notice.answered",
+    body: "notice.answeredBody",
+    kind: "ANSWER",
+    targetId: data.video_id,
+  });
+  return { data };
+}
+
+async function draftSummary(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"summary.draft">,
+): Promise<MutationResult> {
+  const completed = (
+    await tx.query(
+      "SELECT count(*) AS n FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 AND status='COMPLETED' AND starts_at>=$3::date AT TIME ZONE 'Europe/Istanbul' AND starts_at<($3::date+7) AT TIME ZONE 'Europe/Istanbul'",
+      [ws, student, c.weekOn],
+    )
+  ).rows[0].n;
+  const pending = (
+    await tx.query(
+      "SELECT count(*) AS n FROM derslik.assignments a WHERE a.workspace_id=$1 AND a.student_id=$2 AND a.status='OPEN' AND due_on<=($3::date+6) AND NOT EXISTS(SELECT 1 FROM derslik.submissions s WHERE s.workspace_id=a.workspace_id AND s.assignment_id=a.id)",
+      [ws, student, c.weekOn],
+    )
+  ).rows[0].n;
+  // Taslak öğretmenin dilinde; öğretmen düzenleyip yayımlar.
+  const text =
+    [
+      apiText("api.summaryDraftLessons", { count: Number(completed) }),
+      apiText("api.summaryDraftPending", { count: Number(pending) }),
+      apiText("api.summaryDraftTail"),
+    ].join(" ") + " ";
+  const data = (
+    await tx.query(
+      "INSERT INTO derslik.weekly_summaries(workspace_id,student_id,week_on,body) VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,student_id,week_on) DO NOTHING RETURNING *",
+      [ws, student, c.weekOn, text],
+    )
+  ).rows[0];
+  if (!data) throw new ConflictException("api.summaryExists");
+  return { data };
+}
+
+async function publishSummary(
+  tx: PoolClient,
+  ws: string,
+  student: string,
+  c: LearningAction<"summary.publish">,
+): Promise<MutationResult> {
+  const data = (
+    await tx.query(
+      "UPDATE derslik.weekly_summaries SET body=$4,status='PUBLISHED',version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$5 RETURNING *",
+      [ws, student, c.summaryId, c.body, c.version],
+    )
+  ).rows[0];
+  if (!data) throw new ConflictException("api.summaryNotFound");
+  await notify(tx, ws, student, {
+    title: "notice.summaryReady",
+    body: "notice.summaryReadyBody",
+    kind: "SUMMARY",
+    targetId: data.id,
+  });
+  return { data };
+}
+
+async function applyLearning(
+  tx: PoolClient,
+  actor: Actor,
+  ws: string,
+  student: string,
+  c: LearningInput,
+): Promise<MutationResult> {
+  switch (c.action) {
+    case "assignment.create":
+      return createAssignment(tx, ws, student, c);
+    case "assignment.update":
+      return updateAssignment(tx, ws, student, c);
+    case "assignment.submit":
+      return submitAssignment(tx, actor, ws, student, c);
+    case "assignment.review":
+      return reviewAssignment(tx, ws, student, c);
+    case "note.publish":
+      return publishNote(tx, ws, student, c);
+    case "question.create":
+    case "video.progress":
+      return recordVideoEvent(tx, actor, ws, student, c);
+    case "question.answer":
+      return answerQuestion(tx, ws, student, c);
+    case "summary.draft":
+      return draftSummary(tx, ws, student, c);
+    default:
+      return publishSummary(tx, ws, student, c);
+  }
+}
+
 @Injectable()
 export class LearningService {
   constructor(
@@ -265,211 +583,7 @@ export class LearningService {
       { ...c, studentId: student },
       async (tx) => {
         if (!portal) await lockStudent(tx, ws, student, true);
-        if (c.action === "assignment.create") {
-          const data = (
-            await tx.query(
-              "INSERT INTO derslik.assignments(workspace_id,student_id,title,instructions,due_on) VALUES($1,$2,$3,$4,$5) RETURNING *",
-              [ws, student, c.title, c.instructions, c.dueOn],
-            )
-          ).rows[0];
-          await notify(tx, ws, student, {
-            title: "notice.assignmentNew",
-            body: c.title,
-            kind: "ASSIGNMENT",
-            targetId: data.id,
-          });
-          return { data };
-        }
-        if (c.action === "assignment.update") {
-          await tx.query(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-            [ws + ":" + c.assignmentId],
-          );
-          const data = (
-            await tx.query(
-              "UPDATE derslik.assignments SET title=$4,instructions=$5,due_on=$6,status=$7,version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$8 RETURNING *",
-              [
-                ws,
-                student,
-                c.assignmentId,
-                c.title,
-                c.instructions,
-                c.dueOn,
-                c.status,
-                c.version,
-              ],
-            )
-          ).rows[0];
-          if (!data) throw new ConflictException("api.assignmentChanged");
-          return { data };
-        }
-        if (c.action === "assignment.submit") {
-          await tx.query(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-            [ws + ":" + c.assignmentId],
-          );
-          const assignment = (
-            await tx.query(
-              `SELECT id,status,due_on IS NOT NULL AND due_on<${ISTANBUL_TODAY} AS past_due
-               FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 AND id=$3`,
-              [ws, student, c.assignmentId],
-            )
-          ).rows[0];
-          if (!assignment)
-            throw new NotFoundException("api.assignmentNotFound");
-          if (assignment.status !== "OPEN")
-            throw new ConflictException("api.assignmentClosed");
-          const previous = (
-            await tx.query(
-              "SELECT * FROM derslik.submissions WHERE workspace_id=$1 AND assignment_id=$2 FOR UPDATE",
-              [ws, c.assignmentId],
-            )
-          ).rows[0];
-          // A late first hand-in is still accepted; changing it is not.
-          if (previous && assignment.past_due)
-            throw new ConflictException("api.dueDatePassedSubmission");
-          if ((previous?.version ?? 0) !== c.version)
-            throw new ConflictException("api.submissionChanged");
-          // Editing a reviewed hand-in sends it back to the teacher's queue.
-          const data = (
-            await tx.query(
-              `INSERT INTO derslik.submissions(workspace_id,student_id,assignment_id,user_id,body) VALUES($1,$2,$3,$4,$5)
-     ON CONFLICT(workspace_id,assignment_id) DO UPDATE SET body=EXCLUDED.body,status='SUBMITTED',version=submissions.version+1 RETURNING *`,
-              [ws, student, c.assignmentId, actor.id, c.body],
-            )
-          ).rows[0];
-          await notify(tx, ws, student, {
-            title: previous
-              ? "notice.submissionUpdated"
-              : "notice.submissionNew",
-            body: previous
-              ? "notice.submissionUpdatedBody"
-              : "notice.submissionNewBody",
-            kind: "SUBMISSION",
-            targetId: data.assignment_id,
-            ownerOnly: true,
-          });
-          return { data };
-        }
-        if (c.action === "assignment.review") {
-          const data = (
-            await tx.query(
-              "UPDATE derslik.submissions SET feedback=$4,status='REVIEWED',version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$5 RETURNING *",
-              [ws, student, c.submissionId, c.feedback, c.version],
-            )
-          ).rows[0];
-          if (!data) throw new ConflictException("api.submissionNotFound");
-          await notify(tx, ws, student, {
-            title: "notice.reviewed",
-            body: "notice.reviewedBody",
-            kind: "REVIEW",
-            targetId: data.assignment_id,
-          });
-          return { data };
-        }
-        if (c.action === "note.publish") {
-          const data = (
-            await tx.query(
-              "INSERT INTO derslik.shared_notes(workspace_id,student_id,body,audience) VALUES($1,$2,$3,$4) RETURNING *",
-              [ws, student, c.body, c.audience],
-            )
-          ).rows[0];
-          return { data, audit: { audience: c.audience } };
-        }
-        if (c.action === "question.create" || c.action === "video.progress") {
-          const video = (
-            await tx.query(
-              "SELECT id,duration_seconds FROM derslik.videos WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='READY' AND NOT delete_requested",
-              [ws, student, c.videoId],
-            )
-          ).rows[0];
-          if (!video) throw new NotFoundException("api.playableVideoNotFound");
-          const at = c.action === "question.create" ? c.atSeconds : c.seconds;
-          if (at > (video.duration_seconds ?? 0))
-            throw new ConflictException("api.timeBeyondVideo");
-          if (c.action === "question.create") {
-            const data = (
-              await tx.query(
-                "INSERT INTO derslik.video_questions(workspace_id,student_id,video_id,user_id,at_seconds,body) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
-                [ws, student, c.videoId, actor.id, c.atSeconds, c.body],
-              )
-            ).rows[0];
-            await notify(tx, ws, student, {
-              title: "notice.question",
-              body: "notice.questionBody",
-              kind: "QUESTION",
-              targetId: c.videoId,
-              ownerOnly: true,
-            });
-            return { data };
-          }
-          const data = (
-            await tx.query(
-              "INSERT INTO derslik.video_progress(workspace_id,student_id,video_id,user_id,seconds) VALUES($1,$2,$3,$4,$5) ON CONFLICT(workspace_id,video_id,user_id) DO UPDATE SET seconds=EXCLUDED.seconds,updated_at=now() RETURNING *",
-              [ws, student, c.videoId, actor.id, c.seconds],
-            )
-          ).rows[0];
-          return { data };
-        }
-        if (c.action === "question.answer") {
-          const data = (
-            await tx.query(
-              "UPDATE derslik.video_questions SET answer=$4,resolved=$5,version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$6 RETURNING *",
-              [ws, student, c.questionId, c.answer, c.resolved, c.version],
-            )
-          ).rows[0];
-          if (!data) throw new ConflictException("api.questionNotFound");
-          await notify(tx, ws, student, {
-            title: "notice.answered",
-            body: "notice.answeredBody",
-            kind: "ANSWER",
-            targetId: data.video_id,
-          });
-          return { data };
-        }
-        if (c.action === "summary.draft") {
-          const completed = (
-            await tx.query(
-              "SELECT count(*) AS n FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 AND status='COMPLETED' AND starts_at>=$3::date AT TIME ZONE 'Europe/Istanbul' AND starts_at<($3::date+7) AT TIME ZONE 'Europe/Istanbul'",
-              [ws, student, c.weekOn],
-            )
-          ).rows[0].n;
-          const pending = (
-            await tx.query(
-              "SELECT count(*) AS n FROM derslik.assignments a WHERE a.workspace_id=$1 AND a.student_id=$2 AND a.status='OPEN' AND due_on<=($3::date+6) AND NOT EXISTS(SELECT 1 FROM derslik.submissions s WHERE s.workspace_id=a.workspace_id AND s.assignment_id=a.id)",
-              [ws, student, c.weekOn],
-            )
-          ).rows[0].n;
-          // Taslak öğretmenin dilinde; öğretmen düzenleyip yayımlar.
-          const text =
-            [
-              apiText("api.summaryDraftLessons", { count: Number(completed) }),
-              apiText("api.summaryDraftPending", { count: Number(pending) }),
-              apiText("api.summaryDraftTail"),
-            ].join(" ") + " ";
-          const data = (
-            await tx.query(
-              "INSERT INTO derslik.weekly_summaries(workspace_id,student_id,week_on,body) VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,student_id,week_on) DO NOTHING RETURNING *",
-              [ws, student, c.weekOn, text],
-            )
-          ).rows[0];
-          if (!data) throw new ConflictException("api.summaryExists");
-          return { data };
-        }
-        const data = (
-          await tx.query(
-            "UPDATE derslik.weekly_summaries SET body=$4,status='PUBLISHED',version=version+1 WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND version=$5 RETURNING *",
-            [ws, student, c.summaryId, c.body, c.version],
-          )
-        ).rows[0];
-        if (!data) throw new ConflictException("api.summaryNotFound");
-        await notify(tx, ws, student, {
-          title: "notice.summaryReady",
-          body: "notice.summaryReadyBody",
-          kind: "SUMMARY",
-          targetId: data.id,
-        });
-        return { data };
+        return applyLearning(tx, actor, ws, student, c);
       },
       portal
         ? {
