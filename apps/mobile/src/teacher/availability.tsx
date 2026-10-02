@@ -287,7 +287,10 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                 <Text style={styles.muted}>{t("booking.noClosedDays")}</Text>
               )}
               {form.blocks.map((block, index) => (
-                <View key={index} style={{ gap: 4 }}>
+                <View
+                  key={index} // NOSONAR: kapalı gün satırlarının kimliği yok ve alanları düzenlenebilir; içerikten anahtar yazarken satırı yeniden kurup odağı düşürür. Liste kontrollü, yalnızca ekle/sil ile değişir.
+                  style={{ gap: 4 }}
+                >
                   <View style={[styles.row, { flexWrap: "nowrap", gap: 8 }]}>
                     <View style={{ flex: 1 }}>
                       <Input

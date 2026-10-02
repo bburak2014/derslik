@@ -215,7 +215,7 @@ function Application() {
         { key: "link", label: t("mobile.inviteLink"), value: invite || "" },
       ],
       submit: async (v) => {
-        const token = v.link.match(/([a-f0-9]{64})\/?$/)?.[1];
+        const token = /([a-f0-9]{64})\/?$/.exec(v.link)?.[1];
         if (!token) throw new Error(t("mobile.inviteInvalid"));
         const r = await request<{
           data: {

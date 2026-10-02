@@ -32,12 +32,16 @@ function define(target: object, key: string, value: unknown) {
 const ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+/** Dizideki karakterin kodu; aralık dışında NaN (charCodeAt gibi). */
+const codeAt = (input: string, index: number) =>
+  input.codePointAt(index) ?? Number.NaN;
+
 function encodeBase64(input: string) {
   let output = "";
   for (let i = 0; i < input.length; i += 3) {
-    const a = input.charCodeAt(i),
-      b = input.charCodeAt(i + 1),
-      c = input.charCodeAt(i + 2);
+    const a = codeAt(input, i),
+      b = codeAt(input, i + 1),
+      c = codeAt(input, i + 2);
     if (a > 255 || b > 255 || c > 255)
       throw new Error("btoa: yalnızca latin1 karakterler kodlanabilir.");
     const chunk =
@@ -66,7 +70,7 @@ function decodeBase64(input: string) {
     bits += 6;
     if (bits >= 8) {
       bits -= 8;
-      output += String.fromCharCode((value >> bits) & 0xff);
+      output += String.fromCodePoint((value >> bits) & 0xff);
     }
   }
   return output;

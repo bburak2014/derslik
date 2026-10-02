@@ -39,7 +39,7 @@ const rawSecureStorage = {
         SecureStore.getItemAsync(`${key}.${m.generation}.${i}`, options),
       ),
     );
-    return chunks.some((x) => x === null) ? null : chunks.join("");
+    return chunks.includes(null) ? null : chunks.join("");
   },
   async setItem(key: string, value: string) {
     const old = storageManifest(await SecureStore.getItemAsync(key, options)),

@@ -272,7 +272,7 @@ export function Avatar({
 }: Readonly<{ name: string; size?: number }>) {
   const { colors, section } = useTheme();
   const index =
-    Array.from(name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4;
+    Array.from(name).reduce((sum, ch) => sum + (ch.codePointAt(0) ?? 0), 0) % 4;
   const tone = [
     { bg: colors.tint1Bg, fg: colors.tint1Fg },
     { bg: colors.tint4Bg, fg: colors.tint4Fg },

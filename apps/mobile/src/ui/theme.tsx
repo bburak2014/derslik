@@ -69,21 +69,20 @@ export function ThemeProvider({
 }: Readonly<{ children: React.ReactNode }>) {
   const device = useColorScheme();
   const [fontsReady, fontError] = useFonts(fontFiles);
-  const [mode, setModeState] = useState<ThemeMode>("system");
+  const [mode, setMode] = useState<ThemeMode>("system");
   useEffect(() => {
     let alive = true;
     void getItemAsync(THEME_KEY)
       .then((stored) => {
-        if (alive && (stored === "light" || stored === "dark"))
-          setModeState(stored);
+        if (alive && (stored === "light" || stored === "dark")) setMode(stored);
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, []);
-  const setMode = useCallback((next: ThemeMode) => {
-    setModeState(next);
+  const changeMode = useCallback((next: ThemeMode) => {
+    setMode(next);
     void (next === "system"
       ? deleteItemAsync(THEME_KEY).catch(() => {})
       : setItemAsync(THEME_KEY, next).catch(() => {}));
@@ -91,8 +90,8 @@ export function ThemeProvider({
   const scheme = resolveScheme(mode, device);
   const family = fontsReady ? "brand" : "system";
   const value = useMemo(
-    () => ({ ...themes[family][scheme], scheme, mode, setMode }),
-    [family, scheme, mode, setMode],
+    () => ({ ...themes[family][scheme], scheme, mode, setMode: changeMode }),
+    [family, scheme, mode, changeMode],
   );
   if (!fontsReady && !fontError)
     return <View style={{ flex: 1, backgroundColor: value.colors.canvas }} />;

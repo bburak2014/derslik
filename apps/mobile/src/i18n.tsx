@@ -14,7 +14,7 @@ import {
   localeNames,
   locales,
   matchLocale,
-  setLocale,
+  setLocale as setActiveLocale,
   t,
   type Locale,
 } from "@derslik/contracts";
@@ -56,7 +56,7 @@ export function LocaleProvider({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const { colors } = useTheme();
-  const [locale, setState] = useState<Locale | null>(null);
+  const [locale, setLocale] = useState<Locale | null>(null);
   useEffect(() => {
     let alive = true;
     void getItemAsync(LOCALE_KEY)
@@ -64,16 +64,16 @@ export function LocaleProvider({
       .then((stored) => {
         if (!alive) return;
         const next = matchLocale(stored) ?? deviceLocale();
+        setActiveLocale(next);
         setLocale(next);
-        setState(next);
       });
     return () => {
       alive = false;
     };
   }, []);
   const change = useCallback((next: Locale) => {
+    setActiveLocale(next);
     setLocale(next);
-    setState(next);
     void setItemAsync(LOCALE_KEY, next).catch(() => {});
   }, []);
   const value = useMemo(
@@ -111,8 +111,8 @@ export function Flag({ locale }: Readonly<{ locale: Locale }>) {
         viewBox={flag.viewBox}
         preserveAspectRatio="xMidYMid slice"
       >
-        {flag.shapes.map((shape, i) => (
-          <Path key={i} d={shape.d} fill={shape.fill} />
+        {flag.shapes.map((shape) => (
+          <Path key={shape.d} d={shape.d} fill={shape.fill} />
         ))}
       </Svg>
     </View>

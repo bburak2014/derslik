@@ -21,7 +21,7 @@ const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 /** Satır içi <script> için JSON: "</script>" gibi bir dizi betiği erken
  *  kapatamasın diye "<" kaçırılır. */
 const scriptJson = (value: string) =>
-  JSON.stringify(value).replace(/</g, "\\u003c");
+  JSON.stringify(value).replaceAll("<", String.raw`\u003c`);
 
 function buildHtml(url: string, background: string, muted: string) {
   return `<!doctype html>

@@ -784,8 +784,8 @@ function remember(known: Set<string>, list: ChatMessage[]) {
 
 /** Gelen mesajları ekran okuyuculara duyurur; tek mesajsa içeriğiyle. */
 function announceIncoming(incoming: ChatMessage[], thread: MessageThread) {
-  if (!incoming.length) return;
-  const last = incoming[incoming.length - 1];
+  const last = incoming.at(-1);
+  if (!last) return;
   AccessibilityInfo.announceForAccessibility(
     incoming.length === 1
       ? t("chat.preview", {
@@ -955,7 +955,7 @@ export function Conversation({
       setNow(Date.now());
       setError("");
       callbacks.current.onUpdate?.(page.thread);
-      const newest = page.messages[page.messages.length - 1]?.createdAt;
+      const newest = page.messages.at(-1)?.createdAt;
       if (!loaded.current) {
         loaded.current = true;
         // Yükleme bitmeden gönderilen mesaj sayfada yoksa listede kalır.

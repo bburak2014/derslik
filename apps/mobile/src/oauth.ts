@@ -11,7 +11,7 @@ export const providers: { id: SocialProvider; name: string }[] = [
   { id: "azure", name: "Microsoft" },
 ];
 export type AuthRoute = "callback" | "confirm" | "recovery";
-const routes: AuthRoute[] = ["callback", "confirm", "recovery"];
+const routes = new Set<AuthRoute>(["callback", "confirm", "recovery"]);
 
 // A standalone or development build opens `derslik://auth/<route>`; Expo Go
 // receives the same route as `exp://<host>:8081/--/auth/<route>`. Building the
@@ -48,8 +48,7 @@ export function authRoute(value: string): AuthRoute | null {
   // adının ardından `auth/<route>`. Araya giren başka yol parçası reddedilir.
   if (segments.length !== (own.hostname ? 3 : 2)) return null;
   const route = segments.at(-1) as AuthRoute | undefined;
-  if (segments.at(-2) !== "auth" || !route || !routes.includes(route))
-    return null;
+  if (segments.at(-2) !== "auth" || !route || !routes.has(route)) return null;
   return route;
 }
 

@@ -3,8 +3,8 @@ const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
 const root = path.resolve(__dirname, "../..");
-const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const sep = "[/\\\\]";
+const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+const sep = String.raw`[/\\]`;
 
 // Mobile only bundles its own source plus the two shared workspace packages.
 // Watching apps/web and apps/api as well made every Next.js or Nest rebuild

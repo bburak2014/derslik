@@ -146,12 +146,15 @@ async function readFileBytes(uri: string) {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error(t("ml.readFailed")));
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error(t("ml.readFailed")));
+    };
     reader.readAsDataURL(blob);
   });
   const binary = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0;
   return bytes;
 }
 
@@ -193,7 +196,7 @@ export function LearningScreen({
     [loading, setLoading] = useState(true),
     [refreshing, setRefreshing] = useState(false),
     [error, setError] = useState(""),
-    [selectedTab, setTab] = useState(
+    [selectedTab, setSelectedTab] = useState(
       view ?? (owner ? "assignments" : "lessons"),
     ),
     [invite, setInvite] = useState<Invite | null>(null),
@@ -237,7 +240,7 @@ export function LearningScreen({
   function openFocus(target: NoticeFocus) {
     if (target.section === "requests" || target.section === "myRequests")
       return;
-    if (!view) setTab(target.section);
+    if (!view) setSelectedTab(target.section);
     if (target.section === "messages") chat.setOpen(target.itemId);
     else setHighlight(target.itemId);
   }
@@ -549,7 +552,7 @@ export function LearningScreen({
     return ["warning", t("learn.awaiting")];
   };
   function chooseTab(id: string) {
-    setTab(id);
+    setSelectedTab(id);
     if (id === "access") void loadLinks();
   }
   // Ekranın başlığı ve sekme şeridi; Mesajlar sekmesi de aynılarını çizer.
@@ -1746,7 +1749,7 @@ export function LearningScreen({
           onChanged={refreshLessons}
           onMessage={
             ((data as PortalData).permissions || []).includes("lessons")
-              ? () => setTab("messages")
+              ? () => setSelectedTab("messages")
               : undefined
           }
         />
