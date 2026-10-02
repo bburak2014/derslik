@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { SCANNER_IMAGE } from "./sonar-local.mjs";
 
 export function scannerInvocation({
   root,
@@ -51,7 +52,10 @@ export function scannerInvocation({
       "SONAR_SCANNER_JAVA_OPTS",
       "-v",
       `${root}:/usr/src`,
-      "sonarsource/sonar-scanner-cli",
+      // İmajın arm64 sürümü yok; Apple Silicon'da öykünmeyle çalışır.
+      "--platform",
+      "linux/amd64",
+      SCANNER_IMAGE,
       memoryArgument,
     ],
     options: {

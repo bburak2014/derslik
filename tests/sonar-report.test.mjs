@@ -9,6 +9,7 @@ import {
   scannerInvocation,
   waitForAnalysis,
 } from "../scripts/sonar-report.mjs";
+import { SCANNER_IMAGE } from "../scripts/sonar-local.mjs";
 
 const response = (body, status = 200) =>
   new Response(JSON.stringify(body), { status });
@@ -62,6 +63,12 @@ test("default Docker scanner preserves its container network and keeps token out
   assert.ok(
     !invocation.args.some((argument) => argument.includes("fixture-secret")),
   );
+  const image = invocation.args.indexOf(SCANNER_IMAGE);
+  assert.ok(image > 0, "sabit tarayıcı imajı kullanılır");
+  assert.deepEqual(invocation.args.slice(image - 2, image), [
+    "--platform",
+    "linux/amd64",
+  ]);
 });
 
 test("scanner report must identify the submitted task", async () => {

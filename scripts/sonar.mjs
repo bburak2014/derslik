@@ -2,6 +2,7 @@
 // Yerel SonarQube analizi: Docker'da SonarQube Community'yi açar (ilk seferde
 // kurar), sonar-scanner'ı çalıştırır ve özet ölçüleri yazdırır. Hesap veya
 // bulut gerekmez; sonuçlar http://localhost:9000 adresinde durur.
+// --gate: tarar, açık sorunları listeler ve sorun varsa 1 ile çıkar (commit kancası).
 // Ayrıntı: docs/sonar.md
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -14,8 +15,25 @@ import {
   scannerInvocation,
   waitForAnalysis,
 } from "./sonar-report.mjs";
+import { collectPages, evaluateGate } from "./sonar-gate.mjs";
+import {
+  SONARQUBE_IMAGE,
+  acquireLock,
+  containerNeedsRebuild,
+  findNativeScanner,
+  gitCommonDir,
+} from "./sonar-local.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// Worktree'ler parolayı, yerel tarayıcıyı ve önbelleği ana checkout'tan
+// paylaşır. Kilit bütün kopyaların ortak git klasöründedir.
+const COMMON_DIR = gitCommonDir(root);
+const MAIN_ROOT = COMMON_DIR ? path.dirname(COMMON_DIR) : root;
+const LOCK_DIR = path.join(
+  COMMON_DIR ?? path.join(root, ".scannerwork"),
+  "sonar-gate.lock",
+);
+const gate = process.argv.includes("--gate");
 const PORT = process.env.SONAR_PORT ?? "9000";
 if (!/^\d+$/.test(PORT) || Number(PORT) < 1 || Number(PORT) > 65535) {
   throw new Error("SONAR_PORT 1-65535 aralığında bir port olmalı.");
@@ -34,11 +52,10 @@ if (
 const SCANNER_JAVA_OPTS = process.env.SONAR_SCANNER_JAVA_OPTS ?? "-Xmx512m";
 const SCANNER_PATH = process.env.SONAR_SCANNER_PATH
   ? path.resolve(root, process.env.SONAR_SCANNER_PATH)
-  : undefined;
-const SCANNER_HOME = path.resolve(
-  root,
-  process.env.SONAR_USER_HOME ?? "reports/quality/cache",
-);
+  : findNativeScanner(MAIN_ROOT);
+const SCANNER_HOME = process.env.SONAR_USER_HOME
+  ? path.resolve(root, process.env.SONAR_USER_HOME)
+  : path.join(MAIN_ROOT, "reports", "quality", "cache");
 if (SCANNER_PATH) {
   fs.accessSync(SCANNER_PATH, fs.constants.X_OK);
   fs.mkdirSync(SCANNER_HOME, { recursive: true });
@@ -60,7 +77,7 @@ const PROJECT = "derslik";
 // git'e girmeyen reports/ klasöründe saklanır.
 const secretFile = process.env.SONAR_ADMIN_FILE
   ? path.resolve(root, process.env.SONAR_ADMIN_FILE)
-  : path.join(root, "reports", ".sonar-admin");
+  : path.join(MAIN_ROOT, "reports", ".sonar-admin");
 function adminPassword() {
   if (process.env.SONAR_ADMIN_PASSWORD) return process.env.SONAR_ADMIN_PASSWORD;
   if (fs.existsSync(secretFile))
@@ -89,6 +106,32 @@ function ensureServer() {
   } catch {
     docker(["network", "create", NETWORK]);
   }
+  // Sabit sürümden farklı ya da bütün ağ arayüzlerine açık bir kapsayıcı
+  // yeniden kurulur. Veri birimleri silinmez: analizler ve parola korunur.
+  const current = spawnSync(
+    "docker",
+    [
+      "inspect",
+      "-f",
+      "{{.Config.Image}}|{{json .HostConfig.PortBindings}}",
+      CONTAINER,
+    ],
+    { encoding: "utf8" },
+  );
+  if (current.status === 0) {
+    const [image, bindings] = current.stdout.trim().split("|");
+    if (
+      containerNeedsRebuild(
+        { image, portBindings: JSON.parse(bindings) },
+        SONARQUBE_IMAGE,
+      )
+    ) {
+      console.log(
+        `SonarQube kapsayıcısı ${SONARQUBE_IMAGE} ile, yalnızca 127.0.0.1'de yeniden kuruluyor (veri korunur)...`,
+      );
+      docker(["rm", "-f", CONTAINER]);
+    }
+  }
   const state = spawnSync(
     "docker",
     ["inspect", "-f", "{{.State.Running}}", CONTAINER],
@@ -114,7 +157,7 @@ function ensureServer() {
       `${DATA_VOLUME}:/opt/sonarqube/data`,
       "-v",
       `${EXTENSIONS_VOLUME}:/opt/sonarqube/extensions`,
-      "sonarqube:community",
+      SONARQUBE_IMAGE,
     ]);
   } else if (state.stdout.trim() !== "true") {
     docker(["start", CONTAINER]);
@@ -227,6 +270,58 @@ async function summary(auth, taskId) {
   if (report.qualityGate.status !== "OK") process.exitCode = 1;
 }
 
+async function enforceGate(auth, taskId) {
+  const request = (method, pathname) => api(method, pathname, auth);
+  // Yalnızca bu taramanın işlenmiş sonucu okunur (ceTaskId).
+  await waitForAnalysis(request, taskId);
+  const json = async (pathname) => {
+    const res = await request("GET", pathname);
+    if (!res.ok)
+      throw new Error(`SonarQube API ${res.status}: ${pathname.split("?")[0]}`);
+    return res.json();
+  };
+  const issues = await collectPages(async (p) => {
+    const r = await json(
+      `/api/issues/search?components=${PROJECT}&resolved=false&ps=500&p=${p}`,
+    );
+    return { items: r.issues, total: r.paging?.total ?? r.total };
+  });
+  const hotspots = await collectPages(async (p) => {
+    const r = await json(
+      `/api/hotspots/search?projectKey=${PROJECT}&status=TO_REVIEW&ps=500&p=${p}`,
+    );
+    return { items: r.hotspots, total: r.paging?.total };
+  });
+  const measures = await json(
+    `/api/measures/component?component=${PROJECT}&metricKeys=duplicated_lines_density`,
+  );
+  const duplication = Number(
+    measures.component?.measures?.find(
+      (m) => m.metric === "duplicated_lines_density",
+    )?.value,
+  );
+  const result = evaluateGate({ issues, hotspots, duplication });
+  const output = path.join(root, "reports", "sonar-gate.json");
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  fs.writeFileSync(output, JSON.stringify(result, null, 2) + "\n");
+  for (const line of result.text) console.log(line);
+  console.log(
+    `\nAyrıntılar: ${HOST}/dashboard?id=${PROJECT} · liste: reports/sonar-gate.json`,
+  );
+  return result.failed;
+}
+
+if (gate) {
+  console.log(`Sonar kapısı: ${root} (Node ${process.version})`);
+  const release = await acquireLock(LOCK_DIR, {
+    onWait: (owner) =>
+      console.log(`Başka bir tarama sürüyor (pid ${owner}); sıra bekleniyor...`),
+  });
+  // process.exit dahil her çıkışta kilit bırakılır; Ctrl-C de çıkış sayılır.
+  process.on("exit", release);
+  for (const signal of ["SIGINT", "SIGTERM"])
+    process.once(signal, () => process.exit(130));
+}
 ensureDocker();
 ensureServer();
 await waitUp();
@@ -251,4 +346,13 @@ const invocation = scannerInvocation({
 const scan = spawnSync(invocation.command, invocation.args, invocation.options);
 if (scan.error) throw scan.error;
 if (scan.status !== 0) process.exit(scan.status ?? 1);
-await summary(auth, scannerTaskId(taskFile));
+const taskId = scannerTaskId(taskFile);
+if (gate) {
+  // Kapı kapalıyken güvenli: okuma hatası da kapıyı düşürür.
+  const failed = await enforceGate(auth, taskId).catch((error) => {
+    console.error(`Sonar kapısı: ${error.message}`);
+    return true;
+  });
+  process.exit(failed ? 1 : 0);
+}
+await summary(auth, taskId);
