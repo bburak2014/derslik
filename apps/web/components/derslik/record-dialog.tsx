@@ -94,6 +94,7 @@ export function RecordDialog({
   data,
   onClose,
   onSwitch,
+  onCloseAutoFocus,
   mutate,
   busy,
 }: Readonly<{
@@ -101,6 +102,7 @@ export function RecordDialog({
   data: WorkspaceData;
   onClose: () => void;
   onSwitch: (m: ModalState) => void;
+  onCloseAutoFocus: (event: Event) => void;
   mutate: Mutate;
   busy: boolean;
 }>) {
@@ -248,348 +250,362 @@ export function RecordDialog({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-[540px]">
-        <DialogHeader>
+      <DialogContent
+        className="flex h-[min(90dvh,46rem)] flex-col overflow-hidden sm:max-w-[540px]"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="grid gap-4">
-          {noStudents ? (
-            <Alert>
-              <Info />
-              <AlertTitle>{t("record.noStudents")}</AlertTitle>
-              <AlertDescription>
-                <p>{t("record.noStudentsHint")}</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => onSwitch({ type: "student" })}
-                >
-                  <Plus /> {t("ws.addStudent")}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              {needsStudent && (
-                <Field label={t("common.student")} id="student">
-                  <Choice
-                    id="student"
-                    value={studentId}
-                    onChange={setStudentId}
-                    options={activeStudents.map((s) => ({
-                      value: s.id,
-                      label:
-                        s.name +
-                        (s.is_sample ? " · " + t("common.sample") : ""),
-                    }))}
-                  />
-                </Field>
-              )}
-              {modal.type === "student" && (
-                <>
-                  <Field label={t("record.fullName")} id="student-name">
-                    <Input
-                      id="student-name"
-                      autoFocus
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder={t("record.namePlaceholder")}
-                      autoComplete="name"
-                      required
-                      maxLength={120}
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
+          <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto">
+            {noStudents ? (
+              <Alert>
+                <Info />
+                <AlertTitle>{t("record.noStudents")}</AlertTitle>
+                <AlertDescription>
+                  <p>{t("record.noStudentsHint")}</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => onSwitch({ type: "student" })}
+                  >
+                    <Plus /> {t("ws.addStudent")}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                {needsStudent && (
+                  <Field label={t("common.student")} id="student">
+                    <Choice
+                      id="student"
+                      value={studentId}
+                      onChange={setStudentId}
+                      options={activeStudents.map((s) => ({
+                        value: s.id,
+                        label:
+                          s.name +
+                          (s.is_sample ? " · " + t("common.sample") : ""),
+                      }))}
                     />
                   </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label={t("record.subject")} id="subject">
+                )}
+                {modal.type === "student" && (
+                  <>
+                    <Field label={t("record.fullName")} id="student-name">
                       <Input
-                        id="subject"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        placeholder={t("record.defaultSubject")}
+                        id="student-name"
+                        autoFocus
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder={t("record.namePlaceholder")}
+                        autoComplete="name"
                         required
                         maxLength={120}
                       />
                     </Field>
-                    <Field label={t("record.grade")} id="grade">
-                      <Input
-                        id="grade"
-                        value={grade}
-                        onChange={(e) => setGrade(e.target.value)}
-                        placeholder={t("record.gradePlaceholder")}
-                        maxLength={50}
-                      />
-                    </Field>
-                  </div>
-                  <Field label={t("record.phoneOptional")} id="phone">
-                    <Input
-                      id="phone"
-                      type="tel"
-                      autoComplete="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder={t("record.phonePlaceholder")}
-                      maxLength={30}
-                    />
-                  </Field>
-                  <Field
-                    label={t("record.emailOptional")}
-                    id="email"
-                    hint={t("record.emailHint")}
-                  >
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder={t("auth.emailPlaceholder")}
-                      maxLength={150}
-                    />
-                  </Field>
-                </>
-              )}
-              {modal.type === "package" && (
-                <>
-                  <Field label={t("record.packageName")} id="package-name">
-                    <Input
-                      id="package-name"
-                      value={packageName}
-                      onChange={(e) => setPackageName(e.target.value)}
-                      required
-                      maxLength={120}
-                    />
-                  </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label={t("record.granted")} id="granted">
-                      <Input
-                        id="granted"
-                        type="number"
-                        min={1}
-                        max={100}
-                        step={1}
-                        required
-                        value={granted}
-                        onChange={(e) => setGranted(e.target.value)}
-                      />
-                    </Field>
-                    <Field label={t("record.price")} id="price">
-                      <Input
-                        id="price"
-                        inputMode="decimal"
-                        required
-                        placeholder="4800,00"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  <Field label={t("record.expiresOptional")} id="expires">
-                    <Input
-                      id="expires"
-                      type="date"
-                      min={dateKey()}
-                      value={expires}
-                      onChange={(e) => setExpires(e.target.value)}
-                    />
-                  </Field>
-                  <Alert>
-                    <Info />
-                    <AlertDescription>
-                      {t("record.packageNote")}
-                    </AlertDescription>
-                  </Alert>
-                </>
-              )}
-              {(modal.type === "lesson" || modal.type === "reschedule") && (
-                <>
-                  {modal.type === "lesson" && (
-                    <>
-                      <Field label={t("record.topic")} id="topic">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label={t("record.subject")} id="subject">
                         <Input
-                          id="topic"
+                          id="subject"
+                          value={subject}
+                          onChange={(e) => setSubject(e.target.value)}
+                          placeholder={t("record.defaultSubject")}
                           required
                           maxLength={120}
-                          placeholder={t("record.topicPlaceholder")}
-                          value={topic}
-                          onChange={(e) => setTopic(e.target.value)}
                         />
                       </Field>
-                      <Field
-                        label={t("record.linkedPackage")}
-                        id="lesson-package"
-                      >
-                        {noPackage ? (
-                          <Alert>
-                            <Info />
-                            <AlertDescription>
-                              <p>{t("record.noEligiblePackage")}</p>
-                              <Button
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                                className="mt-2"
-                                onClick={() =>
-                                  onSwitch({ type: "package", studentId })
-                                }
-                              >
-                                <Plus /> {t("overview.addPackage")}
-                              </Button>
-                            </AlertDescription>
-                          </Alert>
-                        ) : (
-                          <Choice
-                            id="lesson-package"
-                            value={selectedPackage}
-                            onChange={setPackageId}
-                            options={eligiblePackages.map((p) => ({
-                              value: p.id,
-                              label:
-                                p.name +
-                                " · " +
-                                t("common.creditCount", { count: p.remaining }),
-                            }))}
-                          />
-                        )}
+                      <Field label={t("record.grade")} id="grade">
+                        <Input
+                          id="grade"
+                          value={grade}
+                          onChange={(e) => setGrade(e.target.value)}
+                          placeholder={t("record.gradePlaceholder")}
+                          maxLength={50}
+                        />
                       </Field>
-                    </>
-                  )}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label={t("record.date")} id="date">
+                    </div>
+                    <Field label={t("record.phoneOptional")} id="phone">
                       <Input
-                        id="date"
+                        id="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder={t("record.phonePlaceholder")}
+                        maxLength={30}
+                      />
+                    </Field>
+                    <Field
+                      label={t("record.emailOptional")}
+                      id="email"
+                      hint={t("record.emailHint")}
+                    >
+                      <Input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder={t("auth.emailPlaceholder")}
+                        maxLength={150}
+                      />
+                    </Field>
+                  </>
+                )}
+                {modal.type === "package" && (
+                  <>
+                    <Field label={t("record.packageName")} id="package-name">
+                      <Input
+                        id="package-name"
+                        value={packageName}
+                        onChange={(e) => setPackageName(e.target.value)}
+                        required
+                        maxLength={120}
+                      />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label={t("record.granted")} id="granted">
+                        <Input
+                          id="granted"
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={1}
+                          required
+                          value={granted}
+                          onChange={(e) => setGranted(e.target.value)}
+                        />
+                      </Field>
+                      <Field label={t("record.price")} id="price">
+                        <Input
+                          id="price"
+                          inputMode="decimal"
+                          required
+                          placeholder="4800,00"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t("record.expiresOptional")} id="expires">
+                      <Input
+                        id="expires"
                         type="date"
-                        required
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
+                        min={dateKey()}
+                        value={expires}
+                        onChange={(e) => setExpires(e.target.value)}
                       />
                     </Field>
-                    <Field label={t("record.time")} id="time">
-                      <Input
-                        id="time"
-                        type="time"
-                        required
-                        value={time}
-                        onChange={(e) => setTime(e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label={t("record.duration")} id="duration">
-                      <Input
-                        id="duration"
-                        type="number"
-                        min={15}
-                        max={180}
-                        step={1}
-                        required
-                        value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
-                      />
-                    </Field>
-                    {modal.type === "lesson" && !modal.makeupForId && (
-                      <Field label={t("record.repeat")} id="weeks">
-                        <Choice
-                          id="weeks"
-                          value={weeks}
-                          onChange={setWeeks}
-                          options={[
-                            { value: "1", label: t("record.single") },
-                            {
-                              value: "4",
-                              label: t("record.weekly", { count: 4 }),
-                            },
-                            {
-                              value: "8",
-                              label: t("record.weekly", { count: 8 }),
-                            },
-                          ]}
+                    <Alert>
+                      <Info />
+                      <AlertDescription>
+                        {t("record.packageNote")}
+                      </AlertDescription>
+                    </Alert>
+                  </>
+                )}
+                {(modal.type === "lesson" || modal.type === "reschedule") && (
+                  <>
+                    {modal.type === "lesson" && (
+                      <>
+                        <Field label={t("record.topic")} id="topic">
+                          <Input
+                            id="topic"
+                            required
+                            maxLength={120}
+                            placeholder={t("record.topicPlaceholder")}
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                          />
+                        </Field>
+                        <Field
+                          label={t("record.linkedPackage")}
+                          id="lesson-package"
+                        >
+                          {noPackage ? (
+                            <Alert>
+                              <Info />
+                              <AlertDescription>
+                                <p>{t("record.noEligiblePackage")}</p>
+                                <Button
+                                  size="sm"
+                                  type="button"
+                                  variant="outline"
+                                  className="mt-2"
+                                  onClick={() =>
+                                    onSwitch({ type: "package", studentId })
+                                  }
+                                >
+                                  <Plus /> {t("overview.addPackage")}
+                                </Button>
+                              </AlertDescription>
+                            </Alert>
+                          ) : (
+                            <Choice
+                              id="lesson-package"
+                              value={selectedPackage}
+                              onChange={setPackageId}
+                              options={eligiblePackages.map((p) => ({
+                                value: p.id,
+                                label:
+                                  p.name +
+                                  " · " +
+                                  t("common.creditCount", {
+                                    count: p.remaining,
+                                  }),
+                              }))}
+                            />
+                          )}
+                        </Field>
+                      </>
+                    )}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label={t("record.date")} id="date">
+                        <Input
+                          id="date"
+                          type="date"
+                          required
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
+                      </Field>
+                      <Field label={t("record.time")} id="time">
+                        <Input
+                          id="time"
+                          type="time"
+                          required
+                          value={time}
+                          onChange={(e) => setTime(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label={t("record.duration")} id="duration">
+                        <Input
+                          id="duration"
+                          type="number"
+                          min={15}
+                          max={180}
+                          step={1}
+                          required
+                          value={duration}
+                          onChange={(e) => setDuration(e.target.value)}
+                        />
+                      </Field>
+                      {modal.type === "lesson" && !modal.makeupForId && (
+                        <Field label={t("record.repeat")} id="weeks">
+                          <Choice
+                            id="weeks"
+                            value={weeks}
+                            onChange={setWeeks}
+                            options={[
+                              { value: "1", label: t("record.single") },
+                              {
+                                value: "4",
+                                label: t("record.weekly", { count: 4 }),
+                              },
+                              {
+                                value: "8",
+                                label: t("record.weekly", { count: 8 }),
+                              },
+                            ]}
+                          />
+                        </Field>
+                      )}
+                    </div>
+                    {modal.type === "lesson" && (
+                      <Field label={t("record.location")} id="location">
+                        <Input
+                          id="location"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          maxLength={100}
+                          placeholder={t("record.locationPlaceholder")}
                         />
                       </Field>
                     )}
-                  </div>
-                  {modal.type === "lesson" && (
-                    <Field label={t("record.location")} id="location">
-                      <Input
-                        id="location"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        maxLength={100}
-                        placeholder={t("record.locationPlaceholder")}
+                    <p className="text-muted-foreground text-xs">
+                      {t("record.timezoneNote")}
+                    </p>
+                  </>
+                )}
+                {modal.type === "payment" && (
+                  <>
+                    <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm">
+                      <span className="text-muted-foreground">
+                        {t("record.studentBalance")}
+                      </span>
+                      <strong className="font-semibold tabular-nums">
+                        {money(balanceFor(data, studentId))}
+                      </strong>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label={t("record.amount")} id="amount">
+                        <Input
+                          id="amount"
+                          inputMode="decimal"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder="2400,00"
+                          required
+                        />
+                      </Field>
+                      <Field label={t("record.received")} id="received">
+                        <Input
+                          id="received"
+                          type="date"
+                          required
+                          max={dateKey()}
+                          value={received}
+                          onChange={(e) => setReceived(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                    <Field label={t("record.method")} id="method">
+                      <Choice
+                        id="method"
+                        value={method}
+                        onChange={setMethod}
+                        options={[
+                          {
+                            value: "TRANSFER",
+                            label: t("payments.methods.TRANSFER"),
+                          },
+                          { value: "CASH", label: t("payments.methods.CASH") },
+                          {
+                            value: "OTHER",
+                            label: t("payments.methods.OTHER"),
+                          },
+                        ]}
                       />
                     </Field>
-                  )}
-                  <p className="text-muted-foreground text-xs">
-                    {t("record.timezoneNote")}
-                  </p>
-                </>
-              )}
-              {modal.type === "payment" && (
-                <>
-                  <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm">
-                    <span className="text-muted-foreground">
-                      {t("record.studentBalance")}
-                    </span>
-                    <strong className="font-semibold tabular-nums">
-                      {money(balanceFor(data, studentId))}
-                    </strong>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label={t("record.amount")} id="amount">
+                    <Field label={t("record.referenceOptional")} id="reference">
                       <Input
-                        id="amount"
-                        inputMode="decimal"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="2400,00"
-                        required
+                        id="reference"
+                        value={reference}
+                        onChange={(e) => setReference(e.target.value)}
+                        maxLength={200}
+                        placeholder={t("record.referencePlaceholder")}
                       />
                     </Field>
-                    <Field label={t("record.received")} id="received">
-                      <Input
-                        id="received"
-                        type="date"
-                        required
-                        max={dateKey()}
-                        value={received}
-                        onChange={(e) => setReceived(e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  <Field label={t("record.method")} id="method">
-                    <Choice
-                      id="method"
-                      value={method}
-                      onChange={setMethod}
-                      options={[
-                        {
-                          value: "TRANSFER",
-                          label: t("payments.methods.TRANSFER"),
-                        },
-                        { value: "CASH", label: t("payments.methods.CASH") },
-                        { value: "OTHER", label: t("payments.methods.OTHER") },
-                      ]}
-                    />
-                  </Field>
-                  <Field label={t("record.referenceOptional")} id="reference">
-                    <Input
-                      id="reference"
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
-                      maxLength={200}
-                      placeholder={t("record.referencePlaceholder")}
-                    />
-                  </Field>
-                  <p className="text-muted-foreground text-xs">
-                    {t("record.paymentNote")}
-                  </p>
-                </>
-              )}
-            </>
+                    <p className="text-muted-foreground text-xs">
+                      {t("record.paymentNote")}
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+          {error && (
+            <div className="shrink-0">
+              <FormError>{error}</FormError>
+            </div>
           )}
-          {error && <FormError>{error}</FormError>}
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button
               type="button"
               variant="outline"
