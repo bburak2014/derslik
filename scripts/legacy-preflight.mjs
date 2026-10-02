@@ -27,7 +27,7 @@ function integer(value) {
     return BigInt(value);
   throw new Error("Kayıpsız tam sayı gerekli.");
 }
-export async function preflight(snapshot, objects) {
+function assertCompleteSnapshot(snapshot) {
   if (
     snapshot.format !== "derslik-d1-v4" ||
     snapshot.complete !== true ||
@@ -39,29 +39,31 @@ export async function preflight(snapshot, objects) {
   for (const name of tables)
     if (!Array.isArray(snapshot.tables?.[name]))
       throw new Error(`Eksik tablo: ${name}`);
-  const data = snapshot.tables;
-  const blockers = [],
-    warnings = [],
-    assets = [];
+}
+function checkRowIdentities(name, rows, workspaces, students, blockers) {
+  const ids = new Set();
+  for (const row of rows) {
+    if (!uuid.test(row.id) || ids.has(row.id))
+      blockers.push(`${name}: geçersiz/tekrarlanan kimlik ${row.id}`);
+    ids.add(row.id);
+    if (name !== "workspaces" && !workspaces.has(row.workspace_id))
+      blockers.push(`${name}/${row.id}: çalışma alanı eksik`);
+    if (
+      row.student_id &&
+      students.get(row.student_id)?.workspace_id !== row.workspace_id
+    )
+      blockers.push(`${name}/${row.id}: öğrenci bağlantısı uyumsuz`);
+  }
+}
+function checkIdentities(data, blockers) {
   const students = new Map(data.students.map((r) => [r.id, r]));
   const workspaces = new Set(data.workspaces.map((r) => r.id));
   for (const name of tables.filter(
     (n) => !["teaching_parts", "commands"].includes(n),
-  )) {
-    const ids = new Set();
-    for (const row of data[name]) {
-      if (!uuid.test(row.id) || ids.has(row.id))
-        blockers.push(`${name}: geçersiz/tekrarlanan kimlik ${row.id}`);
-      ids.add(row.id);
-      if (name !== "workspaces" && !workspaces.has(row.workspace_id))
-        blockers.push(`${name}/${row.id}: çalışma alanı eksik`);
-      if (
-        row.student_id &&
-        students.get(row.student_id)?.workspace_id !== row.workspace_id
-      )
-        blockers.push(`${name}/${row.id}: öğrenci bağlantısı uyumsuz`);
-    }
-  }
+  ))
+    checkRowIdentities(name, data[name], workspaces, students, blockers);
+}
+function checkPackageLedgers(data, blockers) {
   for (const p of data.packages) {
     const movement = data.credit_entries
       .filter((c) => c.package_id === p.id)
@@ -71,13 +73,17 @@ export async function preflight(snapshot, objects) {
         `packages/${p.id}: ders hakkı hareketleri ile kalan hak uyuşmuyor`,
       );
   }
+}
+function checkAssignmentDueDates(data, warnings) {
   for (const a of data.teaching_assignments)
     if (!a.due_on)
       warnings.push(
         `teaching_assignments/${a.id}: teslim tarihi boş; PostgreSQL due_on alanında null olarak koruyun`,
       );
-  // PostgreSQL'de bir öğretmende bir e-posta tek öğrenci kaydında durur
-  // (0012_one_student_per_email); aktarımda kopyaların e-postası boşaltılmalı.
+}
+// PostgreSQL'de bir öğretmende bir e-posta tek öğrenci kaydında durur
+// (0012_one_student_per_email); aktarımda kopyaların e-postası boşaltılmalı.
+function checkDuplicateEmails(data, warnings) {
   const emails = new Map();
   for (const s of data.students) {
     const email =
@@ -90,6 +96,8 @@ export async function preflight(snapshot, objects) {
       );
     else emails.set(key, s.id);
   }
+}
+function checkPaymentsAgainstCharges(data, blockers) {
   for (const s of data.students) {
     const charges = data.packages
       .filter((p) => p.student_id === s.id)
@@ -102,6 +110,30 @@ export async function preflight(snapshot, objects) {
         `students/${s.id}: tahsilat borçtan fazla; hedef tahsilat dağıtımı incelenmeli`,
       );
   }
+}
+async function describeAsset(f, objects) {
+  const key = `teaching/${f.workspace_id}/${f.id}`;
+  const file = resolve(objects, key);
+  const info = await stat(file);
+  if (!info.isFile() || BigInt(info.size) !== integer(f.size))
+    throw new Error("Boyut eşleşmiyor");
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  return {
+    id: f.id,
+    workspaceId: f.workspace_id,
+    studentId: f.student_id,
+    kind: f.kind,
+    sourceKey: key,
+    sizeBytes: String(info.size),
+    sha256: hash.digest("hex"),
+    target:
+      f.kind === "video"
+        ? "Cloudflare Stream (private, signed URLs)"
+        : `${f.workspace_id}/${f.student_id}/${f.id}`,
+  };
+}
+async function checkTeachingFiles(data, objects, blockers, assets) {
   for (const f of data.teaching_files) {
     if (f.state === "DELETED") continue;
     if (f.state !== "READY") {
@@ -111,33 +143,27 @@ export async function preflight(snapshot, objects) {
       continue;
     }
     if (!uuid.test(f.id) || !uuid.test(f.workspace_id)) continue;
-    const key = `teaching/${f.workspace_id}/${f.id}`;
     try {
-      const file = resolve(objects, key);
-      const info = await stat(file);
-      if (!info.isFile() || BigInt(info.size) !== integer(f.size))
-        throw new Error("Boyut eşleşmiyor");
-      const hash = createHash("sha256");
-      for await (const chunk of createReadStream(file)) hash.update(chunk);
-      assets.push({
-        id: f.id,
-        workspaceId: f.workspace_id,
-        studentId: f.student_id,
-        kind: f.kind,
-        sourceKey: key,
-        sizeBytes: String(info.size),
-        sha256: hash.digest("hex"),
-        target:
-          f.kind === "video"
-            ? "Cloudflare Stream (private, signed URLs)"
-            : `${f.workspace_id}/${f.student_id}/${f.id}`,
-      });
+      assets.push(await describeAsset(f, objects));
     } catch (e) {
       blockers.push(
         `teaching_files/${f.id}: dosya yedeği eksik veya tutarsız (${e.message})`,
       );
     }
   }
+}
+export async function preflight(snapshot, objects) {
+  assertCompleteSnapshot(snapshot);
+  const data = snapshot.tables;
+  const blockers = [],
+    warnings = [],
+    assets = [];
+  checkIdentities(data, blockers);
+  checkPackageLedgers(data, blockers);
+  checkAssignmentDueDates(data, warnings);
+  checkDuplicateEmails(data, warnings);
+  checkPaymentsAgainstCharges(data, blockers);
+  await checkTeachingFiles(data, objects, blockers, assets);
   return {
     format: "derslik-migration-preflight-v1",
     databaseWrites: 0,

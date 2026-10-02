@@ -98,6 +98,75 @@ function lockAge(lockDir, now) {
 /** Sahibi yazılmamış kilit bu süreden eskiyse bayattır (yazan süreç çöktü). */
 const OWNERLESS_STALE_MS = 30_000;
 
+/** Kilit klasörünü atomik olarak alır. Alındıysa bırakma işlevini, klasör
+ *  zaten varsa null döndürür; başka her hata fırlatılır. */
+function tryCreateLock(lockDir, ownerFile, pid) {
+  try {
+    fs.mkdirSync(lockDir);
+    fs.writeFileSync(ownerFile, String(pid));
+    return () => {
+      if (readOwner(ownerFile) === pid)
+        fs.rmSync(lockDir, { recursive: true, force: true });
+    };
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    return null;
+  }
+}
+
+/** Kilit bayat mı: sahibi yazılmamışsa yaşına, yazılmışsa sahibin yaşayıp
+ *  yaşamadığına bakılır. */
+function isStale(lockDir, owner, isAlive, now) {
+  return owner === null
+    ? lockAge(lockDir, now) > OWNERLESS_STALE_MS
+    : !isAlive(owner);
+}
+
+/** Geri alma muteksini alır. Başkası tutuyorsa false döner; tutan çökmüş
+ *  (30 saniyeden eski) ise muteksi de temizler ki sonraki tur alabilsin. */
+function tryTakeReclaimMutex(reclaimDir, now) {
+  try {
+    fs.mkdirSync(reclaimDir);
+    return true;
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    if (lockAge(reclaimDir, now) > OWNERLESS_STALE_MS)
+      fs.rmSync(reclaimDir, { recursive: true, force: true });
+    return false;
+  }
+}
+
+/** Geri alma muteksi elde: bayat kararını yeniden kontrol eder, hâlâ bayat ve
+ *  sahibi değişmediyse kilidi siler; muteksi her durumda bırakır. */
+function reclaimStaleLock(lockDir, ownerFile, reclaimDir, owner, isAlive, now) {
+  try {
+    const currentOwner = readOwner(ownerFile);
+    const stale = isStale(lockDir, currentOwner, isAlive, now);
+    if (stale && currentOwner === owner)
+      fs.rmSync(lockDir, { recursive: true, force: true });
+  } finally {
+    fs.rmSync(reclaimDir, { recursive: true, force: true });
+  }
+}
+
+/** Bekleme turu: süre dolduysa hata verir, ilk beklemede onWait'i çağırır,
+ *  sonra bir yoklama aralığı uyur. */
+function createWaiter({ lockDir, timeoutMs, pollMs, now, sleep, onWait }) {
+  const started = now();
+  let waited = false;
+  return async (owner) => {
+    if (now() - started >= timeoutMs)
+      throw new Error(
+        `Sonar kapısı: kilit ${Math.round(timeoutMs / 60_000)} dakikada alınamadı (${lockDir}).`,
+      );
+    if (!waited) {
+      onWait(owner);
+      waited = true;
+    }
+    await sleep(pollMs);
+  };
+}
+
 /** Aynı anda tek Sonar kapısı. Kilit klasörünü alır (mkdir atomiktir) ve
  *  bırakma işlevini döndürür. Sahibi yaşamayan kilit bayattır, alınır.
  *  Süre içinde alınamazsa hata verir. */
@@ -114,76 +183,20 @@ export async function acquireLock(lockDir, options = {}) {
   const ownerFile = path.join(lockDir, "pid");
   const reclaimDir = `${lockDir}.reclaim`;
   fs.mkdirSync(path.dirname(lockDir), { recursive: true });
-  const started = now();
-  let waited = false;
+  const wait = createWaiter({ lockDir, timeoutMs, pollMs, now, sleep, onWait });
   for (;;) {
-    try {
-      fs.mkdirSync(lockDir);
-      fs.writeFileSync(ownerFile, String(pid));
-      return () => {
-        if (readOwner(ownerFile) === pid)
-          fs.rmSync(lockDir, { recursive: true, force: true });
-      };
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-    }
+    const release = tryCreateLock(lockDir, ownerFile, pid);
+    if (release) return release;
     const owner = readOwner(ownerFile);
-    const stale =
-      owner === null
-        ? lockAge(lockDir, now) > OWNERLESS_STALE_MS
-        : !isAlive(owner);
-    if (stale) {
-      // İki bekleyici aynı anda bayat kilidi silip almasın diye geri alma muteksi kullan.
-      // Muteks başkası tarafından tutuluyorsa, onu da kontrol et.
-      try {
-        fs.mkdirSync(reclaimDir);
-      } catch (reclaimError) {
-        if (reclaimError.code === "EEXIST") {
-          // Başkası geri almaya çalışıyor. Onun kilidi eski mi kontrol et.
-          if (lockAge(reclaimDir, now) > OWNERLESS_STALE_MS) {
-            // Çökmüş geri alıcı; onun mutex'ini temizle.
-            fs.rmSync(reclaimDir, { recursive: true, force: true });
-          }
-          // Bu tur atla, normal timeout/bekleme yoluna dön.
-          if (now() - started >= timeoutMs)
-            throw new Error(
-              `Sonar kapısı: kilit ${Math.round(timeoutMs / 60_000)} dakikada alınamadı (${lockDir}).`,
-            );
-          if (!waited) {
-            onWait(owner);
-            waited = true;
-          }
-          await sleep(pollMs);
-          continue;
-        }
-        throw reclaimError;
-      }
-      // Geri alma muteksi tutuldu.
-      try {
-        // Bayat kararını yeniden kontrol et.
-        const currentOwner = readOwner(ownerFile);
-        const currentStale =
-          currentOwner === null
-            ? lockAge(lockDir, now) > OWNERLESS_STALE_MS
-            : !isAlive(currentOwner);
-        if (currentStale && currentOwner === owner) {
-          // Hala bayat ve değişmedi; sil.
-          fs.rmSync(lockDir, { recursive: true, force: true });
-        }
-        // Devam et (mkdir yeniden denene).
-      } finally {
-        fs.rmSync(reclaimDir, { recursive: true, force: true });
-      }
+    // İki bekleyici aynı anda bayat kilidi silip almasın diye geri alma muteksi
+    // kullanılır. Muteks başkasındaysa bu tur kilit beklenir.
+    if (
+      isStale(lockDir, owner, isAlive, now) &&
+      tryTakeReclaimMutex(reclaimDir, now)
+    ) {
+      reclaimStaleLock(lockDir, ownerFile, reclaimDir, owner, isAlive, now);
       continue;
     }
-    if (now() - started >= timeoutMs)
-      throw new Error(
-        `Sonar kapısı: kilit ${Math.round(timeoutMs / 60_000)} dakikada alınamadı (${lockDir}).`,
-      );
-    if (!waited) {
-      onWait(owner);
-      waited = true;
-    }
-    await sleep(pollMs);
+    await wait(owner);
   }
 }

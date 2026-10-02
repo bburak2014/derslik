@@ -45,129 +45,7 @@ export function sites({ mockAuth = true } = {}): Plugin {
 
       server.config.logger.info(`Sites local sign-in: ${localEmail}`);
       server.middlewares.use((request, response, next) => {
-        for (const name of Object.keys(request.headers)) {
-          if (name.startsWith("oai-authenticated-user-")) {
-            removeHeader(request, name);
-          }
-        }
-
-        let authority: URL;
-        let url: URL;
-        try {
-          authority = new URL(
-            `${secure ? "https" : "http"}://${request.headers.host}`,
-          );
-          url = new URL(request.url ?? "/", authority);
-        } catch {
-          if (authPaths.has((request.url ?? "/").split("?")[0])) {
-            respond(response, 403);
-          } else {
-            next();
-          }
-          return;
-        }
-
-        const hostname = authority.hostname
-          .replace(/^\[|\]$/g, "")
-          .toLowerCase();
-        if (
-          !localHosts.has(hostname) ||
-          !localAddresses.has(request.socket.remoteAddress ?? "") ||
-          url.origin !== authority.origin
-        ) {
-          if (authPaths.has(url.pathname)) respond(response, 403);
-          else next();
-          return;
-        }
-
-        const cookies = (request.headers.cookie ?? "")
-          .split(";")
-          .map((cookie) => cookie.trim())
-          .filter(Boolean);
-        const signInCookies = cookies
-          .filter((cookie) => cookie.startsWith(`${localCookieName}=`))
-          .map((cookie) => cookie.slice(localCookieName.length + 1));
-        const applicationCookies = cookies.filter(
-          (cookie) => !cookie.startsWith(`${localCookieName}=`),
-        );
-        if (applicationCookies.length !== cookies.length) {
-          removeHeader(request, "cookie");
-          if (applicationCookies.length) {
-            setHeader(request, "cookie", applicationCookies.join("; "));
-          }
-        }
-
-        if (url.pathname === "/callback") {
-          respond(response, 501);
-          return;
-        }
-
-        const signIn = url.pathname === "/signin-with-chatgpt";
-        const signOut = url.pathname === "/signout-with-chatgpt";
-        if (!signIn && !signOut) {
-          if (signInCookies.length === 1 && signInCookies[0] === "1") {
-            setHeader(request, "oai-authenticated-user-id", localUserId);
-            setHeader(request, "oai-authenticated-user-email", localEmail);
-            setHeader(
-              request,
-              "oai-authenticated-user-full-name",
-              localFullName,
-            );
-            setHeader(
-              request,
-              "oai-authenticated-user-full-name-encoding",
-              "percent-encoded-utf-8",
-            );
-          }
-          next();
-          return;
-        }
-
-        if (
-          (request.headers.origin && request.headers.origin !== url.origin) ||
-          request.headers["sec-fetch-site"] === "cross-site"
-        ) {
-          respond(response, 403);
-          return;
-        }
-
-        if (
-          request.headers["next-router-prefetch"] !== undefined ||
-          request.headers["x-middleware-prefetch"] === "1" ||
-          [request.headers.purpose, request.headers["sec-purpose"]].some(
-            (value) =>
-              typeof value === "string" &&
-              value
-                .split(/[;,]/)
-                .some((part) => part.trim().toLowerCase() === "prefetch"),
-          )
-        ) {
-          respond(response, 204);
-          return;
-        }
-
-        if (
-          request.method !== "GET" &&
-          (!signOut || request.method !== "POST")
-        ) {
-          response.setHeader("Allow", signIn ? "GET" : "GET, POST");
-          respond(response, 405);
-          return;
-        }
-
-        response.statusCode = request.method === "POST" ? 303 : 302;
-        response.setHeader("Cache-Control", "private, no-store");
-        response.setHeader(
-          "Location",
-          safeReturn(url.searchParams.get("return_to")),
-        );
-        response.setHeader(
-          "Set-Cookie",
-          `${localCookieName}=${signIn ? "1" : ""}; Path=/; ${
-            signOut ? "Max-Age=0; " : ""
-          }HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`,
-        );
-        response.end();
+        handleLocalAuth(request, response, next, secure);
       });
     },
     async closeBundle() {
@@ -191,6 +69,191 @@ export function sites({ mockAuth = true } = {}): Plugin {
       }
     },
   };
+}
+
+function handleLocalAuth(
+  request: IncomingMessage,
+  response: ServerResponse,
+  next: () => void,
+  secure: boolean,
+): void {
+  removeSpoofedIdentityHeaders(request);
+
+  const parsed = parseRequestUrl(request, secure);
+  if (!parsed) {
+    refuseAuthPath((request.url ?? "/").split("?")[0], response, next);
+    return;
+  }
+  const { authority, url } = parsed;
+  if (!isLocalRequest(request, authority, url)) {
+    refuseAuthPath(url.pathname, response, next);
+    return;
+  }
+
+  const signInCookies = takeSignInCookies(request);
+
+  if (url.pathname === "/callback") {
+    respond(response, 501);
+    return;
+  }
+
+  const signIn = url.pathname === "/signin-with-chatgpt";
+  const signOut = url.pathname === "/signout-with-chatgpt";
+  if (!signIn && !signOut) {
+    attachLocalIdentity(request, signInCookies);
+    next();
+    return;
+  }
+
+  if (isCrossSiteRequest(request, url)) {
+    respond(response, 403);
+    return;
+  }
+
+  if (isPrefetchRequest(request)) {
+    respond(response, 204);
+    return;
+  }
+
+  if (!isAllowedMethod(request.method, signOut)) {
+    response.setHeader("Allow", signIn ? "GET" : "GET, POST");
+    respond(response, 405);
+    return;
+  }
+
+  redirectAfterAuth(request, response, url, signIn, secure);
+}
+
+function removeSpoofedIdentityHeaders(request: IncomingMessage): void {
+  for (const name of Object.keys(request.headers)) {
+    if (name.startsWith("oai-authenticated-user-")) {
+      removeHeader(request, name);
+    }
+  }
+}
+
+function parseRequestUrl(
+  request: IncomingMessage,
+  secure: boolean,
+): { authority: URL; url: URL } | undefined {
+  try {
+    const authority = new URL(
+      `${secure ? "https" : "http"}://${request.headers.host}`,
+    );
+    return { authority, url: new URL(request.url ?? "/", authority) };
+  } catch {
+    return undefined;
+  }
+}
+
+function refuseAuthPath(
+  pathname: string,
+  response: ServerResponse,
+  next: () => void,
+): void {
+  if (authPaths.has(pathname)) respond(response, 403);
+  else next();
+}
+
+function isLocalRequest(
+  request: IncomingMessage,
+  authority: URL,
+  url: URL,
+): boolean {
+  const hostname = authority.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return (
+    localHosts.has(hostname) &&
+    localAddresses.has(request.socket.remoteAddress ?? "") &&
+    url.origin === authority.origin
+  );
+}
+
+// Removes the sign-in cookie from what the application sees and returns its
+// values.
+function takeSignInCookies(request: IncomingMessage): string[] {
+  const cookies = (request.headers.cookie ?? "")
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .filter(Boolean);
+  const signInCookies = cookies
+    .filter((cookie) => cookie.startsWith(`${localCookieName}=`))
+    .map((cookie) => cookie.slice(localCookieName.length + 1));
+  const applicationCookies = cookies.filter(
+    (cookie) => !cookie.startsWith(`${localCookieName}=`),
+  );
+  if (applicationCookies.length !== cookies.length) {
+    removeHeader(request, "cookie");
+    if (applicationCookies.length) {
+      setHeader(request, "cookie", applicationCookies.join("; "));
+    }
+  }
+  return signInCookies;
+}
+
+// Exactly one sign-in cookie holding "1" means the local account is signed in.
+function attachLocalIdentity(
+  request: IncomingMessage,
+  signInCookies: string[],
+): void {
+  if (signInCookies.length !== 1 || signInCookies[0] !== "1") return;
+  setHeader(request, "oai-authenticated-user-id", localUserId);
+  setHeader(request, "oai-authenticated-user-email", localEmail);
+  setHeader(request, "oai-authenticated-user-full-name", localFullName);
+  setHeader(
+    request,
+    "oai-authenticated-user-full-name-encoding",
+    "percent-encoded-utf-8",
+  );
+}
+
+function isCrossSiteRequest(request: IncomingMessage, url: URL): boolean {
+  const { origin } = request.headers;
+  if (origin && origin !== url.origin) return true;
+  return request.headers["sec-fetch-site"] === "cross-site";
+}
+
+function declaresPrefetch(value: string | string[] | undefined): boolean {
+  return (
+    typeof value === "string" &&
+    value.split(/[;,]/).some((part) => part.trim().toLowerCase() === "prefetch")
+  );
+}
+
+function isPrefetchRequest(request: IncomingMessage): boolean {
+  const { headers } = request;
+  return (
+    headers["next-router-prefetch"] !== undefined ||
+    headers["x-middleware-prefetch"] === "1" ||
+    [headers.purpose, headers["sec-purpose"]].some(declaresPrefetch)
+  );
+}
+
+// Signing in needs GET; signing out also accepts POST.
+function isAllowedMethod(
+  method: string | undefined,
+  signOut: boolean,
+): boolean {
+  return method === "GET" || (signOut && method === "POST");
+}
+
+// Only reached for sign-in or sign-out, so `signIn === false` means sign-out.
+function redirectAfterAuth(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: URL,
+  signIn: boolean,
+  secure: boolean,
+): void {
+  response.statusCode = request.method === "POST" ? 303 : 302;
+  response.setHeader("Cache-Control", "private, no-store");
+  response.setHeader("Location", safeReturn(url.searchParams.get("return_to")));
+  response.setHeader(
+    "Set-Cookie",
+    `${localCookieName}=${signIn ? "1" : ""}; Path=/; ${
+      signIn ? "" : "Max-Age=0; "
+    }HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`,
+  );
+  response.end();
 }
 
 function removeHeader(request: IncomingMessage, name: string): void {
