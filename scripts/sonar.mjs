@@ -106,8 +106,11 @@ function ensureServer() {
   } catch {
     docker(["network", "create", NETWORK]);
   }
-  // Sabit sürümden farklı ya da bütün ağ arayüzlerine açık bir kapsayıcı
-  // yeniden kurulur. Veri birimleri silinmez: analizler ve parola korunur.
+  // Sabit sürümden farklı ya da bütün ağ arayüzlerine açık kapsayıcı yeniden
+  // kurulur; veri birimleri silinmez, analizler ve parola korunur. Yalnızca
+  // bu betiğin yönettiği derslik-sonarqube silinir: SONAR_CONTAINER ile verilen
+  // başka bir kapsayıcı (ör. derslik-quality-sonar) kullanıcıya aittir, veri
+  // birimleri adsız olabilir; ona dokunulmaz, yalnızca uyarılır.
   const current = spawnSync(
     "docker",
     [
@@ -126,10 +129,16 @@ function ensureServer() {
         SONARQUBE_IMAGE,
       )
     ) {
-      console.log(
-        `SonarQube kapsayıcısı ${SONARQUBE_IMAGE} ile, yalnızca 127.0.0.1'de yeniden kuruluyor (veri korunur)...`,
-      );
-      docker(["rm", "-f", CONTAINER]);
+      if (CONTAINER === "derslik-sonarqube") {
+        console.log(
+          `SonarQube kapsayıcısı ${SONARQUBE_IMAGE} ile, yalnızca 127.0.0.1'de yeniden kuruluyor (veri korunur)...`,
+        );
+        docker(["rm", "-f", CONTAINER]);
+      } else {
+        console.warn(
+          `Uyarı: ${CONTAINER} kapsayıcısı sabit imajda (${SONARQUBE_IMAGE}) değil ya da yalnızca 127.0.0.1'e bağlı değil; şu anki imajı ${image}. Silinmedi, olduğu gibi kullanılıyor.`,
+        );
+      }
     }
   }
   const state = spawnSync(
@@ -353,6 +362,10 @@ if (gate) {
     console.error(`Sonar kapısı: ${error.message}`);
     return true;
   });
-  process.exit(failed ? 1 : 0);
+  // process.exit boruya yazılan büyük çıktıyı keser (macOS'ta 128 KiB'de);
+  // bu yüzden çıkış kodu verilir ve betik kendiliğinden biter. Kilit "exit"
+  // olayında yine bırakılır.
+  process.exitCode = failed ? 1 : 0;
+} else {
+  await summary(auth, taskId);
 }
-await summary(auth, taskId);
