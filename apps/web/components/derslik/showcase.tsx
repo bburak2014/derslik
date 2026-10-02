@@ -139,14 +139,14 @@ function Chips<T extends string>({
   label,
   onChange,
   max,
-}: {
+}: Readonly<{
   id: string;
   options: readonly T[];
   value: T[];
   label: (v: T) => string;
   onChange: (v: T[]) => void;
   max?: number;
-}) {
+}>) {
   return (
     <ToggleGroup
       id={id}
@@ -181,12 +181,12 @@ function RequestCard({
   busy,
   onDecide,
   onOpenStudent,
-}: {
+}: Readonly<{
   request: LessonRequest;
   busy: boolean;
   onDecide: (decision: "accept" | "decline") => void;
   onOpenStudent: (id: string) => void;
-}) {
+}>) {
   return (
     <Card
       data-notice-target={request.id}
@@ -278,7 +278,7 @@ export function ShowcaseView({
   onPending,
   onAccepted,
   onOpenStudent,
-}: {
+}: Readonly<{
   workspaceId: string;
   fallbackName: string;
   /** Bildirimden gelindiyse vurgulanacak istek. */
@@ -288,7 +288,7 @@ export function ShowcaseView({
   /** Kabul edilen öğrenci öğrenci listesine eklendi; çalışma alanı yenilenir. */
   onAccepted?: () => void;
   onOpenStudent: (id: string) => void;
-}) {
+}>) {
   const [data, setData] = useState<Showcase | null>(null),
     [error, setError] = useState(""),
     [tab, setTab] = useState<Tab | null>(null),
@@ -540,12 +540,12 @@ function ProfileEditor({
   showcase,
   fallbackName,
   onSaved,
-}: {
+}: Readonly<{
   workspaceId: string;
   showcase: Showcase;
   fallbackName: string;
   onSaved: () => Promise<Showcase | null>;
-}) {
+}>) {
   const saved = showcase.profile;
   const [form, setForm] = useState<TeacherProfileInput>(() =>
       saved

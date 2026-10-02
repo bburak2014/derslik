@@ -38,10 +38,10 @@ const statuses: Record<string, [Tone, MessageKey]> = {
 export function Subscription({
   workspaceId,
   onUpdate,
-}: {
+}: Readonly<{
   workspaceId: string;
   onUpdate: () => void;
-}) {
+}>) {
   const [data, setData] = useState<SubscriptionState | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);

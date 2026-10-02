@@ -256,7 +256,7 @@ export function useMessageThreads(path: string | null) {
 export type ThreadStore = ReturnType<typeof useMessageThreads>;
 
 const tints = ["sage", "peach", "lavender", "blue"];
-function ChatAvatar({ thread }: { thread: MessageThread }) {
+function ChatAvatar({ thread }: Readonly<{ thread: MessageThread }>) {
   // Öğretmen veli yazışmasını simgeyle, diğerlerini karşı tarafın baş
   // harfleriyle görür; renk adın kendisinden gelir (öğrenci listesindeki gibi).
   const name =
@@ -288,13 +288,13 @@ function ThreadRow({
   teacher,
   now,
   onOpen,
-}: {
+}: Readonly<{
   thread: MessageThread;
   selected: boolean;
   teacher: boolean;
   now: number;
   onOpen: (linkId: string) => void;
-}) {
+}>) {
   const meta = useId();
   return (
     <Item
@@ -406,7 +406,7 @@ export function MessagesView({
   studentName,
   onClearStudent,
   refreshAt = 0,
-}: {
+}: Readonly<{
   store: ThreadStore;
   /** Yazışma rotalarının kökü (…/messages). */
   base: string;
@@ -422,7 +422,7 @@ export function MessagesView({
   onClearStudent?: () => void;
   /** Bildirime her dokunuşta değişir; liste ve açık yazışma yeniden alınır. */
   refreshAt?: number;
-}) {
+}>) {
   const { threads, error, reload } = store;
   const [query, setQuery] = useState(""),
     [onlyUnread, setOnlyUnread] = useState(false),
@@ -712,7 +712,7 @@ function Conversation({
   teacher,
   onBack,
   refreshAt,
-}: {
+}: Readonly<{
   base: string;
   linkId: string;
   /** Listedeki satır: yazışma yüklenirken başlık hemen görünür. */
@@ -721,7 +721,7 @@ function Conversation({
   teacher: boolean;
   onBack?: () => void;
   refreshAt: number;
-}) {
+}>) {
   const path = `${base}/${linkId}`;
   const { upsert } = store;
   const [page, setPage] = useState<Page | null>(null),

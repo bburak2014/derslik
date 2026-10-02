@@ -17,13 +17,13 @@ export function SidebarAccount({
   switcher,
   onSignout,
   children,
-}: {
+}: Readonly<{
   displayName: string;
   role: string;
   switcher?: React.ReactNode;
   onSignout?: () => void;
   children?: React.ReactNode;
-}) {
+}>) {
   return (
     <SidebarFooter className="p-6 gap-4">
       <ThemeToggle />
@@ -58,11 +58,11 @@ export function Topbar({
   root,
   current,
   children,
-}: {
+}: Readonly<{
   root: string;
   current: string;
   children?: React.ReactNode;
-}) {
+}>) {
   return (
     <>
       <a href="#main-content" className="skip-link">

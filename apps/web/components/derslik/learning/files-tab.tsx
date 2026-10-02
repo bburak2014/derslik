@@ -46,7 +46,7 @@ import {
   UploadAside,
 } from "./shared";
 
-export function FilesTab({ ctx }: { ctx: LearningCtx }) {
+export function FilesTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
   const {
     view,
     owner,

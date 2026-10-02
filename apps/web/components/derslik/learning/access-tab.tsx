@@ -25,7 +25,7 @@ import {
   whatsappInviteUrl,
 } from "./shared";
 
-export function AccessTab({ ctx }: { ctx: LearningCtx }) {
+export function AccessTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
   const {
     workspaceId,
     studentId,

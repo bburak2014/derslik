@@ -92,10 +92,10 @@ export type FormSpec = {
 export function ActionForm({
   spec,
   onClose,
-}: {
+}: Readonly<{
   spec: FormSpec | null;
   onClose: () => void;
-}) {
+}>) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
@@ -215,10 +215,10 @@ export type Confirmation = {
 export function ConfirmDialog({
   state,
   onClose,
-}: {
+}: Readonly<{
   state: Confirmation | null;
   onClose: () => void;
-}) {
+}>) {
   return (
     <AlertDialog open={!!state} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent>
@@ -319,11 +319,11 @@ export function SectionHeading({
   title,
   description,
   children,
-}: {
+}: Readonly<{
   title: string;
   description: string;
   children?: React.ReactNode;
-}) {
+}>) {
   // Dar ekranda düğmeler başlığın altına iner; başlık birkaç harflik bir
   // sütuna sıkışmaz.
   return (
@@ -347,14 +347,14 @@ export function LessonSchedule({
   lessons,
   children,
   extra,
-}: {
+}: Readonly<{
   lessons: PortalLesson[];
   /** Başlığın yanındaki düğmeler (yenile). */
   children?: React.ReactNode;
   /** Dersin yanındaki ek öğe (ayarlama etiketi, iptal). `now` bileşenin
    *  dakikada bir ilerleyen saatidir. */
   extra?: (lesson: PortalLesson, now: number) => React.ReactNode;
-}) {
+}>) {
   // Süren dersi ve "bugün/yarın" etiketini güncel tutmak için dakikada bir
   // ilerleyen saat; öğretmen günlüğündeki ders satırlarıyla aynı yaklaşım.
   const [clock, setClock] = useState(() => Date.now());
@@ -456,7 +456,7 @@ export function LessonItem({
   chip,
   status = false,
   extra,
-}: {
+}: Readonly<{
   lesson: PortalLesson;
   day: string;
   /** Sıradaki ya da süren ders: kart fosforlu, yanında bu etiket. */
@@ -465,7 +465,7 @@ export function LessonItem({
   status?: boolean;
   /** Satırın sağındaki ek öğe (ör. ayarlama etiketi ve iptal). */
   extra?: React.ReactNode;
-}) {
+}>) {
   return (
     <Item
       role="listitem"
@@ -527,14 +527,14 @@ export function EmptyNote({
   title,
   children,
   role,
-}: {
+}: Readonly<{
   icon: LucideIcon;
   title: string;
   children: React.ReactNode;
   /** Bir listenin (ItemGroup) içindeyse "listitem": ekran okuyucu ve
    *  otomatik denetim listenin yalnızca öğe içerdiğini görsün. */
   role?: "listitem";
-}) {
+}>) {
   return (
     <Empty role={role} className="border md:p-10">
       <EmptyHeader>
@@ -554,11 +554,11 @@ export function FilePicker({
   busy,
   disabled,
   onPick,
-}: {
+}: Readonly<{
   busy: boolean;
   disabled: boolean;
   onPick: (file: File) => void;
-}) {
+}>) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -597,14 +597,14 @@ export function IconAction({
   disabled,
   danger,
   outline,
-}: {
+}: Readonly<{
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
   outline?: boolean;
-}) {
+}>) {
   return (
     <TooltipProvider>
       <Tooltip>
@@ -660,7 +660,7 @@ export function whatsappInviteUrl(phone: string, name: string, invite: string) {
 // Yükleme formu okunabilir genişlikte kalınca sağda geniş bir boşluk kalıyordu.
 // Oraya dekor yerine işin kendisine ait bilgi konuyor: akışın adımları, kabul
 // edilen dosya kuralları ve öğrencinin sonunda ne göreceği.
-export function UploadAside({ kind }: { kind: "files" | "videos" }) {
+export function UploadAside({ kind }: Readonly<{ kind: "files" | "videos" }>) {
   const video = kind === "videos";
   const steps = video
     ? [t("learn.videoStep1"), t("learn.videoStep2"), t("learn.videoStep3")]

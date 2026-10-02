@@ -178,10 +178,10 @@ const threadFromUrl = (search?: string) =>
 function DiscoverNavigation({
   current,
   onNavigate,
-}: {
+}: Readonly<{
   current: PortalPage;
   onNavigate: (page: PortalPage) => void;
-}) {
+}>) {
   const { setOpenMobile } = useSidebar();
   return (
     <SidebarMenu>
@@ -212,13 +212,13 @@ function PortalNavigation({
   current,
   onNavigate,
   unread,
-}: {
+}: Readonly<{
   tabs: LearningTabInfo[];
   current: PortalPage;
   onNavigate: (tab: PortalPage) => void;
   /** Öğretmenden gelen okunmamış mesajlar. */
   unread: number;
-}) {
+}>) {
   const { setOpenMobile } = useSidebar();
   if (!tabs.length)
     return (
@@ -261,7 +261,7 @@ function PortalNavigation({
 
 /** Logo: sayfa yeniden yüklenmeden ilk sekmeye döner; telefonda menüyü de
  *  kapatır. */
-function PortalBrand({ onHome }: { onHome: () => void }) {
+function PortalBrand({ onHome }: Readonly<{ onHome: () => void }>) {
   const { setOpenMobile } = useSidebar();
   return (
     <Link
@@ -297,7 +297,7 @@ export function Portal({
   onStartTeaching,
   teacherAccount = false,
   initialSearch,
-}: {
+}: Readonly<{
   access: Access | null;
   displayName: string;
   switcher?: React.ReactNode;
@@ -314,7 +314,7 @@ export function Portal({
   teacherAccount?: boolean;
   /** Sayfanın sorgu dizesi: sunucu ve istemci ilk çizimde aynı sekmeyi seçer. */
   initialSearch?: string;
-}) {
+}>) {
   const role: PortalRole = access?.role === "GUARDIAN" ? "GUARDIAN" : "STUDENT";
   // Veli hesabı adına ders isteği gönderilmez; vitrin yalnızca öğrencide.
   // Öğretmen hesabı da istek gönderemez (bir e-posta ya öğretmen ya öğrenci).

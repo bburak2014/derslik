@@ -40,7 +40,7 @@ export {
 export { AccountExtras } from "./learning/inbox";
 export type { LearningPanelProps } from "./learning/use-learning-panel";
 
-export function LearningPanel(props: LearningPanelProps) {
+export function LearningPanel(props: Readonly<LearningPanelProps>) {
   const ctx = useLearningPanel(props);
   const {
     view,

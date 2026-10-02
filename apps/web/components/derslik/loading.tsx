@@ -12,7 +12,9 @@ export { Skeleton, Spinner };
  * Sayfa ya da bölüm yüklenirken alanın ortasında dönen simge.
  * Görünen metin yok; ekran okuyucu için etiket var.
  */
-export function PageLoader({ compact = false }: { compact?: boolean }) {
+export function PageLoader({
+  compact = false,
+}: Readonly<{ compact?: boolean }>) {
   return (
     <div
       className={"loading-state" + (compact ? " is-compact" : "")}

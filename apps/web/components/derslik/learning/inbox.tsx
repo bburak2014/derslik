@@ -77,12 +77,12 @@ function UsageMeter({
   used,
   limit,
   unit,
-}: {
+}: Readonly<{
   label: string;
   used: number;
   limit: number;
   unit?: string;
-}) {
+}>) {
   const percent = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   return (
     <div className="grid gap-2">
@@ -110,11 +110,11 @@ function UsageMeter({
 export function AccountExtras({
   workspaceId,
   onOpen,
-}: {
+}: Readonly<{
   workspaceId?: string;
   /** Bildirime tıklanınca ilgili sayfayı açar. */
   onOpen?: (target: NoticeTarget) => void;
-}) {
+}>) {
   const [open, setOpen] = useState(false),
     [tab, setTab] = useState("inbox"),
     [inbox, setInbox] = useState<Notice[]>([]),

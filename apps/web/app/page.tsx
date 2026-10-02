@@ -15,9 +15,9 @@ const searchString = (params: Record<string, string | string[] | undefined>) =>
   ).toString();
 export default async function Home({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   if (configured()) {
     const signedIn = await hasSessionCookie();
     return (

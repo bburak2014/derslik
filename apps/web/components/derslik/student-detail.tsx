@@ -58,12 +58,12 @@ function NoteEditor({
   note,
   mutate,
   busy,
-}: {
+}: Readonly<{
   studentId: string;
   note?: PrivateNote;
   mutate: Mutate;
   busy: boolean;
-}) {
+}>) {
   const [body, setBody] = useState(note?.body || "");
   return (
     <form
@@ -114,7 +114,7 @@ export function StudentDetail({
   focus,
   onMessages,
   messagesUnread = 0,
-}: {
+}: Readonly<{
   workspaceId?: string;
   /** "Mesajlar": öğrencinin yazışmalarını açar; bağlı hesabı yoksa false. */
   onMessages?: (studentId: string) => Promise<boolean>;
@@ -128,7 +128,7 @@ export function StudentDetail({
   onClose: () => void;
   mutate: Mutate;
   busy: boolean;
-}) {
+}>) {
   // invite bir sayaç: kısayola arka arkaya basıldığında da panel yeniden
   // kurulsun ve davet formu tekrar açılsın.
   const [tabState, setTabState] = useState({

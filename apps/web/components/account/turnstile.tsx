@@ -52,12 +52,12 @@ export function Turnstile({
   round,
   onToken,
   onError,
-}: {
+}: Readonly<{
   siteKey: string;
   round: number;
   onToken: (token: string) => void;
   onError: () => void;
-}) {
+}>) {
   const holder = useRef<HTMLDivElement>(null);
   const widget = useRef<string | undefined>(undefined);
   const handlers = useRef({ onToken, onError });

@@ -15,14 +15,14 @@ export function VideoPlayer({
   initialTime,
   onAsk,
   onProgress,
-}: {
+}: Readonly<{
   video: Video;
   mediaPath: string;
   canAsk: boolean;
   initialTime: number;
   onAsk: (seconds: number) => void;
   onProgress: (seconds: number) => Promise<void>;
-}) {
+}>) {
   const ref = useRef<HTMLVideoElement>(null),
     position = useRef(initialTime),
     playing = useRef(false),

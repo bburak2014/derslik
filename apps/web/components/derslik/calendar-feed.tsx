@@ -37,9 +37,9 @@ type Feed = { data: { url: string } };
  *  öğrenci ve veli bağlı oldukları öğrencilerin derslerini takviminde görür. */
 export function CalendarFeedButton({
   size = "default",
-}: {
+}: Readonly<{
   size?: "default" | "sm";
-}) {
+}>) {
   const [open, setOpen] = useState(false),
     [url, setUrl] = useState(""),
     [error, setError] = useState(""),

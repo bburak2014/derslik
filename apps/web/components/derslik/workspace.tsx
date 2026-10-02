@@ -156,7 +156,7 @@ function Navigation({
   count,
   requests,
   unread,
-}: {
+}: Readonly<{
   view: View;
   onNavigate: (view: View) => void;
   count: number;
@@ -164,7 +164,7 @@ function Navigation({
   requests: number;
   /** Öğrenci ve velilerden gelen okunmamış mesajlar. */
   unread: number;
-}) {
+}>) {
   const { setOpenMobile } = useSidebar();
   return (
     <SidebarMenu>
@@ -203,7 +203,7 @@ export default function Workspace({
   focus,
   onNotice,
   initialSearch = "",
-}: {
+}: Readonly<{
   displayName: string;
   connected: import("@derslik/api-client").Access;
   onSignout: () => void;
@@ -216,7 +216,7 @@ export default function Workspace({
   onNotice?: (target: import("@derslik/contracts").NoticeTarget) => void;
   /** Sayfanın sorgu dizesi: sunucu ve istemci ilk çizimde aynı görünümü seçer. */
   initialSearch?: string;
-}) {
+}>) {
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace),
     [loading, setLoading] = useState(true),
     [loadError, setLoadError] = useState(""),

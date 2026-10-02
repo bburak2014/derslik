@@ -49,7 +49,7 @@ import {
   UploadAside,
 } from "./shared";
 
-export function VideosTab({ ctx }: { ctx: LearningCtx }) {
+export function VideosTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
   const {
     studentId,
     view,

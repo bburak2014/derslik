@@ -78,7 +78,10 @@ export function creditsFor(data: WorkspaceData, id: string) {
 }
 /** Paketteki haklar defter kareleri gibi: dolu kare kalan hak. Kareler yalnızca
  *  süsleme; sayı yanında metin olarak zaten okunuyor. */
-export function CreditPips({ data, id }: { data: WorkspaceData; id: string }) {
+export function CreditPips({
+  data,
+  id,
+}: Readonly<{ data: WorkspaceData; id: string }>) {
   const packs = data.packages.filter(
     (p) => p.student_id === id && (!p.expires_on || p.expires_on >= dateKey()),
   );
@@ -99,10 +102,10 @@ export function CreditPips({ data, id }: { data: WorkspaceData; id: string }) {
 export function StudentAvatar({
   student,
   large = false,
-}: {
+}: Readonly<{
   student: Student;
   large?: boolean;
-}) {
+}>) {
   const colors = ["sage", "peach", "lavender", "blue"];
   const idx =
     Array.from(student.name).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4;
@@ -117,7 +120,7 @@ export function StudentAvatar({
     </span>
   );
 }
-export function Status({ status }: { status: Lesson["status"] }) {
+export function Status({ status }: Readonly<{ status: Lesson["status"] }>) {
   if (status === "COMPLETED")
     return (
       <ToneBadge tone="ok">
@@ -136,10 +139,10 @@ export function Status({ status }: { status: Lesson["status"] }) {
 export function CreditBadge({
   count,
   unit,
-}: {
+}: Readonly<{
   count: number;
   unit: "lessons" | "credits";
-}) {
+}>) {
   const low = count <= 2;
   return (
     <ToneBadge tone={low ? "warn" : "info"} className="tabular-nums">
@@ -155,12 +158,12 @@ export function Empty({
   title,
   text,
   action,
-}: {
+}: Readonly<{
   icon?: typeof CalendarDays;
   title: string;
   text: string;
   action?: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="empty-state">
       <div className="empty-icon">
@@ -179,13 +182,13 @@ export function LessonRows({
   actions,
   busy = false,
   showDate = false,
-}: {
+}: Readonly<{
   lessons: Lesson[];
   data: WorkspaceData;
   actions: Actions;
   busy?: boolean;
   showDate?: boolean;
-}) {
+}>) {
   // Süren dersi işaretlemek için saat; dakikada bir ilerler.
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
@@ -313,14 +316,14 @@ export function Overview({
   onAddStudent,
   onSeed,
   busy,
-}: {
+}: Readonly<{
   data: WorkspaceData;
   actions: Actions;
   onNavigate: (v: View) => void;
   onAddStudent: () => void;
   onSeed?: () => void;
   busy: boolean;
-}) {
+}>) {
   const today = dateKey(),
     todayLessons = data.lessons.filter((l) => dateKey(l.starts_at) === today),
     next = data.lessons.filter(
@@ -625,7 +628,7 @@ export function CalendarView({
   onSelectDay,
   busy,
   workspaceId,
-}: {
+}: Readonly<{
   data: WorkspaceData;
   actions: Actions;
   selectedDay: string;
@@ -633,7 +636,7 @@ export function CalendarView({
   busy: boolean;
   /** Müsaitlik ayarları bu çalışma alanınındır. */
   workspaceId: string;
-}) {
+}>) {
   const [mode, setMode] = useState("day"),
     today = dateKey();
   const dayOfWeek = new Date(selectedDay + "T12:00:00+03:00").getUTCDay();
@@ -767,12 +770,12 @@ export function StudentsView({
   actions,
   search,
   onAdd,
-}: {
+}: Readonly<{
   data: WorkspaceData;
   actions: Actions;
   search: string;
   onAdd: () => void;
-}) {
+}>) {
   const [filter, setFilter] = useState("active");
   const shown = data.students.filter(
     (s) =>
@@ -918,11 +921,11 @@ export function PaymentsView({
   data,
   actions,
   busy,
-}: {
+}: Readonly<{
   data: WorkspaceData;
   actions: Actions;
   busy: boolean;
-}) {
+}>) {
   const due = data.students
     .filter((s) => balanceFor(data, s.id) > 0)
     .sort((a, b) => balanceFor(data, b.id) - balanceFor(data, a.id));

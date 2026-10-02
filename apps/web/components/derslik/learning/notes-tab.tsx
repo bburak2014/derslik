@@ -16,7 +16,7 @@ import { ToneBadge } from "../feedback";
 import { type LearningCtx } from "./use-learning-panel";
 import { SectionHeading, EmptyNote } from "./shared";
 
-export function NotesTab({ ctx }: { ctx: LearningCtx }) {
+export function NotesTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
   const { view, owner, data, simple, refresh } = ctx;
   return (
     <>

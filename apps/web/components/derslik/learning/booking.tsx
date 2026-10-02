@@ -1,7 +1,12 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, CalendarPlus, TriangleAlert, Wallet } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarPlus,
+  TriangleAlert,
+  Wallet,
+} from "lucide-react";
 import { ApiError } from "@derslik/api-client";
 import {
   canCancelBooking,
@@ -45,10 +50,10 @@ import type { LearningCtx } from "./use-learning-panel";
 export function BookButton({
   ctx,
   onOpenMessages,
-}: {
+}: Readonly<{
   ctx: LearningCtx;
   onOpenMessages?: () => void;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const { reload } = ctx;
   // Pencerenin saat yükleyicisi bunlara bağlı; her çizimde yeniden
@@ -83,7 +88,7 @@ function BookingDialog({
   onClose,
   onChanged,
   onOpenMessages,
-}: {
+}: Readonly<{
   workspaceId: string;
   studentId: string;
   /** Öğrencinin dersleri; planlı dersi olan günler uyarı tonuyla görünür. */
@@ -92,7 +97,7 @@ function BookingDialog({
   /** Ders listesi ve ayarlama özeti yenilensin (portal verisi). */
   onChanged: () => void;
   onOpenMessages?: () => void;
-}) {
+}>) {
   const base = `/portal/${workspaceId}/${studentId}/booking`;
   const [slots, setSlots] = useState<BookingSlots | null>(null),
     [error, setError] = useState(""),
@@ -355,11 +360,11 @@ export function BookedLessonExtra({
   ctx,
   lesson,
   now,
-}: {
+}: Readonly<{
   ctx: LearningCtx;
   lesson: PortalLesson;
   now: number;
-}) {
+}>) {
   const booking = "booking" in ctx.data ? ctx.data.booking : null;
   const upcoming =
     lesson.status === "SCHEDULED" && Date.parse(lesson.ends_at) > now;

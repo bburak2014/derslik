@@ -14,7 +14,7 @@ export function PublicDirectory({
   teacherId,
   hasSession = true,
   openRequest = false,
-}: {
+}: Readonly<{
   teacherId?: string;
   /** ?request=1: profil istek penceresi açık gelir. Sunucu okur; sayfa
    *  sunucuda çizilirken `location` yoktur. */
@@ -22,7 +22,7 @@ export function PublicDirectory({
   /** Sunucu oturum çerezi görmediyse ziyaretçi anonimdir; /api/session
    *  sorulmaz (konsolda boşuna 401 kalmaz, profil hemen çizilir). */
   hasSession?: boolean;
-}) {
+}>) {
   const [signedIn, setSignedIn] = useState<boolean | null>(
     hasSession ? null : false,
   );

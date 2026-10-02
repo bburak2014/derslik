@@ -51,7 +51,9 @@ const issueText = (message: string) =>
   isMessageKey(message) ? t(message) : t("api.invalidFields");
 
 /** Takvim araç çubuğundaki "Müsaitlik" düğmesi; yanında açık/kapalı durumu. */
-export function AvailabilityButton({ workspaceId }: { workspaceId: string }) {
+export function AvailabilityButton({
+  workspaceId,
+}: Readonly<{ workspaceId: string }>) {
   const [enabled, setEnabled] = useState<boolean | null>(null),
     [open, setOpen] = useState(false);
   useEffect(() => {
@@ -90,11 +92,11 @@ function AvailabilityDialog({
   workspaceId,
   onClose,
   onSaved,
-}: {
+}: Readonly<{
   workspaceId: string;
   onClose: () => void;
   onSaved: (settings: BookingSettings) => void;
-}) {
+}>) {
   const [form, setForm] = useState<BookingSettings | null>(null),
     [issues, setIssues] = useState<Record<string, string>>({}),
     [error, setError] = useState(""),
@@ -274,7 +276,9 @@ function AvailabilityDialog({
                             onClick={() =>
                               edit((f) => ({
                                 ...f,
-                                windows: f.windows.filter((_, i) => i !== index),
+                                windows: f.windows.filter(
+                                  (_, i) => i !== index,
+                                ),
                               }))
                             }
                           >
@@ -459,12 +463,12 @@ function TimeSelect({
   value,
   options,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
-}) {
+}>) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger aria-label={label} className="w-28">
@@ -488,14 +492,14 @@ function NumberSelect({
   options,
   format,
   onChange,
-}: {
+}: Readonly<{
   id: string;
   label: string;
   value: number;
   options: number[];
   format: (n: number) => string;
   onChange: (value: number) => void;
-}) {
+}>) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>

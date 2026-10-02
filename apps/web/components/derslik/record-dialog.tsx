@@ -46,12 +46,12 @@ function Field({
   id,
   children,
   hint,
-}: {
+}: Readonly<{
   label: string;
   id: string;
   children: React.ReactNode;
   hint?: string;
-}) {
+}>) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
@@ -66,13 +66,13 @@ function Choice({
   onChange,
   options,
   placeholder = t("common.choose"),
-}: {
+}: Readonly<{
   id: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   placeholder?: string;
-}) {
+}>) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger id={id} className="w-full">
@@ -96,14 +96,14 @@ export function RecordDialog({
   onSwitch,
   mutate,
   busy,
-}: {
+}: Readonly<{
   modal: ModalState;
   data: WorkspaceData;
   onClose: () => void;
   onSwitch: (m: ModalState) => void;
   mutate: Mutate;
   busy: boolean;
-}) {
+}>) {
   const existing = modal.type === "student" ? modal.student : undefined;
   const lesson = modal.type === "reschedule" ? modal.lesson : undefined;
   const activeStudents = data.students.filter(

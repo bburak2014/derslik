@@ -4,9 +4,9 @@ import { hasSessionCookie } from "@/lib/server/session";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
-}: {
+}: Readonly<{
   params: Promise<{ token: string }>;
-}) {
+}>) {
   const { token } = await params;
   if (!/^[a-f0-9]{64}$/.test(token))
     return (

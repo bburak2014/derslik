@@ -21,7 +21,7 @@ import { ToneBadge } from "../feedback";
 import { type LearningCtx } from "./use-learning-panel";
 import { SectionHeading } from "./shared";
 
-export function PaymentsTab({ ctx }: { ctx: LearningCtx }) {
+export function PaymentsTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
   const { view, data, refresh } = ctx;
   if (!("packages" in data)) return null;
   return (

@@ -3,7 +3,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
 /** Form hatası: her ekranda aynı shadcn uyarısı, aynı ikon ve renk. */
-export function FormError({ children }: { children: React.ReactNode }) {
+export function FormError({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <Alert
       variant="destructive"
@@ -18,7 +20,9 @@ export function FormError({ children }: { children: React.ReactNode }) {
 }
 
 /** Başarılı bir işlemin kalıcı bildirimi (ör. "e-postanızı kontrol edin"). */
-export function FormSuccess({ children }: { children: React.ReactNode }) {
+export function FormSuccess({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <Alert
       role="status"
@@ -45,11 +49,11 @@ export function ToneBadge({
   tone,
   children,
   className = "",
-}: {
+}: Readonly<{
   tone: Tone;
   children: React.ReactNode;
   className?: string;
-}) {
+}>) {
   return (
     <Badge variant="secondary" className={`${tones[tone]} ${className}`}>
       {children}

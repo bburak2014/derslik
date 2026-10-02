@@ -70,7 +70,7 @@ export function ConnectedWorkspace({
   signedOut = false,
   initialSession = null,
   initialSearch = "",
-}: {
+}: Readonly<{
   inviteToken?: string;
   /** Sunucu oturum çerezi görmediyse giriş formu ilk HTML'de çizilir; form
    *  JavaScript'i beklemeden görünür. */
@@ -80,7 +80,7 @@ export function ConnectedWorkspace({
   initialSession?: SessionState | null;
   /** Sayfanın sorgu dizesi; sunucu ve ilk istemci çizimi aynı görünümü seçer. */
   initialSearch?: string;
-}) {
+}>) {
   const [session, setSession] = useState<SessionState | null>(initialSession),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(!signedOut && !initialSession),

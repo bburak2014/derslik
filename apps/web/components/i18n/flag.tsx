@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 export function Flag({
   locale,
   className = "",
-}: {
+}: Readonly<{
   locale: Locale;
   className?: string;
-}) {
+}>) {
   const flag = localeFlags[locale];
   return (
     <svg

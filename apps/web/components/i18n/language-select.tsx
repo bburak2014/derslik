@@ -26,7 +26,9 @@ function choose(value: string) {
   location.reload();
 }
 
-export function LanguageSelect({ className = "" }: { className?: string }) {
+export function LanguageSelect({
+  className = "",
+}: Readonly<{ className?: string }>) {
   return (
     <Select value={getLocale()} onValueChange={choose}>
       <SelectTrigger

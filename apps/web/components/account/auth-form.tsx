@@ -34,10 +34,10 @@ const social = [
 export function AuthForm({
   onSuccess,
   reset = false,
-}: {
+}: Readonly<{
   onSuccess: () => void;
   reset?: boolean;
-}) {
+}>) {
   const [mode, setMode] = useState(reset ? "password" : "signin");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");

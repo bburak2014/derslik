@@ -99,12 +99,12 @@ export function TeacherPhoto({
   version,
   name,
   size = 56,
-}: {
+}: Readonly<{
   id: string;
   version: number | null;
   name: string;
   size?: number;
-}) {
+}>) {
   const style = { width: size, height: size, fontSize: Math.round(size / 2.8) };
   if (version)
     return (
@@ -135,10 +135,10 @@ export function TeacherPhoto({
 export function Stars({
   value,
   size = 14,
-}: {
+}: Readonly<{
   value: number | null;
   size?: number;
-}) {
+}>) {
   const rounded = Math.round(value ?? 0);
   return (
     <span
@@ -158,7 +158,7 @@ export function Stars({
   );
 }
 
-function Rating({ teacher }: { teacher: PublicTeacher }) {
+function Rating({ teacher }: Readonly<{ teacher: PublicTeacher }>) {
   if (!teacher.ratingCount)
     return (
       <ToneBadge tone="info" className="w-fit">
@@ -183,10 +183,10 @@ function Rating({ teacher }: { teacher: PublicTeacher }) {
 function Price({
   teacher,
   large,
-}: {
+}: Readonly<{
   teacher: PublicTeacher;
   large?: boolean;
-}) {
+}>) {
   const price = priceText(teacher);
   if (!price)
     return (
@@ -215,7 +215,9 @@ const statusTone: Record<RequestStatus, Tone> = {
   CANCELLED: "muted",
   EXPIRED: "muted",
 };
-export function RequestStatusBadge({ status }: { status: RequestStatus }) {
+export function RequestStatusBadge({
+  status,
+}: Readonly<{ status: RequestStatus }>) {
   return (
     <ToneBadge tone={statusTone[status]}>
       {t(`dir.status.${status}` as MessageKey)}
@@ -228,7 +230,7 @@ export function RequestStatusBadge({ status }: { status: RequestStatus }) {
 type Filters = Required<Pick<TeacherFilter, "sort">> &
   Omit<TeacherFilter, "sort" | "page">;
 
-function CardStateBadge({ state }: { state: CardState }) {
+function CardStateBadge({ state }: Readonly<{ state: CardState }>) {
   // Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz.
   if (state === "teacher") return null;
   if (state === "pending") return <RequestStatusBadge status="PENDING" />;
@@ -247,7 +249,7 @@ export function TeacherCard({
   onRequest,
   requestHref,
   state = null,
-}: {
+}: Readonly<{
   teacher: PublicTeacher;
   onOpen?: () => void;
   href?: string;
@@ -256,7 +258,7 @@ export function TeacherCard({
   /** Kartın altındaki "İstek gönder": profili istek penceresi açık açar. */
   onRequest?: () => void;
   requestHref?: string;
-}) {
+}>) {
   return (
     <Card className="teacher-card relative gap-4 p-5">
       <div className="flex items-start gap-4">
@@ -363,14 +365,14 @@ export function TeacherDirectory({
   onOpen,
   hrefFor,
   signedIn = false,
-}: {
+}: Readonly<{
   /** `request` doluysa profil, istek penceresi açık gelir. */
   onOpen?: (id: string, request?: boolean) => void;
   /** Herkese açık sayfada kartlar bağlantıdır (yeni sekmede açılabilir). */
   hrefFor?: (id: string, request?: boolean) => string;
   /** Oturum varsa kartlar, istek gönderilemeyen öğretmende durumu gösterir. */
   signedIn?: boolean;
-}) {
+}>) {
   const [relations, setRelations] = useState<TeacherRelations | null>(null),
     // Karttaki "İstek gönder": form listede açılır, profile gidilmez.
     [requestFor, setRequestFor] = useState<PublicTeacher | null>(null),
@@ -705,7 +707,7 @@ export function TeacherDirectory({
 
 // --- Profil -----------------------------------------------------------------
 
-export function ReviewList({ reviews }: { reviews: PublicReview[] }) {
+export function ReviewList({ reviews }: Readonly<{ reviews: PublicReview[] }>) {
   if (!reviews.length)
     return (
       <p className="text-muted-foreground text-sm">{t("dir.noReviews")}</p>
@@ -731,10 +733,10 @@ export function ReviewList({ reviews }: { reviews: PublicReview[] }) {
 function StarPicker({
   value,
   onChange,
-}: {
+}: Readonly<{
   value: number;
   onChange: (v: number) => void;
-}) {
+}>) {
   return (
     <div
       className="flex gap-1"
@@ -762,11 +764,11 @@ function ReviewForm({
   teacherId,
   review,
   onSaved,
-}: {
+}: Readonly<{
   teacherId: string;
   review: PublicReview | null;
   onSaved: () => void;
-}) {
+}>) {
   const [rating, setRating] = useState(review?.rating ?? 0),
     [comment, setComment] = useState(review?.comment ?? ""),
     [busy, setBusy] = useState(false),
@@ -848,12 +850,12 @@ function RequestDialog({
   open,
   onOpenChange,
   onSent,
-}: {
+}: Readonly<{
   teacher: PublicTeacher;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSent: () => void;
-}) {
+}>) {
   const [form, setForm] = useState<LessonRequestInput>({
       studentName: "",
       subject: teacher.subjects[0] ?? "general",
@@ -998,7 +1000,7 @@ function RequestDialog({
 }
 
 /** Öğretmenin reddederken yazdığı not; öğrencinin gördüğü haliyle. */
-function TeacherNote({ note }: { note: string }) {
+function TeacherNote({ note }: Readonly<{ note: string }>) {
   return (
     <div className="bg-muted/60 grid gap-1 rounded-lg px-3 py-2.5 text-sm">
       <span className="text-muted-foreground text-xs font-medium">
@@ -1018,7 +1020,7 @@ function ActionPanel({
   onEditProfile,
   signInHref,
   openRequest = false,
-}: {
+}: Readonly<{
   teacher: PublicTeacher;
   relation: TeacherRelation | null;
   signedIn: boolean;
@@ -1028,7 +1030,7 @@ function ActionPanel({
   signInHref: string;
   /** Karttaki "İstek gönder"den gelindi: istek gönderilebiliyorsa pencere açık başlar. */
   openRequest?: boolean;
-}) {
+}>) {
   const [dialog, setDialog] = useState(openRequest),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -1171,7 +1173,7 @@ function ActionPanel({
   );
 }
 
-function Facts({ teacher }: { teacher: PublicTeacher }) {
+function Facts({ teacher }: Readonly<{ teacher: PublicTeacher }>) {
   const row = (
     icon: React.ReactNode,
     label: string,
@@ -1239,7 +1241,7 @@ export function TeacherProfileView({
   onOpenLessons,
   onEditProfile,
   openRequest,
-}: {
+}: Readonly<{
   id: string;
   signedIn: boolean;
   onBack?: () => void;
@@ -1248,7 +1250,7 @@ export function TeacherProfileView({
   onEditProfile?: () => void;
   /** Karttaki "İstek gönder"den gelindiyse istek penceresi açık başlar. */
   openRequest?: boolean;
-}) {
+}>) {
   const [teacher, setTeacher] = useState<PublicTeacher | null>(null),
     [reviews, setReviews] = useState<PublicReview[]>([]),
     [relation, setRelation] = useState<TeacherRelation | null>(null),
@@ -1413,7 +1415,7 @@ export function MyRequests({
   onBrowse,
   focusId,
   focusAt,
-}: {
+}: Readonly<{
   onOpenTeacher: (id: string) => void;
   onOpenLessons?: (workspaceId: string) => void;
   onBrowse: () => void;
@@ -1421,7 +1423,7 @@ export function MyRequests({
   focusId?: string | null;
   /** Bildirime her dokunuşta değişir; liste açıksa yeniden çekilir. */
   focusAt?: number;
-}) {
+}>) {
   const [items, setItems] = useState<MyLessonRequest[] | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState("");

@@ -23,7 +23,7 @@ import { ToneBadge, type Tone } from "../feedback";
 import { type LearningCtx } from "./use-learning-panel";
 import { SectionHeading, EmptyNote, FilePicker } from "./shared";
 
-export function AssignmentsTab({ ctx }: { ctx: LearningCtx }) {
+export function AssignmentsTab({ ctx }: Readonly<{ ctx: LearningCtx }>) {
   const {
     view,
     owner,

@@ -30,13 +30,13 @@ export function TeachingHub({
   data,
   view,
   focus,
-}: {
+}: Readonly<{
   workspaceId: string;
   data: WorkspaceData;
   view: TeachingView;
   /** Bildirimden gelindiyse o öğrenci seçilir, kayıt vurgulanır. */
   focus?: NoticeFocus | null;
-}) {
+}>) {
   const [selected, setSelected] = useState(focus?.studentId ?? ""),
     [appliedFocus, setAppliedFocus] = useState(focus?.at ?? 0);
   if (focus && focus.at !== appliedFocus) {
