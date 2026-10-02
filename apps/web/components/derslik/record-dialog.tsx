@@ -114,9 +114,7 @@ export function RecordDialog({
         s.id === modal.studentId),
   );
   const [studentId, setStudentId] = useState(
-    "studentId" in modal && modal.studentId
-      ? modal.studentId
-      : lesson?.student_id || activeStudents[0]?.id || "",
+    initialStudentId(modal, lesson, activeStudents),
   );
   const [name, setName] = useState(existing?.name || ""),
     [grade, setGrade] = useState(existing?.grade || ""),
@@ -141,11 +139,7 @@ export function RecordDialog({
         : "60",
     ),
     [weeks, setWeeks] = useState("1"),
-    [topic, setTopic] = useState(
-      modal.type === "lesson" && modal.makeupForId
-        ? data.lessons.find((l) => l.id === modal.makeupForId)?.topic || ""
-        : "",
-    ),
+    [topic, setTopic] = useState(initialTopic(modal, data.lessons)),
     [location, setLocation] = useState(t("record.defaultLocation"));
   const eligiblePackages = data.packages.filter(
     (p) =>
@@ -618,6 +612,23 @@ export function RecordDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function initialStudentId(
+  modal: ModalState,
+  lesson: Lesson | undefined,
+  activeStudents: Student[],
+) {
+  return "studentId" in modal && modal.studentId
+    ? modal.studentId
+    : lesson?.student_id || activeStudents[0]?.id || "";
+}
+
+/** Telafi dersi, telafisi planlanan dersin konusuyla başlar. */
+function initialTopic(modal: ModalState, lessons: Lesson[]) {
+  return modal.type === "lesson" && modal.makeupForId
+    ? lessons.find((l) => l.id === modal.makeupForId)?.topic || ""
+    : "";
 }
 
 function initialDate(modal: ModalState, lesson: Lesson | undefined) {

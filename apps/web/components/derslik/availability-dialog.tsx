@@ -50,6 +50,24 @@ const TIMES = halfHourOptions();
 const issueText = (message: string) =>
   isMessageKey(message) ? t(message) : t("api.invalidFields");
 
+type BookingWindow = BookingSettings["windows"][number];
+/** Verilen satırdaki saat aralığını değiştirir; diğer satırlar aynen kalır. */
+const patchWindow = (
+  form: BookingSettings,
+  index: number,
+  patch: Partial<BookingWindow>,
+): BookingSettings => ({
+  ...form,
+  windows: form.windows.map((w, i) => (i === index ? { ...w, ...patch } : w)),
+});
+const removeWindow = (
+  form: BookingSettings,
+  index: number,
+): BookingSettings => ({
+  ...form,
+  windows: form.windows.filter((_, i) => i !== index),
+});
+
 /** Takvim araç çubuğundaki "Müsaitlik" düğmesi; yanında açık/kapalı durumu. */
 export function AvailabilityButton({
   workspaceId,
@@ -233,12 +251,7 @@ function AvailabilityDialog({
                             value={window.start}
                             options={TIMES.slice(0, -1)}
                             onChange={(start) =>
-                              edit((f) => ({
-                                ...f,
-                                windows: f.windows.map((w, i) =>
-                                  i === index ? { ...w, start } : w,
-                                ),
-                              }))
+                              edit((f) => patchWindow(f, index, { start }))
                             }
                           />
                           <span aria-hidden="true">–</span>
@@ -247,12 +260,7 @@ function AvailabilityDialog({
                             value={window.end}
                             options={TIMES.slice(1)}
                             onChange={(end) =>
-                              edit((f) => ({
-                                ...f,
-                                windows: f.windows.map((w, i) =>
-                                  i === index ? { ...w, end } : w,
-                                ),
-                              }))
+                              edit((f) => patchWindow(f, index, { end }))
                             }
                           />
                           <Button
@@ -260,14 +268,7 @@ function AvailabilityDialog({
                             size="icon-sm"
                             variant="ghost"
                             aria-label={t("booking.removeRange")}
-                            onClick={() =>
-                              edit((f) => ({
-                                ...f,
-                                windows: f.windows.filter(
-                                  (_, i) => i !== index,
-                                ),
-                              }))
-                            }
+                            onClick={() => edit((f) => removeWindow(f, index))}
                           >
                             <X />
                           </Button>

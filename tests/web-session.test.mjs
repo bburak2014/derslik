@@ -56,7 +56,8 @@ test(
       user_metadata: {},
       identities: [],
     };
-    let unavailable = false;
+    let unavailable = false,
+      lastRedirect = null;
     const upstream = createServer(async (req, res) => {
       const reply = (status, data) =>
         res
@@ -90,6 +91,24 @@ test(
           refresh_token: randomUUID(),
           user,
         });
+      }
+      if (
+        req.url.startsWith("/auth/v1/signup") ||
+        req.url.startsWith("/auth/v1/recover")
+      ) {
+        let body = "";
+        for await (const c of req) body += c;
+        lastRedirect = new URL(
+          req.url,
+          "http://upstream.test",
+        ).searchParams.get("redirect_to");
+        if (JSON.parse(body).gotrue_meta_security?.captcha_token !== "ok-token")
+          return reply(400, {
+            code: 400,
+            error_code: "captcha_failed",
+            msg: "captcha protection: request disallowed",
+          });
+        return reply(200, req.url.startsWith("/auth/v1/signup") ? user : {});
       }
       if (req.url === "/auth/v1/.well-known/jwks.json")
         return reply(200, { keys: [jwk] });
@@ -246,6 +265,21 @@ test(
           .getSetCookie()
           .some((c) => c.includes("code-verifier") && /HttpOnly/i.test(c)),
       );
+      // Azure e-posta kapsamı ister; geçerli bir sonraki adres çerezde saklanır.
+      const inviteNext = "/invite/" + "a".repeat(64);
+      const azure = await call("/api/auth/oauth", {
+        provider: "azure",
+        next: inviteNext,
+      });
+      assert.equal(azure.status, 200);
+      const azureUrl = new URL((await azure.json()).url);
+      assert.equal(azureUrl.searchParams.get("provider"), "azure");
+      assert.equal(azureUrl.searchParams.get("scopes"), "email");
+      assert.equal(authorize.searchParams.get("scopes"), null);
+      assert.equal(
+        decodeURIComponent(jar.get("derslik-auth-next")),
+        inviteNext,
+      );
       const body = {
         email: user.email,
         password: "test-password-only",
@@ -289,6 +323,106 @@ test(
           .status,
         415,
       );
+      // Geçersiz girdi, bilinmeyen eylem, kayıt ve sıfırlama (kendi IP'siyle,
+      // sınırlar diğer denemelerle karışmasın).
+      const fresh = { "X-Forwarded-For": "198.51.100.77" };
+      const unknown = await call("/api/auth/nope", {}, fresh);
+      assert.equal(unknown.status, 404);
+      assert.match((await unknown.json()).error, /Action not found/);
+      const badSignin = await call(
+        "/api/auth/signin",
+        { email: "not-an-email", password: "x" },
+        fresh,
+      );
+      assert.equal(badSignin.status, 400);
+      assert.match(
+        (await badSignin.json()).error,
+        /valid email and a password/,
+      );
+      const wrongPassword = await call(
+        "/api/auth/signin",
+        { ...body, password: "wrong-password" },
+        fresh,
+      );
+      assert.equal(wrongPassword.status, 400);
+      assert.match((await wrongPassword.json()).error, /Couldn't sign in/);
+      const shortSignup = await call(
+        "/api/auth/signup",
+        { ...body, password: "short" },
+        fresh,
+      );
+      assert.equal(shortSignup.status, 400);
+      assert.match(
+        (await shortSignup.json()).error,
+        /valid email and a password/,
+      );
+      const noCaptchaSignup = await call(
+        "/api/auth/signup",
+        { email: "new@example.test", password: "long-enough-password" },
+        fresh,
+      );
+      assert.equal(noCaptchaSignup.status, 400);
+      assert.match(
+        (await noCaptchaSignup.json()).error,
+        /complete the security check/i,
+      );
+      const signup = { ...body, email: "New@Example.test" };
+      const created = await call("/api/auth/signup", signup, fresh);
+      assert.equal(created.status, 200, await created.clone().text());
+      assert.deepEqual(await created.json(), {
+        ok: true,
+        confirmationRequired: true,
+      });
+      assert.equal(lastRedirect, origin + "/api/auth/callback");
+      const invited = await call(
+        "/api/auth/signup",
+        { ...signup, next: inviteNext },
+        fresh,
+      );
+      assert.equal(invited.status, 200);
+      assert.equal(
+        lastRedirect,
+        origin + "/api/auth/callback?next=" + encodeURIComponent(inviteNext),
+      );
+      const foreignNext = await call(
+        "/api/auth/signup",
+        { ...signup, next: "https://foreign.example" },
+        fresh,
+      );
+      assert.equal(foreignNext.status, 200);
+      assert.equal(lastRedirect, origin + "/api/auth/callback");
+      const badSignup = await call(
+        "/api/auth/signup",
+        { ...signup, captchaToken: "bad-token" },
+        fresh,
+      );
+      assert.equal(badSignup.status, 400);
+      assert.match((await badSignup.json()).error, /security check failed/i);
+      const invalidRecover = await call(
+        "/api/auth/recover",
+        { email: "not-an-email" },
+        fresh,
+      );
+      assert.equal(invalidRecover.status, 400);
+      assert.match((await invalidRecover.json()).error, /valid email/i);
+      const recovered = await call(
+        "/api/auth/recover",
+        { email: user.email, captchaToken: "ok-token" },
+        fresh,
+      );
+      assert.equal(recovered.status, 200, await recovered.clone().text());
+      assert.deepEqual(await recovered.json(), { ok: true });
+      assert.equal(
+        lastRedirect,
+        origin + "/api/auth/callback?next=/reset-password",
+      );
+      const badRecover = await call(
+        "/api/auth/recover",
+        { email: user.email, captchaToken: "bad-token" },
+        fresh,
+      );
+      assert.equal(badRecover.status, 400);
+      assert.match((await badRecover.json()).error, /security check failed/i);
       const login = await call("/api/auth/signin", body);
       assert.equal(login.status, 200, await login.clone().text());
       assert.ok(
@@ -410,6 +544,20 @@ test(
       });
       assert.equal(victim.status, 200, await victim.clone().text());
       assert.equal((await call("/api/auth/signout", {})).status, 200);
+      // Şifre değiştirme: kısa şifre ve oturumsuz istek reddedilir.
+      const shortPassword = await call("/api/auth/password", {
+        password: "short",
+      });
+      assert.equal(shortPassword.status, 400);
+      assert.match(
+        (await shortPassword.json()).error,
+        /at least 10 characters/,
+      );
+      const signedOut = await call("/api/auth/password", {
+        password: "new-password-123",
+      });
+      assert.equal(signedOut.status, 401);
+      assert.match((await signedOut.json()).error, /sign in/i);
     } finally {
       child.kill("SIGTERM");
       await new Promise((resolve) => {

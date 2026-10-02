@@ -395,6 +395,83 @@ function ListSkeleton() {
   );
 }
 
+/** Hiç yazışma yokken: öğretmene ve öğrenciye göre açıklama. */
+function EmptyThreads({ teacher }: Readonly<{ teacher: boolean }>) {
+  return (
+    <Empty className="bg-card border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <MessageCircle />
+        </EmptyMedia>
+        <EmptyTitle className="text-base">
+          {teacher ? t("chat.emptyTeacherTitle") : t("chat.title")}
+        </EmptyTitle>
+        <EmptyDescription>
+          {teacher ? t("chat.emptyTeacherText") : t("chat.emptyPortal")}
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+/** Yazışma listesinin gövdesi: açık yazışmalar, açılır "kapalı" bölümü ve
+ *  sonuç yoksa not. */
+function ThreadListBody({
+  loading,
+  open,
+  closed,
+  noMatches,
+  noAccount,
+  showClosed,
+  onToggleClosed,
+  row,
+}: Readonly<{
+  loading: boolean;
+  open: MessageThread[];
+  closed: MessageThread[];
+  noMatches: boolean;
+  noAccount: boolean;
+  showClosed: boolean;
+  onToggleClosed: () => void;
+  row: (x: MessageThread) => React.ReactNode;
+}>) {
+  if (loading) return <ListSkeleton />;
+  return (
+    <>
+      {open.length > 0 && (
+        <ItemGroup className="divide-y">{open.map(row)}</ItemGroup>
+      )}
+      {closed.length > 0 && (
+        <div className={cn(open.length > 0 && "border-t")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground m-2"
+            aria-expanded={showClosed}
+            onClick={onToggleClosed}
+          >
+            {showClosed ? <ChevronUp /> : <ChevronDown />}
+            {showClosed
+              ? t("chat.hideClosed")
+              : t("chat.showClosed", { count: closed.length })}
+          </Button>
+          {showClosed && (
+            <ItemGroup className="divide-y border-t opacity-80">
+              {closed.map(row)}
+            </ItemGroup>
+          )}
+        </div>
+      )}
+      {noMatches && (
+        <p className="text-muted-foreground p-6 text-center text-sm">
+          {noAccount ? t("chat.noAccount") : t("chat.noResults")}
+        </p>
+      )}
+    </>
+  );
+}
+
 /** Mesajlar sayfası: solda yazışmalar, sağda açık yazışma. Dar alanda tek
  *  bölme görünür; yazışmadan "Yazışmalar" düğmesiyle ya da tarayıcının geri
  *  tuşuyla listeye dönülür. Tek yazışması olan öğrenci doğrudan yazışmayı
@@ -472,21 +549,7 @@ export function MessagesView({
       </div>
     );
   if (threads && !threads.length && !selected)
-    return (
-      <Empty className="bg-card border">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <MessageCircle />
-          </EmptyMedia>
-          <EmptyTitle className="text-base">
-            {teacher ? t("chat.emptyTeacherTitle") : t("chat.title")}
-          </EmptyTitle>
-          <EmptyDescription>
-            {teacher ? t("chat.emptyTeacherText") : t("chat.emptyPortal")}
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
+    return <EmptyThreads teacher={teacher} />;
 
   const sorted = [...(threads ?? [])]
     .filter((x) => !student || x.studentId === student)
@@ -587,44 +650,16 @@ export function MessagesView({
               </div>
             )}
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {!threads ? (
-                <ListSkeleton />
-              ) : (
-                <>
-                  {open.length > 0 && (
-                    <ItemGroup className="divide-y">{open.map(row)}</ItemGroup>
-                  )}
-                  {closed.length > 0 && (
-                    <div className={cn(open.length > 0 && "border-t")}>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground m-2"
-                        aria-expanded={showClosed}
-                        onClick={() => setShowClosed(!showClosed)}
-                      >
-                        {showClosed ? <ChevronUp /> : <ChevronDown />}
-                        {showClosed
-                          ? t("chat.hideClosed")
-                          : t("chat.showClosed", { count: closed.length })}
-                      </Button>
-                      {showClosed && (
-                        <ItemGroup className="divide-y border-t opacity-80">
-                          {closed.map(row)}
-                        </ItemGroup>
-                      )}
-                    </div>
-                  )}
-                  {!matches.length && (
-                    <p className="text-muted-foreground p-6 text-center text-sm">
-                      {student && !sorted.length
-                        ? t("chat.noAccount")
-                        : t("chat.noResults")}
-                    </p>
-                  )}
-                </>
-              )}
+              <ThreadListBody
+                loading={!threads}
+                open={open}
+                closed={closed}
+                noMatches={!matches.length}
+                noAccount={!!student && !sorted.length}
+                showClosed={showClosed}
+                onToggleClosed={() => setShowClosed(!showClosed)}
+                row={row}
+              />
             </div>
           </div>
         )}
@@ -713,6 +748,73 @@ function readersText(thread: MessageThread) {
   return { shared: false, text: t("chat.readersNone") };
 }
 
+/** Son sayfayı eldeki mesajlarla birleştirir. Son sayfanın en eski mesajı
+ *  elde değilse (ör. uzun aradan sonra) arada mesaj kalmış olabilir; o zaman
+ *  liste bu sayfayla değişir (`gap`). */
+function nextPage(old: Page | null, fetched: Page, known: ReadonlySet<string>) {
+  const oldest = fetched.messages[0];
+  const gap =
+    !!old?.messages.length && fetched.more && !!oldest && !known.has(oldest.id);
+  const next: Page =
+    !old || gap
+      ? fetched
+      : {
+          thread: fetched.thread,
+          messages: merge(old.messages, fetched.messages),
+          more: old.more,
+        };
+  return { gap, next };
+}
+
+/** Yeni sayfadan sonra kaydırma: ilk açılışta ya da aralık kapanınca en alta;
+ *  yeni mesaj varsa ve okuyucu en altta (ya da mesaj kendisinin) ise en alta,
+ *  değilse yerinde kalır (null). Değişiklik yoksa undefined. */
+function scrollAfterLatest(
+  initial: boolean,
+  gap: boolean,
+  fresh: ChatMessage[],
+  atBottom: boolean,
+): "bottom" | null | undefined {
+  if (initial || gap) return "bottom";
+  if (!fresh.length) return undefined;
+  return atBottom || fresh.some((m) => m.mine) ? "bottom" : null;
+}
+
+/** Ekran okuyucuya okunacak, karşı taraftan gelen yeni mesajlar. */
+const announcement = (incoming: ChatMessage[], thread: MessageThread) =>
+  incoming
+    .map((m) =>
+      t("chat.preview", { name: senderLabel(m, thread), text: m.body }),
+    )
+    .join("\n");
+
+/** Sunucu isteği reddetti (4xx); bağlantı ve sunucu hataları (5xx) bunun
+ *  dışındadır. */
+const rejectedByServer = (e: unknown): e is ApiError =>
+  e instanceof ApiError && e.status < 500;
+
+/** Yazışma kapandı ya da erişim kalktı. */
+const accessLost = (e: unknown) =>
+  e instanceof ApiError && (e.status === 403 || e.status === 404);
+
+type SendAttempt = { text: string; key: string };
+/** Aynı metnin yeniden denemesi aynı anahtarla, yeni metin yeni anahtarla. */
+const sendAttempt = (previous: SendAttempt | null, text: string) =>
+  previous?.text === text ? previous : { text, key: crypto.randomUUID() };
+
+/** Sunucunun kaydettiği mesaj, gönderenin ekranında gösterilecek biçimde. */
+const sentMessage = (
+  saved: { id: string; createdAt: string },
+  text: string,
+  thread: MessageThread,
+): ChatMessage => ({
+  id: saved.id,
+  createdAt: saved.createdAt,
+  body: text,
+  mine: true,
+  senderRole: thread.viewer === "OWNER" ? "OWNER" : thread.role,
+});
+
 function Conversation({
   base,
   linkId,
@@ -759,7 +861,7 @@ function Conversation({
     // Gönderimin tekrar anahtarı: aynı metnin yeniden denemesi aynı anahtarla
     // gider (sunucu ikinci kez kaydetmez). Gönderilince ya da metin değişince
     // bırakılır; aynı metin sonradan ayrı bir mesaj olarak gönderilebilir.
-    sendKey = useRef<{ text: string; key: string } | null>(null),
+    sendKey = useRef<SendAttempt | null>(null),
     // Aynı anda tek okundu isteği gider.
     reading = useRef(false);
   const countId = useId();
@@ -813,42 +915,21 @@ function Conversation({
         const initial = first || !old;
         const known = new Set(old?.messages.map((m) => m.id));
         const fresh = r.data.messages.filter((m) => !known.has(m.id));
-        // Son sayfanın en eski mesajı elde değilse (ör. uzun aradan sonra)
-        // arada mesaj kalmış olabilir; o zaman liste bu sayfayla değişir.
-        const oldest = r.data.messages[0];
-        const gap =
-          !!old?.messages.length &&
-          r.data.more &&
-          !!oldest &&
-          !known.has(oldest.id);
-        const next: Page =
-          !old || gap
-            ? r.data
-            : {
-                thread: r.data.thread,
-                messages: merge(old.messages, r.data.messages),
-                more: old.more,
-              };
-        if (initial || gap) scroll.current = "bottom";
-        else if (fresh.length)
-          scroll.current =
-            atBottom.current || fresh.some((m) => m.mine) ? "bottom" : null;
+        const { gap, next } = nextPage(old, r.data, known);
+        const scrolled = scrollAfterLatest(
+          initial,
+          gap,
+          fresh,
+          atBottom.current,
+        );
+        if (scrolled !== undefined) scroll.current = scrolled;
         current.current = next;
         setPage(next);
         setClock(Date.now());
         setError("");
         const incoming = fresh.filter((m) => !m.mine);
         if (!initial && incoming.length)
-          setAnnounce(
-            incoming
-              .map((m) =>
-                t("chat.preview", {
-                  name: senderLabel(m, r.data.thread),
-                  text: m.body,
-                }),
-              )
-              .join("\n"),
-          );
+          setAnnounce(announcement(incoming, r.data.thread));
         // Okundu isteği gitmediyse ya da sonradan mesaj geldiyse yazışma
         // okunmamış kalır; her yoklamada yeniden denenir.
         if (initial || incoming.length || r.data.thread.unread > 0)
@@ -858,11 +939,7 @@ function Conversation({
         if (!alive.current) return;
         // Yoklama hatası (bağlantı) eldeki mesajları silmez; yazışma
         // kapandıysa ya da erişim kalktıysa gösterilir.
-        if (
-          first ||
-          !current.current ||
-          (e instanceof ApiError && (e.status === 403 || e.status === 404))
-        )
+        if (first || !current.current || accessLost(e))
           setError((e as Error).message);
       }
     },
@@ -956,10 +1033,7 @@ function Conversation({
     const text = clean,
       typed = draft;
     // Aynı metnin yeniden denemesi aynı anahtarla, yeni metin yeni anahtarla.
-    const attempt =
-      sendKey.current?.text === text
-        ? sendKey.current
-        : { text, key: crypto.randomUUID() };
+    const attempt = sendAttempt(sendKey.current, text);
     sendKey.current = attempt;
     // Gönderilen metin taslaklardan çıkar: yanıt gelmeden başka yazışmaya
     // geçilip dönülürse kutuda yeniden görünüp ikinci kez gönderilmesin.
@@ -982,100 +1056,34 @@ function Conversation({
         unread: 0,
       });
       if (!alive.current) return;
-      const mine: ChatMessage = {
-        id: r.data.id,
-        createdAt: r.data.createdAt,
-        body: text,
-        mine: true,
-        senderRole: thread.viewer === "OWNER" ? "OWNER" : thread.role,
-      };
+      const mine = sentMessage(r.data, text, thread);
       scroll.current = "bottom";
       setPage((p) => (p ? { ...p, messages: merge(p.messages, [mine]) } : p));
       // Gönderim sürerken yeni bir şey yazıldıysa o kutuda kalır.
       if (getChatDraft(path) === undefined) setDraftState("");
       input.current?.focus();
     } catch (e) {
-      // Sunucu metni geri çevirdi (4xx): sonraki deneme yeni anahtarla.
-      // Bağlantı ya da sunucu hatasında anahtar korunur; metin belki kaydedildi.
-      if (
-        e instanceof ApiError &&
-        e.status < 500 &&
-        sendKey.current === attempt
-      )
-        sendKey.current = null;
-      // Metin taslaklara geri döner (bu arada yeni bir şey yazılmadıysa).
-      if (getChatDraft(path) === undefined) setChatDraft(path, typed);
-      if (!alive.current) return;
-      // Metin kutuda kalır; kullanıcı yeniden gönderebilir. Sunucunun açık
-      // nedeni (çok hızlı, kapalı yazışma) varsa o gösterilir.
-      setProblem(
-        e instanceof ApiError && e.status < 500 ? e.message : t("chat.failed"),
-      );
-      if (e instanceof ApiError && (e.status === 403 || e.status === 404))
-        void latest(false);
+      failSend(e, attempt, typed);
     } finally {
       if (alive.current) setSending(false);
     }
   }
-
-  const items: React.ReactNode[] = [];
-  if (page && info) {
-    let day = "",
-      who = "";
-    for (const m of page.messages) {
-      const key = dateKey(m.createdAt);
-      if (key !== day) {
-        day = key;
-        who = "";
-        items.push(
-          <li
-            key={"day-" + key}
-            className="text-muted-foreground before:bg-border after:bg-border my-3 flex items-center gap-3 text-xs font-medium before:h-px before:flex-1 after:h-px after:flex-1"
-          >
-            {dayName(m.createdAt, clock)}
-          </li>,
-        );
-      }
-      const sender = m.mine ? "me" : m.senderRole;
-      const first = sender !== who;
-      who = sender;
-      items.push(
-        <li
-          key={m.id}
-          className={cn(
-            "flex flex-col",
-            m.mine ? "items-end" : "items-start",
-            first ? "mt-3" : "mt-1",
-          )}
-        >
-          <span
-            className={cn(
-              "text-muted-foreground px-1 pb-1 text-xs font-medium",
-              (m.mine || !first) && "sr-only",
-            )}
-          >
-            {senderLabel(m, info)}
-          </span>
-          <div
-            className={cn(
-              "max-w-[85%] rounded-2xl border px-3.5 pt-2 pb-1.5 text-sm leading-relaxed @lg:max-w-[75%]",
-              m.mine
-                ? "border-(--brand-line) bg-(--brand-soft) text-(--ink) rounded-br-md"
-                : "bg-card text-card-foreground rounded-bl-md",
-            )}
-          >
-            <p className="wrap-anywhere whitespace-pre-wrap">{m.body}</p>
-            <time
-              dateTime={m.createdAt}
-              className="text-muted-foreground mt-0.5 block text-right text-[11px] tabular-nums"
-            >
-              {timeLabel(m.createdAt)}
-            </time>
-          </div>
-        </li>,
-      );
-    }
+  /** Gönderim hata verdi: anahtar ve taslak durumu düzeltilir, neden gösterilir. */
+  function failSend(e: unknown, attempt: SendAttempt, typed: string) {
+    // Sunucu metni geri çevirdi (4xx): sonraki deneme yeni anahtarla.
+    // Bağlantı ya da sunucu hatasında anahtar korunur; metin belki kaydedildi.
+    if (rejectedByServer(e) && sendKey.current === attempt)
+      sendKey.current = null;
+    // Metin taslaklara geri döner (bu arada yeni bir şey yazılmadıysa).
+    if (getChatDraft(path) === undefined) setChatDraft(path, typed);
+    if (!alive.current) return;
+    // Metin kutuda kalır; kullanıcı yeniden gönderebilir. Sunucunun açık
+    // nedeni (çok hızlı, kapalı yazışma) varsa o gösterilir.
+    setProblem(rejectedByServer(e) ? e.message : t("chat.failed"));
+    if (accessLost(e)) void latest(false);
   }
+
+  const items = messageItems(page, info, clock);
   const readers = info && info.viewer !== "GUARDIAN_READ" && readersText(info);
   const canWrite = !!info && info.viewer !== "GUARDIAN_READ" && info.canSend;
   return (
@@ -1115,16 +1123,7 @@ function Conversation({
           )}
         </div>
       </header>
-      {readers && (
-        <p className="text-muted-foreground bg-muted/40 flex items-start gap-2 border-b px-4 py-2 text-xs leading-relaxed">
-          {readers.shared ? (
-            <Eye className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          ) : (
-            <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          )}
-          {readers.text}
-        </p>
-      )}
+      {readers && <ReadersNote readers={readers} />}
       <div
         ref={log}
         className="min-h-0 flex-1 overflow-y-auto bg-(--canvas) px-3 py-3 sm:px-4"
@@ -1134,42 +1133,16 @@ function Conversation({
             el.scrollHeight - el.scrollTop - el.clientHeight < 64;
         }}
       >
-        {!page ? (
-          <PageFallback error={error} onRetry={() => void latest(true)} />
-        ) : (
-          <>
-            {error && <FormError>{error}</FormError>}
-            {page.more && (
-              <div className="flex justify-center pt-1 pb-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="bg-card"
-                  disabled={older}
-                  onClick={() => void loadOlder()}
-                >
-                  {older ? <Spinner /> : <ChevronUp />}
-                  {t("chat.older")}
-                </Button>
-              </div>
-            )}
-            {page.messages.length ? (
-              <ol
-                aria-label={info ? threadTitle(info) : undefined}
-                className="pb-1"
-              >
-                {items}
-              </ol>
-            ) : (
-              canWrite && (
-                <p className="text-muted-foreground grid h-full place-items-center p-6 text-center text-sm">
-                  {t("chat.emptyThread")}
-                </p>
-              )
-            )}
-          </>
-        )}
+        <MessageThreadBody
+          page={page}
+          error={error}
+          older={older}
+          info={info}
+          canWrite={canWrite}
+          items={items}
+          onRetry={() => void latest(true)}
+          onLoadOlder={() => void loadOlder()}
+        />
         <p className="sr-only" aria-live="polite">
           {announce}
         </p>
@@ -1222,19 +1195,178 @@ function Conversation({
             </Button>
           </div>
           {length >= COUNT_FROM && (
-            <p
-              id={countId}
-              className={cn(
-                "text-right text-xs tabular-nums",
-                over ? "text-destructive" : "text-muted-foreground",
-              )}
-            >
-              {t("chat.count", { count: length })}
-            </p>
+            <CharacterCount id={countId} length={length} over={over} />
           )}
         </form>
       )}
     </>
+  );
+}
+
+/** Gün ayraçları ve mesaj baloncukları; art arda aynı göndericinin
+ *  mesajları tek başlıkla gruplanır. */
+function messageItems(
+  page: Page | null,
+  info: MessageThread | null,
+  clock: number,
+) {
+  const items: React.ReactNode[] = [];
+  if (!page || !info) return items;
+  let day = "",
+    who = "";
+  for (const m of page.messages) {
+    const key = dateKey(m.createdAt);
+    if (key !== day) {
+      day = key;
+      who = "";
+      items.push(
+        <li
+          key={"day-" + key}
+          className="text-muted-foreground before:bg-border after:bg-border my-3 flex items-center gap-3 text-xs font-medium before:h-px before:flex-1 after:h-px after:flex-1"
+        >
+          {dayName(m.createdAt, clock)}
+        </li>,
+      );
+    }
+    const sender = m.mine ? "me" : m.senderRole;
+    const first = sender !== who;
+    who = sender;
+    items.push(
+      <MessageBubble key={m.id} message={m} info={info} first={first} />,
+    );
+  }
+  return items;
+}
+
+/** Tek mesaj; `first`, aynı göndericinin art arda mesajlarında ilkidir. */
+function MessageBubble({
+  message: m,
+  info,
+  first,
+}: Readonly<{ message: ChatMessage; info: MessageThread; first: boolean }>) {
+  return (
+    <li
+      className={cn(
+        "flex flex-col",
+        m.mine ? "items-end" : "items-start",
+        first ? "mt-3" : "mt-1",
+      )}
+    >
+      <span
+        className={cn(
+          "text-muted-foreground px-1 pb-1 text-xs font-medium",
+          (m.mine || !first) && "sr-only",
+        )}
+      >
+        {senderLabel(m, info)}
+      </span>
+      <div
+        className={cn(
+          "max-w-[85%] rounded-2xl border px-3.5 pt-2 pb-1.5 text-sm leading-relaxed @lg:max-w-[75%]",
+          m.mine
+            ? "border-(--brand-line) bg-(--brand-soft) text-(--ink) rounded-br-md"
+            : "bg-card text-card-foreground rounded-bl-md",
+        )}
+      >
+        <p className="wrap-anywhere whitespace-pre-wrap">{m.body}</p>
+        <time
+          dateTime={m.createdAt}
+          className="text-muted-foreground mt-0.5 block text-right text-[11px] tabular-nums"
+        >
+          {timeLabel(m.createdAt)}
+        </time>
+      </div>
+    </li>
+  );
+}
+
+/** Yazışmayı kimlerin okuyabildiği (veli çocuğunun yazışmasını yalnızca okur). */
+function ReadersNote({
+  readers,
+}: Readonly<{ readers: ReturnType<typeof readersText> }>) {
+  return (
+    <p className="text-muted-foreground bg-muted/40 flex items-start gap-2 border-b px-4 py-2 text-xs leading-relaxed">
+      {readers.shared ? (
+        <Eye className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      ) : (
+        <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      )}
+      {readers.text}
+    </p>
+  );
+}
+
+/** Mesaj bölmesinin içeriği: yükleniyorsa iskelet ya da hata, yüklendiyse
+ *  "öncekileri göster" düğmesi ve mesajlar. */
+function MessageThreadBody({
+  page,
+  error,
+  older,
+  info,
+  canWrite,
+  items,
+  onRetry,
+  onLoadOlder,
+}: Readonly<{
+  page: Page | null;
+  error: string;
+  older: boolean;
+  info: MessageThread | null;
+  canWrite: boolean;
+  items: React.ReactNode[];
+  onRetry: () => void;
+  onLoadOlder: () => void;
+}>) {
+  if (!page) return <PageFallback error={error} onRetry={onRetry} />;
+  return (
+    <>
+      {error && <FormError>{error}</FormError>}
+      {page.more && (
+        <div className="flex justify-center pt-1 pb-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="bg-card"
+            disabled={older}
+            onClick={onLoadOlder}
+          >
+            {older ? <Spinner /> : <ChevronUp />}
+            {t("chat.older")}
+          </Button>
+        </div>
+      )}
+      {page.messages.length ? (
+        <ol aria-label={info ? threadTitle(info) : undefined} className="pb-1">
+          {items}
+        </ol>
+      ) : (
+        canWrite && (
+          <p className="text-muted-foreground grid h-full place-items-center p-6 text-center text-sm">
+            {t("chat.emptyThread")}
+          </p>
+        )
+      )}
+    </>
+  );
+}
+
+/** Karakter sayacı; sınırı aşınca uyarı rengiyle. */
+function CharacterCount({
+  id,
+  length,
+  over,
+}: Readonly<{ id: string; length: number; over: boolean }>) {
+  return (
+    <p
+      id={id}
+      className={cn(
+        "text-right text-xs tabular-nums",
+        over ? "text-destructive" : "text-muted-foreground",
+      )}
+    >
+      {t("chat.count", { count: length })}
+    </p>
   );
 }
 

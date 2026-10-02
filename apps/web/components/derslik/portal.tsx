@@ -354,12 +354,7 @@ export function Portal({
   }, [fallback]);
   // Adresteki sayfaya izin yoksa (ör. ödeme bilgisi gizli) ilk izinli sayfa açılır.
   const current = currentPage(tab, canDiscover, fallback, !!access, tabs);
-  const heading = isDiscover(current)
-    ? { label: discover[current].label, subtitle: discover[current].subtitle }
-    : {
-        label: (pages[current] ?? pages.lessons!).label,
-        subtitle: (pages[current] ?? pages.lessons!).subtitle[role],
-      };
+  const heading = headingOf(current, role);
   function navigate(
     next: PortalPage,
     teacherId: string | null = null,
@@ -396,42 +391,45 @@ export function Portal({
   // Bildirim bu öğrenciye aitse ilgili sekme açılır ve kayıt vurgulanır.
   const [appliedFocus, setAppliedFocus] = useState(0),
     [panelFocus, setPanelFocus] = useState<{ id: string | null; at: number }>();
-  if (focus && focus.at !== appliedFocus) {
-    if (focus.section === "myRequests") {
-      setAppliedFocus(focus.at);
+  // Bildirimin bölümüne göre sayfa ve vurgular ayarlanır; render sırasında
+  // yalnızca aşağıdaki koşul içinden çağrılır.
+  function applyNoticeFocus(target: NoticeFocus) {
+    if (target.section === "myRequests") {
+      setAppliedFocus(target.at);
       setTab("requests");
       setTeacher(null);
-      setRequestFocus(focus.itemId);
+      setRequestFocus(target.itemId);
       // Önceki bildirimlerin adresi bu bildirimin adresini ezmesin.
       setPanelFocus(undefined);
       setChatFocus(0);
     } else if (
-      focus.section === "messages" &&
+      target.section === "messages" &&
       access &&
-      focus.workspaceId === access.id &&
-      focus.studentId === access.studentId
+      target.workspaceId === access.id &&
+      target.studentId === access.studentId
     ) {
       // Mesaj bildirimi: Mesajlar sayfasında o yazışma açılır.
-      setAppliedFocus(focus.at);
+      setAppliedFocus(target.at);
       setTab("messages");
       setTeacher(null);
-      setChatThread(focus.itemId);
-      setChatFocus(focus.at);
+      setChatThread(target.itemId);
+      setChatFocus(target.at);
       setPanelFocus(undefined);
       setRequestFocus(null);
     } else if (
-      focus.section !== "requests" &&
-      focus.section !== "messages" &&
+      target.section !== "requests" &&
+      target.section !== "messages" &&
       access &&
-      focus.workspaceId === access.id &&
-      focus.studentId === access.studentId
+      target.workspaceId === access.id &&
+      target.studentId === access.studentId
     ) {
-      setAppliedFocus(focus.at);
-      setTab(focus.section);
-      setPanelFocus({ id: focus.itemId, at: focus.at });
+      setAppliedFocus(target.at);
+      setTab(target.section);
+      setPanelFocus({ id: target.itemId, at: target.at });
       setChatFocus(0);
     }
   }
+  if (focus && focus.at !== appliedFocus) applyNoticeFocus(focus);
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
   const focusedTab = focusedTabOf(
     panelFocus,
@@ -439,20 +437,13 @@ export function Portal({
     requestFocus,
     chatFocus,
   );
-  const focusedUrl =
-    focusedTab === "messages"
-      ? chatSearch(chatThread)
-      : focusedTab && "?view=" + focusedTab;
+  const focusedUrl = focusedUrlOf(focusedTab, chatThread);
   useEffect(() => {
     if (focusedUrl) window.history.pushState({}, "", "/" + focusedUrl);
   }, [focusedUrl, appliedFocus]);
   // Kenar çubuğundaki okunmamış sayacı ve Mesajlar sayfası aynı listeyi
   // kullanır. Mesaj rotaları "lessons" iznini ister; izin yoksa istek gitmez.
-  const chat = useMessageThreads(
-    access?.studentId && tabs.some((x) => x.id === "messages")
-      ? `/portal/${access.id}/${access.studentId}/messages`
-      : null,
-  );
+  const chat = useMessageThreads(messagesPathOf(access, tabs));
   // Sol menüdeki sekmeleri LearningPanel bildirir; ama öğrenci doğrudan
   // "Öğretmen bul" / "İsteklerim" sayfasında açarsa panel hiç yüklenmez ve
   // menü iskelet olarak kalırdı. O durumda izinler burada ayrıca alınır.
@@ -469,55 +460,6 @@ export function Portal({
       live = false;
     };
   }, [needsTabs, access?.id, access?.studentId]);
-  let content: React.ReactNode;
-  if (current === "teachers")
-    content = teacher ? (
-      <TeacherProfileView
-        key={teacher}
-        id={teacher}
-        signedIn
-        onBack={() => navigate("teachers")}
-        onOpenLessons={onOpenWorkspace}
-        openRequest={openRequest}
-      />
-    ) : (
-      <TeacherDirectory
-        signedIn
-        onOpen={(id, request) => navigate("teachers", id, request)}
-      />
-    );
-  else if (current === "requests")
-    content = (
-      <MyRequests
-        focusId={requestFocus}
-        focusAt={requestFocus ? appliedFocus : undefined}
-        onBrowse={() => navigate("teachers")}
-        onOpenTeacher={(id) => navigate("teachers", id)}
-        onOpenLessons={onOpenWorkspace}
-      />
-    );
-  else if (access)
-    content = (
-      <LearningPanel
-        workspaceId={access.id}
-        studentId={access.studentId!}
-        role={role}
-        view={current}
-        onTabs={setTabs}
-        focus={panelFocus}
-        onOpenMessages={
-          tabs.some((x) => x.id === "messages")
-            ? () => openThread(null)
-            : undefined
-        }
-        chat={{
-          store: chat,
-          thread: chatThread,
-          onOpen: openThread,
-          refreshAt: chatFocus,
-        }}
-      />
-    );
   return (
     <SidebarProvider
       style={{ "--sidebar-width": "15.5rem" } as React.CSSProperties}
@@ -624,7 +566,24 @@ export function Portal({
               <p>{t(heading.subtitle)}</p>
             </div>
           </div>
-          {content}
+          <PortalContent
+            current={current}
+            access={access}
+            role={role}
+            teacher={teacher}
+            openRequest={openRequest}
+            requestFocus={requestFocus}
+            appliedFocus={appliedFocus}
+            panelFocus={panelFocus}
+            tabs={tabs}
+            onTabs={setTabs}
+            chat={chat}
+            chatThread={chatThread}
+            chatFocus={chatFocus}
+            onNavigate={navigate}
+            onOpenThread={openThread}
+            onOpenWorkspace={onOpenWorkspace}
+          />
         </div>
       </main>
       <AlertDialog open={signoutOpen} onOpenChange={setSignoutOpen}>
@@ -678,4 +637,126 @@ function focusedTabOf(
   if (panelFocus) return section;
   if (requestFocus) return "requests";
   return chatFocus ? "messages" : undefined;
+}
+
+/** Adres çubuğuna yazılacak sorgu dizesi; açık bildirim vurgusu yoksa boş. */
+function focusedUrlOf(
+  focusedTab: ReturnType<typeof focusedTabOf>,
+  chatThread: string | null,
+) {
+  return focusedTab === "messages"
+    ? chatSearch(chatThread)
+    : focusedTab && "?view=" + focusedTab;
+}
+
+/** Mesaj listesinin adresi; izin ya da bağlı öğrenci yoksa istek gitmez. */
+function messagesPathOf(
+  access: Access | null,
+  tabs: readonly LearningTabInfo[],
+) {
+  return access?.studentId && tabs.some((x) => x.id === "messages")
+    ? `/portal/${access.id}/${access.studentId}/messages`
+    : null;
+}
+
+/** Sayfa başlığı ve alt başlığı. */
+function headingOf(current: PortalPage, role: PortalRole) {
+  return isDiscover(current)
+    ? { label: discover[current].label, subtitle: discover[current].subtitle }
+    : {
+        label: (pages[current] ?? pages.lessons!).label,
+        subtitle: (pages[current] ?? pages.lessons!).subtitle[role],
+      };
+}
+
+/** Sayfa gövdesi: Öğretmen bul, İsteklerim ya da öğretmenin izin verdiği
+ *  sayfalardan biri. Durum Portal'da kalır. */
+function PortalContent({
+  current,
+  access,
+  role,
+  teacher,
+  openRequest,
+  requestFocus,
+  appliedFocus,
+  panelFocus,
+  tabs,
+  onTabs,
+  chat,
+  chatThread,
+  chatFocus,
+  onNavigate,
+  onOpenThread,
+  onOpenWorkspace,
+}: Readonly<{
+  current: PortalPage;
+  access: Access | null;
+  role: PortalRole;
+  teacher: string | null;
+  openRequest: boolean;
+  requestFocus: string | null;
+  appliedFocus: number;
+  panelFocus: { id: string | null; at: number } | undefined;
+  tabs: LearningTabInfo[];
+  onTabs: (tabs: LearningTabInfo[]) => void;
+  chat: ReturnType<typeof useMessageThreads>;
+  chatThread: string | null;
+  chatFocus: number;
+  onNavigate: (
+    next: PortalPage,
+    teacherId?: string | null,
+    request?: boolean,
+  ) => void;
+  onOpenThread: (id: string | null) => void;
+  onOpenWorkspace?: (workspaceId: string) => void;
+}>) {
+  if (current === "teachers")
+    return teacher ? (
+      <TeacherProfileView
+        key={teacher}
+        id={teacher}
+        signedIn
+        onBack={() => onNavigate("teachers")}
+        onOpenLessons={onOpenWorkspace}
+        openRequest={openRequest}
+      />
+    ) : (
+      <TeacherDirectory
+        signedIn
+        onOpen={(id, request) => onNavigate("teachers", id, request)}
+      />
+    );
+  if (current === "requests")
+    return (
+      <MyRequests
+        focusId={requestFocus}
+        focusAt={requestFocus ? appliedFocus : undefined}
+        onBrowse={() => onNavigate("teachers")}
+        onOpenTeacher={(id) => onNavigate("teachers", id)}
+        onOpenLessons={onOpenWorkspace}
+      />
+    );
+  if (access)
+    return (
+      <LearningPanel
+        workspaceId={access.id}
+        studentId={access.studentId!}
+        role={role}
+        view={current}
+        onTabs={onTabs}
+        focus={panelFocus}
+        onOpenMessages={
+          tabs.some((x) => x.id === "messages")
+            ? () => onOpenThread(null)
+            : undefined
+        }
+        chat={{
+          store: chat,
+          thread: chatThread,
+          onOpen: onOpenThread,
+          refreshAt: chatFocus,
+        }}
+      />
+    );
+  return null;
 }

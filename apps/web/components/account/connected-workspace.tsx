@@ -65,6 +65,29 @@ type SessionState = {
   active: Access | null;
 };
 
+const key = (a: Access) => `${a.id}:${a.role}:${a.studentId || ""}`;
+const sameAccess = (a: Access | null, b: Access | null) =>
+  !!a && !!b && key(a) === key(b);
+/** Açık alan öğretmen çalışma alanı değilse (ya da hiç alan yoksa ve öğrenci
+ *  modundaysa) sekme ve görünüm öğrenci içindir. */
+const isStudentView = (session: SessionState | null, studentMode: boolean) =>
+  !!session && (session.active ? session.active.role !== "OWNER" : studentMode);
+/** Kabul edilen isteğin öğretmenindeki öğrenci görünümü. */
+const acceptedBy = (target: NoticeTarget) => (a: Access) =>
+  a.id === target.workspaceId &&
+  a.role === "STUDENT" &&
+  a.studentId === target.studentId;
+/** Ders isteği bildirimi: kabul edilen öğretmendeki görünüm, yoksa açık
+ *  öğrenci görünümü, yoksa herhangi bir öğrenci görünümü. */
+const requestNoticeAccess = (
+  target: NoticeTarget,
+  list: Access[],
+  current: Access | null,
+) =>
+  list.find(acceptedBy(target)) ||
+  (current && current.role !== "OWNER" ? current : null) ||
+  list.find((a) => a.role === "STUDENT");
+
 export function ConnectedWorkspace({
   inviteToken,
   signedOut = false,
@@ -126,9 +149,7 @@ export function ConnectedWorkspace({
   }, []);
   // Sekme başlığı açık olan alana uyar: öğrenci ve veli "öğretmen çalışma
   // alanı" görmesin.
-  const studentView =
-    !!session &&
-    (session.active ? session.active.role !== "OWNER" : studentMode);
+  const studentView = isStudentView(session, studentMode);
   useEffect(() => {
     if (!session) return;
     document.title = t(studentView ? "meta.titleStudent" : "meta.title");
@@ -223,7 +244,6 @@ export function ConnectedWorkspace({
         </Card>
       </main>
     );
-  const key = (a: Access) => `${a.id}:${a.role}:${a.studentId || ""}`;
   // Kabul edilen isteğin öğretmenine geçer: erişim listesi yenilenir, o
   // öğretmendeki öğrenci görünümü seçilir.
   async function openWorkspace(workspaceId: string) {
@@ -243,37 +263,22 @@ export function ConnectedWorkspace({
   async function openNotice(target: NoticeTarget) {
     const current = session!.active;
     let list = session!.list;
-    const same = (a: Access | null, b: Access | null) =>
-      !!a && !!b && key(a) === key(b);
-    let next: Access | null | undefined;
-    if (target.section === "myRequests") {
-      const accepted = (a: Access) =>
-        a.id === target.workspaceId &&
-        a.role === "STUDENT" &&
-        a.studentId === target.studentId;
-      if (target.studentId && !list.some(accepted))
-        list = (await webRequest<{ list: Access[] }>("/api/session")).list;
-      next =
-        list.find(accepted) ||
-        (current && current.role !== "OWNER" ? current : null) ||
-        list.find((a) => a.role === "STUDENT");
-      if (!next) {
-        if (current) {
-          setError(t("conn.noticeNoAccess"));
-          return;
-        }
-        setStudentMode(true);
-        setFocus({ ...target, at: Date.now() });
-        return;
-      }
-    } else {
-      next = noticeAccess(target, list, current);
+    const isRequest = target.section === "myRequests";
+    if (isRequest && target.studentId && !list.some(acceptedBy(target)))
+      list = (await webRequest<{ list: Access[] }>("/api/session")).list;
+    const next = isRequest
+      ? requestNoticeAccess(target, list, current)
+      : noticeAccess(target, list, current);
+    if (!next && isRequest && !current) {
+      setStudentMode(true);
+      setFocus({ ...target, at: Date.now() });
+      return;
     }
     if (!next) {
       setError(t("conn.noticeNoAccess"));
       return;
     }
-    if (!same(next, current)) {
+    if (!sameAccess(next, current)) {
       setBusy(true);
       try {
         await webRequest("/api/session", { key: key(next) });

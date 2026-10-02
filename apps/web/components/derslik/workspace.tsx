@@ -338,6 +338,44 @@ export default function Workspace({
       alive = false;
     };
   }, [connected.id]);
+  // Bildirimin bölümüne göre görünüm ve vurgular ayarlanır; render sırasında
+  // yalnızca aşağıdaki koşul içinden çağrılır.
+  function applyFocusSection(target: NoticeFocus) {
+    if (target.section === "requests") {
+      setView("showcase");
+      setShowcaseFocus({ id: target.itemId, at: target.at });
+      setStudentId(null);
+    } else if (target.section === "myRequests") {
+      // Öğrenci bildirimi; öğretmen görünümünde açılacak yeri yok.
+    } else if (target.section === "messages") {
+      // Mesaj bildirimi: yazışma Mesajlar görünümünde açılır.
+      setView("messages");
+      setChat({ thread: target.itemId, student: null });
+      setSearch("");
+      setHubFocus(null);
+      setShowcaseFocus(null);
+      setNotesFocus(null);
+      setStudentId(null);
+    } else if (target.section === "lessons") {
+      // Ders hatırlatması: takvim o dersin gününde açılır.
+      const lesson = data.lessons.find((l) => l.id === target.itemId);
+      setSelectedDay(dateKey(lesson?.starts_at));
+      setView("calendar");
+      setSearch("");
+      setHubFocus(null);
+      setShowcaseFocus(null);
+      setStudentId(null);
+    } else if (target.section === "notes") {
+      setNotesFocus(target);
+      setStudentId(target.studentId);
+    } else {
+      setView(target.section);
+      setHubFocus(target);
+      setShowcaseFocus(null);
+      setSearch("");
+      setStudentId(null);
+    }
+  }
   if (
     focus &&
     focus.at !== appliedFocus &&
@@ -347,40 +385,7 @@ export default function Workspace({
     setCalendarFocus(focus.section === "lessons");
     // Önceki mesaj bildirimi yeni bildirimin adresini ezmesin.
     setChatFocus(focus.section === "messages" ? focus.at : 0);
-    if (focus.section === "requests") {
-      setView("showcase");
-      setShowcaseFocus({ id: focus.itemId, at: focus.at });
-      setStudentId(null);
-    } else if (focus.section === "myRequests") {
-      // Öğrenci bildirimi; öğretmen görünümünde açılacak yeri yok.
-    } else if (focus.section === "messages") {
-      // Mesaj bildirimi: yazışma Mesajlar görünümünde açılır.
-      setView("messages");
-      setChat({ thread: focus.itemId, student: null });
-      setSearch("");
-      setHubFocus(null);
-      setShowcaseFocus(null);
-      setNotesFocus(null);
-      setStudentId(null);
-    } else if (focus.section === "lessons") {
-      // Ders hatırlatması: takvim o dersin gününde açılır.
-      const lesson = data.lessons.find((l) => l.id === focus.itemId);
-      setSelectedDay(dateKey(lesson?.starts_at));
-      setView("calendar");
-      setSearch("");
-      setHubFocus(null);
-      setShowcaseFocus(null);
-      setStudentId(null);
-    } else if (focus.section === "notes") {
-      setNotesFocus(focus);
-      setStudentId(focus.studentId);
-    } else {
-      setView(focus.section);
-      setHubFocus(focus);
-      setShowcaseFocus(null);
-      setSearch("");
-      setStudentId(null);
-    }
+    applyFocusSection(focus);
   }
   // Adres çubuğu render sırasında değişemez (Next yönlendiricisini günceller).
   const focusedView = focusedViewOf(
@@ -389,10 +394,7 @@ export default function Workspace({
     chatFocus,
     hubFocus?.section,
   );
-  const focusedUrl =
-    focusedView === "messages"
-      ? chatSearch(chat.thread, chat.student)
-      : focusedView && "?view=" + focusedView;
+  const focusedUrl = focusedUrlOf(focusedView, chat);
   useEffect(() => {
     if (focusedUrl) window.history.pushState({}, "", "/" + focusedUrl);
   }, [focusedUrl, appliedFocus]);
@@ -442,16 +444,15 @@ export default function Workspace({
     }
   };
   useWorkspaceTools(data, mutate, setModal);
+  const makeupLesson = (l: Lesson) =>
+    setModal({
+      type: "lesson",
+      studentId: l.student_id,
+      date: dateKey(),
+      makeupForId: l.id,
+    });
   const actions: Actions = {
-    makeup: connected
-      ? (l) =>
-          setModal({
-            type: "lesson",
-            studentId: l.student_id,
-            date: dateKey(),
-            makeupForId: l.id,
-          })
-      : undefined,
+    makeup: connected ? makeupLesson : undefined,
     openStudent: setStudentId,
     newPackage: (id) => setModal({ type: "package", studentId: id }),
     newLesson: (id) =>
@@ -571,13 +572,7 @@ export default function Workspace({
         <div className="page-body" id="main-content">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">
-                {view === "overview"
-                  ? upper(t("ws.focusOnTeaching"))
-                  : upper("Derslik") +
-                    " / " +
-                    upper(t(navigation.find((n) => n.id === view)!.label))}
-              </p>
+              <p className="eyebrow">{eyebrowFor(view)}</p>
               <h1>{t(titles[view].title)}</h1>
               <p>{t(titles[view].subtitle)}</p>
             </div>
@@ -817,6 +812,24 @@ function focusedViewOf(
   if (chatFocus) return "messages";
   return hubSection;
 }
+
+/** Adres çubuğuna yazılacak sorgu dizesi; açık bildirim vurgusu yoksa boş. */
+function focusedUrlOf(
+  focusedView: ReturnType<typeof focusedViewOf>,
+  chat: ReturnType<typeof chatFromSearch>,
+) {
+  return focusedView === "messages"
+    ? chatSearch(chat.thread, chat.student)
+    : focusedView && "?view=" + focusedView;
+}
+
+/** Sayfa başlığının üstündeki küçük etiket. */
+const eyebrowFor = (view: View) =>
+  view === "overview"
+    ? upper(t("ws.focusOnTeaching"))
+    : upper("Derslik") +
+      " / " +
+      upper(t(navigation.find((n) => n.id === view)!.label));
 
 /** Üstteki ekle düğmesi: görünüme göre öğrenci, ödeme ya da ders formu. */
 function addRecord(
