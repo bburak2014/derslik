@@ -19,9 +19,10 @@ kurala girmez. Her `git commit` öncesinde `.githooks/pre-commit` bu kapıyı
 - `git commit --no-verify` kancayı atlar; yalnızca kullanıcının açık onayıyla kullanılır (`AGENTS.md`).
 
 SonarQube imajı (`sonarqube:26.9.0.129388-community`) ve Docker tarayıcı
-imajı `scripts/sonar-local.mjs`'te tam sürüme sabittir. Var olan kapsayıcı
-farklı bir imajla ya da bütün ağ arayüzlerine açık çalışıyorsa veri birimleri
-korunarak yeniden kurulur.
+imajı `scripts/sonar-local.mjs`'te tam sürüme sabittir. Yönetilen kapsayıcı
+`derslik-sonarqube` farklı bir imajla ya da bütün ağ arayüzlerine açık
+çalışıyorsa veri birimleri korunarak yeniden kurulur. `SONAR_CONTAINER` ile
+seçilen kapsayıcı hiçbir zaman silinmez, yalnızca uymazsa uyarı yazılır.
 
 Susturma kuralı ve göndermeden önceki kontrol listesi: kökteki `AGENTS.md`.
 
@@ -48,7 +49,8 @@ olmadığında komut başarısız olur. Testlerin başarılı olması test kapsa
 Sonar'ın bir kapsam metriği döndürüp döndürmediğini ifade eder; otomatik sıfır
 kapsam değeri test raporu aktarımı olarak kabul edilmez.
 
-Kapsayıcı yalnızca `127.0.0.1:9000` üzerinde dinler; bütün arayüzlere açık eski bir kapsayıcı yeniden kurulur.
+Kapsayıcı yalnızca `127.0.0.1:<SONAR_PORT>` üzerinde dinler (varsayılan 9000).
+`derslik-sonarqube` bütün arayüzlere açık ise yeniden kurulur.
 
 Mevcut yerel sunucudan bağımsız bir analiz ortamı açmak için:
 
@@ -70,11 +72,12 @@ makinenin belleğine göre ayarlanabilir. Tarayıcı başarısız olursa script
 hata kodunu aktarır; önceki analiz sonuçları başarı olarak gösterilmez.
 
 Apple Silicon gibi ortamlarda Docker scanner emülasyonu yerine resmi platform
-CLI'si kullanılabilir. İndirilen executable yolunu `SONAR_SCANNER_PATH` ile
-verin. Sunucu Docker'da kalır, scanner yerelde çalışır; token yalnızca ortam
-değişkeniyle iletilir. Varsayılan yerel cache `reports/quality/cache`, farklı
-konum için `SONAR_USER_HOME` kullanılabilir. Yerel scanner mevcut native Node
-executable'ını kullanır.
+CLI'si kullanılabilir. Yerli tarayıcı ve önbelleği ana checkout'taki
+`reports/quality/tool-cache/sonar-scanner-*/bin/sonar-scanner` ve
+`reports/quality/cache` konumlarında bulur. Farklı bir yol ya da önbellek için
+`SONAR_SCANNER_PATH` / `SONAR_USER_HOME` kullanılabilir. Yerli scanner mevcut
+native Node executable'ını kullanır; sunucu Docker'da kalır, token yalnızca
+ortam değişkeniyle iletilir.
 
 Resmi platform paketleri: [SonarScanner CLI indirme ve kurulum](https://docs.sonarsource.com/sonarqube-server/analyzing-source-code/scanners/sonarscanner).
 
@@ -90,7 +93,7 @@ Ne analiz edildiği `sonar-project.properties` içinde:
 - Çeviri dosyaları (`packages/contracts/src/i18n`) tekrar sayımına girmez.
 
 Kapsayıcıyı durdurmak: `docker stop derslik-sonarqube`.
-Tamamen sıfırlamak:
+Tamamen sıfırlamak (ana checkout'tan çalıştırın):
 
 ```bash
 docker rm -f derslik-sonarqube
