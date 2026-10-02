@@ -95,15 +95,11 @@ export class CalendarService {
   private render(locale: Locale, rows: FeedRow[]) {
     const web = new URL("/", this.config.WEB_ORIGIN).href;
     const summary = (r: FeedRow) =>
-      translate(
-        locale,
-        r.viewer_role === "OWNER"
-          ? "calendar.icsSummaryTeacher"
-          : r.viewer_role === "GUARDIAN"
-            ? "calendar.icsSummaryGuardian"
-            : "calendar.icsSummaryStudent",
-        { topic: r.topic, student: r.student_name, teacher: r.teacher_name },
-      );
+      translate(locale, summaryKey(r.viewer_role), {
+        topic: r.topic,
+        student: r.student_name,
+        teacher: r.teacher_name,
+      });
     return calendar({
       name: translate(locale, "calendar.icsName"),
       events: rows.map((r) => ({
@@ -128,4 +124,10 @@ export class CalendarService {
       [actor.id, currentLocale()],
     );
   }
+}
+
+function summaryKey(role: FeedRow["viewer_role"]) {
+  if (role === "OWNER") return "calendar.icsSummaryTeacher";
+  if (role === "GUARDIAN") return "calendar.icsSummaryGuardian";
+  return "calendar.icsSummaryStudent";
 }

@@ -659,11 +659,7 @@ export class MediaService {
           Number(e.duration) > 0 &&
           Math.ceil(e.duration!) <= v.reserved_seconds;
         if (v.status === "READY") return { received: true };
-        const next = ready
-          ? "READY"
-          : e.status.state === "error"
-            ? "FAILED"
-            : "PROCESSING";
+        const next = videoStatusOf(ready, e.status.state);
         // A ready event without privacy protection is never made visible.
         await tx.query(
           "UPDATE derslik.videos SET status=$3,duration_seconds=$4,updated_at=now() WHERE workspace_id=$1 AND id=$2",
@@ -685,4 +681,10 @@ export class MediaService {
       },
     );
   }
+}
+
+function videoStatusOf(ready: boolean | undefined, state: string) {
+  if (ready) return "READY";
+  if (state === "error") return "FAILED";
+  return "PROCESSING";
 }

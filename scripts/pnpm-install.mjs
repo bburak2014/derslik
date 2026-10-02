@@ -219,7 +219,7 @@ async function main() {
     let spawnError;
     child.once("error", (error) => { spawnError = error; });
     result = await new Promise((resolve) => child.once("close", (code, signal) => {
-      resolve({ code: spawnError ? (spawnError.code === "ENOENT" ? 127 : 1) : code, signal });
+      resolve({ code: spawnError ? spawnFailureCode(spawnError, 1) : code, signal });
     }));
     for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
     lines.close();
@@ -256,6 +256,10 @@ async function main() {
   if (result.signal) {
     try { process.kill(process.pid, result.signal); } catch {}
   }
+}
+
+function spawnFailureCode(spawnError, otherwise) {
+  return spawnError.code === "ENOENT" ? 127 : otherwise;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
