@@ -113,3 +113,23 @@ export async function collectPages(fetchPage) {
       );
   }
 }
+
+/** Gerekçesi olmayan Sonar susturma yorumlarının satır numaraları (1'den).
+ *  Yalnızca yorumlara bakılır; dize içindeki "NOSONAR" sayılmaz. Kabul
+ *  edilenler: "// NOSONAR: <gerekçe>" ve
+ *  "eslint-disable… sonarjs/<kural> -- <gerekçe>". */
+export function bareSuppressions(text) {
+  const found = [];
+  text.split("\n").forEach((line, i) => {
+    const comment = line.search(/\/\/|\/\*/);
+    if (comment === -1) return;
+    const body = line.slice(comment);
+    const nosonar = /NOSONAR/.test(body) && !/NOSONAR:\s*\S/.test(body);
+    const eslint =
+      /eslint-disable/.test(body) &&
+      /sonarjs\//.test(body) &&
+      !/--\s*\S/.test(body);
+    if (nosonar || eslint) found.push(i + 1);
+  });
+  return found;
+}
