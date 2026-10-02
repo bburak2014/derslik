@@ -7,6 +7,7 @@
   },
   "scripts": {
     "install:ci": "bash scripts/install-pnpm.sh",
+    "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/run-framework.mjs build",
     "start": "node scripts/dev.mjs --production",
@@ -47,7 +48,7 @@
     "services:check": "node scripts/check-services.mjs",
     "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
     "test:booking": "node --experimental-strip-types --test tests/booking-rules.test.mjs",
-    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs",
+    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs",
     "quality:sonar": "node scripts/sonar.mjs",
     "quality:gate": "node scripts/sonar.mjs --gate",
     "quality:dup": "npx -y jscpd@4",

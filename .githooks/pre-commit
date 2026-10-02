@@ -1,0 +1,32 @@
+#!/bin/sh
+# Her commit'ten önce Sonar kapısı (pnpm quality:gate): projede açık Sonar
+# sorunu, inceleme bekleyen güvenlik noktası ya da sınırı aşan kod tekrarı
+# varsa commit atılmaz. Atlatmak (git commit --no-verify) yalnızca
+# kullanıcının açık onayıyla. Ayrıntı: AGENTS.md, docs/sonar.md.
+root=$(git rev-parse --show-toplevel) || exit 1
+
+# Node 22.13+ gerekir (package.json engines). Masaüstü uygulamalarının
+# PATH'inde eski Node olabilir; o zaman nvm'de kurulu sürümler denenir.
+supported() {
+  "$1" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)' >/dev/null 2>&1
+}
+node_bin=
+if command -v node >/dev/null 2>&1 && supported node; then
+  node_bin=node
+else
+  # Glob sırası artandır: uygun olan en yeni sürüm kalır.
+  for candidate in "${NVM_DIR:-$HOME/.nvm}"/versions/node/v*/bin/node; do
+    if [ -x "$candidate" ] && supported "$candidate"; then
+      node_bin=$candidate
+    fi
+  done
+fi
+if [ -z "$node_bin" ]; then
+  echo "Sonar kapısı: Node 22.13 ya da üstü bulunamadı (PATH ve nvm). Commit durduruldu." >&2
+  exit 1
+fi
+
+if ! "$node_bin" "$root/scripts/sonar.mjs" --gate; then
+  echo "Sonar kapısı geçmedi; commit durduruldu. Liste: reports/sonar-gate.json" >&2
+  exit 1
+fi
