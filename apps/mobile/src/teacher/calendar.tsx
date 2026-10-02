@@ -74,9 +74,7 @@ export function CalendarSection({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
           onPress={() => setAvailability(true)}
           style={{ flex: 1 }}
         >
-          {enabled === null
-            ? t("booking.availability")
-            : `${t("booking.availability")} · ${enabled ? t("booking.on") : t("booking.off")}`}
+          {availabilityLabel(enabled)}
         </Button>
       </View>
       <AvailabilitySheet
@@ -99,4 +97,9 @@ export function CalendarSection({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
       )}
     </>
   );
+}
+
+function availabilityLabel(enabled: boolean | null) {
+  if (enabled === null) return t("booking.availability");
+  return `${t("booking.availability")} · ${enabled ? t("booking.on") : t("booking.off")}`;
 }

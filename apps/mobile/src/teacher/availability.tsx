@@ -157,16 +157,7 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
           contentContainerStyle={[styles.body, { gap: 20 }]}
         >
           {!form ? (
-            error ? (
-              <>
-                <ErrorText message={error} />
-                <Button secondary onPress={() => void load()}>
-                  {t("common.retry")}
-                </Button>
-              </>
-            ) : (
-              <Loading />
-            )
+            <LoadFallback error={error} onRetry={() => void load()} />
           ) : (
             <>
               <Toggle
@@ -438,5 +429,20 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function LoadFallback({
+  error,
+  onRetry,
+}: Readonly<{ error: string; onRetry: () => void }>) {
+  if (!error) return <Loading />;
+  return (
+    <>
+      <ErrorText message={error} />
+      <Button secondary onPress={onRetry}>
+        {t("common.retry")}
+      </Button>
+    </>
   );
 }

@@ -88,8 +88,7 @@ export function ThemeProvider({
       ? deleteItemAsync(THEME_KEY).catch(() => {})
       : setItemAsync(THEME_KEY, next).catch(() => {}));
   }, []);
-  const scheme: "light" | "dark" =
-    mode === "system" ? (device === "dark" ? "dark" : "light") : mode;
+  const scheme = resolveScheme(mode, device);
   const family = fontsReady ? "brand" : "system";
   const value = useMemo(
     () => ({ ...themes[family][scheme], scheme, mode, setMode }),
@@ -100,6 +99,14 @@ export function ThemeProvider({
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
+}
+
+function resolveScheme(
+  mode: ThemeMode,
+  device: ReturnType<typeof useColorScheme>,
+): "light" | "dark" {
+  if (mode !== "system") return mode;
+  return device === "dark" ? "dark" : "light";
 }
 
 /** Bileşenler bunu `const { colors, styles } = useTheme()` diye kullanır. */

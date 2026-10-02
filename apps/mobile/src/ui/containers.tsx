@@ -18,7 +18,7 @@ import {
   upper,
   type LessonPackage,
 } from "@derslik/contracts";
-import { type IconName } from "./tokens";
+import { type IconName, type Palette } from "./tokens";
 import { useTheme } from "./theme";
 import { ripple } from "./buttons";
 
@@ -40,16 +40,7 @@ export function Card({
   onLayout?: ViewProps["onLayout"];
 }>) {
   const { colors, styles } = useTheme();
-  const toned =
-    tone === "brand"
-      ? { backgroundColor: colors.brandSoft, borderColor: colors.brandLine }
-      : tone === "muted"
-        ? {
-            backgroundColor: colors.sunken,
-            borderColor: colors.line,
-            boxShadow: "none",
-          }
-        : null;
+  const toned = cardTone(tone, colors);
   if (!onPress)
     return (
       <View style={[styles.card, toned, style]} onLayout={onLayout}>
@@ -72,6 +63,18 @@ export function Card({
       {children}
     </Pressable>
   );
+}
+
+function cardTone(tone: "plain" | "brand" | "muted", colors: Palette) {
+  if (tone === "brand")
+    return { backgroundColor: colors.brandSoft, borderColor: colors.brandLine };
+  if (tone === "muted")
+    return {
+      backgroundColor: colors.sunken,
+      borderColor: colors.line,
+      boxShadow: "none",
+    };
+  return null;
 }
 
 /** Alt sayfa ve seçicilerin kapat düğmesi. */
@@ -203,11 +206,7 @@ export function Badge({
   }[tone];
   return (
     <View style={[section.badge, { backgroundColor: palette.bg }]}>
-      {icon ? (
-        <Ionicons name={icon} size={12} color={palette.fg} />
-      ) : dot ? (
-        <View style={[section.badgeDot, { backgroundColor: palette.fg }]} />
-      ) : null}
+      {badgeGlyph(icon, dot, palette.fg, section)}
       <Text
         numberOfLines={1}
         style={[section.badgeText, { color: palette.fg }]}
@@ -216,6 +215,17 @@ export function Badge({
       </Text>
     </View>
   );
+}
+
+function badgeGlyph(
+  icon: IconName | undefined,
+  dot: boolean,
+  fg: string,
+  section: ReturnType<typeof useTheme>["section"],
+) {
+  if (icon) return <Ionicons name={icon} size={12} color={fg} />;
+  if (dot) return <View style={[section.badgeDot, { backgroundColor: fg }]} />;
+  return null;
 }
 
 /** Ders durumu rozeti: web'deki Status bileşeninin karşılığı. */
@@ -235,15 +245,19 @@ export function LessonStatus({
         {t("lesson.awaitingConfirmation")}
       </Badge>
     );
-  return status === "COMPLETED" ? (
-    <Badge tone="success" icon="checkmark">
-      {t("lesson.completed")}
-    </Badge>
-  ) : status === "CANCELLED" ? (
-    <Badge tone="neutral" dot>
-      {t("lesson.cancelled")}
-    </Badge>
-  ) : (
+  if (status === "COMPLETED")
+    return (
+      <Badge tone="success" icon="checkmark">
+        {t("lesson.completed")}
+      </Badge>
+    );
+  if (status === "CANCELLED")
+    return (
+      <Badge tone="neutral" dot>
+        {t("lesson.cancelled")}
+      </Badge>
+    );
+  return (
     <Badge tone="info" dot>
       {t("lesson.scheduled")}
     </Badge>

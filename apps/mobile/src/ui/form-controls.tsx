@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { lower, t } from "@derslik/contracts";
-import { type IconName, radius } from "./tokens";
+import { type IconName, type Palette, radius } from "./tokens";
 import { type ThemeMode, useTheme } from "./theme";
 import { ripple } from "./buttons";
 import { CloseButton } from "./containers";
@@ -210,11 +210,7 @@ export function ChipGroup({
               borderRadius: radius.pill,
               borderWidth: 1,
               borderColor: on ? colors.brandLine : colors.lineControl,
-              backgroundColor: on
-                ? colors.brandSoft
-                : pressed
-                  ? colors.sunken
-                  : colors.surface,
+              backgroundColor: chipBackground(colors, on, pressed),
               opacity: disabled ? 0.45 : 1,
             })}
           >
@@ -233,6 +229,11 @@ export function ChipGroup({
       })}
     </View>
   );
+}
+
+function chipBackground(colors: Palette, on: boolean, pressed: boolean) {
+  if (on) return colors.brandSoft;
+  return pressed ? colors.sunken : colors.surface;
 }
 
 /** Aç/kapa anahtarı (shadcn Switch), etiketi ve açıklamasıyla bir satır. */

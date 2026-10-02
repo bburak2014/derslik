@@ -47,6 +47,7 @@ import {
   timeLabel,
   type Notice,
   type NoticeTarget,
+  type AccessInvitation,
   type StudentAccessList,
   type WorkspaceLimits,
 } from "@derslik/contracts";
@@ -416,11 +417,7 @@ export function LearningScreen({
       if (!upload) {
         const r = await request<{ data: FileReservation }>(media + "/files", {
           assignmentId,
-          purpose: owner
-            ? assignmentId
-              ? "ASSIGNMENT"
-              : "RESOURCE"
-            : "SUBMISSION",
+          purpose: filePurpose(owner, assignmentId),
           name: asset.name,
           mimeType: asset.mimeType || "application/octet-stream",
           sizeBytes: bytes.byteLength,
@@ -579,18 +576,16 @@ export function LearningScreen({
   const assignmentState = (
     a: LearningData["assignments"][number],
     sub?: LearningData["submissions"][number],
-  ): [BadgeTone, string] =>
-    a.status === "CANCELLED"
-      ? ["neutral", t("lesson.cancelled")]
-      : a.status === "COMPLETED"
-        ? ["success", t("lesson.completed")]
-        : sub
-          ? sub.status === "REVIEWED"
-            ? ["success", t("learn.reviewed")]
-            : ["info", t("learn.submitted")]
-          : a.due_on && a.due_on < dateKey()
-            ? ["danger", t("learn.late")]
-            : ["warning", t("learn.awaiting")];
+  ): [BadgeTone, string] => {
+    if (a.status === "CANCELLED") return ["neutral", t("lesson.cancelled")];
+    if (a.status === "COMPLETED") return ["success", t("lesson.completed")];
+    if (sub) {
+      if (sub.status === "REVIEWED") return ["success", t("learn.reviewed")];
+      return ["info", t("learn.submitted")];
+    }
+    if (a.due_on && a.due_on < dateKey()) return ["danger", t("learn.late")];
+    return ["warning", t("learn.awaiting")];
+  };
   // Ekranın başlığı ve sekme şeridi; Mesajlar sekmesi de aynılarını çizer.
   const header = !view && (
     <View style={styles.header}>
@@ -682,13 +677,7 @@ export function LearningScreen({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
             <Avatar name={studentName} size={52} />
             <View style={{ flex: 1, gap: 4 }}>
-              <Kicker>
-                {owner
-                  ? t("ml.learningArea")
-                  : student
-                    ? t("ml.studentArea")
-                    : t("ml.guardianArea")}
-              </Kicker>
+              <Kicker>{areaLabel(owner, student)}</Kicker>
               <Text style={styles.title} numberOfLines={2}>
                 {studentName}
               </Text>
@@ -922,11 +911,7 @@ export function LearningScreen({
                   </View>
                   {student && sub && a.status === "OPEN" && (
                     <Text style={[styles.caption, { marginTop: -4 }]}>
-                      {editable
-                        ? a.due_on
-                          ? t("ml.editableToday")
-                          : t("ml.editableAnytime")
-                        : t("ml.locked")}
+                      {editableHint(editable, a.due_on)}
                     </Text>
                   )}
                   {!!a.instructions && (
@@ -1151,15 +1136,7 @@ export function LearningScreen({
                           {file.name}
                         </Text>
                         <Text style={styles.caption} numberOfLines={1}>
-                          {!ready
-                            ? file.delete_requested
-                              ? t("learn.deletePending")
-                              : t("learn.uploadIncomplete")
-                            : file.assignment_id
-                              ? data.assignments.find(
-                                  (a) => a.id === file.assignment_id,
-                                )?.title
-                              : t("learn.generalMaterial")}
+                          {materialCaption(file, ready, data.assignments)}
                         </Text>
                       </View>
                       <View style={{ flexDirection: "row", gap: 6 }}>
@@ -1291,13 +1268,7 @@ export function LearningScreen({
                         {v.title}
                       </Text>
                       <Badge
-                        tone={
-                          v.delete_requested || v.status === "FAILED"
-                            ? "danger"
-                            : v.status === "READY"
-                              ? "success"
-                              : "warning"
-                        }
+                        tone={videoTone(v)}
                         icon={
                           v.status === "READY" && !v.delete_requested
                             ? "time-outline"
@@ -1305,17 +1276,7 @@ export function LearningScreen({
                         }
                         dot={!(v.status === "READY" && !v.delete_requested)}
                       >
-                        {v.delete_requested
-                          ? t("learn.deletePending")
-                          : v.status === "READY"
-                            ? t("learn.minutes", {
-                                count: Math.ceil(
-                                  (v.duration_seconds || 0) / 60,
-                                ),
-                              })
-                            : v.status === "FAILED"
-                              ? t("learn.videoFailed")
-                              : t("learn.videoPreparing")}
+                        {videoStatusText(v)}
                       </Badge>
                     </View>
                   </View>
@@ -1799,13 +1760,7 @@ export function LearningScreen({
                 ))}
                 {links?.invitations?.map((inv, i) => {
                   const expired = new Date(inv.expiresAt) < new Date();
-                  const [tone, state]: [BadgeTone, string] = inv.acceptedAt
-                    ? ["success", t("learn.accepted")]
-                    : inv.revokedAt
-                      ? ["neutral", t("lesson.cancelled")]
-                      : expired
-                        ? ["neutral", t("learn.expired")]
-                        : ["warning", t("learn.invitePending")];
+                  const [tone, state] = invitationState(inv, expired);
                   return (
                     <ListRow
                       key={inv.id}
@@ -1945,6 +1900,61 @@ export function LearningScreen({
       )}
     </SafeAreaView>
   );
+}
+
+function filePurpose(owner: boolean, assignmentId: string | null) {
+  if (!owner) return "SUBMISSION";
+  return assignmentId ? "ASSIGNMENT" : "RESOURCE";
+}
+
+function areaLabel(owner: boolean, student: boolean) {
+  if (owner) return t("ml.learningArea");
+  return student ? t("ml.studentArea") : t("ml.guardianArea");
+}
+
+function editableHint(editable: boolean, dueOn: string | null) {
+  if (!editable) return t("ml.locked");
+  return dueOn ? t("ml.editableToday") : t("ml.editableAnytime");
+}
+
+function materialCaption(
+  file: Material,
+  ready: boolean,
+  assignments: LearningData["assignments"],
+) {
+  if (!ready)
+    return file.delete_requested
+      ? t("learn.deletePending")
+      : t("learn.uploadIncomplete");
+  if (file.assignment_id)
+    return assignments.find((a) => a.id === file.assignment_id)?.title;
+  return t("learn.generalMaterial");
+}
+
+function videoTone(v: Video): BadgeTone {
+  if (v.delete_requested || v.status === "FAILED") return "danger";
+  return v.status === "READY" ? "success" : "warning";
+}
+
+function videoStatusText(v: Video) {
+  if (v.delete_requested) return t("learn.deletePending");
+  if (v.status === "READY")
+    return t("learn.minutes", {
+      count: Math.ceil((v.duration_seconds || 0) / 60),
+    });
+  return v.status === "FAILED"
+    ? t("learn.videoFailed")
+    : t("learn.videoPreparing");
+}
+
+function invitationState(
+  inv: AccessInvitation,
+  expired: boolean,
+): [BadgeTone, string] {
+  if (inv.acceptedAt) return ["success", t("learn.accepted")];
+  if (inv.revokedAt) return ["neutral", t("lesson.cancelled")];
+  if (expired) return ["neutral", t("learn.expired")];
+  return ["warning", t("learn.invitePending")];
 }
 
 /** Dosya, erişim ve davet satırlarının başındaki simge karosu. */

@@ -22,6 +22,7 @@ import {
   EmptyState,
   ErrorText,
   Loading,
+  type Palette,
   useTheme,
 } from "./ui";
 
@@ -63,7 +64,7 @@ function BookingBody({
   onChanged,
   onMessage,
 }: Readonly<Props>) {
-  const { colors, styles, section, type } = useTheme();
+  const { colors, styles, section } = useTheme();
   const base = `/portal/${workspaceId}/${studentId}/booking`;
   const [slots, setSlots] = useState<BookingSlots | null>(null),
     [error, setError] = useState(""),
@@ -146,156 +147,23 @@ function BookingBody({
         <CloseButton onPress={onClose} disabled={busy} />
       </View>
       <ScrollView contentContainerStyle={[styles.body, { gap: 16 }]}>
-        {!slots ? (
-          error ? (
-            <ErrorText message={error} />
-          ) : (
-            <Loading />
-          )
-        ) : slots.freeCredits < 1 ? (
-          <EmptyState
-            icon="wallet-outline"
-            title={t("booking.noCredits")}
-            description={t("booking.noCreditsHint")}
-            action={
-              onMessage ? (
-                <Button
-                  secondary
-                  size="sm"
-                  icon="chatbubble-outline"
-                  onPress={() => {
-                    onClose();
-                    onMessage();
-                  }}
-                >
-                  {t("booking.writeTeacher")}
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : !current ? (
-          <EmptyState
-            icon="calendar-clear-outline"
-            title={t("booking.noSlots")}
-            description={t("booking.noSlotsHint")}
-          />
-        ) : chosen ? (
-          <Card tone="brand">
-            <Text style={styles.h2}>
-              {dayLabel(chosen.startsAt, { weekday: "long" })} ·{" "}
-              {timeLabel(chosen.startsAt)}–{timeLabel(chosen.endsAt)}
-            </Text>
-            <Text style={styles.muted}>
-              {slots.location || t("lesson.noLocation")}
-            </Text>
-            <Text style={styles.caption}>
-              {until
-                ? t("booking.cancelUntil", {
-                    time: dayTimeLabel(until.toISOString()),
-                  })
-                : t("booking.cancelNotAllowed")}
-            </Text>
-          </Card>
-        ) : (
-          <>
-            <Text style={styles.label}>{t("booking.pickDay")}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {days.map((d) => {
-                const on = d.day === current.day,
-                  // Bu gün zaten planlı dersi var: seçili değilse uyarı tonu.
-                  warn = booked.has(d.day) && !on;
-                const label = dayLabel(d.day + "T12:00:00+03:00", {
-                  weekday: "short",
-                  month: "short",
-                });
-                return (
-                  <Pressable
-                    key={d.day}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    accessibilityLabel={
-                      booked.has(d.day)
-                        ? `${label}, ${t("booking.hasLesson")}`
-                        : label
-                    }
-                    onPress={() => setDay(d.day)}
-                    style={{
-                      minHeight: 40,
-                      justifyContent: "center",
-                      paddingHorizontal: 14,
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: on
-                        ? colors.brandLine
-                        : warn
-                          ? colors.warnLine
-                          : colors.lineControl,
-                      backgroundColor: on
-                        ? colors.brandSoft
-                        : warn
-                          ? colors.warnSoft
-                          : colors.surface,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        ...type.medium,
-                        color: warn ? colors.warn : colors.ink,
-                      }}
-                    >
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            {dayLessons && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  padding: 12,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.warnLine,
-                  backgroundColor: colors.warnSoft,
-                }}
-              >
-                <Ionicons
-                  name="warning-outline"
-                  size={18}
-                  color={colors.warn}
-                  accessible={false}
-                />
-                <Text style={[styles.muted, { flex: 1, color: colors.warn }]}>
-                  {t("booking.dayHasLessons", { times: dayLessons.join(", ") })}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.label}>{t("booking.pickTime")}</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {current.slots.map((s) => (
-                <Button
-                  key={s.startsAt}
-                  secondary
-                  size="sm"
-                  onPress={() => {
-                    setChosen(s);
-                    setChosenAt(Date.now());
-                  }}
-                  style={{ minWidth: 88 }}
-                >
-                  {timeLabel(s.startsAt)}
-                </Button>
-              ))}
-            </View>
-          </>
-        )}
+        <BookingContent
+          slots={slots}
+          error={error}
+          current={current}
+          chosen={chosen}
+          until={until}
+          days={days}
+          booked={booked}
+          dayLessons={dayLessons}
+          onMessage={onMessage}
+          onClose={onClose}
+          onDay={setDay}
+          onPick={(s) => {
+            setChosen(s);
+            setChosenAt(Date.now());
+          }}
+        />
         {!!slots && <ErrorText message={error} />}
       </ScrollView>
       {chosen && (
@@ -319,4 +187,221 @@ function BookingBody({
       )}
     </SafeAreaView>
   );
+}
+
+type DayGroup = ReturnType<typeof groupSlotsByDay>[number];
+
+function BookingContent({
+  slots,
+  error,
+  current,
+  chosen,
+  until,
+  days,
+  booked,
+  dayLessons,
+  onMessage,
+  onClose,
+  onDay,
+  onPick,
+}: Readonly<{
+  slots: BookingSlots | null;
+  error: string;
+  current: DayGroup | undefined;
+  chosen: BookingSlot | null;
+  until: Date | null;
+  days: DayGroup[];
+  booked: ReturnType<typeof scheduledByDay>;
+  dayLessons: string[] | undefined;
+  onMessage?: () => void;
+  onClose: () => void;
+  onDay: (day: string) => void;
+  onPick: (slot: BookingSlot) => void;
+}>) {
+  if (!slots) return error ? <ErrorText message={error} /> : <Loading />;
+  if (slots.freeCredits < 1)
+    return (
+      <EmptyState
+        icon="wallet-outline"
+        title={t("booking.noCredits")}
+        description={t("booking.noCreditsHint")}
+        action={
+          onMessage ? (
+            <Button
+              secondary
+              size="sm"
+              icon="chatbubble-outline"
+              onPress={() => {
+                onClose();
+                onMessage();
+              }}
+            >
+              {t("booking.writeTeacher")}
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  if (!current)
+    return (
+      <EmptyState
+        icon="calendar-clear-outline"
+        title={t("booking.noSlots")}
+        description={t("booking.noSlotsHint")}
+      />
+    );
+  if (chosen) return <ChosenSlot slots={slots} chosen={chosen} until={until} />;
+  return (
+    <DayPicker
+      days={days}
+      current={current}
+      booked={booked}
+      dayLessons={dayLessons}
+      onDay={onDay}
+      onPick={onPick}
+    />
+  );
+}
+
+function ChosenSlot({
+  slots,
+  chosen,
+  until,
+}: Readonly<{ slots: BookingSlots; chosen: BookingSlot; until: Date | null }>) {
+  const { styles } = useTheme();
+  return (
+    <Card tone="brand">
+      <Text style={styles.h2}>
+        {dayLabel(chosen.startsAt, { weekday: "long" })} ·{" "}
+        {timeLabel(chosen.startsAt)}–{timeLabel(chosen.endsAt)}
+      </Text>
+      <Text style={styles.muted}>
+        {slots.location || t("lesson.noLocation")}
+      </Text>
+      <Text style={styles.caption}>
+        {until
+          ? t("booking.cancelUntil", {
+              time: dayTimeLabel(until.toISOString()),
+            })
+          : t("booking.cancelNotAllowed")}
+      </Text>
+    </Card>
+  );
+}
+
+function DayPicker({
+  days,
+  current,
+  booked,
+  dayLessons,
+  onDay,
+  onPick,
+}: Readonly<{
+  days: DayGroup[];
+  current: DayGroup;
+  booked: ReturnType<typeof scheduledByDay>;
+  dayLessons: string[] | undefined;
+  onDay: (day: string) => void;
+  onPick: (slot: BookingSlot) => void;
+}>) {
+  const { colors, styles, type } = useTheme();
+  return (
+    <>
+      <Text style={styles.label}>{t("booking.pickDay")}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {days.map((d) => {
+          const on = d.day === current.day,
+            // Bu gün zaten planlı dersi var: seçili değilse uyarı tonu.
+            warn = booked.has(d.day) && !on;
+          const label = dayLabel(d.day + "T12:00:00+03:00", {
+            weekday: "short",
+            month: "short",
+          });
+          return (
+            <Pressable
+              key={d.day}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={
+                booked.has(d.day)
+                  ? `${label}, ${t("booking.hasLesson")}`
+                  : label
+              }
+              onPress={() => onDay(d.day)}
+              style={{
+                minHeight: 40,
+                justifyContent: "center",
+                paddingHorizontal: 14,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: dayBorder(colors, on, warn),
+                backgroundColor: dayFill(colors, on, warn),
+              }}
+            >
+              <Text
+                style={{
+                  ...type.medium,
+                  color: warn ? colors.warn : colors.ink,
+                }}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      {dayLessons && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 8,
+            padding: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.warnLine,
+            backgroundColor: colors.warnSoft,
+          }}
+        >
+          <Ionicons
+            name="warning-outline"
+            size={18}
+            color={colors.warn}
+            accessible={false}
+          />
+          <Text style={[styles.muted, { flex: 1, color: colors.warn }]}>
+            {t("booking.dayHasLessons", { times: dayLessons.join(", ") })}
+          </Text>
+        </View>
+      )}
+      <Text style={styles.label}>{t("booking.pickTime")}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {current.slots.map((s) => (
+          <Button
+            key={s.startsAt}
+            secondary
+            size="sm"
+            onPress={() => onPick(s)}
+            style={{ minWidth: 88 }}
+          >
+            {timeLabel(s.startsAt)}
+          </Button>
+        ))}
+      </View>
+    </>
+  );
+}
+
+function dayBorder(colors: Palette, on: boolean, warn: boolean) {
+  if (on) return colors.brandLine;
+  return warn ? colors.warnLine : colors.lineControl;
+}
+
+function dayFill(colors: Palette, on: boolean, warn: boolean) {
+  if (on) return colors.brandSoft;
+  return warn ? colors.warnSoft : colors.surface;
 }

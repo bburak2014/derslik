@@ -140,40 +140,13 @@ function FormBody({
               required={f.required}
               error={missing.includes(f.key) ? t("common.required") : undefined}
             >
-              {f.options && pickFromList(f.options) ? (
-                <Picker
-                  label={f.label}
-                  options={f.options}
-                  value={values[f.key]}
-                  onChange={(next) => set(f.key, next)}
-                />
-              ) : f.options ? (
-                <Segmented
-                  label={f.label}
-                  options={f.options}
-                  value={values[f.key]}
-                  onChange={(next) => set(f.key, next)}
-                />
-              ) : (
-                <Input
-                  accessibilityLabel={f.label}
-                  invalid={missing.includes(f.key)}
-                  value={values[f.key]}
-                  onChangeText={(text) => set(f.key, text)}
-                  placeholder={f.placeholder}
-                  keyboardType={f.keyboard || "default"}
-                  multiline={f.multiline}
-                  secureTextEntry={f.secure}
-                  editable={!busy}
-                  autoCapitalize={
-                    f.keyboard === "email-address" ? "none" : "sentences"
-                  }
-                  autoCorrect={f.keyboard !== "email-address"}
-                  maxLength={
-                    f.maxLength ?? (f.multiline ? 5000 : f.secure ? 128 : 200)
-                  }
-                />
-              )}
+              <FieldControl
+                field={f}
+                value={values[f.key]}
+                invalid={missing.includes(f.key)}
+                busy={busy}
+                onChange={(next) => set(f.key, next)}
+              />
             </Field>
           ))}
           <ErrorText message={error} />
@@ -200,4 +173,58 @@ function FormBody({
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function FieldControl({
+  field: f,
+  value,
+  invalid,
+  busy,
+  onChange,
+}: Readonly<{
+  field: FormField;
+  value: string;
+  invalid: boolean;
+  busy: boolean;
+  onChange: (next: string) => void;
+}>) {
+  if (f.options && pickFromList(f.options))
+    return (
+      <Picker
+        label={f.label}
+        options={f.options}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  if (f.options)
+    return (
+      <Segmented
+        label={f.label}
+        options={f.options}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  return (
+    <Input
+      accessibilityLabel={f.label}
+      invalid={invalid}
+      value={value}
+      onChangeText={onChange}
+      placeholder={f.placeholder}
+      keyboardType={f.keyboard || "default"}
+      multiline={f.multiline}
+      secureTextEntry={f.secure}
+      editable={!busy}
+      autoCapitalize={f.keyboard === "email-address" ? "none" : "sentences"}
+      autoCorrect={f.keyboard !== "email-address"}
+      maxLength={f.maxLength ?? defaultMaxLength(f)}
+    />
+  );
+}
+
+function defaultMaxLength(f: FormField) {
+  if (f.multiline) return 5000;
+  return f.secure ? 128 : 200;
 }

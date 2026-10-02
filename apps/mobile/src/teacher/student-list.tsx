@@ -69,11 +69,7 @@ export function StudentList({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
                       {[s.subject, s.grade].filter(Boolean).join(" · ")}
                     </Text>
                   </View>
-                  {!s.active ? (
-                    <Badge>{t("hub.archived")}</Badge>
-                  ) : open > 0 ? (
-                    <Badge tone="warning">{money(open)}</Badge>
-                  ) : null}
+                  {studentBadge(s.active, open)}
                   <Ionicons
                     name="chevron-forward"
                     size={17}
@@ -87,4 +83,10 @@ export function StudentList({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
       })()}
     </>
   );
+}
+
+function studentBadge(active: number, open: number) {
+  if (!active) return <Badge>{t("hub.archived")}</Badge>;
+  if (open > 0) return <Badge tone="warning">{money(open)}</Badge>;
+  return null;
 }

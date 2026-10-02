@@ -23,6 +23,7 @@ import { InboxSection } from "./teacher/inbox";
 import { Conversation, ThreadList } from "./messages";
 import {
   useTeacherScreen,
+  type TeacherCtx,
   type TeacherScreenProps,
 } from "./teacher/use-teacher-screen";
 
@@ -235,22 +236,19 @@ export function TeacherScreen(props: Readonly<TeacherScreenProps>) {
             {t("common.retry")}
           </Button>
         )}
-        {student ? (
-          <StudentFile ctx={ctx} />
-        ) : tab === "overview" ? (
-          <Overview ctx={ctx} />
-        ) : tab === "students" ? (
-          <StudentList ctx={ctx} />
-        ) : tab === "calendar" ? (
-          <CalendarSection ctx={ctx} />
-        ) : tab === "payments" ? (
-          <PaymentsSection ctx={ctx} />
-        ) : (
-          <InboxSection ctx={ctx} />
-        )}
+        <TabBody ctx={ctx} />
       </ScrollView>
       {tabBar}
       <FormSheet form={form} onClose={() => setForm(null)} />
     </SafeAreaView>
   );
+}
+
+function TabBody({ ctx }: Readonly<{ ctx: TeacherCtx }>) {
+  if (ctx.student) return <StudentFile ctx={ctx} />;
+  if (ctx.tab === "overview") return <Overview ctx={ctx} />;
+  if (ctx.tab === "students") return <StudentList ctx={ctx} />;
+  if (ctx.tab === "calendar") return <CalendarSection ctx={ctx} />;
+  if (ctx.tab === "payments") return <PaymentsSection ctx={ctx} />;
+  return <InboxSection ctx={ctx} />;
 }

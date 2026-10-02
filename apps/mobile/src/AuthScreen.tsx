@@ -273,13 +273,7 @@ export function AuthScreen({
                           { opacity: off || busy ? 0.5 : 1 },
                         ]}
                       >
-                        {p.id === "google" ? (
-                          <GoogleMark size={20} />
-                        ) : p.id === "apple" ? (
-                          <AppleMark size={20} color={colors.ink} />
-                        ) : (
-                          <MicrosoftMark size={20} />
-                        )}
+                        {socialMark(p.id, colors.ink)}
                         <Text style={auth.socialLabel} numberOfLines={1}>
                           {busy === p.id ? t("auth.opening") : p.name}
                         </Text>
@@ -444,6 +438,12 @@ export function AuthScreen({
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function socialMark(id: SocialProvider, ink: string) {
+  if (id === "google") return <GoogleMark size={20} />;
+  if (id === "apple") return <AppleMark size={20} color={ink} />;
+  return <MicrosoftMark size={20} />;
 }
 
 const makeAuth = (colors: Palette, type: Typography) =>

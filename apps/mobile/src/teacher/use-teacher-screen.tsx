@@ -516,76 +516,26 @@ export function useTeacherScreen({
             )}
           </View>
         </View>
-        {l.status === "SCHEDULED" ? (
-          <View style={[styles.row, { marginTop: 2 }]}>
-            <Button
-              size="sm"
-              icon="checkmark"
-              disabled={busy}
-              style={{ flexGrow: 1, flexBasis: "100%" }}
-              onPress={() =>
-                confirmAction(
-                  t("confirm.completeTitle"),
-                  t("mt.completeBody"),
-                  () =>
-                    mutate({
-                      action: "lesson.complete",
-                      id: l.id,
-                      version: l.version,
-                    }),
-                  setError,
-                )
-              }
-            >
-              {t("mt.completeLesson")}
-            </Button>
-            <Button
-              secondary
-              size="sm"
-              icon="calendar-outline"
-              disabled={busy}
-              onPress={() => reschedule(l)}
-              style={{ flexGrow: 1 }}
-            >
-              {t("mt.changeTime")}
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon="close"
-              disabled={busy}
-              style={{ flexGrow: 1 }}
-              onPress={() =>
-                confirmAction(
-                  t("mt.cancelTitle"),
-                  t("mt.cancelBody"),
-                  () =>
-                    mutate({
-                      action: "lesson.cancel",
-                      id: l.id,
-                      version: l.version,
-                    }),
-                  setError,
-                )
-              }
-            >
-              {t("mt.cancelLesson")}
-            </Button>
-          </View>
-        ) : l.status === "COMPLETED" ? (
+        {lessonActions(l)}
+      </Card>
+    );
+  }
+  function lessonActions(l: Lesson) {
+    if (l.status === "SCHEDULED")
+      return (
+        <View style={[styles.row, { marginTop: 2 }]}>
           <Button
-            secondary
             size="sm"
-            icon="arrow-undo-outline"
+            icon="checkmark"
             disabled={busy}
-            style={{ alignSelf: "flex-start" }}
+            style={{ flexGrow: 1, flexBasis: "100%" }}
             onPress={() =>
               confirmAction(
-                t("confirm.reverseTitle"),
-                t("mt.reverseBody"),
+                t("confirm.completeTitle"),
+                t("mt.completeBody"),
                 () =>
                   mutate({
-                    action: "lesson.reverse",
+                    action: "lesson.complete",
                     id: l.id,
                     version: l.version,
                   }),
@@ -593,20 +543,77 @@ export function useTeacherScreen({
               )
             }
           >
-            {t("confirm.reverseTitle")}
+            {t("mt.completeLesson")}
           </Button>
-        ) : (
           <Button
             secondary
             size="sm"
-            icon="refresh-outline"
-            style={{ alignSelf: "flex-start" }}
-            onPress={() => newLesson(l.student_id, l)}
+            icon="calendar-outline"
+            disabled={busy}
+            onPress={() => reschedule(l)}
+            style={{ flexGrow: 1 }}
           >
-            {t("lesson.planMakeup")}
+            {t("mt.changeTime")}
           </Button>
-        )}
-      </Card>
+          <Button
+            variant="danger"
+            size="sm"
+            icon="close"
+            disabled={busy}
+            style={{ flexGrow: 1 }}
+            onPress={() =>
+              confirmAction(
+                t("mt.cancelTitle"),
+                t("mt.cancelBody"),
+                () =>
+                  mutate({
+                    action: "lesson.cancel",
+                    id: l.id,
+                    version: l.version,
+                  }),
+                setError,
+              )
+            }
+          >
+            {t("mt.cancelLesson")}
+          </Button>
+        </View>
+      );
+    if (l.status === "COMPLETED")
+      return (
+        <Button
+          secondary
+          size="sm"
+          icon="arrow-undo-outline"
+          disabled={busy}
+          style={{ alignSelf: "flex-start" }}
+          onPress={() =>
+            confirmAction(
+              t("confirm.reverseTitle"),
+              t("mt.reverseBody"),
+              () =>
+                mutate({
+                  action: "lesson.reverse",
+                  id: l.id,
+                  version: l.version,
+                }),
+              setError,
+            )
+          }
+        >
+          {t("confirm.reverseTitle")}
+        </Button>
+      );
+    return (
+      <Button
+        secondary
+        size="sm"
+        icon="refresh-outline"
+        style={{ alignSelf: "flex-start" }}
+        onPress={() => newLesson(l.student_id, l)}
+      >
+        {t("lesson.planMakeup")}
+      </Button>
     );
   }
   const balance = (id?: string) =>
@@ -627,20 +634,7 @@ export function useTeacherScreen({
       .filter((l) => l.status === "SCHEDULED" && l.ends_at >= now)
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
     shown = todayLessons.length ? todayLessons : upcoming.slice(0, 4);
-  const title =
-    tab === "overview"
-      ? t("portal.studentNote1") + "\n" + t("portal.studentNote2")
-      : tab === "students"
-        ? t("ws.studentsTitle")
-        : tab === "calendar"
-          ? t("nav.calendar")
-          : tab === "payments"
-            ? t("nav.payments")
-            : tab === "teaching"
-              ? t("mt.teaching")
-              : tab === "messages"
-                ? t("chat.title")
-                : t("mt.notifications");
+  const title = tabTitle(tab);
   // Dar ekranda marka, üç simge ve "Hesabım" yazısı yan yana sığmıyor: telefonda
   // hesap düğmesi simgeye döner; çok dar ekranda (ya da büyük yazıda) marka
   // yalnızca işaretiyle, öğrenci dosyasının geri düğmesi yazısız çizilir.
@@ -650,16 +644,18 @@ export function useTeacherScreen({
     phone = width < 520,
     tight = width < 380 * scale,
     narrow = width < 370 * scale;
-  const header = (
-    <View style={styles.header}>
-      {student && narrow ? (
+  function headerLead() {
+    if (student && narrow)
+      return (
         <IconButton
           ghost
           icon="chevron-back"
           label={t("nav.students")}
           onPress={() => setSelected(null)}
         />
-      ) : student ? (
+      );
+    if (student)
+      return (
         <Button
           variant="ghost"
           size="sm"
@@ -669,9 +665,12 @@ export function useTeacherScreen({
         >
           {t("nav.students")}
         </Button>
-      ) : (
-        <Brand compact={tight} />
-      )}
+      );
+    return <Brand compact={tight} />;
+  }
+  const header = (
+    <View style={styles.header}>
+      {headerLead()}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <IconButton
           ghost
@@ -836,3 +835,14 @@ export function useTeacherScreen({
   };
 }
 export type TeacherCtx = ReturnType<typeof useTeacherScreen>;
+
+function tabTitle(tab: string) {
+  if (tab === "overview")
+    return t("portal.studentNote1") + "\n" + t("portal.studentNote2");
+  if (tab === "students") return t("ws.studentsTitle");
+  if (tab === "calendar") return t("nav.calendar");
+  if (tab === "payments") return t("nav.payments");
+  if (tab === "teaching") return t("mt.teaching");
+  if (tab === "messages") return t("chat.title");
+  return t("mt.notifications");
+}

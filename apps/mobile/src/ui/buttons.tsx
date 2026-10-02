@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "@derslik/contracts";
-import { type IconName } from "./tokens";
+import { type IconName, type Palette } from "./tokens";
 import { useTheme } from "./theme";
 
 /* ------------------------------------------------------------------ */
@@ -106,11 +106,7 @@ export function Button({
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color={tint} />
-      ) : icon ? (
-        <Ionicons name={icon} size={iconSize} color={tint} />
-      ) : null}
+      {buttonLeading(loading, icon, iconSize, tint)}
       <Text
         style={[
           styles.buttonText,
@@ -126,6 +122,17 @@ export function Button({
       )}
     </Pressable>
   );
+}
+
+function buttonLeading(
+  loading: boolean,
+  icon: IconName | undefined,
+  iconSize: number,
+  tint: string,
+) {
+  if (loading) return <ActivityIndicator size="small" color={tint} />;
+  if (icon) return <Ionicons name={icon} size={iconSize} color={tint} />;
+  return null;
 }
 
 /** Metin bağlantısı görünümlü düğme (shadcn Button variant="link"). */
@@ -208,7 +215,7 @@ export function IconButton({
       <Ionicons
         name={icon}
         size={19}
-        color={danger ? colors.danger : selected ? colors.brand : colors.text}
+        color={iconButtonTint(colors, danger, selected)}
       />
       {count > 0 && (
         <View style={section.count}>
@@ -217,4 +224,10 @@ export function IconButton({
       )}
     </Pressable>
   );
+}
+
+function iconButtonTint(colors: Palette, danger: boolean, selected: boolean) {
+  if (danger) return colors.danger;
+  if (selected) return colors.brand;
+  return colors.text;
 }

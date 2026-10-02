@@ -143,19 +143,18 @@ function Stars({
       {[1, 2, 3, 4, 5].map((i) => (
         <Ionicons
           key={i}
-          name={
-            v >= i - 0.25
-              ? "star"
-              : v >= i - 0.75
-                ? "star-half"
-                : "star-outline"
-          }
+          name={starIcon(v, i)}
           size={size}
           color={v ? colors.warn : colors.faint}
         />
       ))}
     </View>
   );
+}
+
+function starIcon(v: number, i: number): "star" | "star-half" | "star-outline" {
+  if (v >= i - 0.25) return "star";
+  return v >= i - 0.75 ? "star-half" : "star-outline";
 }
 
 function Rating({ teacher }: Readonly<{ teacher: PublicTeacher }>) {
@@ -247,21 +246,26 @@ function TeacherCard({
           <Price teacher={teacher} />
         </View>
         {/* Öğretmen hesabı: listenin üstündeki not açıklar, kartta düğme olmaz. */}
-        {state === "teacher" ? null : state === "pending" ? (
-          <RequestStatusBadge status="PENDING" />
-        ) : state === "cooling" ? (
-          <RequestStatusBadge status="DECLINED" />
-        ) : state ? (
-          <Badge tone={state === "student" ? "success" : "neutral"} dot>
-            {t(state === "student" ? "dir.cardStudent" : "dir.cardOwn")}
-          </Badge>
-        ) : (
-          <Button size="sm" icon="paper-plane-outline" onPress={onRequest}>
-            {t("dir.requestShort")}
-          </Button>
-        )}
+        {cardAction(state, onRequest)}
       </View>
     </Card>
+  );
+}
+
+function cardAction(state: CardState | null, onRequest: () => void) {
+  if (state === "teacher") return null;
+  if (state === "pending") return <RequestStatusBadge status="PENDING" />;
+  if (state === "cooling") return <RequestStatusBadge status="DECLINED" />;
+  if (state)
+    return (
+      <Badge tone={state === "student" ? "success" : "neutral"} dot>
+        {t(state === "student" ? "dir.cardStudent" : "dir.cardOwn")}
+      </Badge>
+    );
+  return (
+    <Button size="sm" icon="paper-plane-outline" onPress={onRequest}>
+      {t("dir.requestShort")}
+    </Button>
   );
 }
 
@@ -327,23 +331,49 @@ export function DirectoryScreen({
           onChange={(id) => setTab(id as DirectoryTab)}
         />
       )}
-      {teacher ? (
-        <TeacherProfile
-          key={teacher}
-          id={teacher}
-          onOpenWorkspace={onOpenWorkspace}
-          openRequest={openRequest}
-        />
-      ) : tab === "teachers" ? (
-        <TeacherList onOpen={open} />
-      ) : (
-        <MyRequests
-          onOpen={open}
-          onBrowse={() => setTab("teachers")}
-          onOpenWorkspace={onOpenWorkspace}
-        />
-      )}
+      <DirectoryBody
+        teacher={teacher}
+        tab={tab}
+        openRequest={openRequest}
+        onOpen={open}
+        onBrowse={() => setTab("teachers")}
+        onOpenWorkspace={onOpenWorkspace}
+      />
     </SafeAreaView>
+  );
+}
+
+function DirectoryBody({
+  teacher,
+  tab,
+  openRequest,
+  onOpen,
+  onBrowse,
+  onOpenWorkspace,
+}: Readonly<{
+  teacher: string | null;
+  tab: DirectoryTab;
+  openRequest: boolean;
+  onOpen: (id: string, request?: boolean) => void;
+  onBrowse: () => void;
+  onOpenWorkspace: (workspaceId: string) => void;
+}>) {
+  if (teacher)
+    return (
+      <TeacherProfile
+        key={teacher}
+        id={teacher}
+        onOpenWorkspace={onOpenWorkspace}
+        openRequest={openRequest}
+      />
+    );
+  if (tab === "teachers") return <TeacherList onOpen={onOpen} />;
+  return (
+    <MyRequests
+      onOpen={onOpen}
+      onBrowse={onBrowse}
+      onOpenWorkspace={onOpenWorkspace}
+    />
   );
 }
 
@@ -602,30 +632,22 @@ function TeacherList({
       {/* Arama değişince eski sonuçlar yenisi gelene kadar kalır. */}
       {!page ? (
         !error && <Loading />
-      ) : !rows.length && !error ? (
-        <EmptyState
-          icon="search-outline"
-          title={t("dir.emptyTitle")}
-          description={t("dir.emptyText")}
-        />
       ) : (
-        rows.map((x) => (
-          <TeacherCard
-            key={x.id}
-            teacher={x}
-            onPress={() => onOpen(x.id)}
-            onRequest={() => {
-              setNotice("");
-              setForm(
-                requestForm(x, async () => {
-                  setNotice(t("dir.sent"));
-                  setRelations((await client.teacherRelations()).data);
-                }),
-              );
-            }}
-            state={cardState(relations, x.id)}
-          />
-        ))
+        <TeacherResults
+          rows={rows}
+          error={error}
+          relations={relations}
+          onOpen={onOpen}
+          onRequest={(x) => {
+            setNotice("");
+            setForm(
+              requestForm(x, async () => {
+                setNotice(t("dir.sent"));
+                setRelations((await client.teacherRelations()).data);
+              }),
+            );
+          }}
+        />
       )}
       {page && rows.length < page.total && (
         <Button
@@ -638,6 +660,42 @@ function TeacherList({
       )}
       <FormSheet form={form} onClose={() => setForm(null)} />
     </ScrollView>
+  );
+}
+
+function TeacherResults({
+  rows,
+  error,
+  relations,
+  onOpen,
+  onRequest,
+}: Readonly<{
+  rows: PublicTeacher[];
+  error: string;
+  relations: TeacherRelations | null;
+  onOpen: (id: string, request?: boolean) => void;
+  onRequest: (teacher: PublicTeacher) => void;
+}>) {
+  if (!rows.length && !error)
+    return (
+      <EmptyState
+        icon="search-outline"
+        title={t("dir.emptyTitle")}
+        description={t("dir.emptyText")}
+      />
+    );
+  return (
+    <>
+      {rows.map((x) => (
+        <TeacherCard
+          key={x.id}
+          teacher={x}
+          onPress={() => onOpen(x.id)}
+          onRequest={() => onRequest(x)}
+          state={cardState(relations, x.id)}
+        />
+      ))}
+    </>
   );
 }
 
@@ -1087,94 +1145,119 @@ function MyRequests({
       <ErrorText message={error} />
       {!rows ? (
         !error && <Loading />
-      ) : !rows.length ? (
-        <EmptyState
-          icon="paper-plane-outline"
-          title={t("dir.noRequests")}
-          action={
-            <Button secondary onPress={onBrowse}>
-              {t("dir.browse")}
-            </Button>
+      ) : (
+        <RequestRows
+          rows={rows}
+          onBrowse={onBrowse}
+          onOpen={onOpen}
+          onOpenWorkspace={onOpenWorkspace}
+          onCancel={(id) =>
+            confirmAction(
+              t("dir.cancelRequest"),
+              "",
+              async () => {
+                await client.cancelLessonRequest(id);
+                await load();
+              },
+              setError,
+            )
           }
         />
-      ) : (
-        rows.map((r) => (
-          <Card key={r.id}>
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <TeacherPhoto
-                id={r.workspaceId}
-                version={r.teacherPhotoVersion}
-                name={r.teacherName}
-                size={44}
-              />
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={styles.h2} numberOfLines={1}>
-                  {r.teacherName}
-                </Text>
-                <Text style={styles.muted}>
-                  {subjectName(r.subject)}
-                  {r.level ? " · " + levelName(r.level) : ""}
-                </Text>
-                <Text style={styles.caption}>
-                  {t("dir.sentOn", { date: shortDate(r.createdAt) })}
-                </Text>
-              </View>
-            </View>
-            <RequestStatusBadge status={r.status} />
-            {r.status === "DECLINED" && !!r.decisionNote && (
-              <TeacherNote note={r.decisionNote} />
-            )}
-            {r.status === "PENDING" && (
-              <Text style={styles.caption}>
-                {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
-              </Text>
-            )}
-            {r.status === "EXPIRED" && (
-              <Text style={styles.muted}>
-                {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
-              </Text>
-            )}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {r.status === "ACCEPTED" && (
-                <Button
-                  size="sm"
-                  icon="school-outline"
-                  onPress={() => onOpenWorkspace(r.workspaceId)}
-                >
-                  {t("dir.openLessons")}
-                </Button>
-              )}
-              {r.status === "PENDING" && (
-                <Button
-                  size="sm"
-                  secondary
-                  onPress={() =>
-                    confirmAction(
-                      t("dir.cancelRequest"),
-                      "",
-                      async () => {
-                        await client.cancelLessonRequest(r.id);
-                        await load();
-                      },
-                      setError,
-                    )
-                  }
-                >
-                  {t("dir.cancelRequest")}
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onPress={() => onOpen(r.workspaceId)}
-              >
-                {t("dir.viewTeacher")}
-              </Button>
-            </View>
-          </Card>
-        ))
       )}
     </ScrollView>
+  );
+}
+
+function RequestRows({
+  rows,
+  onBrowse,
+  onOpen,
+  onOpenWorkspace,
+  onCancel,
+}: Readonly<{
+  rows: MyLessonRequest[];
+  onBrowse: () => void;
+  onOpen: (id: string) => void;
+  onOpenWorkspace: (workspaceId: string) => void;
+  onCancel: (id: string) => void;
+}>) {
+  const { styles } = useTheme();
+  if (!rows.length)
+    return (
+      <EmptyState
+        icon="paper-plane-outline"
+        title={t("dir.noRequests")}
+        action={
+          <Button secondary onPress={onBrowse}>
+            {t("dir.browse")}
+          </Button>
+        }
+      />
+    );
+  return (
+    <>
+      {rows.map((r) => (
+        <Card key={r.id}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TeacherPhoto
+              id={r.workspaceId}
+              version={r.teacherPhotoVersion}
+              name={r.teacherName}
+              size={44}
+            />
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={styles.h2} numberOfLines={1}>
+                {r.teacherName}
+              </Text>
+              <Text style={styles.muted}>
+                {subjectName(r.subject)}
+                {r.level ? " · " + levelName(r.level) : ""}
+              </Text>
+              <Text style={styles.caption}>
+                {t("dir.sentOn", { date: shortDate(r.createdAt) })}
+              </Text>
+            </View>
+          </View>
+          <RequestStatusBadge status={r.status} />
+          {r.status === "DECLINED" && !!r.decisionNote && (
+            <TeacherNote note={r.decisionNote} />
+          )}
+          {r.status === "PENDING" && (
+            <Text style={styles.caption}>
+              {t("dir.expiryHint", { days: REQUEST_EXPIRY_DAYS })}
+            </Text>
+          )}
+          {r.status === "EXPIRED" && (
+            <Text style={styles.muted}>
+              {t("dir.expiredState", { days: REQUEST_EXPIRY_DAYS })}
+            </Text>
+          )}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {r.status === "ACCEPTED" && (
+              <Button
+                size="sm"
+                icon="school-outline"
+                onPress={() => onOpenWorkspace(r.workspaceId)}
+              >
+                {t("dir.openLessons")}
+              </Button>
+            )}
+            {r.status === "PENDING" && (
+              <Button size="sm" secondary onPress={() => onCancel(r.id)}>
+                {t("dir.cancelRequest")}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => onOpen(r.workspaceId)}
+            >
+              {t("dir.viewTeacher")}
+            </Button>
+          </View>
+        </Card>
+      ))}
+    </>
   );
 }
 
@@ -1317,69 +1400,100 @@ export function ShowcaseView({
         <SuccessText message={notice} />
         {!data ? (
           !error && <Loading />
-        ) : tab === "requests" ? (
-          <>
-            {!data.requests.length && (
-              <EmptyState
-                icon="mail-unread-outline"
-                title={t("dir.noRequestsTeacher")}
-              />
-            )}
-            {pending.map((r) => (
-              <RequestCard
-                key={r.id}
-                request={r}
-                highlight={r.id === focus}
-                onDecide={decide}
-              />
-            ))}
-            {!!earlier.length && (
-              <Kicker muted>{t("dir.earlierRequests")}</Kicker>
-            )}
-            {earlier.map((r) => (
-              <RequestCard key={r.id} request={r} onDecide={decide} />
-            ))}
-          </>
-        ) : tab === "profile" ? (
-          <ProfileEditor
-            key={String(data.profile?.photoVersion) + !!data.profile}
+        ) : (
+          <ShowcaseBody
+            data={data}
+            tab={tab}
             workspaceId={workspaceId}
-            showcase={data}
+            focus={focus}
+            pending={pending}
+            earlier={earlier}
+            onDecide={decide}
             onSaved={async (message) => {
               setNotice(message);
               await load();
             }}
           />
-        ) : (
-          <>
-            {!!data.ratingCount && (
-              <Card>
-                <Kicker muted>{t("dir.average")}</Kicker>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                  }}
-                >
-                  <Text style={styles.title}>
-                    {data.ratingAverage?.toFixed(1)}
-                  </Text>
-                  <Stars value={data.ratingAverage} size={18} />
-                </View>
-                <Text style={styles.muted}>
-                  {t("dir.reviewCount", { count: data.ratingCount })}
-                </Text>
-              </Card>
-            )}
-            <ReviewList
-              reviews={data.reviews}
-              empty={t("dir.noReviewsTeacher")}
-            />
-          </>
         )}
       </ScrollView>
       <FormSheet form={form} onClose={() => setForm(null)} />
+    </>
+  );
+}
+
+function ShowcaseBody({
+  data,
+  tab,
+  workspaceId,
+  focus,
+  pending,
+  earlier,
+  onDecide,
+  onSaved,
+}: Readonly<{
+  data: Showcase;
+  tab: ShowcaseTab;
+  workspaceId: string;
+  focus?: string | null;
+  pending: LessonRequest[];
+  earlier: LessonRequest[];
+  onDecide: (r: LessonRequest, decision: "accept" | "decline") => void;
+  onSaved: (message: string) => Promise<void>;
+}>) {
+  const { styles } = useTheme();
+  if (tab === "requests")
+    return (
+      <>
+        {!data.requests.length && (
+          <EmptyState
+            icon="mail-unread-outline"
+            title={t("dir.noRequestsTeacher")}
+          />
+        )}
+        {pending.map((r) => (
+          <RequestCard
+            key={r.id}
+            request={r}
+            highlight={r.id === focus}
+            onDecide={onDecide}
+          />
+        ))}
+        {!!earlier.length && <Kicker muted>{t("dir.earlierRequests")}</Kicker>}
+        {earlier.map((r) => (
+          <RequestCard key={r.id} request={r} onDecide={onDecide} />
+        ))}
+      </>
+    );
+  if (tab === "profile")
+    return (
+      <ProfileEditor
+        key={String(data.profile?.photoVersion) + !!data.profile}
+        workspaceId={workspaceId}
+        showcase={data}
+        onSaved={onSaved}
+      />
+    );
+  return (
+    <>
+      {!!data.ratingCount && (
+        <Card>
+          <Kicker muted>{t("dir.average")}</Kicker>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <Text style={styles.title}>{data.ratingAverage?.toFixed(1)}</Text>
+            <Stars value={data.ratingAverage} size={18} />
+          </View>
+          <Text style={styles.muted}>
+            {t("dir.reviewCount", { count: data.ratingCount })}
+          </Text>
+        </Card>
+      )}
+      <ReviewList reviews={data.reviews} empty={t("dir.noReviewsTeacher")} />
     </>
   );
 }

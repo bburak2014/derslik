@@ -543,36 +543,16 @@ export function ThreadList({
       )}
       <PrivacyNote />
       <ErrorText message={error} />
-      {!threads ? (
-        // İlk yükleme hata verdiyse boş durum yerine yeniden deneme.
-        error ? (
-          <Button
-            secondary
-            size="sm"
-            icon="refresh-outline"
-            loading={retrying}
-            style={{ alignSelf: "flex-start" }}
-            onPress={() => {
-              setRetrying(true);
-              void messages.load().finally(() => setRetrying(false));
-            }}
-          >
-            {t("common.retry")}
-          </Button>
-        ) : (
-          <ActivityIndicator
-            color={colors.brand}
-            accessibilityLabel={t("common.loading")}
-            style={{ paddingVertical: 28 }}
-          />
-        )
-      ) : !threads.length ? (
-        <EmptyState
-          icon="chatbubbles-outline"
-          title={teacher ? t("chat.emptyTeacherTitle") : t("chat.title")}
-          description={
-            teacher ? t("chat.emptyTeacherText") : t("chat.emptyPortal")
-          }
+      {!threads?.length ? (
+        <ThreadsPlaceholder
+          threads={threads}
+          error={error}
+          retrying={retrying}
+          teacher={teacher}
+          onRetry={() => {
+            setRetrying(true);
+            void messages.load().finally(() => setRetrying(false));
+          }}
         />
       ) : (
         <>
@@ -621,6 +601,53 @@ export function ThreadList({
         </>
       )}
     </ScrollView>
+  );
+}
+
+function ThreadsPlaceholder({
+  threads,
+  error,
+  retrying,
+  teacher,
+  onRetry,
+}: Readonly<{
+  threads: MessageThread[] | null;
+  error: string;
+  retrying: boolean;
+  teacher: boolean;
+  onRetry: () => void;
+}>) {
+  const { colors } = useTheme();
+  if (threads)
+    return (
+      <EmptyState
+        icon="chatbubbles-outline"
+        title={teacher ? t("chat.emptyTeacherTitle") : t("chat.title")}
+        description={
+          teacher ? t("chat.emptyTeacherText") : t("chat.emptyPortal")
+        }
+      />
+    );
+  // İlk yükleme hata verdiyse boş durum yerine yeniden deneme.
+  if (error)
+    return (
+      <Button
+        secondary
+        size="sm"
+        icon="refresh-outline"
+        loading={retrying}
+        style={{ alignSelf: "flex-start" }}
+        onPress={onRetry}
+      >
+        {t("common.retry")}
+      </Button>
+    );
+  return (
+    <ActivityIndicator
+      color={colors.brand}
+      accessibilityLabel={t("common.loading")}
+      style={{ paddingVertical: 28 }}
+    />
   );
 }
 
@@ -1184,28 +1211,12 @@ export function Conversation({
               {t("chat.older")}
             </Button>
           )}
-          {!items
-            ? !error && (
-                <ActivityIndicator
-                  color={colors.brand}
-                  accessibilityLabel={t("common.loading")}
-                  style={{ paddingVertical: 28 }}
-                />
-              )
-            : !items.length
-              ? !!thread?.canSend && (
-                  <Text
-                    style={[
-                      styles.muted,
-                      { textAlign: "center", paddingVertical: 20 },
-                    ]}
-                  >
-                    {t("chat.emptyThread")}
-                  </Text>
-                )
-              : !!thread && (
-                  <MessageItems items={items} thread={thread} now={now} />
-                )}
+          <ConversationItems
+            items={items}
+            error={error}
+            thread={thread}
+            now={now}
+          />
           {!items && !!error && (
             <Button
               secondary
@@ -1218,84 +1229,118 @@ export function Conversation({
             </Button>
           )}
         </ScrollView>
-        {!thread ? null : thread.canSend ? (
-          <View
-            style={{
-              gap: 8,
-              paddingHorizontal: 12,
-              paddingTop: 10,
-              paddingBottom: 10,
-              borderTopWidth: 1,
-              borderTopColor: colors.line,
-              backgroundColor: colors.surface,
-            }}
-          >
-            <ErrorText message={sendError} />
+        {!!thread &&
+          (thread.canSend ? (
             <View
-              style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}
+              style={{
+                gap: 8,
+                paddingHorizontal: 12,
+                paddingTop: 10,
+                paddingBottom: 10,
+                borderTopWidth: 1,
+                borderTopColor: colors.line,
+                backgroundColor: colors.surface,
+              }}
             >
-              <Input
-                multiline
-                accessibilityLabel={t("chat.placeholder")}
-                placeholder={t("chat.placeholder")}
-                value={draft}
-                onChangeText={changeDraft}
-                maxLength={20000}
-                invalid={tooLong}
-                style={{
-                  flex: 1,
-                  minHeight: 48,
-                  maxHeight: 140,
-                  paddingTop: 12,
-                }}
-              />
-              <Button
-                icon="paper-plane-outline"
-                loading={sending}
-                disabled={!body || tooLong}
-                onPress={() => void send()}
+              <ErrorText message={sendError} />
+              <View
+                style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}
               >
-                {t("chat.send")}
-              </Button>
+                <Input
+                  multiline
+                  accessibilityLabel={t("chat.placeholder")}
+                  placeholder={t("chat.placeholder")}
+                  value={draft}
+                  onChangeText={changeDraft}
+                  maxLength={20000}
+                  invalid={tooLong}
+                  style={{
+                    flex: 1,
+                    minHeight: 48,
+                    maxHeight: 140,
+                    paddingTop: 12,
+                  }}
+                />
+                <Button
+                  icon="paper-plane-outline"
+                  loading={sending}
+                  disabled={!body || tooLong}
+                  onPress={() => void send()}
+                >
+                  {t("chat.send")}
+                </Button>
+              </View>
+              {near && (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={[
+                    styles.caption,
+                    { alignSelf: "flex-end", fontVariant: ["tabular-nums"] },
+                    tooLong && { color: colors.danger },
+                  ]}
+                >
+                  {t("chat.count", { count: length })}
+                </Text>
+              )}
             </View>
-            {near && (
-              <Text
-                accessibilityLiveRegion="polite"
-                style={[
-                  styles.caption,
-                  { alignSelf: "flex-end", fontVariant: ["tabular-nums"] },
-                  tooLong && { color: colors.danger },
-                ]}
-              >
-                {t("chat.count", { count: length })}
+          ) : (
+            <View style={[section.footer, { alignItems: "flex-start" }]}>
+              <Ionicons
+                name={
+                  thread.viewer === "GUARDIAN_READ"
+                    ? "eye-outline"
+                    : "lock-closed-outline"
+                }
+                size={18}
+                color={colors.muted}
+                style={{ marginTop: 1 }}
+              />
+              <Text style={[styles.muted, { flex: 1 }]}>
+                {thread.viewer === "GUARDIAN_READ"
+                  ? t("chat.readOnly")
+                  : t("chat.closed")}
               </Text>
-            )}
-          </View>
-        ) : (
-          <View style={[section.footer, { alignItems: "flex-start" }]}>
-            <Ionicons
-              name={
-                thread.viewer === "GUARDIAN_READ"
-                  ? "eye-outline"
-                  : "lock-closed-outline"
-              }
-              size={18}
-              color={colors.muted}
-              style={{ marginTop: 1 }}
-            />
-            <Text style={[styles.muted, { flex: 1 }]}>
-              {thread.viewer === "GUARDIAN_READ"
-                ? t("chat.readOnly")
-                : t("chat.closed")}
-            </Text>
-          </View>
-        )}
+            </View>
+          ))}
       </KeyboardAvoidingView>
       <View
         style={{ height: insets.bottom, backgroundColor: colors.surface }}
       />
     </>
   );
+}
+
+function ConversationItems({
+  items,
+  error,
+  thread,
+  now,
+}: Readonly<{
+  items: ChatMessage[] | null;
+  error: string;
+  thread: MessageThread | null;
+  now: number;
+}>) {
+  const { colors, styles } = useTheme();
+  if (!items)
+    return error ? null : (
+      <ActivityIndicator
+        color={colors.brand}
+        accessibilityLabel={t("common.loading")}
+        style={{ paddingVertical: 28 }}
+      />
+    );
+  if (!items.length)
+    return thread?.canSend ? (
+      <Text
+        style={[styles.muted, { textAlign: "center", paddingVertical: 20 }]}
+      >
+        {t("chat.emptyThread")}
+      </Text>
+    ) : null;
+  return thread ? (
+    <MessageItems items={items} thread={thread} now={now} />
+  ) : null;
 }
 
 /**
