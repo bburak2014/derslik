@@ -30,14 +30,16 @@ export async function uploadTus(
     throw new Error(t("upload.offsetInvalid"));
   while (offset < source.size) {
     const end = Math.min(offset + 8 * 1024 * 1024, source.size);
-    const response = await fetcher(url, {
+    // eslint-disable-next-line no-await-in-loop -- tus yüklemesi sırayla ilerler: her PATCH sunucunun onayladığı Upload-Offset'e bağlı, bir sonraki parça önceki onaylanmadan gönderilemez.
+    const response = await fetcher(url, { // NOSONAR: tus yüklemesi sırayla ilerler: her PATCH sunucunun onayladığı Upload-Offset'e bağlı, bir sonraki parça önceki onaylanmadan gönderilemez
       method: "PATCH",
       headers: {
         ...headers,
         "Upload-Offset": String(offset),
         "Content-Type": "application/offset+octet-stream",
       },
-      body: await source.slice(offset, end),
+      // eslint-disable-next-line no-await-in-loop -- parça bir öncekinin bittiği offset'ten okunur ve her seferinde bellekte tek parça tutulur (belleği sınırlar).
+      body: await source.slice(offset, end), // NOSONAR: parça bir öncekinin bittiği offset'ten okunur ve her seferinde bellekte tek parça tutulur (belleği sınırlar)
       signal,
     });
     if (!response.ok) throw new Error(t("upload.interrupted"));
