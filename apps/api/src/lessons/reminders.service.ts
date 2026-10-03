@@ -79,6 +79,7 @@ export class LessonRemindersService
   async run(): Promise<number> {
     let total = 0;
     for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- döngünün sürüp sürmeyeceği bu partinin sonucuna (lessons < BATCH) bağlı; sonraki parti ancak bu parti işlendikten sonra talep edilir.
       const rows = await this.db.systemTransaction(
         async (tx) =>
           (
@@ -93,7 +94,8 @@ export class LessonRemindersService
       for (const r of rows) {
         // Öğretmen dersleri takviminde görür; e-posta yalnızca öğrenci ve veliye.
         if (r.recipient_role === "OWNER" || !r.email) continue;
-        await this.mail.sendLessonReminder({
+        // eslint-disable-next-line no-await-in-loop -- e-postalar sırayla gider: ilk gönderim hatasında kalan alıcılara gönderim başlamaz (mevcut davranış) ve posta sağlayıcısına aynı anda tek istek gider.
+        await this.mail.sendLessonReminder({ // NOSONAR: e-postalar sırayla gider: ilk gönderim hatasında kalan alıcılara gönderim başlamaz (mevcut davranış) ve posta sağlayıcısına aynı anda tek istek gider
           to: r.email,
           locale: matchLocale(r.locale) ?? defaultLocale,
           role: r.recipient_role,

@@ -490,7 +490,8 @@ export class LearningService {
         "SELECT video_id,seconds FROM derslik.video_progress WHERE workspace_id=$1 AND student_id=$2 AND user_id=derslik.actor_id()",
     };
     for (const [key, sql] of Object.entries(queries))
-      result[key] = (await tx.query(sql, [ws, student])).rows;
+      // eslint-disable-next-line no-await-in-loop -- tek transaction'ın tek pg istemcisi: okumalar zaten sırayla yürür, eşzamanlı client.query pg'de kullanımdan kaldırılmış.
+      result[key] = (await tx.query(sql, [ws, student])).rows; // NOSONAR: tek transaction'ın tek pg istemcisi: okumalar zaten sırayla yürür, eşzamanlı client.query pg'de kullanımdan kaldırılmış
     return rawDto(result) as Record<string, unknown>;
   }
   get(actor: Actor, ws: string, student: string) {

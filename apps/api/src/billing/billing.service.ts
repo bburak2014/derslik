@@ -81,7 +81,8 @@ async function createPayment(
     const amount = due < unallocated ? due : unallocated;
     allocations.push(
       (
-        await tx.query(
+        // eslint-disable-next-line no-await-in-loop -- her tahsilat kalan tutara (unallocated) bağlı ve tutar bitince döngü kesilir; aynı transaction'da sırayla dağıtılır.
+        await tx.query( // NOSONAR: her tahsilat kalan tutara (unallocated) bağlı ve tutar bitince döngü kesilir; aynı transaction'da sırayla dağıtılır
           "INSERT INTO derslik.payment_allocations (workspace_id,student_id,payment_id,charge_id,amount_minor) VALUES ($1,$2,$3,$4,$5) RETURNING *",
           [ws, c.studentId, payment.id, charge.id, amount.toString()],
         )

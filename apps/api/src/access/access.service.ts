@@ -49,11 +49,13 @@ export class AccessService {
       ).rows;
       const portals = [];
       for (const l of links) {
-        await tx.query("SELECT set_config('app.workspace_id',$1,true)", [
+        // eslint-disable-next-line no-await-in-loop -- her tur önce set_config ile bu transaction'ın çalışma alanı bağlamını kurar, sonraki sorgu (RLS) o bağlama bağlıdır; sıra bozulamaz.
+        await tx.query("SELECT set_config('app.workspace_id',$1,true)", [ // NOSONAR: her tur önce set_config ile bu transaction'ın çalışma alanı bağlamını kurar, sonraki sorgu (RLS) o bağlama bağlıdır; sıra bozulamaz
           l.workspace_id,
         ]);
         const row = (
-          await tx.query(
+          // eslint-disable-next-line no-await-in-loop -- sorgu, hemen yukarıdaki set_config'in kurduğu çalışma alanı bağlamına (RLS) bağlı; sıra bozulamaz.
+          await tx.query( // NOSONAR: sorgu, hemen yukarıdaki set_config'in kurduğu çalışma alanı bağlamına (RLS) bağlı; sıra bozulamaz
             "SELECT w.id,w.name,s.name AS student_name FROM derslik.workspaces w JOIN derslik.students s ON s.workspace_id=w.id WHERE w.id=$1 AND s.id=$2 AND s.active",
             [l.workspace_id, l.student_id],
           )

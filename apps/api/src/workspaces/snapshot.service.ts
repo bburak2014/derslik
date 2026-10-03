@@ -26,7 +26,8 @@ export class SnapshotService {
         notes: "private_notes",
       })) {
         data[name] = (
-          await tx.query(
+          // eslint-disable-next-line no-await-in-loop -- tek transaction'ın tek pg istemcisi: tablolar zaten sırayla okunur, eşzamanlı client.query pg'de kullanımdan kaldırılmış.
+          await tx.query( // NOSONAR: tek transaction'ın tek pg istemcisi: tablolar zaten sırayla okunur, eşzamanlı client.query pg'de kullanımdan kaldırılmış
             `SELECT * FROM derslik.${table} WHERE workspace_id=$1 ORDER BY ${name === "notes" ? "updated_at" : "created_at"} DESC`,
             [ws],
           )

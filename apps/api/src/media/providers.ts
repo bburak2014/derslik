@@ -162,6 +162,7 @@ export class MediaProviders {
       const chunks: Buffer[] = [];
       let size = 0;
       while (size < 16) {
+        // eslint-disable-next-line no-await-in-loop -- akış okuması: her parça bir öncekinin bitmesine ve toplanan bayt sayısına bağlı.
         const { value, done } = await reader.read();
         if (done) break;
         const chunk = Buffer.from(value.subarray(0, 16 - size));

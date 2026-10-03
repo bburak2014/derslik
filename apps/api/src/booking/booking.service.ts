@@ -157,13 +157,15 @@ export class BookingService {
         [ws],
       );
       for (const w of c.windows)
-        await tx.query(
+        // eslint-disable-next-line no-await-in-loop -- aynı transaction'ın tek pg istemcisi: pencereler sırayla eklenir, eşzamanlı client.query pg'de kullanımdan kaldırılmış.
+        await tx.query( // NOSONAR: aynı transaction'ın tek pg istemcisi: pencereler sırayla eklenir, eşzamanlı client.query pg'de kullanımdan kaldırılmış
           "INSERT INTO derslik.availability_windows(workspace_id,weekday,start_minute,end_minute) VALUES($1,$2,$3,$4)",
           [ws, w.weekday, minutesOf(w.start), minutesOf(w.end)],
         );
       // Bitişi geçmiş kapalı günler saklanmaz.
       for (const b of c.blocks.filter((b) => b.to >= today))
-        await tx.query(
+        // eslint-disable-next-line no-await-in-loop -- aynı transaction'ın tek pg istemcisi: kapalı günler sırayla eklenir, eşzamanlı client.query pg'de kullanımdan kaldırılmış.
+        await tx.query( // NOSONAR: aynı transaction'ın tek pg istemcisi: kapalı günler sırayla eklenir, eşzamanlı client.query pg'de kullanımdan kaldırılmış
           "INSERT INTO derslik.availability_blocks(workspace_id,starts_on,ends_on) VALUES($1,$2,$3)",
           [ws, b.from, b.to],
         );
