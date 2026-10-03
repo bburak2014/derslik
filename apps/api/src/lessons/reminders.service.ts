@@ -94,8 +94,8 @@ export class LessonRemindersService
       for (const r of rows) {
         // Öğretmen dersleri takviminde görür; e-posta yalnızca öğrenci ve veliye.
         if (r.recipient_role === "OWNER" || !r.email) continue;
-        // eslint-disable-next-line no-await-in-loop -- e-postalar sırayla gider: ilk gönderim hatasında kalan alıcılara gönderim başlamaz (mevcut davranış) ve posta sağlayıcısına aynı anda tek istek gider.
-        await this.mail.sendLessonReminder({ // NOSONAR: e-postalar sırayla gider: ilk gönderim hatasında kalan alıcılara gönderim başlamaz (mevcut davranış) ve posta sağlayıcısına aynı anda tek istek gider
+        // eslint-disable-next-line no-await-in-loop -- e-postalar sırayla gider: sağlayıcıya aynı anda tek istek; Promise.all bir partide yüzlerce eşzamanlı istekle hız sınırına takılır ve gönderilemeyen hatırlatma yeniden denenmediği için kaybolur.
+        await this.mail.sendLessonReminder({ // NOSONAR: e-postalar sırayla gider: sağlayıcıya aynı anda tek istek; Promise.all bir partide yüzlerce eşzamanlı istekle hız sınırına takılır ve gönderilemeyen hatırlatma yeniden denenmediği için kaybolur
           to: r.email,
           locale: matchLocale(r.locale) ?? defaultLocale,
           role: r.recipient_role,

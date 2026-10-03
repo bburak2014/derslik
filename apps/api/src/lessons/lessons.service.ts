@@ -96,8 +96,8 @@ async function createLessons(
     checkExpiry(pack.expires_on, start);
     lessons.push(
       (
-        // eslint-disable-next-line no-await-in-loop -- haftalık dersler aynı transaction'da sırayla yazılır: hafta sırası kayıt sırasını ve lessons[0]'ı belirler, checkExpiry ilk geçersiz haftada durdurur.
-        await tx.query( // NOSONAR: haftalık dersler aynı transaction'da sırayla yazılır: hafta sırası kayıt sırasını ve lessons[0]'ı belirler, checkExpiry ilk geçersiz haftada durdurur
+        // eslint-disable-next-line no-await-in-loop -- aynı transaction'ın tek pg istemcisi: haftalar sırayla eklenir (kayıt sırası ve lessons[0] hafta sırasıdır), eşzamanlı client.query pg'de kullanımdan kaldırılmış.
+        await tx.query( // NOSONAR: aynı transaction'ın tek pg istemcisi: haftalar sırayla eklenir (kayıt sırası ve lessons[0] hafta sırasıdır), eşzamanlı client.query pg'de kullanımdan kaldırılmış
           `INSERT INTO derslik.lessons (workspace_id,student_id,package_id,topic,starts_at,ends_at,location,series_id,makeup_for_id)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
           [

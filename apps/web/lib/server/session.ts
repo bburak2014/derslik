@@ -79,19 +79,24 @@ export async function readBody(request: Request, limit = 16000) {
   const reader = request.body?.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
-  if (reader)
+  if (reader) {
+    let tooLarge = false;
     for (;;) {
       // eslint-disable-next-line no-await-in-loop -- gövde akış olarak okunur: her parça bir öncekinin bitmesine ve toplanan bayt sınırına bağlı.
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
       if (size > limit) {
-        // eslint-disable-next-line no-await-in-loop -- bu dal döngüyü bitirir: okuyucunun iptali beklenir ve hemen 413 fırlatılır, sonraki tur yoktur.
-        await reader.cancel().catch(() => undefined); // NOSONAR: bu dal döngüyü bitirir: okuyucunun iptali beklenir ve hemen 413 fırlatılır, sonraki tur yoktur
-        throw new HttpError(413, "web.requestTooLarge");
+        tooLarge = true;
+        break;
       }
       chunks.push(value);
     }
+    if (tooLarge) {
+      await reader.cancel().catch(() => undefined);
+      throw new HttpError(413, "web.requestTooLarge");
+    }
+  }
   const text = Buffer.concat(chunks).toString("utf8");
   try {
     return JSON.parse(text);
