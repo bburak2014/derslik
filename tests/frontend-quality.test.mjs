@@ -4,44 +4,13 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import test from "node:test";
-import { createContext, runInContext } from "node:vm";
-import ts from "typescript";
+import { loadTestModule } from "../scripts/test-source-loader.mjs";
 
 // Execute application code with deterministic native/network/time adapters.
 // No Expo native runtime or production services are used by these regressions.
 const root = resolve(import.meta.dirname, "..");
 function load(file, dependencies = {}, globals = {}) {
-  const source = readFileSync(resolve(root, file), "utf8");
-  const code = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.CommonJS,
-      esModuleInterop: true,
-    },
-  }).outputText;
-  const exports = {};
-  runInContext(
-    code,
-    createContext({
-      exports,
-      module: { exports },
-      require: (name) => {
-        assert.ok(name in dependencies, `Unexpected dependency ${name}`);
-        return dependencies[name];
-      },
-      URL,
-      URLSearchParams,
-      AbortSignal,
-      AbortController,
-      process: { env: {} },
-      crypto: { randomUUID },
-      setTimeout,
-      clearTimeout,
-      ...globals,
-    }),
-    { filename: file },
-  );
-  return exports;
+  return loadTestModule(file, { dependencies, globals: { crypto: { randomUUID }, ...globals } });
 }
 function deferred() {
   let resolve, reject;

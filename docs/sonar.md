@@ -1,7 +1,8 @@
 # Kod kalitesi analizi (SonarQube + jscpd)
 
 Yerelde hesap veya bulut gerekmez; her şey bu makinede, Docker içinde çalışır.
-CI'da aynı kural SonarCloud üzerinde denetlenir (aşağıda "CI: SonarCloud").
+CI'da SonarCloud'un kalite kapısı ve projenin sıfır sorun kuralı birlikte
+denetlenir (aşağıda "CI: SonarCloud").
 
 ## Commit kancası ve kapı
 
@@ -31,20 +32,31 @@ ESLint'te SonarJS kuralları da vardır (`pnpm lint`); sorunların çoğunu sani
 
 ## CI: SonarCloud
 
-`.github/workflows/ci.yml`'deki `sonar` işi (`checks` ile paralel) iki adımdan oluşur:
+`.github/workflows/ci.yml`'deki `sonar` işi (`checks` ile paralel) üç
+adımda doğrular:
 
-1. **Tarama.** `SonarSource/sonarqube-scan-action` bu depodaki
-   `sonar-project.properties` ile çalışır; kapsam (kaynak, test, hariç) ve
-   gerekçeli susturmalar yerel kapıyla aynıdır. Organizasyon `bburak2014`,
-   proje anahtarı `bburak2014_derslik` komut satırından verilir
-   (`sonar.scm.disabled=false` de oradan açılır).
-2. **Kapı.** `pnpm quality:cloud` (`scripts/sonar-cloud-gate.mjs`) taramanın
-   görevini (`.scannerwork/report-task.txt`) bekler, sonra SonarCloud API'sini
-   okuyup yerel kapıyla aynı kuralı uygular: açık sorun 0, `TO_REVIEW` güvenlik
-   noktası 0, kod tekrarı en çok %3. Biri bozulursa iş kırmızıdır; sorunlar
-   dosya ve satırıyla yazdırılır, `reports/sonar-gate.json` kırmızı işte
-   `sonar-gate` adlı artifact olarak yüklenir. Test kapsamı kurala girmez;
-   SonarCloud'un kendi "Sonar way" kalite kapısı kullanılmaz.
+1. **Gerçek test kapsamı.** `pnpm test:coverage` API ve web'i derler; PGlite
+   API entegrasyon testlerini, mobil güvenlik testlerini ve bütün
+   `tests/*.test.mjs` testlerini V8 kapsamı açıkken çalıştırır. c8, derleme
+   ve VM kaynak haritalarıyla kapsamı asıl TypeScript satırlarına eşler;
+   `reports/coverage/lcov.info` taramadan önce üretilir. Testlerden biri
+   başarısızsa tarama yapılmaz. Mobil testler gerçek uygulama işlevlerini
+   sahte native/ağ adaptörleriyle çalıştırır; cihaz kapsamı sayılmaz.
+2. **Tarama ve SonarCloud kalite kapısı.** `SonarSource/sonarqube-scan-action`
+   `sonar-project.properties` ile çalışır; kaynak/test kapsamı ve gerekçeli
+   susturmalar yerel taramayla aynıdır. Organizasyon `bburak2014`, proje
+   anahtarı `bburak2014_derslik`, `sonar.scm.disabled=false` ve
+   `sonar.qualitygate.wait=true` komut satırından verilir. LCOV,
+   `sonar.javascript.lcov.reportPaths` üzerinden içeri alınır. SonarCloud'un
+   kapısı kırmızıysa (yeni kod kapsamı %80'in altında veya yeni kod tekrarı
+   %3'ün üstünde dahil) tarama adımı başarısız olur.
+3. **Sıfır sorun kapısı.** `pnpm quality:cloud` (`scripts/sonar-cloud-gate.mjs`)
+   tamamlanan analizi bekleyip yerel kapıyla aynı ek kuralı uygular: açık
+   sorun 0, `TO_REVIEW` güvenlik noktası 0, toplam kod tekrarı en çok %3.
+   Sorunlar dosya ve satırıyla yazdırılır; `reports/sonar-gate.json`, kırmızı
+   işte `sonar-gate` artifact'ı olarak yüklenir. Bu ek kural SonarCloud'un
+   kendi kapısının yerine geçmez. LCOV ve kapsam özeti de `test-coverage`
+   artifact'ında saklanır.
 
 Kapı kapalıyken güvenlidir: token yoksa, görev FAILED/CANCELED/zaman aşımıysa,
 API hata verirse ya da sorun listesi eksik gelirse çıkış kodu 0 olmaz.
@@ -90,11 +102,29 @@ Script scanner'ın ürettiği `ceTaskId` ile bu taramanın işlenmesini bekler;
 başarısız, iptal edilmiş ve zaman aşımına uğramış görevlerde hata verir.
 Kalite kapısını tamamlanan analizin `analysisId` değeriyle sorgular ve sonuçları
 `reports/quality/sonar-summary.json` dosyasına yazar. Kalite kapısı `OK`
-olmadığında komut başarısız olur. Testlerin başarılı olması test kapsamının
-ölçüldüğü anlamına gelmez: LCOV raporu içeri alınmadığı için kapsam ayrıca
-`coverageReportImported: false` alanıyla belirtilir. `coverageMeasured` yalnızca
-Sonar'ın bir kapsam metriği döndürüp döndürmediğini ifade eder; otomatik sıfır
-kapsam değeri test raporu aktarımı olarak kabul edilmez.
+olmadığında komut başarısız olur. Kapsamı içeri almak için önce:
+
+```bash
+pnpm test:coverage
+pnpm quality:sonar
+```
+
+`test:coverage` derlemeleri de yapar; önceden üretilmiş bir web/API derlemesi
+gerekmez. Kapsam dosyaları Git'e girmez. c8, `sonar.sources` ve
+`sonar.exclusions` ayarlarını doğrudan okur; testte hiç yüklenmeyen kaynakları
+da %0 ile rapora katar. Kapsamı artırmak amacıyla ek kaynak hariç bırakılmaz.
+Üretim Next sunucusunun minify edilmiş SSR haritaları kapsam ölçümüne
+katılmaz: bu haritalar hiç çağrılmamış istemci işlevlerini çalışmış
+gösterebiliyor. HTTP testleri yine üretim derlemesine karşı çalışır; asıl web
+kaynakları raporda kalır ve doğrudan kaynak testleriyle ölçülür. VM haritası
+regresyon testi, hiç çağrılmamış bir TypeScript işlevinin satırının %0
+kaldığını doğrular.
+
+LCOV satırları var olan depo dosyaları ve geçerli satır numaralarıyla
+karşılaştırılır; boş veya hiç çalıştırılmamış bir rapor başarılı sayılmaz.
+`coverageReportImported` alanı, geçerli LCOV ile Sonar'ın kapsam ölçümünün
+ve en az bir kapsanmış Sonar satırının birlikte doğrulandığını belirtir;
+Sonar'ın rapor olmadan döndürdüğü otomatik sıfır değerinin içeri aktarılmış kapsam olduğu kabul edilmez.
 
 Kapsayıcı yalnızca `127.0.0.1:<SONAR_PORT>` üzerinde dinler (varsayılan 9000).
 `derslik-sonarqube` bütün arayüzlere açık ise yeniden kurulur.

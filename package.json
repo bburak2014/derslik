@@ -47,8 +47,8 @@
     "mobile:clear": "node scripts/sync-env.mjs && pnpm --filter @derslik/mobile start --clear",
     "services:check": "node scripts/check-services.mjs",
     "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
-    "test:booking": "node --experimental-strip-types --test tests/booking-rules.test.mjs",
-    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs tests/pnpm-install.test.mjs tests/sonar-cloud.test.mjs tests/sonar-lint.test.mjs",
+    "test:booking": "node --experimental-strip-types --test tests/booking-rules.test.mjs tests/booking-form.test.mjs tests/availability-form.test.mjs",
+    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs tests/pnpm-install.test.mjs tests/sonar-cloud.test.mjs tests/sonar-lint.test.mjs tests/coverage.test.mjs tests/sonar-cloud-integration.test.mjs tests/sonar-cli.test.mjs tests/coverage-cli.test.mjs tests/web-session-body.test.mjs",
     "quality:sonar": "node scripts/sonar.mjs",
     "quality:gate": "node scripts/sonar.mjs --gate",
     "quality:cloud": "node scripts/sonar-cloud-gate.mjs",
@@ -64,7 +64,8 @@
     "security:web-fixture": "WEB_SECURITY_FIXTURE=reports/security/backend-fixture.json WEB_SECURITY_BACKEND=http://127.0.0.1:3101 WEB_SECURITY_SESSION=reports/security/web-fixture-session.json node tests/web-security-harness.mjs --serve",
     "security:e2e": "node tests/web-security-e2e.mjs",
     "security:zap:api": "node scripts/security-zap-fixture.mjs api",
-    "security:zap:web": "node scripts/security-zap-fixture.mjs web"
+    "security:zap:web": "node scripts/security-zap-fixture.mjs web",
+    "test:coverage": "node scripts/coverage.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -102,6 +103,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
+    "c8": "10.1.3",
     "drizzle-kit": "0.31.10",
     "embedded-postgres": "18.4.0-beta.17",
     "eslint": "9.39.4",

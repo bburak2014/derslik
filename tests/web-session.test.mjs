@@ -175,6 +175,10 @@ test(
         cwd: webRoot,
         env: {
           ...process.env,
+          // Minified Turbopack SSR maps can mark uncalled client methods as
+          // covered. Direct source tests collect coverage; this HTTP test
+          // still verifies the production server without importing its maps.
+          ...(process.env.DERSLIK_TEST_COVERAGE === "1" ? { NODE_V8_COVERAGE: "" } : {}),
           NEXT_TELEMETRY_DISABLED: "1",
           API_BASE_URL: upstreamUrl,
           SUPABASE_URL: upstreamUrl,
