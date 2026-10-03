@@ -81,11 +81,13 @@ export async function readBody(request: Request, limit = 16000) {
   let size = 0;
   if (reader)
     for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- gövde akış olarak okunur: her parça bir öncekinin bitmesine ve toplanan bayt sınırına bağlı.
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
       if (size > limit) {
-        await reader.cancel().catch(() => undefined);
+        // eslint-disable-next-line no-await-in-loop -- bu dal döngüyü bitirir: okuyucunun iptali beklenir ve hemen 413 fırlatılır, sonraki tur yoktur.
+        await reader.cancel().catch(() => undefined); // NOSONAR: bu dal döngüyü bitirir: okuyucunun iptali beklenir ve hemen 413 fırlatılır, sonraki tur yoktur
         throw new HttpError(413, "web.requestTooLarge");
       }
       chunks.push(value);
@@ -152,7 +154,9 @@ export async function serverSession() {
     auth,
     client: new DerslikClient({
       baseUrl: process.env.API_BASE_URL!,
-      getToken: async () => session.access_token,
+      // Gövde yalnızca değişmeyen bir alanı okur ve fırlatamaz; async yerine
+      // hazır bir söz döndürülür (imza aynı: Promise<string>).
+      getToken: () => Promise.resolve(session.access_token),
       locale: () => locale,
     }),
   };

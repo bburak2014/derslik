@@ -28,8 +28,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["@derslik/contracts", "@derslik/api-client"],
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
-  async headers() {
-    return [
+  // Next'in beklediği imza söz döndürmektir. Gövde yalnızca sabit bir dizi
+  // kurar ve fırlatamaz; async yerine hazır bir söz döndürülür.
+  headers() {
+    return Promise.resolve([
       { source: "/:path*", headers: securityHeaders },
       // API yanıtları JSON ya da görsel; hiçbir şey çalıştırmaları gerekmez.
       {
@@ -49,7 +51,7 @@ const nextConfig: NextConfig = {
         source: "/api/calendar/:path*",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
-    ];
+    ]);
   },
 };
 export default nextConfig;

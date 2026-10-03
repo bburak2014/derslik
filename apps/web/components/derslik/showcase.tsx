@@ -99,10 +99,12 @@ async function squarePhoto(file: File) {
   );
   bitmap.close();
   for (const quality of [0.86, 0.75, 0.6]) {
+    // eslint-disable-next-line no-await-in-loop -- kalite basamakları sırayla denenir: ilk uygun boyuttaki sonuç döner, kalanlar için boşuna kodlama yapılmaz.
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", quality),
     );
     if (blob && blob.size <= PHOTO_MAX_BYTES) {
+      // eslint-disable-next-line no-await-in-loop -- uygun blob bulununca sonuç hemen döner; sonraki kalite basamağına geçilmez.
       const bytes = new Uint8Array(await blob.arrayBuffer());
       let binary = "";
       for (let i = 0; i < bytes.length; i += 0x8000)
