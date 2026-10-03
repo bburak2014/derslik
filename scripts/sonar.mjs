@@ -15,7 +15,7 @@ import {
   scannerInvocation,
   waitForAnalysis,
 } from "./sonar-report.mjs";
-import { collectPages, evaluateGate } from "./sonar-gate.mjs";
+import { evaluateGate, fetchGateInputs } from "./sonar-gate.mjs";
 import {
   SONARQUBE_IMAGE,
   acquireLock,
@@ -289,26 +289,10 @@ async function enforceGate(auth, taskId) {
       throw new Error(`SonarQube API ${res.status}: ${pathname.split("?")[0]}`);
     return res.json();
   };
-  const issues = await collectPages(async (p) => {
-    const r = await json(
-      `/api/issues/search?components=${PROJECT}&resolved=false&ps=500&p=${p}`,
-    );
-    return { items: r.issues, total: r.paging?.total ?? r.total };
+  const { issues, hotspots, duplication } = await fetchGateInputs(json, {
+    project: PROJECT,
+    issueComponentParam: "components",
   });
-  const hotspots = await collectPages(async (p) => {
-    const r = await json(
-      `/api/hotspots/search?projectKey=${PROJECT}&status=TO_REVIEW&ps=500&p=${p}`,
-    );
-    return { items: r.hotspots, total: r.paging?.total };
-  });
-  const measures = await json(
-    `/api/measures/component?component=${PROJECT}&metricKeys=duplicated_lines_density`,
-  );
-  const duplication = Number(
-    measures.component?.measures?.find(
-      (m) => m.metric === "duplicated_lines_density",
-    )?.value,
-  );
   const result = evaluateGate({ issues, hotspots, duplication });
   const output = path.join(root, "reports", "sonar-gate.json");
   fs.mkdirSync(path.dirname(output), { recursive: true });

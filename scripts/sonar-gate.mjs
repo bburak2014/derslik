@@ -120,6 +120,39 @@ export async function collectPages(fetchPage) {
   }
 }
 
+/** Kapının üç girdisini (sorunlar, güvenlik noktaları, kod tekrarı) okur.
+ *  `json(pathname)` yolu okuyup JSON döndürür, HTTP hatasında fırlatır.
+ *  `issueComponentParam`: yerel SonarQube'de "components", SonarCloud'da
+ *  "componentKeys". `scope`: boş ya da "branch=main" / "pullRequest=12" gibi
+ *  üç isteğe de eklenen sorgu parçası. */
+export async function fetchGateInputs(
+  json,
+  { project, issueComponentParam, scope = "" },
+) {
+  const suffix = scope ? `&${scope}` : "";
+  const issues = await collectPages(async (p) => {
+    const r = await json(
+      `/api/issues/search?${issueComponentParam}=${project}&resolved=false&ps=500&p=${p}${suffix}`,
+    );
+    return { items: r.issues, total: r.paging?.total ?? r.total };
+  });
+  const hotspots = await collectPages(async (p) => {
+    const r = await json(
+      `/api/hotspots/search?projectKey=${project}&status=TO_REVIEW&ps=500&p=${p}${suffix}`,
+    );
+    return { items: r.hotspots, total: r.paging?.total };
+  });
+  const measures = await json(
+    `/api/measures/component?component=${project}&metricKeys=duplicated_lines_density${suffix}`,
+  );
+  const duplication = Number(
+    measures.component?.measures?.find(
+      (m) => m.metric === "duplicated_lines_density",
+    )?.value,
+  );
+  return { issues, hotspots, duplication };
+}
+
 /** Gerekçesi olmayan Sonar susturma yorumlarının satır numaraları (1'den).
  *  Yalnızca yorumlara bakılır; dize içindeki "NOSONAR" sayılmaz. Kabul
  *  edilenler: "// NOSONAR: <gerekçe>" ve

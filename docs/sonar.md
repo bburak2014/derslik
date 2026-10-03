@@ -1,6 +1,7 @@
 # Kod kalitesi analizi (SonarQube + jscpd)
 
-Hesap veya bulut gerekmez; her şey bu makinede, Docker içinde çalışır.
+Yerelde hesap veya bulut gerekmez; her şey bu makinede, Docker içinde çalışır.
+CI'da aynı kural SonarCloud üzerinde denetlenir (aşağıda "CI: SonarCloud").
 
 ## Commit kancası ve kapı
 
@@ -25,6 +26,50 @@ imajı `scripts/sonar-local.mjs`'te tam sürüme sabittir. Yönetilen kapsayıc�
 seçilen kapsayıcı hiçbir zaman silinmez, yalnızca uymazsa uyarı yazılır.
 
 Susturma kuralı ve göndermeden önceki kontrol listesi: kökteki `AGENTS.md`.
+
+## CI: SonarCloud
+
+`.github/workflows/ci.yml`'deki `sonar` işi (`checks` ile paralel) iki adımdan oluşur:
+
+1. **Tarama.** `SonarSource/sonarqube-scan-action` bu depodaki
+   `sonar-project.properties` ile çalışır; kapsam (kaynak, test, hariç) ve
+   gerekçeli susturmalar yerel kapıyla aynıdır. Organizasyon `bburak2014`,
+   proje anahtarı `bburak2014_derslik` komut satırından verilir
+   (`sonar.scm.disabled=false` de oradan açılır).
+2. **Kapı.** `pnpm quality:cloud` (`scripts/sonar-cloud-gate.mjs`) taramanın
+   görevini (`.scannerwork/report-task.txt`) bekler, sonra SonarCloud API'sini
+   okuyup yerel kapıyla aynı kuralı uygular: açık sorun 0, `TO_REVIEW` güvenlik
+   noktası 0, kod tekrarı en çok %3. Biri bozulursa iş kırmızıdır; sorunlar
+   dosya ve satırıyla yazdırılır, `reports/sonar-gate.json` kırmızı işte
+   `sonar-gate` adlı artifact olarak yüklenir. Test kapsamı kurala girmez;
+   SonarCloud'un kendi "Sonar way" kalite kapısı kullanılmaz.
+
+Kapı kapalıyken güvenlidir: token yoksa, görev FAILED/CANCELED/zaman aşımıysa,
+API hata verirse ya da sorun listesi eksik gelirse çıkış kodu 0 olmaz.
+
+Kurulum:
+
+- SonarCloud'da projenin **otomatik analizi kapalı** olmalı (Administration >
+  Analysis Method); aksi halde CI taraması "otomatik analiz açık" hatasıyla
+  reddedilir.
+- GitHub'da depoya `SONAR_TOKEN` secret'ı eklenir (Settings > Secrets and
+  variables > Actions). Token SonarCloud'da projeyi tarama (Execute
+  Analysis) yetkisiyle üretilir. Fork PR'larına secret verilmediği için iş orada çalışmaz; main'e
+  push'ta her zaman çalışır.
+
+Kapsam: main'e push'ta projenin tamamı (`branch=<dal>`) denetlenir. Çekme
+isteklerinde (`pullRequest=<numara>`) SonarCloud yalnızca yeni kodun
+sorunlarını raporlar; kapının yerel kapı kadar sıkı olması için asıl güvence
+main push'udur. SonarCloud'a özel ek kurallar (taint analizi gibi) yerel
+SonarQube Community'de yoktur; ilk taramada yeni bulgular çıkabilir ve
+düzeltilmeden CI yeşile dönmez.
+
+Yerelde denemek için (taramayı önce CI'daki gibi çalıştırmış olmak gerekir):
+
+```bash
+SONAR_TOKEN=... pnpm quality:cloud --branch main
+SONAR_TOKEN=... pnpm quality:cloud --pull-request 12
+```
 
 ## SonarQube
 
