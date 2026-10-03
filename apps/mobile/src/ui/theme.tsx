@@ -83,9 +83,11 @@ export function ThemeProvider({
   }, []);
   const changeMode = useCallback((next: ThemeMode) => {
     setMode(next);
-    void (next === "system"
-      ? deleteItemAsync(THEME_KEY).catch(() => {})
-      : setItemAsync(THEME_KEY, next).catch(() => {}));
+    const saved =
+      next === "system"
+        ? deleteItemAsync(THEME_KEY)
+        : setItemAsync(THEME_KEY, next);
+    saved.catch(() => {});
   }, []);
   const scheme = resolveScheme(mode, device);
   const family = fontsReady ? "brand" : "system";

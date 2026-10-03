@@ -21,6 +21,14 @@ export async function directoryCases({
     });
     return value;
   }
+  // Alandaki öğrenci kaydı sayısı.
+  async function studentCount(ws) {
+    const { rows } = await admin.query(
+      "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1",
+      [ws],
+    );
+    return Number(rows[0].n);
+  }
   const teacher = randomUUID(),
     other = randomUUID(),
     student = randomUUID(),
@@ -685,23 +693,14 @@ export async function directoryCases({
         "INSERT INTO derslik.portal_links(workspace_id,student_id,user_id,role,permissions) VALUES($1,$2,$3,'STUDENT',ARRAY['lessons'])",
         [ws, record, invited],
       );
-      const count = async () =>
-        Number(
-          (
-            await admin.query(
-              "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1",
-              [ws],
-            )
-          ).rows[0].n,
-        );
-      const before = await count();
+      const before = await studentCount(ws);
       const accepted = await ok(
         `/v1/workspaces/${ws}/requests/${sent.data.id}/accept`,
         {},
         { auth: tokenTeacher },
       );
       assert.equal(accepted.data.studentId, record);
-      assert.equal(await count(), before);
+      assert.equal(await studentCount(ws), before);
       // Öğretmenin seçtiği izinler korunur.
       const links = (
         await admin.query(
@@ -804,15 +803,6 @@ export async function directoryCases({
         { action: "student.create", name: "Deniz", email: "", ...fields },
         { auth: tokenTeacher },
       );
-      const count = async () =>
-        Number(
-          (
-            await admin.query(
-              "SELECT count(*) AS n FROM derslik.students WHERE workspace_id=$1",
-              [ws],
-            )
-          ).rows[0].n,
-        );
       // Ders isteği e-postayla eski kayda bağlanmaz (öğretmenin yazdığı
       // e-posta doğrulanmamıştır, veliye ait olabilir): yeni kayıt açılır,
       // e-posta başka kayıtta olduğu için boş kalır, eski kayda dokunulmaz.
@@ -825,14 +815,14 @@ export async function directoryCases({
         { ...requestBody, studentName: "Elif Su" },
         { auth: tokenRequester },
       );
-      const before = await count();
+      const before = await studentCount(ws);
       const accepted = await ok(
         `/v1/workspaces/${ws}/requests/${first.data.id}/accept`,
         {},
         { auth: tokenTeacher },
       );
       assert.notEqual(accepted.data.studentId, elif.id);
-      assert.equal(await count(), before + 1);
+      assert.equal(await studentCount(ws), before + 1);
       const created = (
         await admin.query("SELECT email FROM derslik.students WHERE id=$1", [
           accepted.data.studentId,

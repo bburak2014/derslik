@@ -16,7 +16,7 @@ function readSonarScope() {
   const sources = new Set();
 
   for (const line of content.split("\n")) {
-    const match = line.match(/^sonar\.(sources|tests)\s*=\s*(.+)$/);
+    const match = line.match(/^sonar\.(sources|tests)\s*=\s*(\S.*)$/);
     if (!match) continue;
     for (const entry of match[2].split(",")) {
       const trimmed = entry.trim();
@@ -44,7 +44,8 @@ const roots = readSonarScope();
 
 // Bu dosyanın örnek satırları bilerek gerekçesizdir.
 // skip regex'i nispi yola uygulanır, mutlak yola değil.
-const skip = /node_modules|\.next|components\/ui\/|sonar-suppressions\.test\.mjs$/;
+const skip =
+  /node_modules|\.next|components\/ui\/|(?:sonar-suppressions\.test\.mjs$)/;
 function* files(entry) {
   if (fs.statSync(entry).isFile()) {
     if (/\.(ts|tsx|js|mjs|cjs)$/.test(entry)) {

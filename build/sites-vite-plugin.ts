@@ -10,6 +10,7 @@ const localEmail = "seedy@sites.test";
 const localFullName = "Seedy";
 const localCookieName = "__sites_local_auth";
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+// eslint-disable-next-line sonarjs/no-hardcoded-ip -- yerel geliştirme sunucusunun loopback izin listesi; dışarıdan gelen adres değil
 const localAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]); // NOSONAR: yerel geliştirme sunucusunun loopback izin listesi
 const authPaths = new Set([
   "/signin-with-chatgpt",

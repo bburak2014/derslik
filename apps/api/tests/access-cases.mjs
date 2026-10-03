@@ -189,12 +189,11 @@ export async function accessCases({
       async function attempt(label, method, url, auth) {
         // Mesaj gönderimi gövdeyi yetkiden önce doğrular; geçerli bir metin
         // isteği yetki denetimine kadar götürür.
-        const body =
-          method === "GET"
-            ? undefined
-            : url.includes("/messages/")
-              ? { version: 0, body: "x" }
-              : { version: 0 };
+        let body;
+        if (method !== "GET")
+          body = url.includes("/messages/")
+            ? { version: 0, body: "x" }
+            : { version: 0 };
         const r = await request(url, { method, body, auth });
         if (r.status >= 300) return;
         const text = JSON.stringify(r.body);

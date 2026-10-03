@@ -28,7 +28,8 @@ export type MessageEvent = {
   u?: string;
 };
 
-const CHANNEL = "derslik_messages";
+// LISTEN parametre almaz; kanal adı sabittir, dışarıdan gelen değer yok.
+const LISTEN_SQL = "LISTEN derslik_messages";
 /** İstemci bu alt protokolü ve `ticket.<bilet>` alt protokolünü birlikte sunar. */
 export const SOCKET_PROTOCOL = "derslik.v1";
 export const SOCKET_PATH = "/v1/socket";
@@ -303,7 +304,7 @@ export class RealtimeService implements OnModuleDestroy {
     client.on("end", drop);
     try {
       await client.connect();
-      await client.query(`LISTEN ${CHANNEL}`);
+      await client.query(LISTEN_SQL);
     } catch (error) {
       if (!this.closed)
         console.error("Derslik realtime listener failed", {

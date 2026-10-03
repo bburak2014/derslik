@@ -27,6 +27,8 @@ seçilen kapsayıcı hiçbir zaman silinmez, yalnızca uymazsa uyarı yazılır.
 
 Susturma kuralı ve göndermeden önceki kontrol listesi: kökteki `AGENTS.md`.
 
+ESLint'te SonarJS kuralları da vardır (`pnpm lint`); sorunların çoğunu saniyeler içinde, kapıdan önce gösterir.
+
 ## CI: SonarCloud
 
 `.github/workflows/ci.yml`'deki `sonar` işi (`checks` ile paralel) iki adımdan oluşur:

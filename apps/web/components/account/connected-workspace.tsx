@@ -49,6 +49,11 @@ const Portal = dynamic(
   { loading: chunkLoader },
 );
 
+/** Paket, ekran açılmadan önce indirilmeye başlar; sonuç beklenmez. */
+const preload = (load: () => Promise<unknown>) => {
+  void load();
+};
+
 /** Öğretmene bağlı olmayan hesap "öğretmen arıyorum" dediyse bu tarayıcıda
  *  hatırlanır; vitrin bağlantısıyla (?teacher=) gelen de öğrenci olarak açılır. */
 function initialStudentMode() {
@@ -139,9 +144,9 @@ export function ConnectedWorkspace({
     // hemen, birbirini beklemeden istenir.
     if (initialSession?.active?.role === "OWNER") {
       prefetchWorkspace();
-      void import("@/components/derslik/workspace");
+      preload(() => import("@/components/derslik/workspace"));
     } else if (initialSession?.active)
-      void import("@/components/derslik/portal");
+      preload(() => import("@/components/derslik/portal"));
     if (signedOut || initialSession) return;
     void reload();
     // Yalnızca ilk açılışta; sonraki yenilemeler reload() ile yapılır.

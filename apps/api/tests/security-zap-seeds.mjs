@@ -61,13 +61,9 @@ for (const route of fixture.routes.filter((r) => r.method === "GET")) {
         "audit",
       ]
     : ["students"]) {
-    const id = route.path.includes("/files/")
-      ? file.body.data.id
-      : route.path.includes("/videos/")
-        ? video.body.data.id
-        : route.path.includes("/students/")
-          ? student
-          : ws;
+    let id = route.path.includes("/students/") ? student : ws;
+    if (route.path.includes("/videos/")) id = video.body.data.id;
+    if (route.path.includes("/files/")) id = file.body.data.id;
     const path = route.path
       .replaceAll(":ws", ws)
       .replaceAll(":student", student)

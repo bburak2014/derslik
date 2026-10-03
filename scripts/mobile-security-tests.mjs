@@ -44,6 +44,7 @@ function load(file, dependencies, suffix = "") {
     setTimeout,
     clearTimeout,
   });
+  // eslint-disable-next-line sonarjs/code-eval -- depodaki kodu yalıtılmış vm bağlamında test eder; dışarıdan gelen kod değil
   runInContext(code, context, { filename: file }); // NOSONAR: depodaki kodu yalıtılmış vm bağlamında test eder
   return exports;
 }
