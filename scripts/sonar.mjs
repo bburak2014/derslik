@@ -15,13 +15,14 @@ import {
   scannerInvocation,
   waitForAnalysis,
 } from "./sonar-report.mjs";
-import { evaluateGate, fetchGateInputs } from "./sonar-gate.mjs";
+import { evaluateGate, fetchGateInputs, safeLogText } from "./sonar-gate.mjs";
 import {
   SONARQUBE_IMAGE,
   acquireLock,
   containerNeedsRebuild,
   findNativeScanner,
   gitCommonDir,
+  localSonarBase,
 } from "./sonar-local.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,7 +39,11 @@ const PORT = process.env.SONAR_PORT ?? "9000";
 if (!/^\d+$/.test(PORT) || Number(PORT) < 1 || Number(PORT) > 65535) {
   throw new Error("SONAR_PORT 1-65535 aralığında bir port olmalı.");
 }
-const HOST = process.env.SONAR_HOST_URL ?? `http://127.0.0.1:${PORT}`;
+// Yönetici kimlik bilgisi bu adrese gider: yalnızca yerel SonarQube kabul edilir.
+const BASE = localSonarBase(
+  process.env.SONAR_HOST_URL ?? `http://127.0.0.1:${PORT}`,
+);
+const HOST = BASE.origin;
 const NODE_MAXSPACE = process.env.SONAR_NODE_MAXSPACE ?? "3072";
 if (
   !/^\d+$/.test(NODE_MAXSPACE) ||
@@ -173,11 +178,21 @@ function ensureServer() {
   }
 }
 
+/** Yolu doğrulanmış yerel tabana bağlar; başka bir ana makineye kaçamaz. */
+function localUrl(pathname) {
+  const url = new URL(pathname, BASE);
+  if (url.origin !== BASE.origin)
+    throw new Error("SonarQube API yolu yerel adresin dışına çıkıyor.");
+  return url;
+}
+
 async function api(method, pathname, auth) {
+  const url = localUrl(pathname);
   // Sunucu "UP" dedikten hemen sonra bağlantıyı bir iki kez kesebiliyor.
   for (let attempt = 1; ; attempt++) {
     try {
-      return await fetch(HOST + pathname, {
+      // eslint-disable-next-line no-await-in-loop -- yeniden deneme: önceki deneme bitmeden sonraki başlamaz.
+      return await fetch(url, { // NOSONAR: yeniden deneme: önceki deneme bitmeden sonraki başlamaz; adres localSonarBase ile doğrulanmış yerel tabandan kurulur (http(s) ve 127.0.0.1, localhost, [::1])
         method,
         signal: AbortSignal.timeout(15_000),
         headers: {
@@ -186,7 +201,8 @@ async function api(method, pathname, auth) {
       });
     } catch (error) {
       if (attempt >= 5) throw error;
-      await new Promise((r) => setTimeout(r, 3000));
+      // eslint-disable-next-line no-await-in-loop -- geri çekilme: bekleme bitmeden sonraki deneme başlamaz.
+      await new Promise((r) => setTimeout(r, 3000)); // NOSONAR: geri çekilme: bekleme bitmeden sonraki deneme başlamaz
     }
   }
 }
@@ -194,9 +210,11 @@ async function api(method, pathname, auth) {
 async function waitUp() {
   for (let i = 0; i < 120; i++) {
     try {
-      const res = await fetch(`${HOST}/api/system/status`, {
+      // eslint-disable-next-line no-await-in-loop -- yoklama: sunucunun hazır olup olmadığı her turda öncekinden sonra sorulur.
+      const res = await fetch(localUrl("/api/system/status"), {
         signal: AbortSignal.timeout(10_000),
       });
+      // eslint-disable-next-line no-await-in-loop -- yoklama: yanıt gövdesi, bu turun isteği bitince okunur ve döngünün sürüp sürmeyeceğini belirler.
       if (res.ok && (await res.json()).status === "UP") return;
     } catch {
       // sunucu henüz dinlemiyor
@@ -210,7 +228,8 @@ async function waitUp() {
       throw new Error(
         `SonarQube kapandı. Nedeni için: docker logs ${CONTAINER}`,
       );
-    await new Promise((r) => setTimeout(r, 5000));
+    // eslint-disable-next-line no-await-in-loop -- yoklama aralığı: sunucu tekrar sorulmadan önce beklenir, paralel olursa aralık anlamsız kalır.
+    await new Promise((r) => setTimeout(r, 5000)); // NOSONAR: yoklama aralığı: sunucu tekrar sorulmadan önce beklenir, paralel olursa aralık anlamsız kalır
   }
   throw new Error("SonarQube 10 dakikada açılmadı: docker logs " + CONTAINER);
 }
@@ -268,8 +287,8 @@ async function summary(auth, taskId) {
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, JSON.stringify(report, null, 2) + "\n");
   for (const [metric, value] of Object.entries(report.metrics))
-    console.log(`  ${metric}: ${value}`);
-  console.log(`  Quality gate: ${report.qualityGate.status}`);
+    console.log(`  ${safeLogText(metric)}: ${safeLogText(value)}`);
+  console.log(`  Quality gate: ${safeLogText(report.qualityGate.status)}`);
   if (!report.coverageReportImported)
     console.log(
       "  Test kapsamı ölçülmedi: Sonar'a coverage raporu aktarılmıyor.",
@@ -297,7 +316,7 @@ async function enforceGate(auth, taskId) {
   const output = path.join(root, "reports", "sonar-gate.json");
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, JSON.stringify(result, null, 2) + "\n");
-  for (const line of result.text) console.log(line);
+  for (const line of result.text) console.log(safeLogText(line));
   console.log(
     `\nAyrıntılar: ${HOST}/dashboard?id=${PROJECT} · liste: reports/sonar-gate.json`,
   );
@@ -343,7 +362,7 @@ const taskId = scannerTaskId(taskFile);
 if (gate) {
   // Kapı kapalıyken güvenli: okuma hatası da kapıyı düşürür.
   const failed = await enforceGate(auth, taskId).catch((error) => {
-    console.error(`Sonar kapısı: ${error.message}`);
+    console.error(`Sonar kapısı: ${safeLogText(error.message)}`);
     return true;
   });
   // process.exit boruya yazılan büyük çıktıyı keser (macOS'ta 128 KiB'de);

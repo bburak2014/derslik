@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
-import { evaluateGate, fetchGateInputs } from "./sonar-gate.mjs";
+import { evaluateGate, fetchGateInputs, safeLogText } from "./sonar-gate.mjs";
 import { scannerTaskId, waitForAnalysis } from "./sonar-report.mjs";
 
 export const CLOUD_HOST = "https://sonarcloud.io";
@@ -60,14 +60,16 @@ export function cloudRequest(
   return async (method, pathname) => {
     for (let attempt = 1; ; attempt++) {
       try {
-        return await fetchFn(CLOUD_HOST + pathname, {
+        // eslint-disable-next-line no-await-in-loop -- yeniden deneme: bağlantı hatası denemeleri sıralıdır, önceki deneme bitmeden sonraki başlamaz.
+        return await fetchFn(CLOUD_HOST + pathname, { // NOSONAR: yeniden deneme: bağlantı hatası denemeleri sıralıdır, önceki deneme bitmeden sonraki başlamaz
           method,
           signal: AbortSignal.timeout(15_000),
           headers: { Authorization: `Bearer ${token}` },
         });
       } catch (error) {
         if (attempt >= attempts) throw error;
-        await sleep(delayMs);
+        // eslint-disable-next-line no-await-in-loop -- geri çekilme: bekleme bitmeden sonraki deneme başlamaz.
+        await sleep(delayMs); // NOSONAR: geri çekilme: bekleme bitmeden sonraki deneme başlamaz
       }
     }
   };
@@ -119,7 +121,7 @@ async function run(argv, env) {
   const output = path.join(root, "reports", "sonar-gate.json");
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, JSON.stringify(result, null, 2) + "\n");
-  for (const line of result.text) console.log(line);
+  for (const line of result.text) console.log(safeLogText(line));
   console.log(
     `\nAyrıntılar: ${CLOUD_HOST}/dashboard?id=${CLOUD_PROJECT}&${scope} · liste: reports/sonar-gate.json`,
   );
@@ -133,7 +135,9 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(
-      message.startsWith("Sonar kapısı") ? message : `Sonar kapısı: ${message}`,
+      safeLogText(
+        message.startsWith("Sonar kapısı") ? message : `Sonar kapısı: ${message}`,
+      ),
     );
     return 1;
   }

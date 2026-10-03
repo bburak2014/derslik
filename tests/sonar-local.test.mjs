@@ -11,6 +11,7 @@ import {
   containerNeedsRebuild,
   findNativeScanner,
   gitCommonDir,
+  localSonarBase,
   mainCheckoutRoot,
 } from "../scripts/sonar-local.mjs";
 
@@ -243,4 +244,29 @@ test("çökmüş geri alma kilidi 30 saniye sonra temizlenir", async (t) => {
   assert.equal(fs.readFileSync(path.join(lock, "pid"), "utf8"), "2222");
   release();
   assert.equal(fs.existsSync(lock), false);
+});
+
+test("yerel SonarQube adresi yalnızca http(s) ve yerel makineyi kabul eder", () => {
+  for (const [raw, expected] of [
+    ["http://127.0.0.1:9000", "http://127.0.0.1:9000/"],
+    ["http://localhost:9001/", "http://localhost:9001/"],
+    ["https://localhost", "https://localhost/"],
+    ["http://[::1]:9000", "http://[::1]:9000/"],
+  ])
+    assert.equal(localSonarBase(raw).href, expected, raw);
+  for (const raw of [
+    "",
+    "9000",
+    "ftp://127.0.0.1:9000",
+    "file:///etc/passwd",
+    "http://example.com:9000",
+    "http://127.0.0.2:9000",
+    "http://localhost.example.com",
+    "http://127.0.0.1.example.com",
+    "http://admin:parola@127.0.0.1:9000",
+    "http://127.0.0.1:9000/sonar",
+    "http://127.0.0.1:9000/?x=1",
+    "http://127.0.0.1:9000/#parca",
+  ])
+    assert.throws(() => localSonarBase(raw), /yerel bir SonarQube/, raw);
 });

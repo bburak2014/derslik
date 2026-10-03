@@ -354,7 +354,8 @@ await check(
     );
     for (const count of [-1, 0, 129, 1.5]) {
       fixture.values.set("session", JSON.stringify({ generation: "x", count }));
-      assert.equal(await fixture.secureStorage.getItem("session"), null);
+      // eslint-disable-next-line no-await-in-loop -- her tur aynı sahte depodaki (fixture.values) 'session' girdisini yeniden yazıp okur; paralel olursa turlar birbirinin değerini ezer.
+      assert.equal(await fixture.secureStorage.getItem("session"), null); // NOSONAR: her tur aynı sahte depodaki (fixture.values) 'session' girdisini yeniden yazıp okur; paralel olursa turlar birbirinin değerini ezer
     }
   },
 );

@@ -144,7 +144,8 @@ async function checkTeachingFiles(data, objects, blockers, assets) {
     }
     if (!uuid.test(f.id) || !uuid.test(f.workspace_id)) continue;
     try {
-      assets.push(await describeAsset(f, objects));
+      // eslint-disable-next-line no-await-in-loop -- dosyalar sırayla özetlenir: büyük video dosyalarının SHA-256'sı aynı anda açılırsa dosya tanıtıcısı ve disk G/Ç sınırı aşılabilir; engel ve dosya sırası belgedeki sırayla kalır.
+      assets.push(await describeAsset(f, objects)); // NOSONAR: dosyalar sırayla özetlenir: büyük video dosyalarının SHA-256'sı aynı anda açılırsa dosya tanıtıcısı ve disk G/Ç sınırı aşılabilir; engel ve dosya sırası belgedeki sırayla kalır
     } catch (e) {
       blockers.push(
         `teaching_files/${f.id}: dosya yedeği eksik veya tutarsız (${e.message})`,

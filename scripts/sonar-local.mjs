@@ -11,6 +11,60 @@ import path from "node:path";
 export const SONARQUBE_IMAGE = "sonarqube:26.9.0.129388-community";
 export const SCANNER_IMAGE = "sonarsource/sonar-scanner-cli:12.2.0.4256_8.1.0";
 
+/** Yerel SonarQube'ün taban adresi (yol "/" olan bir URL). Yönetici kimlik
+ *  bilgisi bu adrese gider; bu yüzden yalnızca http(s) ve yerel makine
+ *  (127.0.0.1, localhost, [::1]) kabul edilir, kullanıcı bilgisi, yol, sorgu
+ *  ve parça içeremez. Dönen adresin şeması ve ana makinesi sabit değerlerden
+ *  kurulur: ham girdi yalnızca (sayısal) port olarak taşınır. Geçersizse hata
+ *  verir. */
+export function localSonarBase(raw) {
+  const invalid = () =>
+    new Error(
+      "SONAR_HOST_URL yalnızca yerel bir SonarQube olabilir: http(s) ve 127.0.0.1, localhost ya da [::1]; yol, kullanıcı bilgisi, sorgu ya da parça içermemeli.",
+    );
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalid();
+  }
+  if (
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname !== "/"
+  )
+    throw invalid();
+  let scheme;
+  switch (url.protocol) {
+    case "http:":
+      scheme = "http";
+      break;
+    case "https:":
+      scheme = "https";
+      break;
+    default:
+      throw invalid();
+  }
+  let host;
+  switch (url.hostname) {
+    case "127.0.0.1":
+      host = "127.0.0.1";
+      break;
+    case "localhost":
+      host = "localhost";
+      break;
+    case "[::1]":
+      host = "[::1]";
+      break;
+    default:
+      throw invalid();
+  }
+  const port = url.port ? `:${Number(url.port)}` : "";
+  return new URL(`${scheme}://${host}${port}/`);
+}
+
 /** Bütün worktree'lerin paylaştığı git klasörü (ana checkout'un .git'i).
  *  Git deposu değilse null. */
 export function gitCommonDir(cwd) {
@@ -196,6 +250,7 @@ export async function acquireLock(lockDir, options = {}) {
       reclaimStaleLock(lockDir, ownerFile, reclaimDir, owner, isAlive, now);
       continue;
     }
-    await wait(owner);
+    // eslint-disable-next-line no-await-in-loop -- kilit yoklaması: her tur kilit durumuna yeniden bakar ve sonraki tura kadar bekler, paralel bekleme kilidi açmaz.
+    await wait(owner); // NOSONAR: kilit yoklaması: her tur kilit durumuna yeniden bakar ve sonraki tura kadar bekler, paralel bekleme kilidi açmaz
   }
 }

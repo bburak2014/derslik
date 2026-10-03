@@ -44,3 +44,42 @@ test("shadcn dosyalarında SonarJS kuralları uygulanmaz", async () => {
     [],
   );
 });
+
+// S9382 (döngüde await) yalnızca kaynaklarda raporlanır; ESLint'teki karşılığı
+// no-await-in-loop da aynı kapsamda hata olur, testlerde ve shadcn'de kapalı.
+const loopSample = [
+  "export async function f(xs) {",
+  "  for (const x of xs) {",
+  "    await Promise.resolve(x);",
+  "  }",
+  "}",
+  "",
+].join("\n");
+async function loopSeverities(file) {
+  const [result] = await eslint.lintText(loopSample, {
+    filePath: path.join(root, file),
+  });
+  return result.messages
+    .filter((m) => m.ruleId === "no-await-in-loop")
+    .map((m) => m.severity);
+}
+
+test("döngüde await Sonar kaynaklarında hata olur", async () => {
+  for (const file of [
+    "apps/api/src/__sonar_probe__.ts",
+    "apps/web/lib/__sonar_probe__.ts",
+    "apps/mobile/src/__sonar_probe__.ts",
+    "packages/api-client/src/__sonar_probe__.ts",
+    "scripts/__sonar_probe__.mjs",
+  ])
+    assert.deepEqual(await loopSeverities(file), [2], file);
+});
+
+test("döngüde await testlerde ve shadcn dosyalarında raporlanmaz", async () => {
+  for (const file of [
+    "tests/__sonar_probe__.mjs",
+    "apps/api/tests/__sonar_probe__.ts",
+    "apps/web/components/ui/__sonar_probe__.tsx",
+  ])
+    assert.deepEqual(await loopSeverities(file), [], file);
+});

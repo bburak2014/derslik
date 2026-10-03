@@ -103,6 +103,7 @@ export async function waitForAnalysis(request, taskId, options = {}) {
   } = options;
   const started = now();
   while (now() - started < timeoutMs) {
+    // eslint-disable-next-line no-await-in-loop -- yoklama: görev durumu her turda öncekinden sonra sorulur ve sonuç döngünün sürüp sürmeyeceğini belirler.
     const { task } = await jsonResponse(
       request,
       `/api/ce/task?id=${encodeURIComponent(taskId)}`,
@@ -123,7 +124,8 @@ export async function waitForAnalysis(request, taskId, options = {}) {
     if (task.status !== "PENDING" && task.status !== "IN_PROGRESS") {
       throw new Error(`Bilinmeyen SonarQube görev durumu: ${task.status}`);
     }
-    await sleep(pollMs);
+    // eslint-disable-next-line no-await-in-loop -- yoklama aralığı: görev durumu tekrar sorulmadan önce beklenir, paralel olursa aralık anlamsız kalır.
+    await sleep(pollMs); // NOSONAR: yoklama aralığı: görev durumu tekrar sorulmadan önce beklenir, paralel olursa aralık anlamsız kalır
   }
   throw new Error(`SonarQube analiz görevi zaman aşımına uğradı: ${taskId}`);
 }

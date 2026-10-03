@@ -16,6 +16,34 @@ const sonarRules = Object.fromEntries(
   }),
 );
 
+// sonar.sources ve sonar.tests ile aynı dosyalar (kapsam sonar-project.properties
+// ile aynı tutulmalı).
+const sonarSourceFiles = [
+  "apps/api/src/**/*.{ts,js,mjs}",
+  "apps/api/drizzle.config.ts",
+  "apps/web/{app,components,hooks,lib}/**/*.{ts,tsx,js,mjs}",
+  "apps/web/{proxy,next.config}.ts",
+  "apps/web/postcss.config.mjs",
+  "apps/mobile/src/**/*.{ts,tsx}",
+  "apps/mobile/index.ts",
+  "apps/mobile/metro.config.cjs",
+  "packages/*/src/**/*.{ts,tsx}",
+  "scripts/**/*.{js,mjs,cjs,ts}",
+  "build/**/*.ts",
+  "{next,vite,drizzle}.config.ts",
+  "{eslint,postcss}.config.mjs",
+];
+const sonarTestFiles = [
+  "apps/api/tests/**/*.{ts,js,mjs}",
+  "tests/**/*.{js,mjs,ts}",
+];
+// Shadcn'den olduğu gibi kopyalanan dosyalar Sonar'da da hariç.
+const sonarIgnores = [
+  "apps/web/components/ui/**",
+  "apps/web/hooks/use-mobile.ts",
+  "apps/web/vendor/**",
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -70,31 +98,20 @@ const eslintConfig = defineConfig([
   },
   {
     // sonar.sources ve sonar.tests ile aynı dosyalar.
-    files: [
-      "apps/api/src/**/*.{ts,js,mjs}",
-      "apps/api/tests/**/*.{ts,js,mjs}",
-      "apps/api/drizzle.config.ts",
-      "apps/web/{app,components,hooks,lib}/**/*.{ts,tsx,js,mjs}",
-      "apps/web/{proxy,next.config}.ts",
-      "apps/web/postcss.config.mjs",
-      "apps/mobile/src/**/*.{ts,tsx}",
-      "apps/mobile/index.ts",
-      "apps/mobile/metro.config.cjs",
-      "packages/*/src/**/*.{ts,tsx}",
-      "scripts/**/*.{js,mjs,cjs,ts}",
-      "build/**/*.ts",
-      "tests/**/*.{js,mjs,ts}",
-      "{next,vite,drizzle}.config.ts",
-      "{eslint,postcss}.config.mjs",
-    ],
+    files: [...sonarSourceFiles, ...sonarTestFiles],
     // Shadcn'den olduğu gibi kopyalanan dosyalar Sonar'da da hariç.
-    ignores: [
-      "apps/web/components/ui/**",
-      "apps/web/hooks/use-mobile.ts",
-      "apps/web/vendor/**",
-    ],
+    ignores: sonarIgnores,
     plugins: { sonarjs },
     rules: sonarRules,
+  },
+  {
+    // S9382 (döngüde await) yalnızca kaynaklarda raporlanır; testler Sonar'da
+    // "test" kapsamındadır. Bilerek sıralı her döngü, Sonar'daki gerekçeli
+    // susturmayla aynı gerekçeyi "eslint-disable-next-line no-await-in-loop --
+    // <neden>" olarak da taşır.
+    files: sonarSourceFiles,
+    ignores: sonarIgnores,
+    rules: { "no-await-in-loop": "error" },
   },
   // Aşağıdaki üç blok, Sonar'ın bu dosyalarda zaten raporlamadığı ya da
   // sonar-project.properties'te gerekçeyle sustuğu bulguları ESLint'te de

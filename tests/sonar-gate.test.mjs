@@ -6,6 +6,7 @@ import {
   componentPath,
   evaluateGate,
   formatFindings,
+  safeLogText,
   severityOf,
 } from "../scripts/sonar-gate.mjs";
 
@@ -139,4 +140,14 @@ test("toplam sayıdan önce boş sayfa ya da bozuk yanıt gelirse hata verilir",
     collectPages(async () => ({ items: undefined, total: 3 })),
     /beklenmeyen/i,
   );
+});
+
+test("loga yazılacak metinde satır sonu ve kontrol karakterleri boşluğa çevrilir", () => {
+  assert.equal(safeLogText("a\r\nb\nc\rd"), "a  b c d");
+  assert.equal(safeLogText("x\u001b[31my\u007fz\u009b"), "x [31my z ");
+  assert.equal(safeLogText("a\tb"), "a b");
+  // Normal metin (Türkçe harfler, noktalama, sayı) aynen kalır.
+  const normal = "Açık sorunlar (3): ığüşöç İĞÜŞÖÇ — %5, 'tırnak'";
+  assert.equal(safeLogText(normal), normal);
+  assert.equal(safeLogText(42), "42");
 });

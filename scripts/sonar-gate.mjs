@@ -22,6 +22,15 @@ export function severityOf(issue) {
   return issue.severity ?? "-";
 }
 
+/** Loga yazılacak dış metni (API iletisi, dosya yolu, ortam değeri) güvenli
+ *  hale getirir: satır sonları (log satırı bölme) ve diğer kontrol
+ *  karakterleri (C0, DEL, C1; terminal kaçış dizileri) boşluğa çevrilir.
+ *  Normal metin değişmez (S5145). */
+export const safeLogText = (value) =>
+  String(value)
+    .replaceAll(/[\r\n]/g, " ")
+    .replaceAll(/\p{Cc}/gu, " ");
+
 /** Kod birimi sırasıyla karşılaştırır (yerel ayardan bağımsız, kararlı). */
 const compareText = (a, b) => {
   if (a < b) return -1;
@@ -108,6 +117,7 @@ export function evaluateGate({
 export async function collectPages(fetchPage) {
   const all = [];
   for (let page = 1; ; page++) {
+    // eslint-disable-next-line no-await-in-loop -- sayfalama: sonraki sayfanın gerekip gerekmediği ve toplam sayı önceki sayfanın yanıtına bağlı.
     const { items, total } = await fetchPage(page);
     if (!Array.isArray(items) || !Number.isFinite(total))
       throw new Error("Sonar kapısı: sayfa yanıtı beklenmeyen biçimde.");
