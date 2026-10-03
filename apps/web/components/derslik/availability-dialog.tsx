@@ -51,19 +51,36 @@ const issueText = (message: string) =>
   isMessageKey(message) ? t(message) : t("api.invalidFields");
 
 type BookingWindow = BookingSettings["windows"][number];
+type BookingBlock = BookingSettings["blocks"][number];
+/** Kapalı gün satırı: kimlik yalnızca istemcide, React anahtarı için tutulur
+ *  ve sunucuya hiç gönderilmez (bkz. toSettings). */
+type FormBlock = BookingBlock & { id: string };
+type FormState = Omit<BookingSettings, "blocks"> & { blocks: FormBlock[] };
+let blockSeq = 0;
+/** Satıra kalıcı kimlik verir; yazarken, ekleyip silerken bile aynı kalır. */
+const withId = (block: BookingBlock): FormBlock => ({
+  ...block,
+  id: `block-${++blockSeq}`,
+});
+const toForm = (settings: BookingSettings): FormState => ({
+  ...settings,
+  blocks: settings.blocks.map(withId),
+});
+/** Kimlikleri atar: şemaya ve API'ye yalnızca { from, to } gider, sıra aynı. */
+const toSettings = (form: FormState): BookingSettings => ({
+  ...form,
+  blocks: form.blocks.map(({ from, to }) => ({ from, to })),
+});
 /** Verilen satırdaki saat aralığını değiştirir; diğer satırlar aynen kalır. */
 const patchWindow = (
-  form: BookingSettings,
+  form: FormState,
   index: number,
   patch: Partial<BookingWindow>,
-): BookingSettings => ({
+): FormState => ({
   ...form,
   windows: form.windows.map((w, i) => (i === index ? { ...w, ...patch } : w)),
 });
-const removeWindow = (
-  form: BookingSettings,
-  index: number,
-): BookingSettings => ({
+const removeWindow = (form: FormState, index: number): FormState => ({
   ...form,
   windows: form.windows.filter((_, i) => i !== index),
 });
@@ -115,7 +132,7 @@ function AvailabilityDialog({
   onClose: () => void;
   onSaved: (settings: BookingSettings) => void;
 }>) {
-  const [form, setForm] = useState<BookingSettings | null>(null),
+  const [form, setForm] = useState<FormState | null>(null),
     [issues, setIssues] = useState<Record<string, string>>({}),
     [error, setError] = useState(""),
     [stale, setStale] = useState(false),
@@ -125,7 +142,7 @@ function AvailabilityDialog({
       const r = await backend<{ data: BookingSettings }>(
         `/workspaces/${workspaceId}/booking`,
       );
-      setForm(r.data);
+      setForm(toForm(r.data));
       setIssues({});
       setStale(false);
       setError("");
@@ -138,14 +155,14 @@ function AvailabilityDialog({
     void load();
   }, [load]);
   /** Formu değiştirir; eski satır hataları artık yanlış satırı gösterebilir. */
-  const edit = (change: (f: BookingSettings) => BookingSettings) => {
+  const edit = (change: (f: FormState) => FormState) => {
     setIssues({});
     setForm((f) => (f ? change(f) : f));
   };
   async function save(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!form || busy) return;
-    const parsed = bookingSettingsSchema.safeParse(form);
+    const parsed = bookingSettingsSchema.safeParse(toSettings(form));
     if (!parsed.success) {
       setIssues(settingsIssues(parsed.error.issues));
       return;
@@ -292,12 +309,10 @@ function AvailabilityDialog({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    edit((f) => ({
-                      ...f,
-                      blocks: [...f.blocks, { from: dateKey(), to: dateKey() }],
-                    }))
-                  }
+                  onClick={() => {
+                    const added = withId({ from: dateKey(), to: dateKey() });
+                    edit((f) => ({ ...f, blocks: [...f.blocks, added] }));
+                  }}
                 >
                   <Plus /> {t("booking.addClosedDays")}
                 </Button>
@@ -309,10 +324,7 @@ function AvailabilityDialog({
                 </p>
               )}
               {form.blocks.map((block, index) => (
-                <div
-                  key={index} // NOSONAR: kapalı gün satırlarının kimliği yok ve alanları düzenlenebilir; içerikten anahtar yazarken satırı yeniden kurup odağı düşürür. Liste kontrollü, yalnızca ekle/sil ile değişir.
-                  className="grid gap-1"
-                >
+                <div key={block.id} className="grid gap-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Input
                       type="date"
@@ -323,8 +335,8 @@ function AvailabilityDialog({
                         const from = e.target.value;
                         edit((f) => ({
                           ...f,
-                          blocks: f.blocks.map((b, i) =>
-                            i === index ? { ...b, from } : b,
+                          blocks: f.blocks.map((b) =>
+                            b.id === block.id ? { ...b, from } : b,
                           ),
                         }));
                       }}
@@ -340,8 +352,8 @@ function AvailabilityDialog({
                         const to = e.target.value;
                         edit((f) => ({
                           ...f,
-                          blocks: f.blocks.map((b, i) =>
-                            i === index ? { ...b, to } : b,
+                          blocks: f.blocks.map((b) =>
+                            b.id === block.id ? { ...b, to } : b,
                           ),
                         }));
                       }}
@@ -354,7 +366,7 @@ function AvailabilityDialog({
                       onClick={() =>
                         edit((f) => ({
                           ...f,
-                          blocks: f.blocks.filter((_, i) => i !== index),
+                          blocks: f.blocks.filter((b) => b.id !== block.id),
                         }))
                       }
                     >
