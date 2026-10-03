@@ -282,6 +282,10 @@ async function summary(auth, taskId) {
     PROJECT,
     taskId,
     analysisId,
+    {
+      coverageReportPath: path.join(root, "reports", "coverage", "lcov.info"),
+      workspace: root,
+    },
   );
   const output = path.join(root, "reports", "quality", "sonar-summary.json");
   fs.mkdirSync(path.dirname(output), { recursive: true });
@@ -291,7 +295,7 @@ async function summary(auth, taskId) {
   console.log(`  Quality gate: ${safeLogText(report.qualityGate.status)}`);
   if (!report.coverageReportImported)
     console.log(
-      "  Test kapsamı ölçülmedi: Sonar'a coverage raporu aktarılmıyor.",
+      "  Coverage aktarımı doğrulanamadı: pnpm test:coverage çalıştırıp yeniden analiz edin.",
     );
   console.log(`  JSON rapor: ${output}`);
   console.log(`\nAyrıntılar: ${HOST}/dashboard?id=${PROJECT}`);

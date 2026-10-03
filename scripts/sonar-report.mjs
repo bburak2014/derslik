@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { SCANNER_IMAGE } from "./sonar-local.mjs";
+import { verifyLcov } from "./coverage.mjs";
 
 export function scannerInvocation({
   root,
@@ -135,6 +136,7 @@ export async function collectAnalysisReport(
   project,
   taskId,
   analysisId,
+  { coverageReportPath, workspace } = {},
 ) {
   const keys = [
     "ncloc",
@@ -168,21 +170,32 @@ export async function collectAnalysisReport(
   if (!gate.projectStatus?.status) {
     throw new Error("SonarQube kalite kapısı sonucunu döndürmedi.");
   }
+  let coverageReport = null;
+  if (coverageReportPath) {
+    let contents;
+    try {
+      contents = readFileSync(coverageReportPath, "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (contents !== undefined) coverageReport = verifyLcov(contents, workspace);
+  }
+  const metrics = Object.fromEntries(
+    measures.component.measures.map(({ metric, value }) => [metric, value]),
+  );
   return {
     generatedAt: new Date().toISOString(),
     project,
     taskId,
     analysisId,
-    metrics: Object.fromEntries(
-      measures.component.measures.map(({ metric, value }) => [metric, value]),
-    ),
+    metrics,
     qualityGate: gate.projectStatus,
     coverageMeasured: measures.component.measures.some(
       ({ metric }) => metric === "coverage",
     ),
-    // This command has no instrumentation/LCOV import configured. A Sonar
-    // metric alone (including its automatic zero-coverage fallback) is not
-    // evidence that tests generated and uploaded a coverage report.
-    coverageReportImported: false,
+    coverageReport,
+    // A validated report plus covered code in this completed analysis supplies
+    // import evidence; Sonar's automatic zero fallback alone does not.
+    coverageReportImported: Boolean(coverageReport && Number(metrics.coverage) > 0),
   };
 }

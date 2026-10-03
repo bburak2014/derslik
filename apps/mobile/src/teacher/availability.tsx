@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -13,15 +13,23 @@ import {
   CANCEL_PRESETS,
   DURATION_PRESETS,
   NOTICE_PRESETS,
+  bookingBlockWithId,
+  bookingEditorReducer,
+  bookingSettingsFromForm,
   bookingSettingsSchema,
   dateKey,
   halfHourOptions,
   isMessageKey,
+  initialBookingEditorState,
+  loadBookingForm,
   nextWindow,
   presetOptions,
+  patchBookingWindow,
+  removeBookingWindow,
   settingsIssues,
   t,
   weekdayName,
+  type BookingFormChange,
   type BookingSettings,
 } from "@derslik/contracts";
 import { client } from "../core";
@@ -50,41 +58,6 @@ const ENDS = TIMES.slice(1).map((v) => ({ value: v, label: v }));
 const issueText = (message: string) =>
   isMessageKey(message) ? t(message) : t("api.invalidFields");
 
-type BookingWindow = BookingSettings["windows"][number];
-type BookingBlock = BookingSettings["blocks"][number];
-/** Kapalı gün satırı: kimlik yalnızca istemcide, React anahtarı için tutulur
- *  ve sunucuya hiç gönderilmez (bkz. toSettings). */
-type FormBlock = BookingBlock & { id: string };
-type FormState = Omit<BookingSettings, "blocks"> & { blocks: FormBlock[] };
-let blockSeq = 0;
-/** Satıra kalıcı kimlik verir; yazarken, ekleyip silerken bile aynı kalır. */
-const withId = (block: BookingBlock): FormBlock => ({
-  ...block,
-  id: `block-${++blockSeq}`,
-});
-const toForm = (settings: BookingSettings): FormState => ({
-  ...settings,
-  blocks: settings.blocks.map(withId),
-});
-/** Kimlikleri atar: şemaya ve API'ye yalnızca { from, to } gider, sıra aynı. */
-const toSettings = (form: FormState): BookingSettings => ({
-  ...form,
-  blocks: form.blocks.map(({ from, to }) => ({ from, to })),
-});
-/** Verilen satırdaki saat aralığını değiştirir; diğer satırlar aynen kalır. */
-const patchWindow = (
-  form: FormState,
-  index: number,
-  patch: Partial<BookingWindow>,
-): FormState => ({
-  ...form,
-  windows: form.windows.map((w, i) => (i === index ? { ...w, ...patch } : w)),
-});
-const removeWindow = (form: FormState, index: number): FormState => ({
-  ...form,
-  windows: form.windows.filter((_, i) => i !== index),
-});
-
 type Props = {
   workspaceId: string;
   onClose: () => void;
@@ -109,46 +82,49 @@ export function AvailabilitySheet({
 
 function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
   const { colors, styles, section } = useTheme();
-  const [form, setForm] = useState<FormState | null>(null),
-    [issues, setIssues] = useState<Record<string, string>>({}),
-    [error, setError] = useState(""),
-    [stale, setStale] = useState(false),
-    [busy, setBusy] = useState(false);
-  const load = useCallback(async () => {
-    try {
-      setForm(toForm((await client.booking(workspaceId)).data));
-      setIssues({});
-      setStale(false);
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, [workspaceId]);
+  const [{ form, issues, error, stale }, dispatch] = useReducer(
+    bookingEditorReducer,
+    undefined,
+    initialBookingEditorState,
+  );
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(
+    () =>
+      loadBookingForm(
+        async () => (await client.booking(workspaceId)).data,
+        dispatch,
+      ),
+    [workspaceId],
+  );
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void load();
   }, [load]);
-  /** Formu değiştirir; eski satır hataları artık yanlış satırı gösterebilir. */
-  const edit = (change: (f: FormState) => FormState) => {
-    setIssues({});
-    setForm((f) => (f ? change(f) : f));
-  };
+  const edit = (change: BookingFormChange) =>
+    dispatch({ type: "edited", change });
   async function save() {
     if (!form || busy) return;
-    const parsed = bookingSettingsSchema.safeParse(toSettings(form));
+    const parsed = bookingSettingsSchema.safeParse(
+      bookingSettingsFromForm(form),
+    );
     if (!parsed.success) {
-      setIssues(settingsIssues(parsed.error.issues));
+      dispatch({
+        type: "invalid",
+        issues: settingsIssues(parsed.error.issues),
+      });
       return;
     }
     setBusy(true);
-    setError("");
+    dispatch({ type: "saving" });
     try {
       onSaved((await client.saveBooking(workspaceId, parsed.data)).data);
       onClose();
     } catch (e) {
       // 409: ayar başka yerde (ör. webde) kaydedilmiş; yeniden yükleme sunulur.
-      setStale(e instanceof ApiError && e.status === 409);
-      setError((e as Error).message);
+      dispatch({
+        type: "failed",
+        stale: e instanceof ApiError && e.status === 409,
+        error: (e as Error).message,
+      });
     } finally {
       setBusy(false);
     }
@@ -247,7 +223,9 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                               value={window.start}
                               options={STARTS}
                               onChange={(start) =>
-                                edit((f) => patchWindow(f, index, { start }))
+                                edit((f) =>
+                                  patchBookingWindow(f, index, { start }),
+                                )
                               }
                             />
                           </View>
@@ -258,7 +236,9 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                               value={window.end}
                               options={ENDS}
                               onChange={(end) =>
-                                edit((f) => patchWindow(f, index, { end }))
+                                edit((f) =>
+                                  patchBookingWindow(f, index, { end }),
+                                )
                               }
                             />
                           </View>
@@ -266,7 +246,9 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                             icon="close"
                             ghost
                             label={t("booking.removeRange")}
-                            onPress={() => edit((f) => removeWindow(f, index))}
+                            onPress={() =>
+                              edit((f) => removeBookingWindow(f, index))
+                            }
                           />
                         </View>
                         {rowIssue(`windows.${index}`)}
@@ -284,7 +266,10 @@ function AvailabilityBody({ workspaceId, onClose, onSaved }: Readonly<Props>) {
                     size="sm"
                     icon="add"
                     onPress={() => {
-                      const added = withId({ from: dateKey(), to: dateKey() });
+                      const added = bookingBlockWithId({
+                        from: dateKey(),
+                        to: dateKey(),
+                      });
                       edit((f) => ({ ...f, blocks: [...f.blocks, added] }));
                     }}
                   >

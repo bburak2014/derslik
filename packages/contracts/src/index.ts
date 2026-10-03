@@ -6,3 +6,4 @@ export * from "./directory";
 export * from "./calendar";
 export * from "./messages";
 export * from "./booking.ts";
+export * from "./booking-form.ts";

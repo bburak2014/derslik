@@ -173,6 +173,9 @@ export async function startWebSecurityHarness({
       cwd: fileURLToPath(new URL("../apps/web", import.meta.url)),
       env: {
         ...process.env,
+        // Keep minified SSR maps out of coverage; original web sources stay
+        // in the all-files report and are measured by direct source tests.
+        ...(process.env.DERSLIK_TEST_COVERAGE === "1" ? { NODE_V8_COVERAGE: "" } : {}),
         NODE_ENV: "production",
         NEXT_TELEMETRY_DISABLED: "1",
         API_BASE_URL: backend ?? upstreamUrl,

@@ -218,6 +218,45 @@ test("automatic zero coverage from Sonar does not imply test coverage was import
   assert.equal(result.coverageReportImported, false);
 });
 
+test("coverage import requires both a valid executed LCOV artifact and covered Sonar code", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "derslik-coverage-report-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = join(directory, "source.js");
+  const report = join(directory, "lcov.info");
+  await writeFile(file, "export const value = 1;\n");
+  await writeFile(report, "SF:source.js\nDA:1,1\nend_of_record\n");
+  const request = (coverage) => async (_, pathname) =>
+    response(
+      pathname.startsWith("/api/measures")
+        ? { component: { key: "derslik", measures: [{ metric: "coverage", value: coverage }] } }
+        : { projectStatus: { status: "OK" } },
+    );
+  const options = { coverageReportPath: report, workspace: directory };
+  const imported = await collectAnalysisReport(request("80.0"), "derslik", "task", "analysis", options);
+  assert.deepEqual(imported.coverageReport, { files: 1, coveredLines: 1 });
+  assert.equal(imported.coverageReportImported, true);
+
+  const zero = await collectAnalysisReport(request("0.0"), "derslik", "task", "analysis", options);
+  assert.equal(zero.coverageReportImported, false);
+  assert.deepEqual(zero.coverageReport, { files: 1, coveredLines: 1 });
+
+  await rm(report);
+  const missing = await collectAnalysisReport(request("80.0"), "derslik", "task", "analysis", options);
+  assert.equal(missing.coverageReport, null);
+  assert.equal(missing.coverageReportImported, false);
+
+  await writeFile(report, "SF:source.js\nDA:99,1\nend_of_record\n");
+  await assert.rejects(
+    collectAnalysisReport(request("80.0"), "derslik", "task", "analysis", options),
+    /Invalid LCOV line/,
+  );
+  await writeFile(report, "SF:missing-source.js\nDA:1,1\nend_of_record\n");
+  await assert.rejects(
+    collectAnalysisReport(request("80.0"), "derslik", "task", "analysis", options),
+    /ENOENT/,
+  );
+});
+
 test("API errors and missing gate or metrics cannot create an empty successful report", async () => {
   await assert.rejects(
     () =>

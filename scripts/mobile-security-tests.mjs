@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID, webcrypto } from "node:crypto";
-import { createContext, runInContext } from "node:vm";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import ts from "typescript";
+import { loadTestModule } from "./test-source-loader.mjs";
 
 // Executes the current application functions with native storage/network adapters
 // replaced by deterministic fixtures. This is not an Android/iOS runtime test.
@@ -17,36 +16,7 @@ const report = {
   observations: [],
 };
 function load(file, dependencies, suffix = "") {
-  const source = readFileSync(resolve(root, file), "utf8") + suffix;
-  const code = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.ReactJSX,
-      esModuleInterop: true,
-    },
-  }).outputText;
-  const exports = {};
-  const context = createContext({
-    exports,
-    module: { exports },
-    require: (name) => {
-      if (!(name in dependencies))
-        throw new Error(`Unexpected dependency ${name}`);
-      return dependencies[name];
-    },
-    URL,
-    URLSearchParams,
-    TextEncoder,
-    AbortSignal,
-    process: { env: {} },
-    console,
-    setTimeout,
-    clearTimeout,
-  });
-  // eslint-disable-next-line sonarjs/code-eval -- depodaki kodu yalıtılmış vm bağlamında test eder; dışarıdan gelen kod değil
-  runInContext(code, context, { filename: file }); // NOSONAR: depodaki kodu yalıtılmış vm bağlamında test eder
-  return exports;
+  return loadTestModule(file, { dependencies, suffix });
 }
 async function check(name, run, observation = false) {
   try {
@@ -398,7 +368,7 @@ const uiDependencies = {
 const pdf = load(
   "apps/mobile/src/PdfViewer.tsx",
   uiDependencies,
-  "\nexport { buildHtml };\n",
+  "\nmodule.exports.buildHtml = buildHtml;\n",
 );
 await check("PDF renderer disables the known font eval execution path", () =>
   assert.match(
