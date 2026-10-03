@@ -33,6 +33,10 @@ Sağlayıcı konsolundaki yetkili dönüş adresi:
 https://PROJE_KIMLIGI.supabase.co/auth/v1/callback
 ```
 
+Yerel Google girişini denemek için alan adı satın almak gerekmez. Google'ın dönüş
+adresi yukarıdaki Supabase adresidir; Supabase ise girişten sonra uygulamanın
+Redirect URLs listesinde izin verilen dönüş adresine yönlendirir.
+
 Supabase Authentication > URL Configuration > Redirect URLs listesine:
 
 ```text
@@ -75,8 +79,8 @@ Canlı web kullanırken kendi HTTPS web callback adresini de ekle; `.env.api` i�
 
 Düğmeler yalnızca Supabase ayarlarında etkin sağlayıcılar için açılır. Etkinleştirdikten sonra giriş ekranını yeniden aç. Hesap yapılandırması tamamlanmadan düğme eklemek tek başına gerçek Google/Apple/Microsoft girişi sağlamaz.
 
-Mobil sosyal giriş artık Expo Go'da da çalışır: uygulama dönüş adresini çalıştığı
-ortama göre üretir (Expo Go'da `exp://`, derlenmiş uygulamada `derslik://`). Expo
+Mobil sosyal girişte uygulama dönüş adresini çalıştığı ortama göre üretir
+(Expo Go'da `exp://`, derlenmiş uygulamada `derslik://`). Expo
 Go'da denemek için yukarıdaki `exp://**` satırının Supabase Redirect URLs listesinde
 olması gerekir. Mağazaya çıkacak sürüm ve tam native davranış için yine kendi
 geliştirme derlemeni al; bu sürüm yeni native bağımlılık içerir, eski kurulu
@@ -88,6 +92,16 @@ pnpm mobile:ios
 # Android SDK/emülatör ile Android
 pnpm mobile:android
 ```
+
+Google hesabını seçtikten sonra uygulamaya dönüyor ancak "Giriş tamamlanmadı"
+uyarısı alıyorsan, adresin izin listesinde bulunması tek başına oturumun kurulduğu
+anlamına gelmez. Güncel uygulama kodunu Expo Go'da **Reload** ile yükle ve yeni
+bir giriş başlat. Expo Go'nun `exp.direct` ve geliştirici bağlantılarında yolu
+ayrıştırırken sunucu adını kaldırması uygulamanın geçerli dönüşü reddetmesine
+neden olabiliyordu; güncel kontrol ham URL'nin sunucu, port ve yolunu doğrular.
+Expo, OAuth denemelerinde kendi URL şeması olan geliştirme derlemesini
+[öneriyor](https://docs.expo.dev/guides/authentication/); native davranışı
+doğrulamak için bu derlemeyi kullan.
 
 Telefon ve bilgisayar aynı ağda olmalı; `.env.api` içindeki MOBILE_API_HOST gerekirse Mac'in yerel IP adresidir. `pnpm env:sync` sonrasında mobil sunucuyu yeniden başlat. Gerçek cihazda localhost telefonun kendisidir.
 

@@ -40,13 +40,15 @@ export function authRoute(value: string): AuthRoute | null {
   // Linking.parse drops the port; another development server on the same
   // hostname must not be accepted as this client's OAuth callback.
   if (own.hostname && url.host !== ownUrl.host) return null;
-  const segments = [link.hostname || "", link.path || ""]
-    .join("/")
-    .split("/")
-    .filter((s) => s && s !== "--");
-  // Tam biçim beklenir: build'de yalnızca `auth/<route>`, Expo Go'da sunucu
-  // adının ardından `auth/<route>`. Araya giren başka yol parçası reddedilir.
-  if (segments.length !== (own.hostname ? 3 : 2)) return null;
+  // Expo Linking removes the hostname and `/--/` from hosted callbacks but
+  // keeps the hostname for the root URL. Read both paths from the native URL
+  // instead, so tunnel and localhost callbacks receive the same validation.
+  const path = url.pathname.split("/").filter(Boolean);
+  if (own.hostname && path[0] === "--") path.shift();
+  const segments = own.hostname ? path : [url.hostname, ...path].filter(Boolean);
+  // Only the leading Expo separator is removed; extra host/path prefixes and
+  // separators inside the auth route are rejected.
+  if (segments.length !== 2) return null;
   const route = segments.at(-1) as AuthRoute | undefined;
   if (segments.at(-2) !== "auth" || !route || !routes.has(route)) return null;
   return route;
