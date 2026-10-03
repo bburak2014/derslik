@@ -49,7 +49,8 @@ const rawSecureStorage = {
     let written = 0;
     try {
       for (; written < parts.length; written++)
-        await SecureStore.setItemAsync(
+        // eslint-disable-next-line no-await-in-loop -- parçalar sırayla yazılır ve manifest en son değiştirilir; okuyucular yarım yazılmış oturum görmez.
+        await SecureStore.setItemAsync( // NOSONAR: parçalar sırayla yazılır ve manifest en son değiştirilir; okuyucular yarım yazılmış oturum görmez
           `${key}.${generation}.${written}`,
           parts[written],
           options,
@@ -63,7 +64,8 @@ const rawSecureStorage = {
       // Yarım kalan yeni parçalar silinir; eski oturum yerinde kalır ve
       // çıkıştan sonra Keychain'de sahipsiz belirteç parçası bırakılmaz.
       for (let i = 0; i < written; i++)
-        await SecureStore.deleteItemAsync(
+        // eslint-disable-next-line no-await-in-loop -- geri alma yolu: yazma az önce başarısız oldu, bu yüzden silmeler tek tek denenir; başarısız depoya aynı anda en çok 127 native çağrı yığılmaz.
+        await SecureStore.deleteItemAsync( // NOSONAR: geri alma yolu: yazma az önce başarısız oldu, bu yüzden silmeler tek tek denenir; başarısız depoya aynı anda en çok 127 native çağrı yığılmaz
           `${key}.${generation}.${i}`,
           options,
         ).catch(() => undefined);
@@ -71,7 +73,8 @@ const rawSecureStorage = {
     }
     if (old) {
       for (let i = 0; i < old.count; i++)
-        await SecureStore.deleteItemAsync(
+        // eslint-disable-next-line no-await-in-loop -- silmeler sırayla yürür ve ilk hatada durur; Promise.all kalan parçaların hepsini baştan başlatırdı (mevcut hata davranışı korunur).
+        await SecureStore.deleteItemAsync( // NOSONAR: silmeler sırayla yürür ve ilk hatada durur; Promise.all kalan parçaların hepsini baştan başlatırdı (mevcut hata davranışı korunur)
           `${key}.${old.generation}.${i}`,
           options,
         );
@@ -82,7 +85,8 @@ const rawSecureStorage = {
     await SecureStore.deleteItemAsync(key, options);
     if (old) {
       for (let i = 0; i < old.count; i++)
-        await SecureStore.deleteItemAsync(
+        // eslint-disable-next-line no-await-in-loop -- silmeler sırayla yürür ve ilk hatada durur; Promise.all kalan parçaların hepsini baştan başlatırdı (mevcut hata davranışı korunur).
+        await SecureStore.deleteItemAsync( // NOSONAR: silmeler sırayla yürür ve ilk hatada durur; Promise.all kalan parçaların hepsini baştan başlatırdı (mevcut hata davranışı korunur)
           `${key}.${old.generation}.${i}`,
           options,
         );
