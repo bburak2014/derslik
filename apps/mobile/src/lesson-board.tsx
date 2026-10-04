@@ -194,7 +194,7 @@ export function NativeLessonBoard({
       confirmAction(
         t("liveLesson.discardDrawing"),
         t("liveLesson.unsavedWarning"),
-        async () => onClose(),
+        onClose,
         setError,
       );
     else onClose();
@@ -301,7 +301,7 @@ export function NativeLessonBoard({
                   confirmAction(
                     t("liveLesson.clearConfirm"),
                     t("liveLesson.clearWarning"),
-                    async () =>
+                    () =>
                       change({ action: "board.clear", epoch: board.epoch }),
                     setError,
                   )

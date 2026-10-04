@@ -22,6 +22,44 @@ function deferred() {
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
+function confirmationFixture(perform) {
+  const alerts = [], errors = [];
+  const { confirmAction } = load("apps/mobile/src/ui/feedback.tsx", {
+    react: {},
+    "react/jsx-runtime": {},
+    "react-native": { Alert: { alert: (...args) => alerts.push(args) } },
+    "@expo/vector-icons": {},
+    "@derslik/contracts": { t: (key) => key },
+    "./theme": {},
+  });
+  confirmAction("Başlık", "Açıklama", perform, (message) => errors.push(message));
+  return { buttons: alerts[0][2], errors };
+}
+
+test("mobile confirmation runs a synchronous action immediately only after approval", async () => {
+  let calls = 0;
+  const f = confirmationFixture(() => { calls++; });
+  assert.equal(calls, 0);
+  assert.equal(f.buttons[0].style, "cancel");
+  assert.equal(f.buttons[0].onPress, undefined);
+  assert.equal(f.buttons[1].onPress(), undefined);
+  assert.equal(calls, 1);
+  await settle();
+  assert.deepEqual(f.errors, []);
+});
+
+for (const [kind, perform] of [
+  ["synchronous", () => { throw new Error("İşlem başarısız"); }],
+  ["asynchronous", () => Promise.reject(new Error("İşlem başarısız"))],
+]) {
+  test(`mobile confirmation reports ${kind} action failure once`, async () => {
+    const f = confirmationFixture(perform);
+    assert.equal(f.buttons[1].onPress(), undefined);
+    await settle();
+    assert.deepEqual(f.errors, ["İşlem başarısız"]);
+  });
+}
+
 function socketFixture(ticket, globals = {}) {
   const timers = new Map(),
     sockets = [];
