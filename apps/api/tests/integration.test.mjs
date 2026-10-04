@@ -1,5 +1,6 @@
 import test from "node:test";
 import { learningCases } from "./learning-cases.mjs";
+import { liveLessonCases } from "./live-lesson-cases.mjs";
 import { directoryCases } from "./directory-cases.mjs";
 import { calendarCases } from "./calendar-cases.mjs";
 import { bookingCases } from "./booking-cases.mjs";
@@ -921,6 +922,7 @@ test(
         sessionBody,
       });
       await directoryCases({ t, admin, request, ok, token, verifiedUsers });
+      await liveLessonCases({ t, app, admin, request, ok, token });
       await calendarCases({
         t,
         config,

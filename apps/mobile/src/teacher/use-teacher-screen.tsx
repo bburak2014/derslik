@@ -31,6 +31,7 @@ import {
 } from "../ui";
 import { type NoticeFocus, type TeachingView } from "../LearningScreen";
 import { useMessages } from "../messages";
+import { LiveLessonActions, meetingField } from "../live-lesson";
 
 export const dateTime = (day: string, time: string) => {
   if (
@@ -344,6 +345,7 @@ export function useTeacherScreen({
           value: makeup?.location,
           required: false,
         },
+        meetingField(makeup?.meeting_url),
         ...(!makeup
           ? [
               {
@@ -370,7 +372,22 @@ export function useTeacherScreen({
           duration: Number(v.duration),
           weeks: makeup ? 1 : Number(v.weeks),
           location: v.location,
+          meetingUrl: v.meetingUrl.trim() || null,
           ...(makeup ? { makeupForId: makeup.id } : {}),
+        });
+      },
+    });
+  }
+  function editMeeting(l: Lesson) {
+    setForm({
+      title: t("liveLesson.editMeeting"),
+      fields: [meetingField(l.meeting_url)],
+      submit: async (v) => {
+        await mutate({
+          action: "lesson.meeting.update",
+          id: l.id,
+          version: l.version,
+          meetingUrl: v.meetingUrl.trim() || null,
         });
       },
     });
@@ -516,6 +533,12 @@ export function useTeacherScreen({
             )}
           </View>
         </View>
+        <LiveLessonActions
+          lesson={l}
+          workspaceId={access.id}
+          disabled={busy}
+          onEditMeeting={() => editMeeting(l)}
+        />
         {lessonActions(l)}
       </Card>
     );

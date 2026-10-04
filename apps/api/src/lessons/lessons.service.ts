@@ -37,6 +37,7 @@ type LessonChange = Extract<
       | "lesson.complete"
       | "lesson.reverse"
       | "lesson.cancel"
+      | "lesson.meeting.update"
       | "lesson.reschedule";
   }
 >;
@@ -46,6 +47,7 @@ function isLessonChange(c: Command): c is LessonChange {
     c.action === "lesson.complete" ||
     c.action === "lesson.reverse" ||
     c.action === "lesson.cancel" ||
+    c.action === "lesson.meeting.update" ||
     c.action === "lesson.reschedule"
   );
 }
@@ -98,8 +100,8 @@ async function createLessons(
       (
         // eslint-disable-next-line no-await-in-loop -- aynı transaction'ın tek pg istemcisi: haftalar sırayla eklenir (kayıt sırası ve lessons[0] hafta sırasıdır), eşzamanlı client.query pg'de kullanımdan kaldırılmış.
         await tx.query( // NOSONAR: aynı transaction'ın tek pg istemcisi: haftalar sırayla eklenir (kayıt sırası ve lessons[0] hafta sırasıdır), eşzamanlı client.query pg'de kullanımdan kaldırılmış
-          `INSERT INTO derslik.lessons (workspace_id,student_id,package_id,topic,starts_at,ends_at,location,series_id,makeup_for_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+          `INSERT INTO derslik.lessons (workspace_id,student_id,package_id,topic,starts_at,ends_at,location,series_id,makeup_for_id,meeting_url)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
           [
             ws,
             c.studentId,
@@ -110,6 +112,7 @@ async function createLessons(
             c.location,
             series,
             c.makeupForId || null,
+            c.meetingUrl ?? null,
           ],
         )
       ).rows[0],
@@ -249,6 +252,15 @@ async function changeLesson(
   if (lesson.status !== expected)
     throw new ConflictException("api.lessonStateInvalid");
   if (c.action === "lesson.cancel") return cancelLesson(tx, ws, c, lesson);
+  if (c.action === "lesson.meeting.update") {
+    const data = (
+      await tx.query(
+        "UPDATE derslik.lessons SET meeting_url=$3,version=version+1 WHERE workspace_id=$1 AND id=$2 RETURNING *",
+        [ws, c.id, c.meetingUrl],
+      )
+    ).rows[0];
+    return { data, audit: { hasMeetingUrl: c.meetingUrl !== null } };
+  }
   const pack = (
     await tx.query(
       "SELECT * FROM derslik.packages WHERE workspace_id=$1 AND id=$2 AND student_id=$3 FOR UPDATE",

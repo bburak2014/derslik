@@ -44,6 +44,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToneBadge } from "./feedback";
 import { CalendarFeedButton } from "./calendar-feed";
 import { AvailabilityButton } from "./availability-dialog";
+import { LiveLessonActions } from "./live-lesson";
 import {
   money,
   dateKey,
@@ -247,6 +248,8 @@ export function LessonRows({
               </div>
             </div>
             <div className="lesson-actions">
+              {actions.liveBase && <LiveLessonActions lesson={l} base={actions.liveBase(l)} disabled={busy}
+                editMeeting={actions.meeting ? () => actions.meeting?.(l) : undefined} />}
               {now && <span className="now-chip">{t("lesson.now")}</span>}
               <Status status={l.status} />
               {l.status === "SCHEDULED" && (

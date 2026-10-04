@@ -73,6 +73,7 @@ import { Overview, CalendarView, StudentsView, PaymentsView } from "./views";
 import { RecordDialog, type ModalState } from "./record-dialog";
 import { StudentDetail } from "./student-detail";
 import { useWorkspaceTools } from "./use-workspace-tools";
+import { MeetingLinkDialog } from "./live-lesson";
 
 type View = CoreView | TeachingView | "showcase" | "messages";
 const navigation: { id: View; label: MessageKey; icon: typeof Users }[] = [
@@ -133,6 +134,8 @@ const titles: Record<View, { title: MessageKey; subtitle: MessageKey }> = {
   },
 };
 export type Actions = {
+  liveBase?: (lesson: Lesson) => string;
+  meeting?: (lesson: Lesson) => void;
   makeup?: (lesson: Lesson) => void;
   openStudent: (id: string) => void;
   newPackage: (id?: string) => void;
@@ -256,6 +259,7 @@ export default function Workspace({
     // Mesaj bildirimine dokunulan an: açık yazışma ve liste yenilenir.
     [chatFocus, setChatFocus] = useState(0);
   const [signoutOpen, setSignoutOpen] = useState(false);
+  const [meetingLesson, setMeetingLesson] = useState<Lesson | null>(null);
   const { modal, setModal, restoreFocus } = useRecordModal();
   const [confirmation, setConfirmation] = useState<{
     title: string;
@@ -472,7 +476,7 @@ export default function Workspace({
       makeupForId: l.id,
     });
   const actions: Actions = {
-    makeup: connected ? makeupLesson : undefined,
+    makeup: makeupLesson,
     openStudent: setStudentId,
     newPackage: (id) => setModal({ type: "package", studentId: id }),
     newLesson: (id) =>
@@ -500,6 +504,8 @@ export default function Workspace({
         message: t("confirm.cancelDone"),
       }),
     reschedule: (l) => setModal({ type: "reschedule", lesson: l }),
+    meeting: (l) => setMeetingLesson(l),
+    liveBase: (l) => `/workspaces/${encodeURIComponent(connected.id)}/students/${encodeURIComponent(l.student_id)}/lessons/${encodeURIComponent(l.id)}/board`,
     voidPayment: (p) =>
       setConfirmation({
         title: t("confirm.voidTitle"),
@@ -756,6 +762,7 @@ export default function Workspace({
           busy={busy}
         />
       )}
+      {meetingLesson && <MeetingLinkDialog lesson={meetingLesson} mutate={mutate} busy={busy} onClose={() => setMeetingLesson(null)} />}
       <AlertDialog open={signoutOpen} onOpenChange={setSignoutOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -347,6 +347,7 @@ function apiFixture(payload, status) {
       },
       "./uploads.ts": {},
       "./socket.ts": {},
+    "./lesson-board.ts": {},
     },
     { fetch: async () => new Response(payload, { status }) },
   );
