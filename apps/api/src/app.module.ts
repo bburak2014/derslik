@@ -8,6 +8,8 @@ import { QueriesService } from "./workspaces/queries.service.js";
 import { StudentsService } from "./students/students.service.js";
 import { LessonsService } from "./lessons/lessons.service.js";
 import { LessonRemindersService } from "./lessons/reminders.service.js";
+import { LessonBoardController } from "./lessons/lesson-board.controller.js";
+import { LessonBoardService } from "./lessons/lesson-board.service.js";
 import { BillingService } from "./billing/billing.service.js";
 import { ApiController } from "./api.controller.js";
 import { HealthController } from "./health.controller.js";
@@ -71,6 +73,7 @@ export class AppModule {
         MessagesController,
         RealtimeController,
         BookingController,
+        LessonBoardController,
         ApiController,
       ],
       providers: [
@@ -83,6 +86,7 @@ export class AppModule {
         StudentsService,
         LessonsService,
         LessonRemindersService,
+        LessonBoardService,
         CalendarService,
         BillingService,
         SnapshotService,

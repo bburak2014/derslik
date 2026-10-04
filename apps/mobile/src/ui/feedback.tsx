@@ -95,15 +95,22 @@ export function SuccessText({ message }: { message: string }) {
 export function confirmAction(
   title: string,
   description: string,
-  perform: () => Promise<void>,
+  perform: () => void | Promise<void>,
   onError: (e: string) => void,
 ) {
+  async function performConfirmed() {
+    try {
+      await perform();
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }
   Alert.alert(title, description, [
     { text: t("common.cancel"), style: "cancel" },
     {
       text: t("common.confirm"),
       onPress: () => {
-        void perform().catch((e) => onError((e as Error).message));
+        void performConfirmed();
       },
     },
   ]);

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { calendarDaySchema, timestampSchema } from "./dates.ts";
+import { meetingUrlSchema } from "./live-lesson.ts";
 
 // Hata iletileri çeviri anahtarıdır; API yanıtı isteğin dilinde yazar.
 const id = z.string().uuid();
@@ -38,12 +39,19 @@ export const commandSchema = z.discriminatedUnion("action", [
     startsAt: timestampSchema,
     duration: z.number().int().min(15).max(180),
     location: z.string().trim().max(100),
+    meetingUrl: meetingUrlSchema.optional(),
     makeupForId: id.optional(),
     weeks: z.number().int().min(1).max(8),
   }),
   z.object({ action: z.literal("lesson.complete"), id, version }),
   z.object({ action: z.literal("lesson.reverse"), id, version }),
   z.object({ action: z.literal("lesson.cancel"), id, version }),
+  z.object({
+    action: z.literal("lesson.meeting.update"),
+    id,
+    version,
+    meetingUrl: meetingUrlSchema,
+  }),
   z.object({
     action: z.literal("lesson.reschedule"),
     id,

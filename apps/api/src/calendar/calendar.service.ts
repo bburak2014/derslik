@@ -22,6 +22,7 @@ type FeedRow = {
   ends_at: Date;
   topic: string;
   location: string;
+  meeting_url: string | null;
   student_name: string;
   teacher_name: string;
   viewer_role: "OWNER" | "STUDENT" | "GUARDIAN";
@@ -109,10 +110,11 @@ export class CalendarService {
         end: new Date(r.ends_at),
         summary: summary(r),
         location: r.location,
-        description: translate(locale, "calendar.icsDescription", {
-          url: web,
-        }),
-        url: web,
+        description:
+          translate(locale, "calendar.icsDescription", {
+            url: web,
+          }) + (r.meeting_url ? `\n${r.meeting_url}` : ""),
+        url: r.meeting_url ?? web,
       })),
     });
   }

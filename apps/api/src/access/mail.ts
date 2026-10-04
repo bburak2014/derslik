@@ -72,6 +72,7 @@ export class MailService {
     startsAt: Date;
     topic: string;
     location: string;
+    meetingUrl?: string | null;
     url: string;
   }): Promise<boolean> {
     if (!this.configured) return false;
@@ -103,11 +104,18 @@ export class MailService {
     return this.send({
       to: input.to,
       subject: text("mail.reminderSubject", { time }),
-      text: `${intro}\n\n${lines.join("\n")}\n\n${input.url}\n`,
+      text:
+        `${intro}\n\n${lines.join("\n")}\n\n${input.url}\n` +
+        (input.meetingUrl
+          ? `${text("liveLesson.join")}\n${input.meetingUrl}\n`
+          : ""),
       html:
         `<p>${escapeHtml(intro)}</p>` +
         `<p>${lines.map(escapeHtml).join("<br>")}</p>` +
-        `<p><a href="${url}">${escapeHtml(text("mail.reminderOpen"))}</a></p>`,
+        `<p><a href="${url}">${escapeHtml(text("mail.reminderOpen"))}</a></p>` +
+        (input.meetingUrl
+          ? `<p><a href="${escapeHtml(input.meetingUrl)}">${escapeHtml(text("liveLesson.join"))}</a></p>`
+          : ""),
     });
   }
 

@@ -88,6 +88,7 @@ import { PdfViewer } from "./PdfViewer";
 import { MediaPlayer } from "./MediaPlayer";
 import { CalendarFeed } from "./calendar-feed";
 import { PortalMessages, useMessages } from "./messages";
+import { LiveLessonActions } from "./live-lesson";
 const empty: LearningData = {
   lessons: [],
   assignments: [],
@@ -743,6 +744,12 @@ export function LearningScreen({
                     )}
                   </View>
                 </View>
+                <LiveLessonActions
+                  lesson={l}
+                  workspaceId={access.id}
+                  portal={!owner}
+                  disabled={busy}
+                />
               </Card>
             ))}
           </>
