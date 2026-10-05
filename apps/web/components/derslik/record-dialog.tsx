@@ -142,7 +142,8 @@ export function RecordDialog({
     ),
     [weeks, setWeeks] = useState("1"),
     [topic, setTopic] = useState(initialTopic(modal, data.lessons)),
-    [location, setLocation] = useState(t("record.defaultLocation"));
+    [location, setLocation] = useState(t("record.defaultLocation")),
+    [meetingUrl, setMeetingUrl] = useState("");
   const eligiblePackages = data.packages.filter(
     (p) =>
       p.student_id === studentId &&
@@ -208,6 +209,7 @@ export function RecordDialog({
             startsAt: date + "T" + time + ":00+03:00",
             duration: Number(duration),
             location,
+            meetingUrl: meetingUrl.trim() || null,
             weeks: Number(weeks),
             ...(modal.makeupForId ? { makeupForId: modal.makeupForId } : {}),
           };
@@ -462,6 +464,13 @@ export function RecordDialog({
                           )}
                         </Field>
                       </>
+                    )}
+                    {modal.type === "lesson" && (
+                      <Field label={t("liveLesson.meetingUrl")} id="meeting-url" hint={t("liveLesson.meetingHint")}>
+                        <Input id="meeting-url" type="url" maxLength={2048} value={meetingUrl}
+                          autoCapitalize="none" autoCorrect="off"
+                          onChange={(e) => setMeetingUrl(e.target.value)} placeholder={t("liveLesson.meetingPlaceholder")} />
+                      </Field>
                     )}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label={t("record.date")} id="date">

@@ -12,6 +12,8 @@ const { ApiError } = loadTestModule("packages/api-client/src/index.ts", {
     "../../contracts/src/i18n/index.ts": i18n,
     "./uploads.ts": {},
     "./socket.ts": {},
+    "./lesson-board.ts": {},
+    "./board-tools.ts": {},
   },
 });
 

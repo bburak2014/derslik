@@ -471,7 +471,7 @@ export class LearningService {
     const result: Record<string, unknown> = {};
     const queries = {
       lessons:
-        "SELECT id,student_id,topic,starts_at,ends_at,location,status,version,makeup_for_id,booked_by FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
+        "SELECT id,student_id,topic,starts_at,ends_at,location,meeting_url,status,version,makeup_for_id,booked_by FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
       assignments:
         "SELECT * FROM derslik.assignments WHERE workspace_id=$1 AND student_id=$2 ORDER BY due_on DESC,id",
       submissions:
@@ -538,7 +538,7 @@ export class LearningService {
             : null,
           lessons: (
             await tx.query(
-              "SELECT id,student_id,topic,starts_at,ends_at,location,status,version,makeup_for_id,booked_by FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
+              "SELECT id,student_id,topic,starts_at,ends_at,location,meeting_url,status,version,makeup_for_id,booked_by FROM derslik.lessons WHERE workspace_id=$1 AND student_id=$2 ORDER BY starts_at DESC",
               [ws, student],
             )
           ).rows,

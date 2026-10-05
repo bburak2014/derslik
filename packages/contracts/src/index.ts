@@ -7,3 +7,4 @@ export * from "./calendar";
 export * from "./messages";
 export * from "./booking.ts";
 export * from "./booking-form.ts";
+export * from "./live-lesson.ts";

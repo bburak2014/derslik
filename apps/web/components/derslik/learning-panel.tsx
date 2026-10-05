@@ -29,6 +29,7 @@ import {
 } from "./learning/use-learning-panel";
 import { ActionForm, ConfirmDialog, LessonSchedule } from "./learning/shared";
 import { BookButton, BookedLessonExtra } from "./learning/booking";
+import { LiveLessonActions } from "./live-lesson";
 
 // Dışarıdan kullanılan adlar; eski içe aktarma yolları çalışmaya devam etsin.
 export {
@@ -136,11 +137,13 @@ export function LearningPanel(props: Readonly<LearningPanelProps>) {
       {tab === "lessons" && "lessons" in data && (
         <LessonSchedule
           lessons={data.lessons}
-          renderExtra={(lesson, now) =>
-            lesson.booked_by ? (
-              <BookedLessonExtra ctx={ctx} lesson={lesson} now={now} />
-            ) : null
-          }
+          renderExtra={(lesson, now) => <>
+            <LiveLessonActions lesson={lesson}
+              base={owner
+                ? `/workspaces/${encodeURIComponent(props.workspaceId)}/students/${encodeURIComponent(props.studentId)}/lessons/${encodeURIComponent(lesson.id)}/board`
+                : `/portal/${encodeURIComponent(props.workspaceId)}/${encodeURIComponent(props.studentId)}/lessons/${encodeURIComponent(lesson.id)}/board`} />
+            {lesson.booked_by && <BookedLessonExtra ctx={ctx} lesson={lesson} now={now} />}
+          </>}
         >
           <BookButton ctx={ctx} onOpenMessages={props.onOpenMessages} />
           {view && refresh}

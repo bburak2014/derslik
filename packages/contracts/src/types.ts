@@ -30,6 +30,7 @@ export type Lesson = {
   starts_at: string;
   ends_at: string;
   location: string;
+  meeting_url?: string | null;
   status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   version: number;
   series_id: string | null;

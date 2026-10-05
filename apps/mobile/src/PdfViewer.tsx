@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import { Button, CloseButton, EmptyState, useTheme } from "./ui";
 import { t } from "@derslik/contracts";
+import { nativePdfJsUrl as PDFJS, pdfScriptJson as scriptJson } from "./pdf-html";
 
 // Android'in tarayıcısında yerleşik PDF görüntüleyici yok; bağlantıyı açmak
 // indirme istemine düşüyordu. Burada PDF, pdf.js ile canvas'a çizilerek
@@ -16,13 +17,6 @@ import { t } from "@derslik/contracts";
 // font. 3.x is kept because 4.x ships only as ES modules; the vendor's
 // mitigation is isEvalSupported:false, set on getDocument below. The WebView
 // also refuses to navigate anywhere, so a hostile file cannot leave the page.
-const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
-
-/** Satır içi <script> için JSON: "</script>" gibi bir dizi betiği erken
- *  kapatamasın diye "<" kaçırılır. */
-const scriptJson = (value: string) =>
-  JSON.stringify(value).replaceAll("<", String.raw`\u003c`);
-
 function buildHtml(url: string, background: string, muted: string) {
   return `<!doctype html>
 <html><head><meta charset="utf-8">

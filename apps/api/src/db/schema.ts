@@ -14,6 +14,7 @@ import {
   index,
   foreignKey,
   check,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const app = pgSchema("derslik");
@@ -130,6 +131,7 @@ export const lessons = app.table(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     location: text("location").notNull().default(""),
+    meetingUrl: text("meeting_url"),
     status: text("status").notNull().default("SCHEDULED"),
     version: integer("version").notNull().default(0),
     seriesId: uuid("series_id"),
@@ -149,6 +151,125 @@ export const lessons = app.table(
       sql`${t.status} IN ('SCHEDULED','COMPLETED','CANCELLED')`,
     ),
     index("lessons_workspace_start").on(t.workspaceId, t.startsAt),
+  ],
+);
+export const lessonBoards = app.table(
+  "lesson_boards",
+  {
+    workspaceId: uuid("workspace_id").notNull(),
+    studentId: uuid("student_id").notNull(),
+    lessonId: uuid("lesson_id").notNull(),
+    epoch: integer("epoch").notNull().default(0),
+    revision: integer("revision").notNull().default(0),
+    documentId: uuid("document_id"),
+    page: integer("page").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.lessonId] }),
+    unique("lesson_boards_scope").on(t.workspaceId, t.studentId, t.lessonId),
+    foreignKey({
+      name: "lesson_board_lesson_fk",
+      columns: [t.workspaceId, t.lessonId, t.studentId],
+      foreignColumns: [lessons.workspaceId, lessons.id, lessons.studentId],
+    }),
+    check("lesson_board_epoch", sql`${t.epoch} >= 0`),
+    check("lesson_board_revision", sql`${t.revision} >= 0`),
+    check(
+      "lesson_board_page",
+      sql`(${t.documentId} IS NULL AND ${t.page}=0) OR (${t.documentId} IS NOT NULL AND ${t.page} BETWEEN 1 AND 100)`,
+    ),
+  ],
+);
+export const lessonBoardDocuments = app.table(
+  "lesson_board_documents",
+  {
+    workspaceId: uuid("workspace_id").notNull(),
+    studentId: uuid("student_id").notNull(),
+    lessonId: uuid("lesson_id").notNull(),
+    materialId: uuid("material_id").notNull(),
+    pageCount: integer("page_count").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.lessonId, t.materialId] }),
+    unique("lesson_board_documents_scope").on(
+      t.workspaceId,
+      t.studentId,
+      t.lessonId,
+      t.materialId,
+    ),
+    foreignKey({
+      columns: [t.workspaceId, t.studentId, t.lessonId],
+      foreignColumns: [
+        lessonBoards.workspaceId,
+        lessonBoards.studentId,
+        lessonBoards.lessonId,
+      ],
+    }),
+    check("lesson_board_document_pages", sql`${t.pageCount} BETWEEN 1 AND 100`),
+  ],
+);
+export const lessonBoardStrokes = app.table(
+  "lesson_board_strokes",
+  {
+    workspaceId: uuid("workspace_id").notNull(),
+    studentId: uuid("student_id").notNull(),
+    lessonId: uuid("lesson_id").notNull(),
+    epoch: integer("epoch").notNull(),
+    id: uuid("id").notNull(),
+    authorId: uuid("author_id").notNull(),
+    points: jsonb("points").notNull(),
+    color: text("color").notNull(),
+    width: integer("width").notNull(),
+    documentId: uuid("document_id"),
+    page: integer("page").notNull().default(0),
+    tool: text("tool").notNull().default("pen"),
+    text: text("text"),
+    removed: boolean("removed").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.lessonId, t.epoch, t.id] }),
+    foreignKey({
+      name: "lesson_stroke_board_fk",
+      columns: [t.workspaceId, t.studentId, t.lessonId],
+      foreignColumns: [
+        lessonBoards.workspaceId,
+        lessonBoards.studentId,
+        lessonBoards.lessonId,
+      ],
+    }),
+    foreignKey({
+      name: "lesson_stroke_author_fk",
+      columns: [t.authorId],
+      foreignColumns: [users.id],
+    }),
+    check("lesson_stroke_epoch", sql`${t.epoch} >= 0`),
+    check(
+      "lesson_stroke_points",
+      sql`jsonb_typeof(${t.points}) = 'array' AND jsonb_array_length(${t.points}) BETWEEN 1 AND 128`,
+    ),
+    check(
+      "lesson_stroke_color",
+      sql`${t.color} IN ('#172554','#2563eb','#dc2626','#16a34a')`,
+    ),
+    check("lesson_stroke_width", sql`${t.width} IN (2,4,8)`),
+    check(
+      "lesson_stroke_page",
+      sql`(${t.documentId} IS NULL AND ${t.page}=0) OR (${t.documentId} IS NOT NULL AND ${t.page} BETWEEN 1 AND 100)`,
+    ),
+    check(
+      "lesson_stroke_tool",
+      sql`${t.tool} IN ('pen','highlighter','line','rectangle','ellipse','note')`,
+    ),
+    check(
+      "lesson_stroke_shape",
+      sql`${t.tool} NOT IN ('line','rectangle','ellipse') OR jsonb_array_length(${t.points})=2`,
+    ),
+    check(
+      "lesson_stroke_note",
+      sql`(${t.tool}='note' AND jsonb_array_length(${t.points})=1 AND ${t.text} IS NOT NULL AND char_length(${t.text}) BETWEEN 1 AND 300) OR (${t.tool}<>'note' AND ${t.text} IS NULL)`,
+    ),
   ],
 );
 export const creditEntries = app.table(

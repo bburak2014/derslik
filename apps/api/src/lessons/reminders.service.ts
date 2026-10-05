@@ -19,6 +19,7 @@ type Reminder = {
   starts_at: Date;
   topic: string;
   location: string;
+  meeting_url: string | null;
   student_name: string;
   teacher_name: string;
   recipient_role: "OWNER" | "STUDENT" | "GUARDIAN";
@@ -104,6 +105,7 @@ export class LessonRemindersService
           startsAt: new Date(r.starts_at),
           topic: r.topic,
           location: r.location,
+          meetingUrl: r.meeting_url,
           url: this.config.WEB_ORIGIN,
         });
       }

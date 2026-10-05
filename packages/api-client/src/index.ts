@@ -19,6 +19,11 @@ import type {
   BookingPolicy,
   BookingSettings,
 } from "../../contracts/src/booking.ts";
+import type {
+  LessonBoard,
+  LessonBoardCommand,
+  LessonBoardReadResult,
+} from "../../contracts/src/live-lesson.ts";
 
 export class ApiError extends Error {
   constructor(
@@ -122,6 +127,59 @@ export class DerslikClient {
     return this.request<PortalData>(
       `/v1/portal/${encodeURIComponent(ws)}/${encodeURIComponent(student)}`,
     );
+  }
+  lessonBoard(
+    ws: string,
+    student: string,
+    lesson: string,
+    portal = false,
+    revision?: number,
+  ) {
+    const query =
+      revision === undefined ? "" : `?revision=${encodeURIComponent(revision)}`;
+    return this.request<LessonBoardReadResult>(
+      this.lessonBoardPath(ws, student, lesson, portal) + query,
+    );
+  }
+  changeLessonBoard(
+    ws: string,
+    student: string,
+    lesson: string,
+    body: LessonBoardCommand,
+    key: string,
+    portal = false,
+  ) {
+    return this.request<{ data: LessonBoard; replayed: boolean }>(
+      this.lessonBoardPath(ws, student, lesson, portal),
+      { method: "POST", body, key },
+    );
+  }
+  lessonBoardDocument(
+    ws: string,
+    student: string,
+    lesson: string,
+    id: string,
+    portal = false,
+  ) {
+    return this.request<{
+      data: SignedUrl & { name: string; expiresIn: number };
+    }>(
+      this.lessonBoardPath(ws, student, lesson, portal) +
+        `/documents/${encodeURIComponent(id)}`,
+    );
+  }
+  private lessonBoardPath(
+    ws: string,
+    student: string,
+    lesson: string,
+    portal: boolean,
+  ) {
+    const workspace = encodeURIComponent(ws),
+      pupil = encodeURIComponent(student);
+    const scope = portal
+      ? `portal/${workspace}/${pupil}`
+      : `workspaces/${workspace}/students/${pupil}`;
+    return `/v1/${scope}/lessons/${encodeURIComponent(lesson)}/board`;
   }
   // --- Öğretmen vitrini -------------------------------------------------
   teachers(filter: TeacherFilter = {}) {
@@ -339,6 +397,16 @@ export type SignedUrl = { url: string };
 export type VideoPlayback = { url: string; expiresAt: number };
 export type InvitationResult = { id: string; url: string; emailed?: boolean };
 export { uploadTus, type UploadSource } from "./uploads.ts";
+export {
+  LessonBoardSession,
+  type LessonBoardState,
+  boardPoint,
+  appendBoardPoint,
+  boardStrokePath,
+  boardUndoStroke,
+  boardPageStrokes,
+} from "./lesson-board.ts";
+export * from "./board-tools.ts";
 export {
   eventConcerns,
   MessageSocket,

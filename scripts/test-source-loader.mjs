@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createContext, runInContext } from "node:vm";
 import ts from "typescript";
 
@@ -23,6 +24,16 @@ export function transpileTestSource(file) {
       sourceMap: true,
       inlineSources: true,
     },
+    transformers: { before: [(context) => {
+      const visit = (node) => {
+        // A CommonJS VM has no import.meta; keep the source URL's ESM meaning.
+        if (ts.isPropertyAccessExpression(node) && ts.isMetaProperty(node.expression)
+          && node.expression.keywordToken === ts.SyntaxKind.ImportKeyword && node.name.text === "url")
+          return ts.factory.createStringLiteral(pathToFileURL(sourcePath).href);
+        return ts.visitEachChild(node, visit, context);
+      };
+      return (node) => ts.visitNode(node, visit);
+    }] },
   });
   const map = JSON.parse(compiled.sourceMapText);
   map.sources = [sourcePath];
