@@ -45,6 +45,28 @@ export class LessonBoardController {
     return this.read(req, ws, student, lesson, true, revision);
   }
 
+  @Get("workspaces/:ws/students/:student/lessons/:lesson/board/documents/:id")
+  teacherDocument(
+    @Req() req: ActorRequest,
+    @Param("ws") ws: string,
+    @Param("student") student: string,
+    @Param("lesson") lesson: string,
+    @Param("id") id: string,
+  ) {
+    return this.document(req, ws, student, lesson, id, false);
+  }
+
+  @Get("portal/:ws/:student/lessons/:lesson/board/documents/:id")
+  portalDocument(
+    @Req() req: ActorRequest,
+    @Param("ws") ws: string,
+    @Param("student") student: string,
+    @Param("lesson") lesson: string,
+    @Param("id") id: string,
+  ) {
+    return this.document(req, ws, student, lesson, id, true);
+  }
+
   @Post("workspaces/:ws/students/:student/lessons/:lesson/board")
   teacherPost(
     @Req() req: ActorRequest,
@@ -90,6 +112,24 @@ export class LessonBoardController {
       uuid.parse(lesson),
       portal,
       current,
+    );
+  }
+
+  private document(
+    req: ActorRequest,
+    ws: string,
+    student: string,
+    lesson: string,
+    id: string,
+    portal: boolean,
+  ) {
+    return this.boards.document(
+      req.actor,
+      uuid.parse(ws),
+      uuid.parse(student),
+      uuid.parse(lesson),
+      uuid.parse(id),
+      portal,
     );
   }
 

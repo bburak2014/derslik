@@ -45,6 +45,20 @@ export const boardColors = [
 export const boardWidths = [2, 4, 8] as const;
 export const maxBoardPoints = 128;
 export const maxBoardStrokes = 500;
+export const maxBoardDocuments = 5;
+export const maxBoardPages = 100;
+export const boardTools = [
+  "pen",
+  "highlighter",
+  "line",
+  "rectangle",
+  "ellipse",
+  "note",
+] as const;
+const boardPageScope = {
+  documentId: z.string().uuid().nullable().default(null),
+  page: z.number().int().min(0).max(maxBoardPages).default(0),
+};
 export const boardPointSchema = z
   .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })
   .strict();
@@ -54,8 +68,30 @@ export const boardStrokeInputSchema = z
     points: z.array(boardPointSchema).min(1).max(maxBoardPoints),
     color: z.enum(boardColors),
     width: z.union([z.literal(2), z.literal(4), z.literal(8)]),
+    ...boardPageScope,
+    tool: z.enum(boardTools).default("pen"),
+    text: z.string().trim().min(1).max(300).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((stroke, ctx) => {
+    let validPoints = true;
+    if (stroke.tool === "note") validPoints = stroke.points.length === 1;
+    else if (["line", "rectangle", "ellipse"].includes(stroke.tool))
+      validPoints = stroke.points.length === 2;
+    if (
+      !validPoints ||
+      (stroke.tool === "note") !== (stroke.text !== undefined)
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "api.boardStrokeInvalid",
+      });
+    if ((stroke.documentId === null) !== (stroke.page === 0))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "api.boardPageInvalid",
+      });
+  });
 const epoch = z.number().int().nonnegative();
 export const lessonBoardCommandSchema = z.discriminatedUnion("action", [
   z
@@ -70,15 +106,41 @@ export const lessonBoardCommandSchema = z.discriminatedUnion("action", [
       action: z.literal("stroke.remove"),
       epoch,
       id: z.string().uuid(),
+      ...boardPageScope,
     })
+    .strict(),
+  z
+    .object({
+      action: z.literal("stroke.restore"),
+      epoch,
+      id: z.string().uuid(),
+      ...boardPageScope,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("document.add"),
+      epoch,
+      id: z.string().uuid(),
+      pageCount: z.number().int().min(1).max(maxBoardPages),
+    })
+    .strict(),
+  z
+    .object({ action: z.literal("document.select"), epoch, ...boardPageScope })
+    .strict(),
+  z
+    .object({ action: z.literal("page.clear"), epoch, ...boardPageScope })
     .strict(),
   z.object({ action: z.literal("board.clear"), epoch }).strict(),
 ]);
 
 export type BoardPoint = z.infer<typeof boardPointSchema>;
-export type BoardStrokeInput = z.infer<typeof boardStrokeInputSchema>;
-export type BoardStroke = BoardStrokeInput & { authorId: string };
-export type LessonBoardCommand = z.infer<typeof lessonBoardCommandSchema>;
+export type BoardStrokeInput = z.input<typeof boardStrokeInputSchema>;
+export type BoardStroke = z.output<typeof boardStrokeInputSchema> & {
+  authorId: string;
+};
+export type LessonBoardCommand = z.input<typeof lessonBoardCommandSchema>;
+export type BoardDocument = { id: string; name: string; pageCount: number };
 export type LessonBoard = {
   id: string;
   revision: number;
@@ -86,6 +148,9 @@ export type LessonBoard = {
   viewerId: string;
   canEdit: boolean;
   canClear: boolean;
+  documents: BoardDocument[];
+  documentId: string | null;
+  page: number;
   strokes: BoardStroke[];
 };
 export type LessonBoardReadResult = {

@@ -85,6 +85,7 @@ import {
 import { setStringAsync } from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { PdfViewer } from "./PdfViewer";
+import { readFileBytes } from "./file-bytes";
 import { MediaPlayer } from "./MediaPlayer";
 import { CalendarFeed } from "./calendar-feed";
 import { PortalMessages, useMessages } from "./messages";
@@ -131,33 +132,6 @@ export function PortalScreen({
 }
 export type TeachingView = "assignments" | "files" | "videos";
 
-/**
- * Seçilen dosyayı bayt olarak okur.
- *
- * expo-file-system'in iki API'si de işe yaramıyor: Expo Go, FileSystem'i
- * kendi deneyim klasörüne kapsıyor, DocumentPicker ise kopyayı Expo Go'nun
- * uygulama önbelleğine (cache/DocumentPicker/...) bırakıyor. Yeni API
- * "Missing READ permission", eskisi "isn't readable" diyor.
- *
- * Ağ katmanının blob okuyucusu bu kapsam kontrolünden geçmiyor, o yüzden
- * içeriği oradan alıp FileReader ile bayta çeviriyoruz.
- */
-async function readFileBytes(uri: string) {
-  const blob = await (await fetch(uri)).blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(t("ml.readFailed")));
-    reader.onload = () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error(t("ml.readFailed")));
-    };
-    reader.readAsDataURL(blob);
-  });
-  const binary = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.codePointAt(i) ?? 0;
-  return bytes;
-}
 
 export function LearningScreen({
   access,

@@ -161,6 +161,8 @@ export const lessonBoards = app.table(
     lessonId: uuid("lesson_id").notNull(),
     epoch: integer("epoch").notNull().default(0),
     revision: integer("revision").notNull().default(0),
+    documentId: uuid("document_id"),
+    page: integer("page").notNull().default(0),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.lessonId] }),
@@ -172,6 +174,39 @@ export const lessonBoards = app.table(
     }),
     check("lesson_board_epoch", sql`${t.epoch} >= 0`),
     check("lesson_board_revision", sql`${t.revision} >= 0`),
+    check(
+      "lesson_board_page",
+      sql`(${t.documentId} IS NULL AND ${t.page}=0) OR (${t.documentId} IS NOT NULL AND ${t.page} BETWEEN 1 AND 100)`,
+    ),
+  ],
+);
+export const lessonBoardDocuments = app.table(
+  "lesson_board_documents",
+  {
+    workspaceId: uuid("workspace_id").notNull(),
+    studentId: uuid("student_id").notNull(),
+    lessonId: uuid("lesson_id").notNull(),
+    materialId: uuid("material_id").notNull(),
+    pageCount: integer("page_count").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.lessonId, t.materialId] }),
+    unique("lesson_board_documents_scope").on(
+      t.workspaceId,
+      t.studentId,
+      t.lessonId,
+      t.materialId,
+    ),
+    foreignKey({
+      columns: [t.workspaceId, t.studentId, t.lessonId],
+      foreignColumns: [
+        lessonBoards.workspaceId,
+        lessonBoards.studentId,
+        lessonBoards.lessonId,
+      ],
+    }),
+    check("lesson_board_document_pages", sql`${t.pageCount} BETWEEN 1 AND 100`),
   ],
 );
 export const lessonBoardStrokes = app.table(
@@ -186,6 +221,10 @@ export const lessonBoardStrokes = app.table(
     points: jsonb("points").notNull(),
     color: text("color").notNull(),
     width: integer("width").notNull(),
+    documentId: uuid("document_id"),
+    page: integer("page").notNull().default(0),
+    tool: text("tool").notNull().default("pen"),
+    text: text("text"),
     removed: boolean("removed").notNull().default(false),
     createdAt: createdAt(),
   },
@@ -215,6 +254,22 @@ export const lessonBoardStrokes = app.table(
       sql`${t.color} IN ('#172554','#2563eb','#dc2626','#16a34a')`,
     ),
     check("lesson_stroke_width", sql`${t.width} IN (2,4,8)`),
+    check(
+      "lesson_stroke_page",
+      sql`(${t.documentId} IS NULL AND ${t.page}=0) OR (${t.documentId} IS NOT NULL AND ${t.page} BETWEEN 1 AND 100)`,
+    ),
+    check(
+      "lesson_stroke_tool",
+      sql`${t.tool} IN ('pen','highlighter','line','rectangle','ellipse','note')`,
+    ),
+    check(
+      "lesson_stroke_shape",
+      sql`${t.tool} NOT IN ('line','rectangle','ellipse') OR jsonb_array_length(${t.points})=2`,
+    ),
+    check(
+      "lesson_stroke_note",
+      sql`(${t.tool}='note' AND jsonb_array_length(${t.points})=1 AND ${t.text} IS NOT NULL AND char_length(${t.text}) BETWEEN 1 AND 300) OR (${t.tool}<>'note' AND ${t.text} IS NULL)`,
+    ),
   ],
 );
 export const creditEntries = app.table(

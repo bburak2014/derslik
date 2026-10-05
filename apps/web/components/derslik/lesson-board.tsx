@@ -1,155 +1,88 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { appendBoardPoint, boardPoint, boardStrokePath, boardUndoStroke, LessonBoardSession, type LessonBoardState } from "@derslik/api-client";
-import { boardColors, boardWidths, maxBoardStrokes, t, type BoardStrokeInput, type LessonBoard, type LessonBoardCommand, type LessonBoardReadResult } from "@derslik/contracts";
-import { backend } from "@/lib/client";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Spinner } from "./loading";
-import { FormError } from "./feedback";
+import { useRef } from "react";
+import { LoaderCircle, LockKeyhole, PencilLine, X, Check } from "lucide-react";
+import { maxBoardStrokes, t, type LessonBoard } from "@derslik/contracts";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BoardCanvas } from "./board-canvas";
+import { BoardDocuments, BoardPageControls, BoardTools } from "./board-controls";
+import { BoardPdfCanvas } from "./board-pdf";
+import { useLessonBoard } from "./use-lesson-board";
+import "./lesson-board.css";
 
-type Pending = { command: LessonBoardCommand; key: string };
-
-function point(event: PointerEvent<SVGSVGElement>) {
-  const box = event.currentTarget.getBoundingClientRect();
-  return boardPoint(event.clientX - box.left, event.clientY - box.top, box.width, box.height);
-}
-
-export function BoardCanvas({ board, editable, color, width, draft, onDraft, onStroke }: Readonly<{
-  board: LessonBoard;
-  editable: boolean;
-  color: BoardStrokeInput["color"];
-  width: BoardStrokeInput["width"];
-  draft: BoardStrokeInput | null;
-  onDraft: (stroke: BoardStrokeInput | null) => void;
-  onStroke: (stroke: BoardStrokeInput, epoch: number) => void;
-}>) {
-  const gesture = useRef<{ stroke: BoardStrokeInput; epoch: number; pointer: number } | null>(null);
-  function down(event: PointerEvent<SVGSVGElement>) {
-    if (!editable || event.button !== 0 || gesture.current) return;
-    event.preventDefault();
-    const stroke = { id: crypto.randomUUID(), points: [point(event)], color, width };
-    gesture.current = { stroke, epoch: board.epoch, pointer: event.pointerId };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    onDraft(stroke);
-  }
-  function move(event: PointerEvent<SVGSVGElement>) {
-    const current = gesture.current;
-    if (current?.pointer !== event.pointerId) return;
-    const stroke = { ...current.stroke, points: appendBoardPoint(current.stroke.points, point(event)) };
-    gesture.current = { ...current, stroke };
-    onDraft(stroke);
-  }
-  function finish(event: PointerEvent<SVGSVGElement>) {
-    const current = gesture.current;
-    if (current?.pointer !== event.pointerId) return;
-    gesture.current = null;
-    const stroke = { ...current.stroke, points: appendBoardPoint(current.stroke.points, point(event)) };
-    onDraft(stroke);
-    onStroke(stroke, current.epoch);
-  }
-  return (
-    <svg viewBox="0 0 1000 600" role="img" aria-label={t("liveLesson.board")}
-      className="block shrink-0 aspect-[5/3] w-full touch-none rounded-xl border bg-white"
-      style={{ cursor: editable ? "crosshair" : "default" }}
-      onPointerDown={down} onPointerMove={move} onPointerUp={finish}
-      onPointerCancel={() => { gesture.current = null; onDraft(null); }}>
-      {[...board.strokes, ...(draft && !board.strokes.some((stroke) => stroke.id === draft.id) ? [draft] : [])].map((stroke) =>
-        stroke.points.length === 1
-          ? <circle key={stroke.id} cx={stroke.points[0].x * 1000} cy={stroke.points[0].y * 600} r={stroke.width / 2} fill={stroke.color} />
-          : <path key={stroke.id} d={boardStrokePath(stroke.points)} stroke={stroke.color} strokeWidth={stroke.width} strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-      )}
-    </svg>
-  );
-}
+export { BoardCanvas } from "./board-canvas";
+type Studio = ReturnType<typeof useLessonBoard>;
 
 export function LessonBoardDialog({ initial, base, title, onClose }: Readonly<{
   initial: LessonBoard; base: string; title: string; onClose: () => void;
 }>) {
-  const [state, setState] = useState<LessonBoardState>({ board: initial, loading: false, saving: false, error: null }),
-    [color, setColor] = useState<BoardStrokeInput["color"]>(boardColors[0]),
-    [width, setWidth] = useState<BoardStrokeInput["width"]>(4),
-    [draft, setDraft] = useState<BoardStrokeInput | null>(null),
-    [pending, setPending] = useState<Pending | null>(null),
-    [error, setError] = useState("");
-  const mounted = useRef(true), sending = useRef(false);
-  const session = useMemo(() => new LessonBoardSession({
-    initial,
-    load: (revision) => {
-      if (document.visibilityState === "hidden") return Promise.resolve({ data: null });
-      const url = revision === undefined ? base : `${base}?revision=${revision}`;
-      return backend<LessonBoardReadResult>(url);
-    },
-    change: (command, key) => backend<{ data: LessonBoard }>(base, command, key),
-    onChange: setState,
-  }), [base, initial]);
-  useEffect(() => {
-    mounted.current = true;
-    session.start();
-    return () => { mounted.current = false; session.stop(); };
-  }, [session]);
-  const board = state.board ?? initial;
-  async function save(change: Pending) {
-    if (sending.current) return;
-    sending.current = true;
-    setPending(change);
-    const saved = await session.save(change.command, change.key);
-    sending.current = false;
-    if (!mounted.current) return;
-    if (saved) { setPending(null); setDraft(null); setError(""); }
-    else setError(session.state.error ?? t("liveLesson.connectionError"));
+  const studio = useLessonBoard(initial, base, onClose);
+  const input = useRef<HTMLInputElement>(null);
+  return <Dialog open onOpenChange={(open) => { if (!open) studio.close(); }}>
+    <DialogContent className="lesson-studio" showCloseButton={false}>
+      <DialogHeader className="studio-header">
+        <div className="studio-brand"><PencilLine size={23} /></div>
+        <div className="studio-heading"><div className="studio-eyebrow">{t("liveLesson.lessonStudio")}</div><DialogTitle>{title}</DialogTitle><DialogDescription>{t("liveLesson.studioDescription")}</DialogDescription></div>
+        <span className="studio-access">{studio.board.canEdit ? <PencilLine size={14} /> : <LockKeyhole size={14} />}{t(studio.board.canEdit ? "liveLesson.sharedCanvas" : "liveLesson.viewOnly")}</span>
+        <button type="button" className="studio-close" aria-label={t("liveLesson.close")} disabled={studio.busy} onClick={studio.close}><X size={20} /></button>
+      </DialogHeader>
+      <div className="studio-body">
+        <BoardDocuments board={studio.board} disabled={studio.navigationDisabled} uploading={studio.uploading} onSelect={studio.select} onUpload={() => input.current?.click()} />
+        <input ref={input} className="hidden" type="file" accept="application/pdf,.pdf" tabIndex={-1} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void studio.upload(file); }} />
+        <BoardWorkspace studio={studio} />
+      </div>
+      <BoardFooter studio={studio} />
+    </DialogContent>
+  </Dialog>;
+}
+
+function BoardWorkspace({ studio: s }: Readonly<{ studio: Studio }>) {
+  const { board, scope, pageState } = s;
+  const paperWidth = scope.documentId ? `${s.zoom}%` : `min(${s.zoom}%,calc((100cqh - 56px) * ${s.aspect} * ${s.zoom / 100}))`;
+  function clear() {
+    if (window.confirm(t("liveLesson.clearPageWarning"))) s.change({ action: "page.clear", epoch: board.epoch, ...scope });
   }
-  function change(command: LessonBoardCommand) {
-    void save({ command, key: crypto.randomUUID() });
+  return <main className="studio-workspace">
+    <BoardTools tool={s.tool} color={s.color} width={s.width} note={s.note} disabled={s.toolsDisabled} onTool={s.setTool} onColor={s.setColor} onWidth={s.setWidth} onNote={s.setNote}
+      undo={s.undo ? () => s.remove(s.undo!.id) : undefined}
+      redo={s.redo ? () => s.change({ action: "stroke.restore", epoch: board.epoch, id: s.redo!, ...scope }) : undefined}
+      clear={board.canClear ? clear : undefined} hasMarks={s.visible.length > 0} />
+    <div className="studio-stage" aria-busy={!!scope.documentId && !s.ready && !s.pdfError}>
+      <div className={`studio-paper${scope.documentId ? " studio-paper-pdf" : " studio-paper-grid"}`} style={{ aspectRatio: s.aspect, width: paperWidth, maxWidth: `${(scope.documentId ? 640 : 1000) * s.zoom / 100}px` }}>
+        {pageState.page && <BoardPdfCanvas key={`${s.scopeKey}:${s.pdfRetry}`} page={pageState.page} onReady={s.onPdfReady} onError={s.onPdfError} />}
+        <BoardCanvas key={`${s.scopeKey}:${s.zoom}`} board={board} editable={!s.toolsDisabled && s.ready && !s.pdfError && board.strokes.length < maxBoardStrokes}
+          color={s.color} width={s.width} tool={s.tool} note={s.note} draft={s.draft} onDraft={s.setDraft} onErase={s.remove} aspect={s.aspect}
+          onStroke={(stroke, epoch) => s.change({ action: "stroke.add", epoch, stroke })} />
+        <BoardPaperState studio={s} />
+      </div>
+    </div>
+    <BoardPageControls board={board} disabled={s.navigationDisabled} zoom={s.zoom} onZoom={s.setZoom} onPage={(page) => s.select(scope.documentId, page)} following={s.following} onFollow={s.followTeacher} />
+  </main>;
+}
+
+function BoardPaperState({ studio: s }: Readonly<{ studio: Studio }>) {
+  if (s.scope.documentId) {
+    if (s.ready && !s.pdfError) return null;
+    return <div className="studio-pdf-state">
+      {s.pdfError ? <><LockKeyhole size={28} /><p>{s.pdfError}</p><button type="button" onClick={() => s.setPdfRetry((value) => value + 1)}>{t("liveLesson.retry")}</button></>
+        : <><LoaderCircle size={28} className="animate-spin" /><p>{t("liveLesson.pdfLoading")}</p></>}
+    </div>;
   }
-  function close() {
-    if (!state.saving && (!pending || window.confirm(t("liveLesson.unsavedWarning")))) onClose();
-  }
-  const undo = boardUndoStroke(board);
-  const toolsDisabled = !board.canEdit || state.saving || !!pending;
-  const colors = ["black", "blue", "red", "green"] as const;
+  if (s.visible.length || s.draft) return null;
+  return <div className="studio-empty" aria-hidden="true"><PencilLine size={28} /><strong>{t("liveLesson.emptyCanvasTitle")}</strong><span>{t("liveLesson.emptyCanvasHint")}</span></div>;
+}
+
+function BoardFooter({ studio: s }: Readonly<{ studio: Studio }>) {
   let status = t("liveLesson.synced");
-  if (error || state.error || pending) status = t("liveLesson.connectionError");
-  if (state.saving) status = t("liveLesson.saving");
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
-      <DialogContent className="flex h-[min(90dvh,50rem)] flex-col overflow-hidden sm:max-w-4xl" showCloseButton={!state.saving}>
-        <DialogHeader className="shrink-0">
-          <DialogTitle>{t("liveLesson.board")} · {title}</DialogTitle>
-          <DialogDescription className="min-h-10">{board.canEdit ? t("liveLesson.boardHint") : t("liveLesson.readOnly")}</DialogDescription>
-        </DialogHeader>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-          <div className="flex flex-wrap items-center gap-2" aria-label={t("liveLesson.pen")}>
-            {boardColors.map((choice, index) => <Button key={choice} size="icon-sm" variant="outline"
-              aria-label={t(`liveLesson.${colors[index]}`)} aria-pressed={choice === color}
-              disabled={toolsDisabled} onClick={() => setColor(choice)}
-              className={choice === color ? "ring-primary ring-2 ring-offset-2" : ""}>
-              <span className="size-5 rounded-full" style={{ backgroundColor: choice }} />
-            </Button>)}
-            {boardWidths.map((choice) => <Button key={choice} size="sm" variant={choice === width ? "default" : "outline"}
-              aria-pressed={choice === width} disabled={toolsDisabled} onClick={() => setWidth(choice)}>{choice}</Button>)}
-            <Button size="sm" variant="outline" disabled={toolsDisabled || !undo}
-              onClick={() => undo && change({ action: "stroke.remove", epoch: board.epoch, id: undo.id })}>{t("liveLesson.undo")}</Button>
-            {board.canClear && <Button size="sm" variant="outline" disabled={toolsDisabled || !board.strokes.length}
-              onClick={() => { if (window.confirm(t("liveLesson.clearWarning"))) change({ action: "board.clear", epoch: board.epoch }); }}>{t("liveLesson.clear")}</Button>}
-          </div>
-          <BoardCanvas board={board} editable={!toolsDisabled && board.strokes.length < maxBoardStrokes}
-            color={color} width={width} draft={draft} onDraft={setDraft}
-            onStroke={(stroke, epoch) => change({ action: "stroke.add", epoch, stroke })} />
-          <div className="min-h-24 space-y-2" aria-live="polite">
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
-              {state.saving && <Spinner />}{status}
-            </p>
-            {(error || state.error) && <FormError>{error || state.error}</FormError>}
-            {board.strokes.length >= maxBoardStrokes && <p className="text-sm">{t("liveLesson.boardFull")}</p>}
-            {pending && !state.saving && <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => void save(pending)}>{t("liveLesson.retry")}</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setPending(null); setDraft(null); setError(""); void session.refresh(); }}>{t("liveLesson.discardDrawing")}</Button>
-            </div>}
-          </div>
-        </div>
-        <DialogFooter className="shrink-0"><Button variant="outline" disabled={state.saving} onClick={close}>{t("liveLesson.close")}</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  if (s.statusError) status = t("liveLesson.connectionError");
+  if (s.busy) status = t("liveLesson.saving");
+  let hint = t(s.board.canEdit ? "liveLesson.boardHint" : "liveLesson.readOnly");
+  if (s.board.strokes.length >= maxBoardStrokes) hint = t("liveLesson.boardFull");
+  function discard() { s.setPending(null); s.setDraft(null); s.setError(""); void s.session.refresh(); }
+  return <div className="studio-footer" aria-live="polite">
+    <div className={`studio-sync${s.statusError ? " studio-sync-error" : ""}`}>{s.busy ? <LoaderCircle size={15} className="animate-spin" /> : <Check size={15} />}<span>{status}</span></div>
+    <div className="studio-feedback"><p role={s.statusError ? "alert" : undefined}>{s.error || s.state.error || hint}</p>
+      {s.pending && !s.state.saving && <div><button type="button" onClick={() => void s.save(s.pending!)}>{t("liveLesson.retry")}</button><button type="button" onClick={discard}>{t("liveLesson.discardDrawing")}</button></div>}
+    </div>
+    <span className="studio-annotation-count">{t("liveLesson.pageAnnotations", { count: s.visible.length })}</span>
+  </div>;
 }

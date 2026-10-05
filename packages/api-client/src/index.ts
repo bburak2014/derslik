@@ -154,6 +154,20 @@ export class DerslikClient {
       { method: "POST", body, key },
     );
   }
+  lessonBoardDocument(
+    ws: string,
+    student: string,
+    lesson: string,
+    id: string,
+    portal = false,
+  ) {
+    return this.request<{
+      data: SignedUrl & { name: string; expiresIn: number };
+    }>(
+      this.lessonBoardPath(ws, student, lesson, portal) +
+        `/documents/${encodeURIComponent(id)}`,
+    );
+  }
   private lessonBoardPath(
     ws: string,
     student: string,
@@ -390,7 +404,9 @@ export {
   appendBoardPoint,
   boardStrokePath,
   boardUndoStroke,
+  boardPageStrokes,
 } from "./lesson-board.ts";
+export * from "./board-tools.ts";
 export {
   eventConcerns,
   MessageSocket,

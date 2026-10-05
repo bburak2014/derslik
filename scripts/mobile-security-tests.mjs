@@ -367,7 +367,7 @@ const uiDependencies = {
 };
 const pdf = load(
   "apps/mobile/src/PdfViewer.tsx",
-  uiDependencies,
+  { ...uiDependencies, "./pdf-html": load("apps/mobile/src/pdf-html.ts") },
   "\nmodule.exports.buildHtml = buildHtml;\n",
 );
 await check("PDF renderer disables the known font eval execution path", () =>

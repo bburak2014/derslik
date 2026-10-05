@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { MailService } from "../../../.api-build/apps/api/src/access/mail.js";
+import { lessonBoardDocumentCases } from "./lesson-board-document-cases.mjs";
 
 export async function liveLessonCases({ t, app, admin, request, ok, token }) {
   const teacher = randomUUID(),
@@ -444,6 +445,25 @@ export async function liveLessonCases({ t, app, admin, request, ok, token }) {
     },
   );
 
+  await lessonBoardDocumentCases({
+    t,
+    app,
+    admin,
+    request,
+    ok,
+    token,
+    ws,
+    student,
+    secondStudent,
+    lesson,
+    teacher,
+    pupil,
+    teacherToken,
+    pupilToken,
+    guardianToken,
+    strangerToken,
+  });
+
   await t.test(
     "board storage is bounded and completed or cancelled lessons reject writing",
     async () => {
@@ -511,8 +531,12 @@ export async function liveLessonCases({ t, app, admin, request, ok, token }) {
       );
       await db.transaction({ id: teacher }, ws, async (tx) => {
         assert.equal(
-          (await tx.query("SELECT * FROM derslik.lesson_board_strokes"))
-            .rowCount,
+          (
+            await tx.query(
+              "SELECT * FROM derslik.lesson_board_strokes WHERE lesson_id=$1",
+              [lesson.id],
+            )
+          ).rowCount,
           1,
         );
       });

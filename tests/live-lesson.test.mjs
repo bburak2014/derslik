@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, webcrypto } from "node:crypto";
 import test from "node:test";
 import {
   boardColors,
@@ -30,6 +30,9 @@ const stroke = (overrides = {}) => ({
   points: [{ x: 0.25, y: 0.75 }],
   color: boardColors[0],
   width: boardWidths[0],
+  documentId: null,
+  page: 0,
+  tool: "pen",
   ...overrides,
 });
 const board = (revision = 1, overrides = {}) => ({
@@ -39,9 +42,37 @@ const board = (revision = 1, overrides = {}) => ({
   viewerId: "teacher-1",
   canEdit: true,
   canClear: true,
+  documents: [],
+  documentId: null,
+  page: 0,
   strokes: [],
   ...overrides,
 });
+
+function applyBoardCommand(current, command, removed) {
+  let { strokes, documents, documentId, page, epoch } = current;
+  if (command.action === "stroke.add") strokes = [...strokes, { ...command.stroke, authorId: current.viewerId }];
+  if (command.action === "stroke.remove") {
+    removed.set(command.id, strokes.find((item) => item.id === command.id));
+    strokes = strokes.filter((item) => item.id !== command.id);
+  }
+  if (command.action === "stroke.restore" && removed.has(command.id)) {
+    strokes = [...strokes, removed.get(command.id)];
+    removed.delete(command.id);
+  }
+  if (command.action === "board.clear" || command.action === "page.clear") {
+    strokes = command.action === "board.clear" ? [] : strokes.filter((item) =>
+      item.documentId !== command.documentId || item.page !== command.page);
+    epoch++;
+  }
+  if (command.action === "document.select") ({ documentId, page } = command);
+  if (command.action === "document.add") {
+    documents = [...documents, { id: command.id, name: "Denklemler.pdf", pageCount: command.pageCount }];
+    documentId = command.id;
+    page = 1;
+  }
+  return { ...current, revision: current.revision + 1, epoch, strokes, documents, documentId, page };
+}
 
 test("meeting links accept supported HTTPS providers and normalize outer whitespace", () => {
   for (const value of [
@@ -128,6 +159,34 @@ test("board commands enforce bounded points, allowed styles and a clear epoch", 
   ]) assert.equal(lessonBoardCommandSchema.safeParse(command).success, false);
 });
 
+test("PDF annotations validate page scope, shape geometry and literal text notes", () => {
+  const documentId = randomUUID();
+  const pdf = stroke({ documentId, page: 2 });
+  for (const tool of ["pen", "highlighter"])
+    assert.equal(boardStrokeInputSchema.safeParse({ ...pdf, tool }).success, true);
+  for (const tool of ["line", "rectangle", "ellipse"])
+    assert.equal(boardStrokeInputSchema.safeParse({ ...pdf, tool, points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }).success, true);
+  const note = { ...pdf, tool: "note", text: "x² + 2x = 8" };
+  assert.equal(boardStrokeInputSchema.safeParse(note).success, true);
+  assert.equal(boardStrokeInputSchema.parse({ ...note, text: "  x = 2  " }).text, "x = 2");
+  for (const invalid of [
+    { ...pdf, page: 0 }, { ...pdf, documentId: null }, { ...pdf, page: 101 },
+    { ...pdf, tool: "rectangle" }, { ...pdf, tool: "ellipse" }, { ...pdf, tool: "line" },
+    { ...pdf, tool: "pen", text: "Unexpected text" }, { ...note, text: "  " },
+    { ...note, text: "x".repeat(301) }, { ...note, points: [...note.points, { x: 0, y: 0 }] },
+  ]) assert.equal(boardStrokeInputSchema.safeParse(invalid).success, false);
+  const legacy = { id: randomUUID(), points: [{ x: 0, y: 0 }], color: boardColors[0], width: 2 };
+  assert.deepEqual(boardStrokeInputSchema.parse(legacy), { ...legacy, documentId: null, page: 0, tool: "pen" });
+  for (const command of [
+    { action: "document.add", epoch: 0, id: documentId, pageCount: 100 },
+    { action: "document.select", epoch: 0, documentId, page: 2 },
+    { action: "page.clear", epoch: 0, documentId, page: 2 },
+    { action: "stroke.restore", epoch: 0, id: pdf.id, documentId, page: 2 },
+  ]) assert.equal(lessonBoardCommandSchema.safeParse(command).success, true);
+  for (const pageCount of [0, 101, 1.5])
+    assert.equal(lessonBoardCommandSchema.safeParse({ action: "document.add", epoch: 0, id: documentId, pageCount }).success, false);
+});
+
 test("shared lesson board client sends teacher and portal paths with opaque IDs and mutation keys", async () => {
   const requests = [];
   const { DerslikClient } = loadTestModule("packages/api-client/src/index.ts", {
@@ -136,6 +195,7 @@ test("shared lesson board client sends teacher and portal paths with opaque IDs 
       "./uploads.ts": {},
       "./socket.ts": {},
       "./lesson-board.ts": boardSource(),
+      "./board-tools.ts": boardToolsSource(),
     },
     globals: {
       fetch: async (url, init) => {
@@ -167,15 +227,24 @@ test("shared lesson board client sends teacher and portal paths with opaque IDs 
   assert.ok(requests.every((request) => request.headers.Authorization === "Bearer fixture-signed-token"));
   await client.lessonBoard("workspace-1", "student-1", "lesson-1", false, 0);
   assert.equal(new URL(requests.at(-1).url).search, "?revision=0");
+  await client.lessonBoardDocument("ws/one", "student?two", "lesson#three", "document/four", true);
+  assert.equal(new URL(requests.at(-1).url).pathname, "/v1/portal/ws%2Fone/student%3Ftwo/lessons/lesson%23three/board/documents/document%2Ffour");
 });
 
 function boardSource(globals = {}) {
-  return loadTestModule("packages/api-client/src/lesson-board.ts", {
+  const shared = loadTestModule("packages/api-client/src/lesson-board.ts", {
     dependencies: {
       "../../contracts/src/live-lesson.ts": { maxBoardPoints },
       "../../contracts/src/i18n/index.ts": { t: (key) => key },
     },
     globals: { Error, ...globals },
+  });
+  return { ...shared, ...boardToolsSource(shared) };
+}
+
+function boardToolsSource(shared) {
+  return loadTestModule("packages/api-client/src/board-tools.ts", {
+    dependencies: { "./lesson-board.ts": shared ?? boardSource() },
   });
 }
 
@@ -202,6 +271,48 @@ test("shared board geometry clamps and rounds native or browser coordinates with
   assert.strictEqual(boardUndoStroke(board(2, { viewerId: "student-1", canClear: false, strokes: [owned, foreign] })), owned);
   assert.strictEqual(boardUndoStroke(board(2, { strokes: [owned, foreign] })), foreign);
   assert.equal(boardUndoStroke(board(2, { viewerId: "guardian-1", canClear: false, strokes: [owned, foreign] })), undefined);
+});
+
+test("shared drawing visibility and undo stay on the selected PDF page", () => {
+  const { boardPageStrokes, boardUndoStroke } = boardSource();
+  const documentId = randomUUID(), otherDocument = randomUUID();
+  const blank = { ...stroke(), authorId: "teacher-1" };
+  const first = { ...stroke({ documentId, page: 1 }), authorId: "teacher-1" };
+  const second = { ...stroke({ documentId, page: 2 }), authorId: "teacher-1" };
+  const own = { ...stroke({ documentId, page: 2 }), authorId: "student-1" };
+  const unrelated = { ...stroke({ documentId: otherDocument, page: 2 }), authorId: "teacher-1" };
+  const current = board(3, { documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }], documentId, page: 2, strokes: [blank, first, second, own, unrelated] });
+  assert.deepEqual(plain(boardPageStrokes(current)), [second, own]);
+  assert.strictEqual(boardUndoStroke({ ...current, viewerId: "student-1", canClear: false }), own);
+  assert.strictEqual(boardUndoStroke({ ...current, page: 1 }), first);
+  assert.strictEqual(boardUndoStroke({ ...current, documentId: null, page: 0 }), blank);
+});
+
+test("shape gestures keep only their endpoints and erasing respects page and author rights", () => {
+  const { boardGesturePoints, boardHitStroke } = boardToolsSource();
+  const points = [{ x: 0.1, y: 0.1 }, { x: 0.4, y: 0.4 }], next = { x: 0.9, y: 0.8 };
+  for (const tool of ["line", "rectangle", "ellipse"])
+    assert.deepEqual(plain(boardGesturePoints(stroke({ points, tool }), next)), [points[0], next]);
+  assert.deepEqual(plain(boardGesturePoints(stroke({ points }), next)), [...points, next]);
+  const documentId = randomUUID();
+  const owned = { ...stroke({ documentId, page: 2, points, tool: "rectangle" }), authorId: "student-1" };
+  const foreign = { ...stroke({ documentId, page: 2, points, tool: "rectangle" }), authorId: "teacher-1" };
+  const hidden = { ...stroke({ documentId, page: 1, points, tool: "rectangle" }), authorId: "student-1" };
+  const pupil = board(3, { documentId, page: 2, viewerId: "student-1", canClear: false, strokes: [owned, foreign, hidden] });
+  assert.strictEqual(boardHitStroke(pupil, { x: 0.1, y: 0.25 }), owned);
+  assert.strictEqual(boardHitStroke({ ...pupil, canClear: true }, { x: 0.1, y: 0.25 }), foreign);
+  assert.equal(boardHitStroke(pupil, { x: 0.25, y: 0.25 }), undefined, "erasing the empty center does not remove an outlined rectangle");
+  const ellipse = { ...stroke({ points: [{ x: 0.1, y: 0.1 }, { x: 0.5, y: 0.5 }], tool: "ellipse" }), authorId: "teacher-1" };
+  assert.strictEqual(boardHitStroke(board(1, { strokes: [ellipse] }), { x: 0.5, y: 0.3 }), ellipse);
+  assert.equal(boardHitStroke(board(1, { strokes: [ellipse] }), { x: 0.3, y: 0.3 }), undefined);
+});
+
+test("notes stay inside the paper and erasing follows their rendered bounds on portrait pages", () => {
+  const { boardNoteLayout, boardHitStroke } = boardToolsSource();
+  const note = { ...stroke({ tool: "note", text: "x = 2", points: [{ x: 0.99, y: 0.99 }] }), authorId: "teacher-1" };
+  assert.deepEqual(plain(boardNoteLayout(note, 1400)), { x: 720, y: 1336, width: 280, height: 64, lines: ["x = 2"] });
+  assert.strictEqual(boardHitStroke(board(1, { strokes: [note] }), { x: 0.9, y: 0.98 }, 1000 / 1400), note);
+  assert.equal(boardHitStroke(board(1, { strokes: [note] }), { x: 0.5, y: 0.98 }, 1000 / 1400), undefined);
 });
 
 function sessionFixture({ load, change, pollMs = 2500 } = {}) {
@@ -571,6 +682,8 @@ test("mobile refuses an empty initial board reply and ignores a closed meeting l
 function nativeBoardFixture(options = {}) {
   const renderer = createTsxFixture();
   const reads = [], writes = [], confirmations = [], timers = new Map();
+  const documentReads = [];
+  const removed = new Map();
   const appState = { currentState: "active" };
   let currentBoard = options.initial ?? board(), timerId = 0, closed = 0;
   const shared = boardSource({
@@ -586,29 +699,32 @@ function nativeBoardFixture(options = {}) {
       react: renderer.react,
       "react/jsx-runtime": renderer.jsx,
       "react-native": {
-        ...Object.fromEntries(["ActivityIndicator", "Modal", "Pressable", "ScrollView", "Text", "View"].map((name) => [name, name])),
+        ...Object.fromEntries(["ActivityIndicator", "Modal", "Pressable", "ScrollView", "Text", "TextInput", "View"].map((name) => [name, name])),
         AppState: appState,
         PanResponder: { create: (handlers) => ({ panHandlers: handlers }) },
       },
       "react-native-safe-area-context": { SafeAreaView: "SafeAreaView" },
-      "react-native-svg": { __esModule: true, default: "Svg", Circle: "Circle", Path: "Path" },
+      "react-native-svg": { __esModule: true, default: "Svg", ...Object.fromEntries(["Circle", "Path", "Rect", "Ellipse", "G", "Line", "Text", "TSpan"].map((name) => [name, name === "Text" ? "SvgText" : name])) },
+      "@expo/vector-icons": { Ionicons: "Ionicons" },
       "expo-crypto": { randomUUID },
       "@derslik/contracts": { ...liveContracts, t: (key) => key },
       "@derslik/api-client": shared,
+      "./lesson-board-pdf": { NativeBoardPdf: "NativeBoardPdf" },
+      "./lesson-board-upload": { uploadBoardPdf: options.upload ?? (() => Promise.resolve(null)) },
       "./core": { client: {
         lessonBoard: async (...args) => {
           reads.push(args);
           return options.load ? options.load(reads.length, currentBoard) : { data: currentBoard };
         },
+        lessonBoardDocument: (...args) => {
+          documentReads.push(args);
+          return options.document ? options.document(...args) : Promise.resolve({ data: { url: "https://storage.example.test/lesson.pdf", expiresIn: 120 } });
+        },
         changeLessonBoard: async (...args) => {
           writes.push(args);
           if (options.change) return options.change(args, writes.length, currentBoard);
           const command = args[3];
-          let strokes = currentBoard.strokes;
-          if (command.action === "stroke.add") strokes = [...strokes, { ...command.stroke, authorId: currentBoard.viewerId }];
-          if (command.action === "stroke.remove") strokes = strokes.filter((stroke) => stroke.id !== command.id);
-          if (command.action === "board.clear") strokes = [];
-          currentBoard = { ...currentBoard, revision: currentBoard.revision + 1, epoch: currentBoard.epoch + (command.action === "board.clear" ? 1 : 0), strokes };
+          currentBoard = applyBoardCommand(currentBoard, command, removed);
           return { data: currentBoard };
         },
       } },
@@ -626,7 +742,7 @@ function nativeBoardFixture(options = {}) {
   const props = { initial: currentBoard, title: "Denklemler", workspaceId: "workspace-1", studentId: "student-1", lessonId: "lesson-1", portal: true, onClose: () => closed++ };
   let tree;
   const render = () => tree = renderer.render(NativeLessonBoard, props);
-  const button = (key) => oneNode(tree, (node) => node.type === "Button" && treeText(node) === key, key);
+  const button = (key) => oneNode(tree, (node) => node.type === "Button" && treeText(node) === (key === "liveLesson.clear" ? "liveLesson.clearPage" : key), key);
   const canvas = () => oneNode(tree, (node) => node.type === "View" && node.props.accessibilityLabel === "liveLesson.board");
   const pointer = (x, y) => ({ nativeEvent: { locationX: x, locationY: y } });
   const draw = (points) => {
@@ -635,7 +751,7 @@ function nativeBoardFixture(options = {}) {
     canvas().props.onPanResponderRelease();
   };
   render();
-  return { reads, writes, timers, props, appState, button, canvas, draw, pointer, render, confirmations, closed: () => closed, tree: () => tree, unmount: renderer.unmount,
+  return { reads, writes, documentReads, timers, props, appState, button, canvas, draw, pointer, render, confirmations, closed: () => closed, tree: () => tree, unmount: renderer.unmount,
     fire() {
       assert.equal(timers.size, 1);
       const [id, timer] = timers.entries().next().value;
@@ -716,7 +832,9 @@ test("native guardian board is read-only, polling waits in background and a full
   assert.ok(treeText(f.tree()).includes("liveLesson.readOnly"));
   assert.equal(f.button("liveLesson.undo").props.disabled, true);
   assert.equal(treeNodes(f.tree()).filter((node) => node.type === "Button" && treeText(node) === "liveLesson.clear").length, 0);
-  assert.ok(treeNodes(f.tree()).filter((node) => node.type === "Pressable").every((node) => node.props.disabled));
+  const drawingLabels = new Set(["pen", "highlighter", "line", "rectangle", "ellipse", "note", "eraser", "black", "blue", "red", "green"].map((name) => `liveLesson.${name}`));
+  for (const width of [2, 4, 8]) drawingLabels.add(`liveLesson.pen ${width}`);
+  assert.ok(treeNodes(f.tree()).filter((node) => node.type === "Pressable" && drawingLabels.has(node.props.accessibilityLabel)).every((node) => node.props.disabled));
   assert.equal(f.canvas().props.onMoveShouldSetPanResponder(), false);
   f.appState.currentState = "background";
   f.fire();
@@ -742,7 +860,7 @@ test("native board undo targets the user's latest stroke and only teacher clear 
   pupil.render();
   pupil.button("liveLesson.undo").props.onPress();
   await settle();
-  assert.deepEqual(plain(pupil.writes[0][3]), { action: "stroke.remove", epoch: 0, id: own.id });
+  assert.deepEqual(plain(pupil.writes[0][3]), { action: "stroke.remove", epoch: 0, id: own.id, documentId: null, page: 0 });
   pupil.unmount();
   const teacher = nativeBoardFixture({ initial: board(1, { strokes: [foreign] }) });
   await settle();
@@ -751,7 +869,7 @@ test("native board undo targets the user's latest stroke and only teacher clear 
   await settle();
   teacher.render();
   assert.equal(teacher.confirmations[0].title, "liveLesson.clearConfirm");
-  assert.deepEqual(plain(teacher.writes[0][3]), { action: "board.clear", epoch: 0 });
+  assert.deepEqual(plain(teacher.writes[0][3]), { action: "page.clear", epoch: 0, documentId: null, page: 0 });
   assert.equal(treeNodes(teacher.tree()).filter((node) => node.type === "Circle" || node.type === "Path").length, 0);
   teacher.unmount();
 });
@@ -801,10 +919,9 @@ test("native terminated gestures never save a stroke and polling errors leave pr
   f.unmount();
 });
 
-test("native drawing keeps its original epoch when a remote clear arrives during a gesture", async () => {
+test("native drawing cancels when a remote clear arrives during a gesture", async () => {
   const f = nativeBoardFixture({
     load: async (index, current) => ({ data: index === 1 ? current : board(2, { epoch: 1 }) }),
-    change: async () => { throw new Error("Stale drawing epoch"); },
   });
   await settle();
   f.render();
@@ -817,14 +934,505 @@ test("native drawing keeps its original epoch when a remote clear arrives during
   f.canvas().props.onPanResponderRelease();
   await settle();
   f.render();
-  assert.equal(f.writes[0][3].epoch, 0, "remote clear cannot revive a gesture from the preceding epoch");
-  assert.equal(oneNode(f.tree(), (node) => node.type === "ErrorText").props.message, "Stale drawing epoch");
+  assert.equal(f.writes.length, 0, "remote clear cannot revive a gesture from the preceding epoch");
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "Circle" || node.type === "Path").length, 0);
   f.unmount();
+});
+
+test("native shape and note tools save bounded geometry, then redo restores the removed annotation", async () => {
+  const f = nativeBoardFixture();
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "liveLesson.rectangle").props.onPress();
+  f.render(); f.draw([[100, 100], [200, 200], [300, 200]]);
+  await settle(); f.render();
+  assert.equal(f.writes[0][3].stroke.tool, "rectangle");
+  assert.deepEqual(plain(f.writes[0][3].stroke.points), [{ x: 0.2, y: 0.333 }, { x: 0.6, y: 0.667 }]);
+  assert.equal(boardStrokeInputSchema.safeParse(f.writes[0][3].stroke).success, true);
+  assert.equal(oneNode(f.tree(), (node) => node.type === "Rect").props.width, 400);
+  f.button("liveLesson.undo").props.onPress();
+  await settle(); f.render();
+  f.button("liveLesson.redo").props.onPress();
+  await settle(); f.render();
+  assert.equal(f.writes[2][3].action, "stroke.restore");
+  assert.equal(f.writes[2][3].id, f.writes[0][3].stroke.id);
+  assert.equal(oneNode(f.tree(), (node) => node.type === "Rect").props.width, 400);
+  oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "liveLesson.note").props.onPress();
+  f.render();
+  oneNode(f.tree(), (node) => node.type === "TextInput").props.onChangeText("x = 2");
+  f.render(); f.draw([[150, 150], [300, 200]]);
+  await settle(); f.render();
+  assert.equal(f.writes[3][3].stroke.text, "x = 2");
+  assert.equal(boardStrokeInputSchema.safeParse(f.writes[3][3].stroke).success, true);
+  f.unmount();
+});
+
+test("native PDF rendering gates drawing, keeps page scope and teacher navigation clears redo history", async () => {
+  const documentId = randomUUID();
+  const f = nativeBoardFixture({ initial: board(1, { documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }], documentId, page: 1 }) });
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 600, height: 840 } } });
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+  oneNode(f.tree(), (node) => node.type === "NativeBoardPdf").props.onReady({ pageCount: 2, aspectRatio: 600 / 840 });
+  f.render();
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), true);
+  assert.equal(oneNode(f.tree(), (node) => node.type === "Svg").props.viewBox, "0 0 1000 1400");
+  f.draw([[150, 420], [300, 210]]);
+  await settle(); f.render();
+  assert.equal(f.writes[0][3].stroke.documentId, documentId);
+  assert.equal(f.writes[0][3].stroke.page, 1);
+  assert.deepEqual(plain(f.writes[0][3].stroke.points), [{ x: 0.25, y: 0.5 }, { x: 0.5, y: 0.25 }]);
+  assert.equal(oneNode(f.tree(), (node) => node.type === "Path").props.d, "M250,700 L500,350");
+  f.button("liveLesson.undo").props.onPress();
+  await settle(); f.render();
+  assert.equal(f.button("liveLesson.redo").props.disabled, false);
+  f.button("liveLesson.nextPage").props.onPress();
+  await settle(); f.render();
+  assert.deepEqual(plain(f.writes[2][3]), { action: "document.select", epoch: 0, documentId, page: 2 });
+  assert.equal(f.button("liveLesson.redo").props.disabled, true);
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+  assert.equal(f.documentReads.length, 1, "page navigation reuses the loaded private PDF");
+  f.unmount();
+});
+
+test("native guardians and completed teachers browse PDF pages locally without board mutations", async () => {
+  const documentId = randomUUID();
+  for (const viewerId of ["guardian-1", "teacher-1"]) {
+    const initial = board(1, { viewerId, canEdit: false, canClear: false, documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }], documentId, page: 1 });
+    const f = nativeBoardFixture({ initial });
+    await settle(); f.render();
+    assert.equal(f.button("liveLesson.nextPage").props.disabled, false);
+    f.button("liveLesson.nextPage").props.onPress();
+    await settle(); f.render();
+    assert.equal(oneNode(f.tree(), (node) => node.type === "NativeBoardPdf").props.page, 2);
+    oneNode(f.tree(), (node) => node.type === "NativeBoardPdf").props.onReady({ pageCount: 2, aspectRatio: 5 / 3 });
+    f.render();
+    assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+    assert.equal(f.button("liveLesson.previousPage").props.disabled, false);
+    const follow = oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "liveLesson.followTeacher");
+    assert.equal(follow.props.accessibilityState.selected, false);
+    follow.props.onPress();
+    f.render();
+    assert.equal(oneNode(f.tree(), (node) => node.type === "NativeBoardPdf").props.page, 1);
+    assert.equal(oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "liveLesson.followTeacher").props.accessibilityState.selected, true);
+    assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+    assert.equal(f.writes.length, 0, `${viewerId} navigation must stay local`);
+    assert.equal(f.documentReads.length, 1);
+    f.unmount();
+  }
+});
+
+test("native students browse another document read-only and follow teacher restores shared drawing", async () => {
+  const documentId = randomUUID();
+  const f = nativeBoardFixture({ initial: board(1, { viewerId: "student-1", canClear: false, documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }] }) });
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), true);
+  const document = oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "Denklemler.pdf");
+  assert.equal(document.props.disabled, false);
+  document.props.onPress();
+  f.render(); await settle(); f.render();
+  oneNode(f.tree(), (node) => node.type === "NativeBoardPdf").props.onReady({ pageCount: 2, aspectRatio: 5 / 3 });
+  f.render();
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+  f.draw([[100, 100], [200, 200]]);
+  f.button("liveLesson.nextPage").props.onPress();
+  await settle(); f.render();
+  assert.equal(oneNode(f.tree(), (node) => node.type === "NativeBoardPdf").props.page, 2);
+  assert.equal(f.writes.length, 0);
+  oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "liveLesson.followTeacher").props.onPress();
+  f.render();
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "NativeBoardPdf").length, 0);
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), true);
+  f.draw([[100, 100]]);
+  await settle(); f.render();
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0][3].action, "stroke.add");
+  assert.equal(f.writes[0][3].stroke.documentId, null);
+  assert.equal(f.writes[0][3].stroke.page, 0);
+  f.unmount();
+});
+
+test("native zoom uses measured paper bounds and panning cannot accidentally create an annotation", async () => {
+  const f = nativeBoardFixture();
+  await settle(); f.render();
+  oneNode(f.tree(), (node) => node.type === "View" && typeof node.props.onLayout === "function" && !node.props.accessibilityLabel).props.onLayout({ nativeEvent: { layout: { width: 500 } } });
+  f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  f.canvas().props.onPanResponderGrant(f.pointer(125, 150));
+  f.button("liveLesson.zoomIn").props.onPress();
+  f.render();
+  assert.equal(f.canvas().props.style.width, 750);
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 750, height: 450 } } });
+  f.canvas().props.onPanResponderRelease();
+  assert.equal(f.writes.length, 0, "changing zoom cancels the earlier gesture");
+  f.draw([[187.5, 225]]);
+  await settle(); f.render();
+  assert.deepEqual(plain(f.writes[0][3].stroke.points), [{ x: 0.25, y: 0.5 }]);
+  f.button("liveLesson.moveCanvas").props.onPress();
+  f.render();
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+  f.draw([[100, 100], [200, 200]]);
+  assert.equal(f.writes.length, 1);
+  f.unmount();
+});
+
+function nativePdfUploaderFixture(options = {}) {
+  const requests = [], uploads = [];
+  const id = randomUUID();
+  const { uploadBoardPdf } = loadTestModule("apps/mobile/src/lesson-board-upload.ts", {
+    dependencies: {
+      "expo-document-picker": { getDocumentAsync: () => Promise.resolve({ canceled: false, assets: [{ uri: "file:///local/lesson.pdf", name: "Denklemler.pdf", size: 100 }] }) },
+      "expo/fetch": { fetch: (url, init) => {
+        uploads.push({ url, init });
+        return options.send ? options.send(uploads.length) : Promise.resolve({ ok: true });
+      } },
+      "expo-crypto": { randomUUID, digest: () => Promise.resolve(new ArrayBuffer(32)), CryptoDigestAlgorithm: { SHA256: "SHA-256" } },
+      "@derslik/contracts": { t: (key) => key },
+      "./file-bytes": { readFileBytes: () => Promise.resolve(new Uint8Array(100)) },
+      "./core": { request: (path, body, key) => {
+        requests.push({ path, body, key });
+        if (options.request) return options.request(path, body, key, requests.length, id);
+        if (path.endsWith("/files")) return Promise.resolve({ data: { id, uploadUrl: "https://storage.example.test/upload" } });
+        if (path.includes("/download")) return Promise.resolve({ data: { url: "https://storage.example.test/lesson.pdf" } });
+        return Promise.resolve({ data: { id, status: "READY" } });
+      } },
+    },
+  });
+  const reservations = new Map();
+  return { requests, uploads, reservations, id, upload: () => uploadBoardPdf("ws/one", "student?two", reservations) };
+}
+
+test("native PDF upload retries completion without another reservation and reads the signed response envelope", async () => {
+  let finishes = 0;
+  const f = nativePdfUploaderFixture({ request: (path, _body, _key, _index, id) => {
+    if (path.endsWith("/files")) return Promise.resolve({ data: { id, uploadUrl: "https://storage.example.test/upload" } });
+    if (path.includes("/download")) return Promise.resolve({ data: { url: "https://storage.example.test/lesson.pdf" } });
+    if (++finishes === 1) return Promise.reject(new Error("Finish response lost"));
+    return Promise.resolve({ data: { id, status: "READY" } });
+  } });
+  await assert.rejects(f.upload(), /Finish response lost/);
+  const uploaded = await f.upload();
+  assert.deepEqual(plain(uploaded), { id: f.id, name: "Denklemler.pdf", url: "https://storage.example.test/lesson.pdf" });
+  assert.deepEqual(f.requests.map((entry) => entry.path), [
+    "/media/ws%2Fone/student%3Ftwo/files", `/media/ws%2Fone/student%3Ftwo/files/${f.id}/finish`, `/media/ws%2Fone/student%3Ftwo/files/${f.id}/finish`, `/media/ws%2Fone/student%3Ftwo/files/${f.id}/download?inline=1`,
+  ]);
+  assert.equal(f.requests[0].body.purpose, "RESOURCE");
+  assert.equal(f.requests[0].body.sizeBytes, 100);
+  assert.equal(f.requests[1].key, f.requests[2].key);
+  assert.notEqual(f.requests[0].key, f.requests[1].key);
+  assert.equal(f.uploads[0].init.headers["x-upsert"], "false");
+  assert.equal(f.uploads[0].init.method, "PUT");
+  assert.equal(f.uploads.length, 1);
+  assert.equal(f.reservations.size, 1, "the finished file stays reusable after the board attachment response is lost");
+});
+
+test("native PDF upload stores reservation identity before a lost reply and refreshes expired PUT URLs", async () => {
+  let reserves = 0;
+  const lost = nativePdfUploaderFixture({ request: (path, _body, _key, _index, id) => {
+    if (path.endsWith("/files") && ++reserves === 1) return Promise.reject(new Error("Reserve response lost"));
+    if (path.includes("/download")) return Promise.resolve({ data: { url: "https://storage.example.test/lesson.pdf" } });
+    return Promise.resolve({ data: { id, uploadUrl: "https://storage.example.test/upload" } });
+  } });
+  await assert.rejects(lost.upload(), /Reserve response lost/);
+  assert.equal(lost.reservations.size, 1);
+  assert.equal(lost.uploads.length, 0);
+  assert.equal((await lost.upload()).id, lost.id);
+  assert.equal(lost.requests[0].key, lost.requests[1].key);
+  assert.deepEqual(plain(lost.requests[0].body), plain(lost.requests[1].body));
+  let refreshed = 0;
+  const expired = nativePdfUploaderFixture({
+    request: (path, _body, _key, _index, id) => {
+      if (path.endsWith("/files")) return Promise.resolve({ data: { id, uploadUrl: `https://storage.example.test/upload?token=${++refreshed}` } });
+      return Promise.resolve({ data: path.includes("/download") ? { url: "https://storage.example.test/lesson.pdf" } : { id, status: "READY" } });
+    },
+    send: (attempt) => Promise.resolve({ ok: attempt > 1, status: attempt > 1 ? 200 : 403 }),
+  });
+  await assert.rejects(expired.upload(), /learn.uploadFailed/);
+  assert.equal((await expired.upload()).id, expired.id);
+  assert.equal(expired.requests[0].key, expired.requests[1].key);
+  assert.equal(expired.uploads[0].url, "https://storage.example.test/upload?token=1");
+  assert.equal(expired.uploads[1].url, "https://storage.example.test/upload?token=2");
+  assert.equal(expired.requests.filter((entry) => entry.path.endsWith("/finish")).length, 1);
+});
+
+test("native PDF upload reuses READY material and download retries never upload or finish again", async () => {
+  const ready = nativePdfUploaderFixture({ request: (path, _body, _key, _index, id) => Promise.resolve({ data: path.endsWith("/files") ? { id, status: "READY" } : { url: "https://storage.example.test/lesson.pdf" } }) });
+  assert.equal((await ready.upload()).id, ready.id);
+  assert.equal(ready.uploads.length, 0);
+  assert.equal(ready.requests.filter((entry) => entry.path.endsWith("/finish")).length, 0);
+  let downloads = 0;
+  const lost = nativePdfUploaderFixture({ request: (path, _body, _key, _index, id) => {
+    if (path.endsWith("/files")) return Promise.resolve({ data: { id, uploadUrl: "https://storage.example.test/upload" } });
+    if (path.includes("/download")) {
+      if (++downloads === 1) return Promise.reject(new Error("Download response lost"));
+      return Promise.resolve({ data: { url: "https://storage.example.test/refreshed.pdf" } });
+    }
+    return Promise.resolve({ data: { id, status: "READY" } });
+  } });
+  await assert.rejects(lost.upload(), /Download response lost/);
+  assert.deepEqual(plain(await lost.upload()), { id: lost.id, name: "Denklemler.pdf", url: "https://storage.example.test/refreshed.pdf" });
+  assert.equal(lost.uploads.length, 1);
+  assert.equal(lost.requests.filter((entry) => entry.path.endsWith("/files")).length, 1);
+  assert.equal(lost.requests.filter((entry) => entry.path.endsWith("/finish")).length, 1);
+  assert.equal(downloads, 2);
+});
+
+test("native PDF HTML escapes file URLs and rejects malformed renderer messages or external navigation", () => {
+  const renderer = createTsxFixture(), ready = [], errors = [];
+  const source = loadTestModule("apps/mobile/src/lesson-board-pdf.tsx", {
+    dependencies: {
+      react: renderer.react, "react/jsx-runtime": renderer.jsx,
+      "react-native-webview": { WebView: "WebView" },
+      "./pdf-html": loadTestModule("apps/mobile/src/pdf-html.ts"),
+    },
+  });
+  const url = "https://storage.example.test/file.pdf?name=</script><script>window.injected=1</script>";
+  const html = source.nativeBoardPdfHtml(url, 2);
+  assert.ok(html.includes(String.raw`\u003c/script>`));
+  assert.equal(html.includes(url), false);
+  assert.equal(html.split("<script").length - 1, 3, "file data cannot create another executable script element");
+  const tree = renderer.render(source.NativeBoardPdf, { url, page: 2, onReady: (value) => ready.push(plain(value)), onError: () => errors.push(true) });
+  tree.props.onMessage({ nativeEvent: { data: JSON.stringify({ pageNumber: 2, pageCount: 2, aspectRatio: 0.7 }) } });
+  assert.deepEqual(ready, [{ pageCount: 2, aspectRatio: 0.7 }]);
+  tree.props.onMessage({ nativeEvent: { data: JSON.stringify({ pageNumber: 1, pageCount: 2, aspectRatio: 0.7 }) } });
+  assert.equal(ready.length, 1, "a previous page render cannot mark the current page ready");
+  for (const data of ["invalid JSON", "null", JSON.stringify({ error: true }), JSON.stringify({ pageNumber: 2, pageCount: 101, aspectRatio: 1 }), JSON.stringify({ pageNumber: 2, pageCount: 1.5, aspectRatio: 1 }), JSON.stringify({ pageNumber: 2, pageCount: 2, aspectRatio: 0.01 }), JSON.stringify({ pageNumber: 2, pageCount: 2, aspectRatio: 11 })])
+    tree.props.onMessage({ nativeEvent: { data } });
+  assert.equal(errors.length, 7);
+  assert.equal(tree.props.onShouldStartLoadWithRequest({ url: "about:blank" }), true);
+  assert.equal(tree.props.onShouldStartLoadWithRequest({ url: "https://external.example.test" }), false);
+  assert.equal(tree.props.onShouldStartLoadWithRequest({ url: "javascript:alert(1)" }), false);
+  const scripts = [];
+  tree.props.ref.current = { injectJavaScript: (script) => scripts.push(script) };
+  const next = renderer.render(source.NativeBoardPdf, { url, page: 3, onReady: (value) => ready.push(plain(value)), onError: () => errors.push(true) });
+  assert.equal(next.props.source.html, tree.props.source.html, "page navigation keeps the same loaded document and HTML");
+  assert.ok(scripts[0].includes("renderBoardPdfPage(3)"));
+  assert.equal(scripts[0].includes(url), false);
+  renderer.unmount();
+});
+
+function pdfUploaderFixture(options = {}) {
+  const requests = [], uploads = [];
+  const id = randomUUID();
+  const { BoardPdfUploader } = loadTestModule("apps/web/components/derslik/board-upload.ts", {
+    dependencies: {
+      "@derslik/contracts": { t: (key) => key },
+      "./board-pdf": { readBoardPdf: options.read ?? (() => Promise.resolve(2)) },
+      "@/lib/client": { backend: (path, body, key) => {
+        requests.push({ path, body, key });
+        if (options.request) return options.request(path, body, key, requests.length, id);
+        return Promise.resolve({ data: path.endsWith("/files") ? { id, uploadUrl: "https://storage.example.test/upload" } : { id, status: "READY" } });
+      } },
+    },
+    globals: { crypto: webcrypto, fetch: (url, init) => {
+      uploads.push({ url, init });
+      return options.send ? options.send(uploads.length) : Promise.resolve({ ok: true, status: 200 });
+    } },
+  });
+  const uploader = new BoardPdfUploader(options.base ?? "/workspaces/workspace-1/students/student-1/lessons/lesson-1/board");
+  return { uploader, requests, uploads, id };
+}
+
+test("web PDF upload preserves reservation and mutation identity after lost reserve or PUT replies", async () => {
+  const file = new File(["%PDF-1.7 sample"], "Denklemler.pdf", { type: "application/pdf" });
+  let reservations = 0;
+  const lost = pdfUploaderFixture({ request: (path, _body, _key, _index, id) => {
+    if (path.endsWith("/files") && ++reservations === 1) return Promise.reject(new Error("Reserve response lost"));
+    return Promise.resolve({ data: { id, uploadUrl: "https://storage.example.test/upload" } });
+  } });
+  await assert.rejects(lost.uploader.upload(file), /Reserve response lost/);
+  assert.deepEqual(plain(await lost.uploader.upload(file)), { id: lost.id, pageCount: 2 });
+  assert.equal(lost.requests[0].key, lost.requests[1].key);
+  let refreshed = 0;
+  const interrupted = pdfUploaderFixture({
+    request: (path, _body, _key, _index, id) => Promise.resolve({ data: path.endsWith("/files") ? { id, uploadUrl: `https://storage.example.test/upload?token=${++refreshed}` } : { id, status: "READY" } }),
+    send: (attempt) => Promise.resolve({ ok: attempt > 1, status: attempt > 1 ? 409 : 403 }),
+  });
+  await assert.rejects(interrupted.uploader.upload(file), /learn.uploadFailed/);
+  assert.deepEqual(plain(await interrupted.uploader.upload(file)), { id: interrupted.id, pageCount: 2 });
+  assert.equal(interrupted.requests.filter((entry) => entry.path.endsWith("/files")).length, 2);
+  assert.equal(interrupted.requests[0].key, interrupted.requests[1].key);
+  assert.equal(interrupted.uploads.length, 2);
+  assert.equal(interrupted.uploads[0].url, "https://storage.example.test/upload?token=1");
+  assert.equal(interrupted.uploads[1].url, "https://storage.example.test/upload?token=2");
+  assert.equal(interrupted.uploads[0].init.headers["x-upsert"], "false");
+});
+
+test("web PDF upload reuses READY material and retries finish without uploading or reserving again", async () => {
+  const file = new File(["%PDF-1.7 sample"], "Denklemler.pdf", { type: "application/pdf" });
+  const ready = pdfUploaderFixture({ request: (_path, _body, _key, _index, id) => Promise.resolve({ data: { id, status: "READY" } }) });
+  assert.deepEqual(plain(await ready.uploader.upload(file)), { id: ready.id, pageCount: 2 });
+  assert.equal(ready.uploads.length, 0);
+  assert.equal(ready.requests.length, 1);
+  assert.deepEqual(plain(await ready.uploader.upload(file)), { id: ready.id, pageCount: 2 });
+  assert.equal(ready.requests.length, 1);
+  let finishes = 0;
+  const interrupted = pdfUploaderFixture({ request: (path, _body, _key, _index, id) => {
+    if (path.endsWith("/files")) return Promise.resolve({ data: { id, uploadUrl: "https://storage.example.test/upload" } });
+    if (++finishes === 1) return Promise.reject(new Error("Finish response lost"));
+    return Promise.resolve({ data: { id, status: "READY" } });
+  } });
+  await assert.rejects(interrupted.uploader.upload(file), /Finish response lost/);
+  assert.deepEqual(plain(await interrupted.uploader.upload(file)), { id: interrupted.id, pageCount: 2 });
+  assert.equal(interrupted.uploads.length, 1);
+  assert.equal(interrupted.requests.filter((entry) => entry.path.endsWith("/files")).length, 1);
+  assert.equal(finishes, 2);
+});
+
+test("web rejected PDFs never reserve storage and student paths cannot upload lesson documents", async () => {
+  const file = new File(["broken PDF"], "lesson.pdf");
+  const invalid = pdfUploaderFixture({ read: () => Promise.reject(new Error("Invalid PDF")) });
+  await assert.rejects(invalid.uploader.upload(file), /Invalid PDF/);
+  assert.equal(invalid.requests.length, 0);
+  assert.equal(invalid.uploads.length, 0);
+  const pupil = pdfUploaderFixture({ base: "/portal/workspace-1/student-1/lessons/lesson-1/board" });
+  await assert.rejects(pupil.uploader.upload(file), /api.boardTeacherOnly/);
+  assert.equal(pupil.requests.length, 0);
+});
+
+function pdfSourceFixture(options = {}) {
+  const renderer = createTsxFixture(), requests = [], downloads = [], parsed = [], destroyed = [];
+  const pdf = options.pdf ?? { numPages: 2, getPage: (number) => Promise.resolve({ number }) };
+  const library = { GlobalWorkerOptions: {}, getDocument: (config) => {
+    parsed.push(config);
+    const loading = options.loading ? options.loading(parsed.length) : { promise: Promise.resolve(pdf) };
+    loading.destroy = () => { destroyed.push(parsed.length); return Promise.resolve(); };
+    return loading;
+  } };
+  const source = loadTestModule("apps/web/components/derslik/board-pdf.tsx", {
+    dependencies: {
+      react: options.element ? { ...renderer.react, useRef: () => ({ current: options.element }) } : renderer.react, "react/jsx-runtime": renderer.jsx,
+      "@derslik/contracts": { ...liveContracts, t: (key) => key },
+      "pdfjs-dist": library,
+      "@/lib/client": { backend: (path) => {
+        requests.push(path);
+        return Promise.resolve({ data: { url: "https://storage.example.test/lesson.pdf" } });
+      } },
+    },
+    globals: { fetch: (url, init) => {
+      downloads.push({ url, init });
+      return options.download ? options.download(init) : Promise.resolve(new Response("%PDF-1.7 local"));
+    } },
+  });
+  const render = (props) => renderer.render((current) => {
+    const document = source.useBoardPdf("/board", current.id, current.retry ?? 0);
+    const page = source.useBoardPdfPage(document.pdf, current.page ?? 1);
+    return { type: "State", props: { value: { document, page } } };
+  }, props).props.value;
+  return { source, render, renderer, parsed, destroyed, requests, downloads, library, unmount: renderer.unmount };
+}
+
+test("actual PDF parsing uses bytes, rejects unsupported files and destroys parse tasks", async () => {
+  const f = pdfSourceFixture();
+  const file = new File(["%PDF-1.7 sample"], "Denklemler.PDF");
+  assert.equal(await f.source.readBoardPdf(file), 2);
+  assert.equal(f.parsed[0].data.byteLength, file.size);
+  assert.equal(Object.hasOwn(f.parsed[0], "url"), false);
+  assert.equal(f.destroyed.length, 1);
+  assert.match(f.library.GlobalWorkerOptions.workerSrc, /pdf\.worker\.min\.mjs$/);
+  await assert.rejects(f.source.readBoardPdf(new File([], "empty.pdf")), /liveLesson.pdfLimit/);
+  await assert.rejects(f.source.readBoardPdf(new File(["text"], "notes.txt")), /liveLesson.pdfLimit/);
+  assert.equal(f.parsed.length, 1);
+  const oversized = pdfSourceFixture({ pdf: { numPages: 101 } });
+  await assert.rejects(oversized.source.readBoardPdf(file), /liveLesson.pdfLimit/);
+  assert.equal(oversized.destroyed.length, 1);
+  const malformed = pdfSourceFixture({ loading: () => ({ promise: Promise.reject(new Error("Malformed PDF")) }) });
+  await assert.rejects(malformed.source.readBoardPdf(file), /Malformed PDF/);
+  assert.equal(malformed.destroyed.length, 1);
+});
+
+test("actual PDF hooks retain full bytes across page changes and cancel stale document loads", async () => {
+  const pages = [];
+  const pdf = { numPages: 2, getPage: (number) => { pages.push(number); return Promise.resolve({ number }); } };
+  const f = pdfSourceFixture({ pdf });
+  f.render({ id: "document-1" });
+  await settle(); f.render({ id: "document-1" });
+  await settle();
+  assert.equal(f.render({ id: "document-1" }).page.page.number, 1);
+  f.render({ id: "document-1", page: 2 });
+  await settle();
+  assert.equal(f.render({ id: "document-1", page: 2 }).page.page.number, 2);
+  assert.deepEqual(pages, [1, 2]);
+  assert.equal(f.downloads.length, 1, "later pages use retained bytes even if the signed URL has expired");
+  assert.equal(Object.hasOwn(f.parsed[0], "url"), false);
+  assert.ok(f.parsed[0].data.byteLength > 0);
+  f.unmount();
+  assert.equal(f.downloads[0].init.signal.aborted, true);
+  assert.equal(f.destroyed.length, 1);
+  const old = deferred(), fresh = deferred();
+  const stale = pdfSourceFixture({ loading: (index) => ({ promise: index === 1 ? old.promise : fresh.promise }) });
+  stale.render({ id: "old" });
+  await settle();
+  stale.render({ id: "fresh" });
+  await settle();
+  old.resolve({ numPages: 1, getPage: () => Promise.resolve({ number: 99 }) });
+  fresh.resolve(pdf);
+  await settle();
+  assert.strictEqual(stale.render({ id: "fresh" }).document.pdf, pdf);
+  assert.equal(stale.downloads[0].init.signal.aborted, true);
+  stale.unmount();
+});
+
+test("actual PDF downloads fail with a retryable translated error and unmount aborts pending bytes", async () => {
+  const failed = pdfSourceFixture({ download: () => Promise.resolve(new Response("Expired", { status: 403 })) });
+  failed.render({ id: "document-1" });
+  await settle();
+  assert.equal(failed.render({ id: "document-1" }).document.error, "liveLesson.pdfError");
+  assert.equal(failed.parsed.length, 0);
+  failed.render({ id: "document-1", retry: 1 });
+  await settle();
+  assert.equal(failed.downloads.length, 2);
+  failed.unmount();
+  const bytes = deferred();
+  const pending = pdfSourceFixture({ download: () => bytes.promise });
+  pending.render({ id: "document-1" });
+  await settle();
+  pending.unmount();
+  assert.equal(pending.downloads[0].init.signal.aborted, true);
+  bytes.resolve(new Response("%PDF-1.7 late"));
+  await settle();
+  assert.equal(pending.parsed.length, 0);
+  const unbounded = pdfSourceFixture({ pdf: { numPages: 101 } });
+  unbounded.render({ id: "document-1" });
+  await settle();
+  assert.equal(unbounded.render({ id: "document-1" }).document.error, "liveLesson.pdfError");
+  assert.ok(unbounded.destroyed.length > 0, "a previously uploaded PDF cannot bypass the page limit");
+  unbounded.unmount();
+});
+
+test("actual PDF canvas bounds render dimensions, cancels old pages and ignores late render callbacks", async () => {
+  const element = {}, first = deferred(), second = deferred(), ready = [], cancelled = [], renderCalls = [];
+  const page = (number, result) => ({
+    number, getViewport: ({ scale }) => ({ width: 3000 * scale, height: 6000 * scale }),
+    render: (options) => { renderCalls.push(options); return { promise: result.promise, cancel: () => cancelled.push(number) }; },
+  });
+  const old = page(1, first), current = page(2, second);
+  const f = pdfSourceFixture({ element });
+  const props = { page: old, onReady: (saved) => ready.push(saved), onError: () => assert.fail("Valid PDF render failed") };
+  f.renderer.render(f.source.BoardPdfCanvas, props);
+  assert.equal(element.width, 800);
+  assert.equal(element.height, 1600);
+  assert.equal(renderCalls[0].annotationMode, 0);
+  f.renderer.render(f.source.BoardPdfCanvas, { ...props, page: current });
+  assert.deepEqual(cancelled, [1]);
+  first.resolve(); second.resolve();
+  await settle();
+  assert.deepEqual(ready, [current]);
+  f.unmount();
+  assert.deepEqual(cancelled, [1, 2]);
+  const waiting = deferred(), closedReady = [];
+  const closed = pdfSourceFixture({ element: {} });
+  closed.renderer.render(closed.source.BoardPdfCanvas, { page: page(3, waiting), onReady: (saved) => closedReady.push(saved), onError: () => assert.fail("Closed PDF reported an error") });
+  closed.unmount(); waiting.resolve();
+  await settle();
+  assert.deepEqual(closedReady, []);
 });
 
 function webFixture(kind, options = {}) {
   const renderer = createTsxFixture();
-  const reads = [], writes = [], confirmations = [], timers = new Map(), drafts = [], strokes = [];
+  const reads = [], writes = [], confirmations = [], timers = new Map(), drafts = [], strokes = [], erased = [];
+  const removed = new Map();
   const document = { visibilityState: "visible" };
   let currentBoard = options.initial ?? board(), timerId = 0, closed = 0;
   const shared = boardSource({
@@ -841,7 +1449,7 @@ function webFixture(kind, options = {}) {
     "react/jsx-runtime": renderer.jsx,
     "@derslik/contracts": { ...liveContracts, t: (key) => key },
     "@derslik/api-client": shared,
-    "lucide-react": { Video: "Video", PencilLine: "PencilLine", Link: "Link" },
+    "lucide-react": new Proxy({}, { get: (_target, name) => String(name) }),
     "@/lib/client": { backend: async (path, command, key) => {
       if (command === undefined) {
         reads.push(path);
@@ -849,11 +1457,7 @@ function webFixture(kind, options = {}) {
       }
       writes.push({ path, command: plain(command), key });
       if (options.change) return options.change(command, writes.length, currentBoard);
-      let strokes = currentBoard.strokes;
-      if (command.action === "stroke.add") strokes = [...strokes, { ...command.stroke, authorId: currentBoard.viewerId }];
-      if (command.action === "stroke.remove") strokes = strokes.filter((stroke) => stroke.id !== command.id);
-      if (command.action === "board.clear") strokes = [];
-      currentBoard = { ...currentBoard, revision: currentBoard.revision + 1, epoch: currentBoard.epoch + (command.action === "board.clear" ? 1 : 0), strokes };
+      currentBoard = applyBoardCommand(currentBoard, command, removed);
       return { data: currentBoard };
     } },
     "@/components/ui/button": { Button: "Button" },
@@ -868,12 +1472,25 @@ function webFixture(kind, options = {}) {
     confirmations.push(message);
     return options.confirm === undefined ? true : options.confirm;
   } } };
+  const canvasSource = loadTestModule("apps/web/components/derslik/board-canvas.tsx", { dependencies, globals });
+  dependencies["./board-canvas"] = canvasSource;
+  dependencies["./board-controls"] = loadTestModule("apps/web/components/derslik/board-controls.tsx", { dependencies, globals });
+  dependencies["./board-pdf"] = {
+    useBoardPdf: () => options.pdf ?? {},
+    useBoardPdfPage: (_pdf, page) => typeof options.pdfPage === "function" ? options.pdfPage(page) : options.pdfPage ?? {},
+    readBoardPdf: options.readPdf ?? (() => Promise.resolve(2)),
+    BoardPdfCanvas: "BoardPdfCanvas",
+  };
+  dependencies["./board-upload"] = { BoardPdfUploader: class { upload(file) { return options.upload ? options.upload(file) : Promise.resolve({ id: randomUUID(), pageCount: 2 }); } } };
+  dependencies["./lesson-board.css"] = {};
+  dependencies["./use-lesson-board"] = loadTestModule("apps/web/components/derslik/use-lesson-board.ts", { dependencies, globals });
   const source = loadTestModule(`apps/web/components/derslik/${kind === "canvas" || kind === "dialog" ? "lesson-board" : "live-lesson"}.tsx`, { dependencies, globals });
   let props;
   if (kind === "canvas") props = {
     board: currentBoard, editable: true, color: boardColors[0], width: 4, draft: null,
     onDraft: (next) => { drafts.push(next); props.draft = next; },
     onStroke: (stroke, epoch) => strokes.push({ stroke: plain(stroke), epoch }),
+    onErase: (id) => erased.push(id),
   };
   else if (kind === "dialog") props = { initial: currentBoard, base, title: "Denklemler", onClose: () => closed++ };
   else if (kind === "actions") props = { lesson: { id: "lesson-1", student_id: "student-1", topic: "Denklemler", status: "SCHEDULED", meeting_url: "https://meet.google.com/abc-defg-hij" }, base, disabled: false };
@@ -882,13 +1499,17 @@ function webFixture(kind, options = {}) {
     return options.mutate ? options.mutate(command, message) : true;
   }, onClose: () => closed++ };
   Object.assign(props, options.props);
-  const components = { canvas: source.BoardCanvas, dialog: source.LessonBoardDialog, actions: source.LiveLessonActions, meeting: source.MeetingLinkDialog };
+  const components = { canvas: canvasSource.BoardCanvas, dialog: source.LessonBoardDialog, actions: source.LiveLessonActions, meeting: source.MeetingLinkDialog };
   let tree;
   const render = () => tree = renderer.render(components[kind], props);
-  const button = (key) => oneNode(tree, (node) => node.type === "Button" && treeText(node) === key, key);
+  const button = (key) => {
+    const labels = { "liveLesson.clear": "liveLesson.clearPage", "8": "liveLesson.strokeWidth 8" };
+    const label = labels[key] ?? key;
+    return oneNode(tree, (node) => ["Button", "button"].includes(node.type) && (treeText(node) === key || node.props["aria-label"] === label), key);
+  };
   const canvas = () => oneNode(tree, (node) => node.type === "svg");
   const captures = [];
-  const target = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 500, height: 300 }), setPointerCapture: (pointer) => captures.push(pointer) };
+  const target = { getBoundingClientRect: () => ({ left: 10, top: 20, width: 500, height: 300, ...options.bounds }), setPointerCapture: (pointer) => captures.push(pointer) };
   const pointer = (x, y, extras = {}) => ({ clientX: x + 10, clientY: y + 20, pointerId: 7, button: 0, currentTarget: target, preventDefault() {}, ...extras });
   const draw = (points) => {
     canvas().props.onPointerDown(pointer(...points[0]));
@@ -896,7 +1517,7 @@ function webFixture(kind, options = {}) {
     canvas().props.onPointerUp(pointer(...points.at(-1)));
   };
   render();
-  return { reads, writes, confirmations, timers, drafts, strokes, document, props, captures, pointer, button, canvas, draw, render, closed: () => closed, tree: () => tree, unmount: renderer.unmount,
+  return { reads, writes, confirmations, timers, drafts, strokes, erased, document, props, captures, pointer, button, canvas, draw, render, closed: () => closed, tree: () => tree, unmount: renderer.unmount,
     fire() {
       assert.equal(timers.size, 1);
       const [id, timer] = timers.entries().next().value;
@@ -906,7 +1527,7 @@ function webFixture(kind, options = {}) {
   };
 }
 
-test("web board uses actual SVG bounds, pointer capture and the epoch at gesture start", () => {
+test("web board uses actual SVG bounds and pointer capture to normalize a completed gesture", () => {
   const f = webFixture("canvas");
   f.canvas().props.onPointerDown(f.pointer(125, 150));
   f.render();
@@ -914,16 +1535,73 @@ test("web board uses actual SVG bounds, pointer capture and the epoch at gesture
   assert.equal(oneNode(f.tree(), (node) => node.type === "circle").props.cx, 250);
   f.canvas().props.onPointerMove(f.pointer(250, 150, { pointerId: 99 }));
   assert.equal(f.drafts.at(-1).points.length, 1);
-  f.props.board = { ...f.props.board, epoch: 2 };
-  f.render();
   f.canvas().props.onPointerMove(f.pointer(250, 150));
   f.canvas().props.onPointerUp(f.pointer(700, 900));
   f.render();
   assert.equal(f.strokes.length, 1);
-  assert.equal(f.strokes[0].epoch, 0, "clear during drawing cannot revive an old stroke in a new epoch");
+  assert.equal(f.strokes[0].epoch, 0);
   assert.deepEqual(f.strokes[0].stroke.points, [{ x: 0.25, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 1, y: 1 }]);
   assert.equal(oneNode(f.tree(), (node) => node.type === "path").props.d, "M250,300 L500,300 L1000,600");
   f.unmount();
+});
+
+test("web remote page changes, clears and revoked editing cancel an unfinished gesture", () => {
+  for (const update of [{ epoch: 1 }, { documentId: randomUUID(), page: 1 }, { canEdit: false }]) {
+    const f = webFixture("canvas");
+    f.canvas().props.onPointerDown(f.pointer(100, 100));
+    f.props.board = { ...f.props.board, ...update };
+    if (update.canEdit === false) f.props.editable = false;
+    f.render();
+    f.canvas().props.onPointerMove(f.pointer(200, 200));
+    f.canvas().props.onPointerUp(f.pointer(200, 200));
+    assert.equal(f.strokes.length, 0, "unfinished work never appears on a different page or after clearing");
+    assert.equal(f.drafts.at(-1), null);
+    f.unmount();
+  }
+});
+
+test("web PDF drawing remains page-scoped when its rendered aspect ratio or zoom changes", () => {
+  const documentId = randomUUID();
+  for (const bounds of [{ width: 600, height: 840 }, { width: 1200, height: 1680 }]) {
+    const f = webFixture("canvas", { initial: board(1, { documentId, page: 2 }), bounds, props: { aspect: bounds.width / bounds.height } });
+    f.draw([[bounds.width / 4, bounds.height / 2], [bounds.width / 2, bounds.height / 4]]);
+    assert.deepEqual(f.strokes[0].stroke.points, [{ x: 0.25, y: 0.5 }, { x: 0.5, y: 0.25 }]);
+    assert.equal(f.strokes[0].stroke.documentId, documentId);
+    assert.equal(f.strokes[0].stroke.page, 2);
+    assert.equal(f.canvas().props.preserveAspectRatio, "none");
+    assert.equal(f.canvas().props.viewBox, "0 0 1000 1400");
+    f.unmount();
+  }
+});
+
+test("web shape, highlighter, literal note and eraser tools perform their selected operation", () => {
+  for (const tool of ["line", "rectangle", "ellipse", "highlighter"]) {
+    const f = webFixture("canvas", { props: { tool } });
+    f.draw([[100, 100], [150, 150], [250, 250]]);
+    assert.equal(f.strokes[0].stroke.tool, tool);
+    assert.equal(f.strokes[0].stroke.points.length, tool === "highlighter" ? 3 : 2);
+    assert.equal(boardStrokeInputSchema.safeParse(f.strokes[0].stroke).success, true);
+    f.render();
+    if (tool === "rectangle") assert.equal(oneNode(f.tree(), (node) => node.type === "rect").props.width, 300);
+    if (tool === "ellipse") assert.equal(oneNode(f.tree(), (node) => node.type === "ellipse").props.rx, 150);
+    if (tool === "highlighter") assert.equal(oneNode(f.tree(), (node) => node.type === "path").props.opacity, 0.3);
+    f.unmount();
+  }
+  const note = webFixture("canvas", { props: { tool: "note", note: "  <b>x = 2</b>  " } });
+  note.canvas().props.onPointerDown(note.pointer(100, 100));
+  assert.equal(note.strokes[0].stroke.text, "<b>x = 2</b>");
+  assert.equal(note.captures.length, 0);
+  assert.equal(boardStrokeInputSchema.safeParse(note.strokes[0].stroke).success, true);
+  note.props.draft = note.strokes[0].stroke;
+  note.render();
+  assert.equal(treeText(oneNode(note.tree(), (node) => node.type === "text")), "<b>x = 2</b>");
+  note.unmount();
+  const owned = { ...stroke({ points: [{ x: 0.2, y: 0.2 }] }), authorId: "student-1" };
+  const erase = webFixture("canvas", { initial: board(1, { viewerId: "student-1", canClear: false, strokes: [owned] }), props: { tool: "eraser" } });
+  erase.canvas().props.onPointerDown(erase.pointer(100, 60));
+  assert.deepEqual(erase.erased, [owned.id]);
+  assert.equal(erase.strokes.length, 0);
+  erase.unmount();
 });
 
 test("web canvas ignores secondary/foreign pointers and cancellation never submits a stroke", () => {
@@ -965,7 +1643,7 @@ test("web lesson board saves real selected colors and widths, then undo/clear re
   const f = webFixture("dialog");
   await settle();
   f.render();
-  oneNode(f.tree(), (node) => node.type === "Button" && node.props["aria-label"] === "liveLesson.red").props.onClick();
+  oneNode(f.tree(), (node) => ["Button", "button"].includes(node.type) && node.props["aria-label"] === "liveLesson.red").props.onClick();
   f.button("8").props.onClick();
   f.render();
   f.draw([[100, 100], [200, 200]]);
@@ -979,7 +1657,7 @@ test("web lesson board saves real selected colors and widths, then undo/clear re
   f.button("liveLesson.undo").props.onClick();
   await settle();
   f.render();
-  assert.deepEqual(f.writes[1].command, { action: "stroke.remove", epoch: 0, id: f.writes[0].command.stroke.id });
+  assert.deepEqual(f.writes[1].command, { action: "stroke.remove", epoch: 0, id: f.writes[0].command.stroke.id, documentId: null, page: 0 });
   assert.equal(treeNodes(f.tree()).filter((node) => node.type === "path").length, 0);
   f.draw([[250, 150]]);
   await settle();
@@ -987,11 +1665,150 @@ test("web lesson board saves real selected colors and widths, then undo/clear re
   f.button("liveLesson.clear").props.onClick();
   await settle();
   f.render();
-  assert.equal(f.confirmations[0], "liveLesson.clearWarning");
-  assert.deepEqual(f.writes[3].command, { action: "board.clear", epoch: 0 });
+  assert.equal(f.confirmations[0], "liveLesson.clearPageWarning");
+  assert.deepEqual(f.writes[3].command, { action: "page.clear", epoch: 0, documentId: null, page: 0 });
   assert.equal(treeNodes(f.tree()).filter((node) => node.type === "circle").length, 0);
   f.unmount();
   assert.equal(f.timers.size, 0);
+});
+
+test("web redo restores only a successful removal and clears are scoped to the active page", async () => {
+  const f = webFixture("dialog");
+  await settle(); f.render();
+  f.button("liveLesson.rectangle").props.onClick();
+  f.render(); f.draw([[100, 100], [250, 200]]);
+  await settle(); f.render();
+  assert.equal(f.writes[0].command.stroke.tool, "rectangle");
+  f.button("liveLesson.undo").props.onClick();
+  await settle(); f.render();
+  assert.equal(f.button("liveLesson.redo").props.disabled, false);
+  f.button("liveLesson.redo").props.onClick();
+  await settle(); f.render();
+  assert.deepEqual(f.writes[2].command, { action: "stroke.restore", epoch: 0, id: f.writes[0].command.stroke.id, documentId: null, page: 0 });
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "rect").length, 1);
+  assert.equal(f.button("liveLesson.redo").props.disabled, true);
+  f.button("liveLesson.clear").props.onClick();
+  await settle(); f.render();
+  assert.equal(f.writes[3].command.action, "page.clear");
+  assert.equal(f.button("liveLesson.redo").props.disabled, true);
+  f.unmount();
+});
+
+test("web remote clears and zoom changes remove unfinished drafts before another gesture can save them", async () => {
+  const cleared = webFixture("dialog", { load: (index, current) => Promise.resolve({ data: index === 1 ? current : board(2, { epoch: 1 }) }) });
+  await settle(); cleared.render();
+  cleared.canvas().props.onPointerDown(cleared.pointer(100, 100));
+  cleared.canvas().props.onPointerMove(cleared.pointer(200, 200));
+  cleared.render();
+  assert.equal(treeNodes(cleared.tree()).filter((node) => node.type === "path").length, 1);
+  cleared.fire(); await settle(); cleared.render();
+  assert.equal(treeNodes(cleared.tree()).filter((node) => node.type === "path").length, 0);
+  cleared.canvas().props.onPointerUp(cleared.pointer(300, 200));
+  assert.equal(cleared.writes.length, 0);
+  cleared.unmount();
+  const resized = webFixture("dialog");
+  await settle(); resized.render();
+  resized.canvas().props.onPointerDown(resized.pointer(100, 100));
+  resized.render();
+  assert.equal(treeNodes(resized.tree()).filter((node) => node.type === "circle").length, 1);
+  resized.button("liveLesson.zoomIn").props.onClick();
+  resized.render();
+  assert.equal(treeNodes(resized.tree()).filter((node) => node.type === "circle").length, 0);
+  resized.canvas().props.onPointerUp(resized.pointer(300, 200));
+  assert.equal(resized.writes.length, 0);
+  resized.unmount();
+});
+
+test("web PDF loading and render errors block drawing, and rendered pages share teacher navigation", async () => {
+  const documentId = randomUUID();
+  const initial = board(1, { documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }], documentId, page: 1 });
+  const pages = [null, { getViewport: () => ({ width: 600, height: 840 }) }, { getViewport: () => ({ width: 840, height: 600 }) }];
+  const f = webFixture("dialog", { initial, pdf: { pdf: {} }, pdfPage: (page) => ({ page: pages[page] }) });
+  await settle(); f.render();
+  assert.equal(f.canvas().props.style.cursor, "default");
+  assert.ok(treeText(f.tree()).includes("liveLesson.pdfLoading"));
+  oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.onReady(pages[1]);
+  f.render();
+  assert.equal(f.canvas().props.style.cursor, "crosshair");
+  f.draw([[100, 100]]);
+  await settle(); f.render();
+  assert.equal(f.writes[0].command.stroke.documentId, documentId);
+  assert.equal(f.writes[0].command.stroke.page, 1);
+  f.button("liveLesson.nextPage").props.onClick();
+  await settle(); f.render();
+  assert.deepEqual(f.writes[1].command, { action: "document.select", epoch: 0, documentId, page: 2 });
+  assert.equal(f.canvas().props.style.cursor, "default");
+  oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.onError();
+  f.render();
+  assert.ok(treeText(f.tree()).includes("liveLesson.pdfError"));
+  assert.equal(f.canvas().props.style.cursor, "default");
+  f.unmount();
+  const pupil = webFixture("dialog", { initial: { ...initial, canClear: false } });
+  await settle(); pupil.render();
+  assert.equal(pupil.button("liveLesson.nextPage").props.disabled, false);
+  assert.equal(treeNodes(pupil.tree()).filter((node) => node.type === "button" && treeText(node).includes("liveLesson.uploadPdf")).length, 0);
+  pupil.unmount();
+});
+
+test("web guardians and completed teachers browse PDF pages locally without board mutations", async () => {
+  const documentId = randomUUID();
+  const pages = [null, { getViewport: () => ({ width: 600, height: 840 }) }, { getViewport: () => ({ width: 840, height: 600 }) }];
+  for (const viewerId of ["guardian-1", "teacher-1"]) {
+    const initial = board(1, { viewerId, canEdit: false, canClear: false, documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }], documentId, page: 1 });
+    const f = webFixture("dialog", { initial, pdf: { pdf: {} }, pdfPage: (page) => ({ page: pages[page] }) });
+    await settle(); f.render();
+    assert.equal(f.button("liveLesson.nextPage").props.disabled, false);
+    f.button("liveLesson.nextPage").props.onClick();
+    f.render();
+    assert.equal(oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.page, pages[2]);
+    oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.onReady(pages[2]);
+    f.render();
+    assert.equal(f.canvas().props.style.cursor, "default");
+    assert.equal(f.button("liveLesson.pen").props.disabled, true);
+    assert.equal(f.button("liveLesson.previousPage").props.disabled, false);
+    assert.equal(f.button("liveLesson.followTeacher").props["aria-pressed"], false);
+    f.button("liveLesson.followTeacher").props.onClick();
+    f.render();
+    assert.equal(oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.page, pages[1]);
+    assert.equal(f.button("liveLesson.followTeacher").props["aria-pressed"], true);
+    assert.equal(f.canvas().props.style.cursor, "default");
+    assert.equal(f.writes.length, 0, `${viewerId} navigation must stay local`);
+    f.unmount();
+  }
+});
+
+test("web students browse another document read-only and follow teacher restores shared drawing", async () => {
+  const documentId = randomUUID();
+  const pages = [null, { getViewport: () => ({ width: 600, height: 840 }) }, { getViewport: () => ({ width: 840, height: 600 }) }];
+  const initial = board(1, { viewerId: "student-1", canClear: false, documents: [{ id: documentId, name: "Denklemler.pdf", pageCount: 2 }] });
+  const f = webFixture("dialog", { initial, pdf: { pdf: {} }, pdfPage: (page) => ({ page: pages[page] }) });
+  await settle(); f.render();
+  assert.equal(f.canvas().props.style.cursor, "crosshair");
+  const document = oneNode(f.tree(), (node) => node.type === "button" && node.props.title === "Denklemler.pdf");
+  assert.equal(document.props.disabled, false);
+  document.props.onClick();
+  f.render();
+  oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.onReady(pages[1]);
+  f.render();
+  assert.equal(f.canvas().props.style.cursor, "default");
+  assert.equal(f.button("liveLesson.pen").props.disabled, true);
+  f.draw([[100, 100], [200, 200]]);
+  f.button("liveLesson.nextPage").props.onClick();
+  f.render();
+  assert.equal(oneNode(f.tree(), (node) => node.type === "BoardPdfCanvas").props.page, pages[2]);
+  assert.equal(f.writes.length, 0);
+  f.button("liveLesson.followTeacher").props.onClick();
+  f.render();
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "BoardPdfCanvas").length, 0);
+  assert.equal(f.canvas().props.style.cursor, "crosshair");
+  assert.equal(f.button("liveLesson.pen").props.disabled, false);
+  f.draw([[100, 100]]);
+  await settle(); f.render();
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0].command.action, "stroke.add");
+  assert.equal(f.writes[0].command.stroke.documentId, null);
+  assert.equal(f.writes[0].command.stroke.page, 0);
+  f.unmount();
 });
 
 test("web failed stroke remains visible, blocks edits, retries the same key and can be discarded", async () => {
@@ -1232,7 +2049,7 @@ test("web rapid board actions cannot overwrite the first pending operation or it
   f.button("liveLesson.retry").props.onClick();
   await settle();
   assert.equal(f.writes.length, 2);
-  assert.deepEqual(f.writes[1].command, { action: "board.clear", epoch: 0 });
+  assert.deepEqual(f.writes[1].command, { action: "page.clear", epoch: 0, documentId: null, page: 0 });
   assert.equal(f.writes[1].key, f.writes[0].key);
   f.unmount();
 });

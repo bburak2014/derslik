@@ -13,6 +13,7 @@ const { ApiError } = loadTestModule("packages/api-client/src/index.ts", {
     "./uploads.ts": {},
     "./socket.ts": {},
     "./lesson-board.ts": {},
+    "./board-tools.ts": {},
   },
 });
 
