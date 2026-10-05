@@ -49,7 +49,7 @@ function BoardWorkspace({ studio: s }: Readonly<{ studio: Studio }>) {
     <div className="studio-stage" aria-busy={!!scope.documentId && !s.ready && !s.pdfError}>
       <div className={`studio-paper${scope.documentId ? " studio-paper-pdf" : " studio-paper-grid"}`} style={{ aspectRatio: s.aspect, width: paperWidth, maxWidth: `${(scope.documentId ? 640 : 1000) * s.zoom / 100}px` }}>
         {pageState.page && <BoardPdfCanvas key={`${s.scopeKey}:${s.pdfRetry}`} page={pageState.page} onReady={s.onPdfReady} onError={s.onPdfError} />}
-        <BoardCanvas key={`${s.scopeKey}:${s.zoom}`} board={board} editable={!s.toolsDisabled && s.ready && !s.pdfError && board.strokes.length < maxBoardStrokes}
+        <BoardCanvas key={`${s.scopeKey}:${s.zoom}:${board.canEdit}`} board={board} editable={!s.toolsDisabled && s.ready && !s.pdfError && board.strokes.length < maxBoardStrokes}
           color={s.color} width={s.width} tool={s.tool} note={s.note} draft={s.draft} onDraft={s.setDraft} onErase={s.remove} aspect={s.aspect}
           onStroke={(stroke, epoch) => s.change({ action: "stroke.add", epoch, stroke })} />
         <BoardPaperState studio={s} />

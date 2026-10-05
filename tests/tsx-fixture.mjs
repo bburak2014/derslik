@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 export function createTsxFixture() {
   const frames = new Map();
   let current;
+  let seen;
   let effects = [];
   const same = (left, right) => Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
     left.every((value, index) => Object.is(value, right[index]));
@@ -60,6 +61,7 @@ export function createTsxFixture() {
     return { ...node, path, props: { ...node.props, children: expand(node.props.children, `${path}/children`) } };
   }
   function render(component, props, path) {
+    seen?.add(path);
     const previous = current;
     const frame = frames.get(path) ?? { index: 0, hooks: [] };
     frames.set(path, frame);
@@ -73,7 +75,14 @@ export function createTsxFixture() {
     react,
     jsx,
     render(component, props = {}) {
+      seen = new Set();
       const tree = render(component, props, "root");
+      for (const [path, frame] of frames) {
+        if (seen.has(path)) continue;
+        for (const cell of frame.hooks) cell?.cleanup?.();
+        frames.delete(path);
+      }
+      seen = undefined;
       const pending = effects;
       effects = [];
       pending.forEach((effect) => effect());

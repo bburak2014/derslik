@@ -1545,15 +1545,15 @@ test("web board uses actual SVG bounds and pointer capture to normalize a comple
   f.unmount();
 });
 
-test("web remote page changes, clears and revoked editing cancel an unfinished gesture", () => {
+test("web remote page changes, clears and revoked editing cancel an unfinished pen gesture", () => {
   for (const update of [{ epoch: 1 }, { documentId: randomUUID(), page: 1 }, { canEdit: false }]) {
     const f = webFixture("canvas");
-    f.canvas().props.onPointerDown(f.pointer(100, 100));
+    f.canvas().props.onPointerDown(f.pointer(100, 100, { pointerType: "pen", pressure: 0.4 }));
     f.props.board = { ...f.props.board, ...update };
     if (update.canEdit === false) f.props.editable = false;
     f.render();
-    f.canvas().props.onPointerMove(f.pointer(200, 200));
-    f.canvas().props.onPointerUp(f.pointer(200, 200));
+    f.canvas().props.onPointerMove(f.pointer(200, 200, { pointerType: "pen", pressure: 0.8 }));
+    f.canvas().props.onPointerUp(f.pointer(200, 200, { pointerType: "pen", pressure: 0 }));
     assert.equal(f.strokes.length, 0, "unfinished work never appears on a different page or after clearing");
     assert.equal(f.drafts.at(-1), null);
     f.unmount();
@@ -1621,11 +1621,99 @@ test("web canvas ignores secondary/foreign pointers and cancellation never submi
   f.canvas().props.onPointerDown(f.pointer(10, 10, { pointerId: 8 }));
   f.canvas().props.onPointerUp(f.pointer(0, 0, { pointerId: 8 }));
   assert.equal(f.strokes.length, 0);
-  f.canvas().props.onPointerCancel();
+  f.canvas().props.onPointerCancel(f.pointer(0, 0));
   f.canvas().props.onPointerUp(f.pointer(0, 0));
   assert.equal(f.drafts.at(-1), null);
   assert.equal(f.strokes.length, 0);
   f.unmount();
+});
+
+test("web active pen ignores another touch's move, release and cancellation", () => {
+  const f = webFixture("canvas", { props: { color: boardColors[1], width: 8 } });
+  const pen = (x, y, extra = {}) => f.pointer(x, y, { pointerType: "pen", pressure: 0.6, ...extra });
+  const palm = (x, y) => f.pointer(x, y, { pointerId: 22, pointerType: "touch", isPrimary: false });
+  f.canvas().props.onPointerDown(pen(125, 150));
+  f.canvas().props.onPointerDown(palm(400, 250));
+  f.canvas().props.onPointerMove(palm(450, 290));
+  f.canvas().props.onPointerUp(palm(450, 290));
+  f.canvas().props.onPointerCancel(palm(450, 290));
+  f.canvas().props.onLostPointerCapture?.(palm(450, 290));
+  f.canvas().props.onPointerMove(pen(250, 75, { pressure: 0.9, button: -1 }));
+  f.canvas().props.onPointerUp(pen(375, 150, { pressure: 0, buttons: 0 }));
+  assert.equal(f.strokes.length, 1, "an unrelated touch cancellation cannot discard the captured pen");
+  assert.deepEqual(f.captures, [7]);
+  assert.deepEqual(f.strokes[0].stroke.points, [{ x: 0.25, y: 0.5 }, { x: 0.5, y: 0.25 }, { x: 0.75, y: 0.5 }]);
+  assert.equal(f.strokes[0].stroke.color, boardColors[1]);
+  assert.equal(f.strokes[0].stroke.width, 8, "varying hardware pressure retains the selected fixed width");
+  assert.equal(boardStrokeInputSchema.safeParse(f.strokes[0].stroke).success, true);
+  f.unmount();
+});
+
+test("web losing active pen capture cancels its draft and allows a fresh pen gesture", () => {
+  const f = webFixture("canvas");
+  const pen = (x, y, pointerId = 7) => f.pointer(x, y, { pointerId, pointerType: "pen" });
+  f.canvas().props.onPointerDown(pen(100, 100));
+  f.canvas().props.onPointerMove(pen(200, 150));
+  f.canvas().props.onLostPointerCapture?.(pen(200, 150));
+  assert.equal(f.drafts.at(-1), null, "capture loss must discard unfinished work without waiting for a release");
+  f.canvas().props.onPointerUp(pen(300, 200));
+  assert.equal(f.strokes.length, 0);
+  f.canvas().props.onPointerDown(pen(125, 150, 8));
+  f.canvas().props.onPointerUp(pen(250, 75, 8));
+  f.canvas().props.onLostPointerCapture?.(pen(250, 75, 8));
+  assert.equal(f.strokes.length, 1);
+  assert.equal(f.drafts.at(-1).id, f.strokes[0].stroke.id, "normal capture loss after release retains the submitted draft until saving completes");
+  assert.deepEqual(f.strokes[0].stroke.points, [{ x: 0.25, y: 0.5 }, { x: 0.5, y: 0.25 }]);
+  f.unmount();
+});
+
+test("web pen barrel and eraser buttons never create ink, while the selected eraser respects ownership and page scope", () => {
+  const documentId = randomUUID();
+  const owned = { ...stroke({ documentId, page: 2, points: [{ x: 0.25, y: 0.5 }] }), authorId: "student-1" };
+  const foreign = { ...owned, id: randomUUID(), authorId: "teacher-1" };
+  const otherPage = { ...owned, id: randomUUID(), page: 1 };
+  const f = webFixture("canvas", { initial: board(1, { viewerId: "student-1", canClear: false, documentId, page: 2, strokes: [owned, foreign, otherPage] }) });
+  for (const button of [2, 5]) {
+    f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen", button, buttons: button === 5 ? 32 : 2 }));
+    f.canvas().props.onPointerUp(f.pointer(125, 150, { pointerType: "pen", button, buttons: 0 }));
+  }
+  assert.equal(f.strokes.length, 0);
+  assert.equal(f.drafts.length, 0);
+  f.props.tool = "eraser";
+  f.render();
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen", button: 0 }));
+  assert.deepEqual(f.erased, [owned.id]);
+  assert.equal(f.strokes.length, 0);
+  f.props.editable = false;
+  f.render();
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen", button: 0 }));
+  assert.deepEqual(f.erased, [owned.id]);
+  f.unmount();
+});
+
+test("web pen shapes and literal notes retain portrait PDF geometry at both page zooms", () => {
+  const documentId = randomUUID();
+  for (const bounds of [{ width: 600, height: 840 }, { width: 1200, height: 1680 }]) {
+    for (const tool of ["rectangle", "ellipse", "note"]) {
+      const f = webFixture("canvas", { initial: board(1, { documentId, page: 2 }), bounds, props: { aspect: bounds.width / bounds.height, tool, note: "<script>literal</script>" } });
+      const pen = (x, y) => f.pointer(x, y, { pointerType: "pen" });
+      f.canvas().props.onPointerDown(pen(bounds.width / 4, bounds.height / 2));
+      f.canvas().props.onPointerMove(pen(bounds.width / 2, bounds.height / 4));
+      f.canvas().props.onPointerUp(pen(bounds.width / 2, bounds.height / 4));
+      const saved = f.strokes[0].stroke;
+      assert.equal(saved.documentId, documentId);
+      assert.equal(saved.page, 2);
+      assert.deepEqual(saved.points, tool === "note" ? [{ x: 0.25, y: 0.5 }] : [{ x: 0.25, y: 0.5 }, { x: 0.5, y: 0.25 }]);
+      assert.equal(boardStrokeInputSchema.safeParse(saved).success, true);
+      f.props.draft = saved;
+      f.render();
+      assert.equal(f.canvas().props.viewBox, "0 0 1000 1400");
+      if (tool === "rectangle") assert.equal(oneNode(f.tree(), (node) => node.type === "rect").props.height, 350);
+      if (tool === "ellipse") assert.equal(oneNode(f.tree(), (node) => node.type === "ellipse").props.ry, 175);
+      if (tool === "note") assert.equal(treeText(oneNode(f.tree(), (node) => node.type === "text")), "<script>literal</script>");
+      f.unmount();
+    }
+  }
 });
 
 test("web canvas does not duplicate a local pending stroke when polling already returns its saved ID", () => {
@@ -1697,26 +1785,44 @@ test("web redo restores only a successful removal and clears are scoped to the a
 test("web remote clears and zoom changes remove unfinished drafts before another gesture can save them", async () => {
   const cleared = webFixture("dialog", { load: (index, current) => Promise.resolve({ data: index === 1 ? current : board(2, { epoch: 1 }) }) });
   await settle(); cleared.render();
-  cleared.canvas().props.onPointerDown(cleared.pointer(100, 100));
-  cleared.canvas().props.onPointerMove(cleared.pointer(200, 200));
+  cleared.canvas().props.onPointerDown(cleared.pointer(100, 100, { pointerType: "pen" }));
+  cleared.canvas().props.onPointerMove(cleared.pointer(200, 200, { pointerType: "pen" }));
   cleared.render();
   assert.equal(treeNodes(cleared.tree()).filter((node) => node.type === "path").length, 1);
   cleared.fire(); await settle(); cleared.render();
   assert.equal(treeNodes(cleared.tree()).filter((node) => node.type === "path").length, 0);
-  cleared.canvas().props.onPointerUp(cleared.pointer(300, 200));
+  cleared.canvas().props.onPointerUp(cleared.pointer(300, 200, { pointerType: "pen" }));
   assert.equal(cleared.writes.length, 0);
   cleared.unmount();
   const resized = webFixture("dialog");
   await settle(); resized.render();
-  resized.canvas().props.onPointerDown(resized.pointer(100, 100));
+  resized.canvas().props.onPointerDown(resized.pointer(100, 100, { pointerType: "pen" }));
   resized.render();
   assert.equal(treeNodes(resized.tree()).filter((node) => node.type === "circle").length, 1);
   resized.button("liveLesson.zoomIn").props.onClick();
   resized.render();
   assert.equal(treeNodes(resized.tree()).filter((node) => node.type === "circle").length, 0);
-  resized.canvas().props.onPointerUp(resized.pointer(300, 200));
+  resized.canvas().props.onPointerUp(resized.pointer(300, 200, { pointerType: "pen" }));
   assert.equal(resized.writes.length, 0);
   resized.unmount();
+});
+
+test("web revoked editing hides an active pen draft immediately and never saves its late release", async () => {
+  const f = webFixture("dialog", { load: (index, current) => Promise.resolve({ data: { ...current, revision: index, canEdit: index !== 2, canClear: index !== 2 } }) });
+  await settle(); f.render();
+  f.canvas().props.onPointerDown(f.pointer(100, 100, { pointerType: "pen" }));
+  f.canvas().props.onPointerMove(f.pointer(200, 200, { pointerType: "pen" }));
+  f.render();
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "path").length, 1);
+  f.fire(); await settle(); f.render();
+  assert.equal(f.canvas().props.style.cursor, "default");
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "path").length, 0, "permission revocation hides the stale draft before another pointer event");
+  f.fire(); await settle(); f.render();
+  assert.equal(f.canvas().props.style.cursor, "crosshair");
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "path").length, 0, "restoring editing cannot revive the revoked draft");
+  f.canvas().props.onPointerUp(f.pointer(300, 200, { pointerType: "pen" }));
+  assert.equal(f.writes.length, 0);
+  f.unmount();
 });
 
 test("web PDF loading and render errors block drawing, and rendered pages share teacher navigation", async () => {
@@ -1819,7 +1925,9 @@ test("web failed stroke remains visible, blocks edits, retries the same key and 
   } });
   await settle();
   f.render();
-  f.draw([[100, 100], [200, 200]]);
+  f.canvas().props.onPointerDown(f.pointer(100, 100, { pointerType: "pen" }));
+  f.canvas().props.onPointerUp(f.pointer(200, 200, { pointerType: "pen" }));
+  f.canvas().props.onLostPointerCapture(f.pointer(200, 200, { pointerType: "pen" }));
   await settle();
   f.render();
   assert.ok(treeText(f.tree()).includes("Save failed"));
@@ -1928,6 +2036,28 @@ test("web meeting links use provider URLs with opener protection and board data 
   assert.equal(treeNodes(f.tree()).filter((node) => node.type === "a").length, 0);
   f.props.lesson = { ...f.props.lesson, status: "CANCELLED" };
   assert.equal(f.render(), null);
+  f.unmount();
+});
+
+test("web rapid pen gestures keep the first pending stroke visible and retry its original geometry", async () => {
+  const reply = deferred();
+  const f = webFixture("dialog", { change: (command, index, current) => index === 1 ? reply.promise : Promise.resolve({ data: { ...current, revision: 2, strokes: [{ ...command.stroke, authorId: current.viewerId }] } }) });
+  await settle(); f.render();
+  const pen = (x, y) => f.pointer(x, y, { pointerType: "pen" });
+  f.canvas().props.onPointerDown(pen(100, 60));
+  f.canvas().props.onPointerUp(pen(200, 120));
+  f.canvas().props.onPointerDown(pen(400, 240));
+  f.canvas().props.onPointerUp(pen(450, 270));
+  assert.equal(f.writes.length, 1, "the synchronous save lock rejects a second submission");
+  reply.reject(new Error("First pen stroke failed"));
+  await settle(); f.render();
+  assert.equal(oneNode(f.tree(), (node) => node.type === "path").props.d, "M200,120 L400,240", "the retry preview must show the first command, even before controls rerendered");
+  f.button("liveLesson.retry").props.onClick();
+  await settle(); f.render();
+  assert.equal(f.writes.length, 2);
+  assert.equal(f.writes[1].key, f.writes[0].key);
+  assert.deepEqual(f.writes[1].command, f.writes[0].command);
+  assert.equal(oneNode(f.tree(), (node) => node.type === "path").props.d, "M200,120 L400,240");
   f.unmount();
 });
 
@@ -2051,5 +2181,97 @@ test("web rapid board actions cannot overwrite the first pending operation or it
   assert.equal(f.writes.length, 2);
   assert.deepEqual(f.writes[1].command, { action: "page.clear", epoch: 0, documentId: null, page: 0 });
   assert.equal(f.writes[1].key, f.writes[0].key);
+  f.unmount();
+});
+
+// Native gesture regressions exercise synthetic touch payloads; no tablet or
+// pen hardware is represented by this fixture.
+test("native force-bearing touch samples retain normalized coordinates and the selected fixed width", async () => {
+  const f = nativeBoardFixture();
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  oneNode(f.tree(), (node) => node.type === "Pressable" && node.props.accessibilityLabel === "liveLesson.pen 8").props.onPress();
+  f.render();
+  const touch = (x, y, force) => ({ nativeEvent: {
+    locationX: x, locationY: y, identifier: 17, force,
+    touches: [{ identifier: 17, locationX: x, locationY: y, force }],
+    changedTouches: [{ identifier: 17, locationX: x, locationY: y, force }],
+  } });
+  f.canvas().props.onPanResponderGrant(touch(100, 60, 0.1));
+  f.canvas().props.onPanResponderMove(touch(250, 180, 0.95));
+  f.canvas().props.onPanResponderRelease(touch(250, 180, 0));
+  await settle(); f.render();
+  assert.equal(f.writes.length, 1);
+  assert.equal(f.writes[0][3].stroke.width, 8, "force does not implement pressure-sensitive width");
+  assert.deepEqual(plain(f.writes[0][3].stroke.points), [{ x: 0.2, y: 0.2 }, { x: 0.5, y: 0.6 }]);
+  assert.equal(boardStrokeInputSchema.safeParse(f.writes[0][3].stroke).success, true);
+  f.unmount();
+});
+
+test("native release includes the final touch position when no final move event arrives", async () => {
+  const f = nativeBoardFixture();
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  f.canvas().props.onPanResponderGrant(f.pointer(100, 60));
+  f.canvas().props.onPanResponderRelease(f.pointer(300, 240));
+  await settle(); f.render();
+  assert.equal(f.writes.length, 1);
+  assert.deepEqual(plain(f.writes[0][3].stroke.points), [{ x: 0.2, y: 0.2 }, { x: 0.6, y: 0.8 }]);
+  f.unmount();
+  const failed = nativeBoardFixture({ change: () => Promise.reject(new Error("Save failed")) });
+  await settle(); failed.render();
+  failed.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  failed.canvas().props.onPanResponderGrant(failed.pointer(100, 60));
+  failed.canvas().props.onPanResponderRelease(failed.pointer(300, 240));
+  await settle(); failed.render();
+  assert.equal(oneNode(failed.tree(), (node) => node.type === "Path").props.d, "M200,120 L600,480", "failed saves retain the final release point in the visible retry draft");
+  failed.unmount();
+});
+
+test("native revoked drawing permission immediately removes an unfinished local draft", async () => {
+  const f = nativeBoardFixture({ load: (index, current) => Promise.resolve({ data: index === 1 ? current : { ...current, revision: current.revision + 1, canEdit: false, canClear: false } }) });
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  f.canvas().props.onPanResponderGrant(f.pointer(100, 60));
+  f.render();
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "Circle").length, 1);
+  f.fire(); await settle(); f.render();
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+  assert.equal(treeNodes(f.tree()).filter((node) => node.type === "Circle").length, 0);
+  f.canvas().props.onPanResponderRelease(f.pointer(300, 240));
+  await settle(); f.render();
+  assert.equal(f.writes.length, 0);
+  f.unmount();
+});
+
+test("native rapid gestures cannot replace the visible draft of an earlier pending save", async () => {
+  const reply = deferred();
+  const f = nativeBoardFixture({ change: () => reply.promise });
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  f.draw([[50, 30], [100, 60]]);
+  f.draw([[400, 240], [450, 270]]);
+  assert.equal(f.writes.length, 1);
+  reply.reject(new Error("First save failed"));
+  await settle(); f.render();
+  assert.equal(oneNode(f.tree(), (node) => node.type === "Path").props.d, "M100,60 L200,120");
+  assert.equal(oneNode(f.tree(), (node) => node.type === "ErrorText").props.message, "First save failed");
+  f.unmount();
+});
+
+test("native permission revocation preserves an already failed retry draft while blocking retry", async () => {
+  const f = nativeBoardFixture({
+    load: (index, current) => Promise.resolve({ data: index === 1 ? current : { ...current, revision: current.revision + 1, canEdit: false, canClear: false } }),
+    change: () => Promise.reject(new Error("Save failed")),
+  });
+  await settle(); f.render();
+  f.canvas().props.onLayout({ nativeEvent: { layout: { width: 500, height: 300 } } });
+  f.draw([[100, 60], [300, 240]]);
+  await settle(); f.render();
+  f.fire(); await settle(); f.render();
+  assert.equal(oneNode(f.tree(), (node) => node.type === "Path").props.d, "M200,120 L600,480");
+  assert.equal(f.button("liveLesson.retry").props.disabled, true);
+  assert.equal(f.canvas().props.onStartShouldSetPanResponder(), false);
+  assert.equal(f.writes.length, 1);
   f.unmount();
 });

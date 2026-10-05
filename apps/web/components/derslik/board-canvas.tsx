@@ -73,13 +73,17 @@ export function BoardCanvas({ board, editable, color, width, draft, onDraft, onS
     const stroke = { ...current.stroke, points: boardGesturePoints(current.stroke, point(event)) };
     onDraft(stroke); onStroke(stroke, current.epoch);
   }
+  function cancel(event: PointerEvent<SVGSVGElement>) {
+    if (gesture.current?.pointer !== event.pointerId) return;
+    gesture.current = null; onDraft(null);
+  }
   const strokes = boardPageStrokes(board);
   const visibleDraft = draft && (draft.documentId ?? null) === (board.documentId ?? null) && (draft.page ?? 0) === (board.page ?? 0) && !strokes.some((stroke) => stroke.id === draft.id) ? [draft] : [];
   const canvasHeight = 1000 / aspect;
   return <svg viewBox={`0 0 1000 ${canvasHeight}`} preserveAspectRatio="none" role="img" aria-label={t("liveLesson.board")}
     className="absolute inset-0 block size-full touch-none" style={{ cursor: editable ? "crosshair" : "default" }}
     onPointerDown={down} onPointerMove={move} onPointerUp={finish}
-    onPointerCancel={() => { gesture.current = null; onDraft(null); }}>
+    onPointerCancel={cancel} onLostPointerCapture={cancel}>
     {[...strokes, ...visibleDraft].map((stroke) => <BoardMark key={stroke.id} stroke={stroke} canvasHeight={canvasHeight} />)}
   </svg>;
 }

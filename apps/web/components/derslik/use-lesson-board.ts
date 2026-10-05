@@ -38,7 +38,11 @@ export function useLessonBoard(initial: LessonBoard, base: string, onClose: () =
       const url = revision === undefined ? base : `${base}?revision=${revision}`;
       return backend<LessonBoardReadResult>(url);
     },
-    change: (command, key) => backend<{ data: LessonBoard }>(base, command, key), onChange: setState,
+    change: (command, key) => backend<{ data: LessonBoard }>(base, command, key),
+    onChange: (next) => {
+      if (next.board && !next.board.canEdit) setDrawing({ stroke: null, epoch: next.board.epoch });
+      setState(next);
+    },
   }), [base, initial]);
   useEffect(() => {
     mounted.current = true; session.start();
@@ -48,7 +52,9 @@ export function useLessonBoard(initial: LessonBoard, base: string, onClose: () =
   const following = board === sharedBoard, scope = boardScope(board), scopeKey = `${board.epoch}:${scope.documentId}:${scope.page}`;
   const currentDrawing = drawing.epoch === board.epoch && (drawing.stroke?.documentId ?? null) === scope.documentId && (drawing.stroke?.page ?? 0) === scope.page;
   const draft = currentDrawing ? drawing.stroke : null;
-  function setDraft(stroke: BoardStrokeInput | null) { setDrawing({ stroke, epoch: board.epoch }); }
+  function setDraft(stroke: BoardStrokeInput | null) {
+    if (!sending.current) setDrawing({ stroke, epoch: board.epoch });
+  }
   function zoomTo(value: number) { setDraft(null); setZoom(value); }
   const pdfState = useBoardPdf(base, scope.documentId, pdfRetry), pageState = useBoardPdfPage(pdfState.pdf, board.page);
   const ready = !scope.documentId || (!!pageState.page && rendered === pageState.page);

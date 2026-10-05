@@ -45,6 +45,11 @@ function nativeLocalBoard(shared: LessonBoard, local: LocalBoardScope | null) {
   } else if (local.page !== 0) return null;
   return { ...shared, ...local, canEdit: false, canClear: false };
 }
+function visibleNativeDraft(draft: BoardStrokeInput | null, epoch: number, board: LessonBoard, pending: boolean) {
+  if (!draft || (!board.canEdit && !pending) || epoch !== board.epoch) return null;
+  const scope = boardScope(board);
+  return (draft.documentId ?? null) === scope.documentId && (draft.page ?? 0) === scope.page ? draft : null;
+}
 
 export function NativeLessonBoard({ initial, title, onClose, ...scope }: Readonly<BoardScope & {
   initial: LessonBoard; title: string; onClose: () => void;
@@ -73,13 +78,20 @@ export function NativeLessonBoard({ initial, title, onClose, ...scope }: Readonl
     displayedPage = useRef(pageKey(initial)),
     frame = useRef({ width: 0, height: 0 }), mounted = useRef(true), sending = useRef(false);
   const { workspaceId, studentId, lessonId, portal } = scope;
+  const acceptState = useCallback((next: LessonBoardState) => {
+    if (next.board && !next.board.canEdit && gesture.current) {
+      gesture.current = null; setDraft(null);
+    }
+    setState(next);
+  }, []);
+  // eslint-disable-next-line react-hooks/refs -- The constructor only stores callbacks; acceptState reads gesture refs when publish runs from start/refresh/save outside render.
   const session = useMemo(() => new LessonBoardSession({
     initial,
     load: (revision) => AppState.currentState === "active"
       ? client.lessonBoard(workspaceId, studentId, lessonId, portal, revision) : Promise.resolve({ data: null }),
     change: (command, key) => client.changeLessonBoard(workspaceId, studentId, lessonId, command, key, portal),
-    onChange: setState,
-  }), [workspaceId, studentId, lessonId, portal, initial]);
+    onChange: acceptState,
+  }), [workspaceId, studentId, lessonId, portal, initial, acceptState]);
   useEffect(() => {
     mounted.current = true;
     session.start();
@@ -137,10 +149,10 @@ export function NativeLessonBoard({ initial, title, onClose, ...scope }: Readonl
     const point = (event: GestureResponderEvent) => boardPoint(event.nativeEvent.locationX, event.nativeEvent.locationY, frame.current.width, frame.current.height);
     // eslint-disable-next-line react-hooks/refs -- PanResponder registers callbacks; refs are only read when native gestures invoke them.
     return PanResponder.create({
-      onStartShouldSetPanResponder: () => editable && frame.current.width > 0,
-      onMoveShouldSetPanResponder: () => editable,
+      onStartShouldSetPanResponder: () => editable && !sending.current && !gesture.current && frame.current.width > 0,
+      onMoveShouldSetPanResponder: () => editable && !sending.current && !gesture.current,
       onPanResponderGrant: (event) => {
-        if (!editable) return;
+        if (!editable || sending.current || gesture.current) return;
         if (tool === "eraser") {
           const hit = boardHitStroke(board, point(event), paperAspect);
           if (hit) change({ action: "stroke.remove", epoch: board.epoch, id: hit.id, ...active });
@@ -162,11 +174,14 @@ export function NativeLessonBoard({ initial, title, onClose, ...scope }: Readonl
         const next = { ...current.stroke, points: boardGesturePoints(current.stroke, point(event)) };
         gesture.current = { ...current, stroke: next }; setDraft(next);
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (event?: GestureResponderEvent) => {
         const current = gesture.current;
         gesture.current = null;
-        if (!current || !editable || current.scope !== activeKey || current.epoch !== board.epoch) { setDraft(null); return; }
-        const stroke = { ...current.stroke, points: boardGesturePoints(current.stroke, current.stroke.points.at(-1)!) };
+        if (!current) return;
+        if (!editable || current.scope !== activeKey || current.epoch !== board.epoch) { setDraft(null); return; }
+        const last = event ? point(event) : current.stroke.points.at(-1)!;
+        const stroke = { ...current.stroke, points: boardGesturePoints(current.stroke, last) };
+        setDraft(stroke);
         change({ action: "stroke.add", epoch: current.epoch, stroke });
       },
       onPanResponderTerminate: () => { gesture.current = null; setDraft(null); },
@@ -220,7 +235,7 @@ export function NativeLessonBoard({ initial, title, onClose, ...scope }: Readonl
     setPdf((previous) => ({ ...previous, ready: false, error: t("liveLesson.pdfError") }));
   }
   const undo = boardUndoStroke(board), redoId = redo.scope === historyKey ? redo.ids.at(-1) : undefined;
-  const visibleDraft = draft && draftEpoch === board.epoch && (draft.documentId ?? null) === active.documentId && (draft.page ?? 0) === active.page ? draft : null;
+  const visibleDraft = visibleNativeDraft(draft, draftEpoch, board, !!pending);
   const pdfError = active.documentId && pdf.scope === documentKey ? pdf.error : "";
   return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={close}>
     <SafeAreaView style={[styles.screen, { flex: 1, backgroundColor: colors.canvas }]} edges={["top", "bottom"]}>
