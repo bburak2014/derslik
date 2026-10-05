@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef, type RefObject } from "react";
 import { ArrowLeft, ArrowRight, Circle, Eraser, FileText, Highlighter, Minus, Pencil, Plus, Redo2, Square, Trash2, Type, Undo2, Upload, LayoutTemplate } from "lucide-react";
 import { boardColors, boardWidths, maxBoardDocuments, t, type BoardStrokeInput, type LessonBoard } from "@derslik/contracts";
 import type { BoardTool } from "./board-canvas";
@@ -10,15 +11,26 @@ const tools = [
 ] as const;
 const colorNames = ["black", "blue", "red", "green"] as const;
 
-export function BoardTools({ tool, color, width, disabled, note, onTool, onColor, onWidth, onNote, undo, redo, clear, hasMarks = true }: Readonly<{
+export function BoardTools({ tool, color, width, disabled, note, noteInputRef, onTool, onColor, onWidth, onNote, undo, redo, clear, hasMarks = true }: Readonly<{
   tool: BoardTool; color: BoardStrokeInput["color"]; width: BoardStrokeInput["width"]; disabled: boolean; note: string;
+  noteInputRef?: RefObject<HTMLInputElement | null>;
   onTool: (value: BoardTool) => void; onColor: (value: BoardStrokeInput["color"]) => void; onWidth: (value: BoardStrokeInput["width"]) => void; onNote: (value: string) => void;
   undo?: () => void; redo?: () => void; clear?: () => void; hasMarks?: boolean;
 }>) {
+  const localNoteInput = useRef<HTMLInputElement>(null);
+  const noteInput = noteInputRef ?? localNoteInput;
+  useEffect(() => {
+    if (tool === "note" && !disabled) noteInput.current?.focus();
+  }, [tool, disabled, noteInput]);
+  function selectTool(value: BoardTool) {
+    if (disabled) return;
+    onTool(value);
+    if (value === "note" && tool === "note") noteInput.current?.focus();
+  }
   return <div className="studio-tools">
     <div className="studio-tool-row" role="toolbar" aria-label={t("liveLesson.drawingTools")}>
       <div className="studio-tool-group">{tools.map(({ id, icon: Icon }) => <button type="button" key={id} className="studio-tool" aria-label={t(`liveLesson.${id}`)} title={t(`liveLesson.${id}`)}
-        aria-pressed={tool === id} disabled={disabled} onClick={() => onTool(id)}><Icon size={19} /></button>)}</div>
+        aria-pressed={tool === id} disabled={disabled} onClick={() => selectTool(id)}><Icon size={19} /></button>)}</div>
       <div className="studio-tool-group">{boardColors.map((value, index) => <button type="button" key={value} className="studio-swatch" aria-label={t(`liveLesson.${colorNames[index]}`)}
         title={t(`liveLesson.${colorNames[index]}`)} aria-pressed={color === value} disabled={disabled} onClick={() => onColor(value)}><span style={{ backgroundColor: value }} /></button>)}</div>
       <div className="studio-tool-group">{boardWidths.map((value) => <button type="button" key={value} className="studio-tool studio-width" title={`${t("liveLesson.strokeWidth")} ${value}`} aria-label={`${t("liveLesson.strokeWidth")} ${value}`}
@@ -31,7 +43,7 @@ export function BoardTools({ tool, color, width, disabled, note, onTool, onColor
     </div>
     <div className="studio-tool-hint">
       <span className="studio-tool-name">{t(`liveLesson.${tool}`)}</span>
-      {tool === "note" ? <input maxLength={300} value={note} disabled={disabled} aria-label={t("liveLesson.notePlaceholder")} placeholder={t("liveLesson.notePlaceholder")} onChange={(event) => onNote(event.target.value)} />
+      {tool === "note" ? <input ref={noteInput} maxLength={300} value={note} disabled={disabled} aria-label={t("liveLesson.notePlaceholder")} placeholder={t("liveLesson.notePlaceholder")} onChange={(event) => onNote(event.target.value)} />
         : <span>{t(tool === "eraser" ? "liveLesson.eraserHint" : "liveLesson.toolHint")}</span>}
     </div>
   </div>;

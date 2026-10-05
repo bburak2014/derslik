@@ -37,12 +37,13 @@ export function LessonBoardDialog({ initial, base, title, onClose }: Readonly<{
 
 function BoardWorkspace({ studio: s }: Readonly<{ studio: Studio }>) {
   const { board, scope, pageState } = s;
+  const noteInput = useRef<HTMLInputElement>(null);
   const paperWidth = scope.documentId ? `${s.zoom}%` : `min(${s.zoom}%,calc((100cqh - 56px) * ${s.aspect} * ${s.zoom / 100}))`;
   function clear() {
     if (window.confirm(t("liveLesson.clearPageWarning"))) s.change({ action: "page.clear", epoch: board.epoch, ...scope });
   }
   return <main className="studio-workspace">
-    <BoardTools tool={s.tool} color={s.color} width={s.width} note={s.note} disabled={s.toolsDisabled} onTool={s.setTool} onColor={s.setColor} onWidth={s.setWidth} onNote={s.setNote}
+    <BoardTools tool={s.tool} color={s.color} width={s.width} note={s.note} noteInputRef={noteInput} disabled={s.toolsDisabled} onTool={s.setTool} onColor={s.setColor} onWidth={s.setWidth} onNote={s.setNote}
       undo={s.undo ? () => s.remove(s.undo!.id) : undefined}
       redo={s.redo ? () => s.change({ action: "stroke.restore", epoch: board.epoch, id: s.redo!, ...scope }) : undefined}
       clear={board.canClear ? clear : undefined} hasMarks={s.visible.length > 0} />
@@ -50,7 +51,7 @@ function BoardWorkspace({ studio: s }: Readonly<{ studio: Studio }>) {
       <div className={`studio-paper${scope.documentId ? " studio-paper-pdf" : " studio-paper-grid"}`} style={{ aspectRatio: s.aspect, width: paperWidth, maxWidth: `${(scope.documentId ? 640 : 1000) * s.zoom / 100}px` }}>
         {pageState.page && <BoardPdfCanvas key={`${s.scopeKey}:${s.pdfRetry}`} page={pageState.page} onReady={s.onPdfReady} onError={s.onPdfError} />}
         <BoardCanvas key={`${s.scopeKey}:${s.zoom}:${board.canEdit}`} board={board} editable={!s.toolsDisabled && s.ready && !s.pdfError && board.strokes.length < maxBoardStrokes}
-          color={s.color} width={s.width} tool={s.tool} note={s.note} draft={s.draft} onDraft={s.setDraft} onErase={s.remove} aspect={s.aspect}
+          color={s.color} width={s.width} tool={s.tool} note={s.note} draft={s.draft} onDraft={s.setDraft} onErase={s.remove} aspect={s.aspect} onNoteRequired={() => noteInput.current?.focus()}
           onStroke={(stroke, epoch) => s.change({ action: "stroke.add", epoch, stroke })} />
         <BoardPaperState studio={s} />
       </div>

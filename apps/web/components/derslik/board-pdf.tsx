@@ -54,21 +54,27 @@ export function useBoardPdf(base: string, documentId: string | null, retry: numb
     void load();
     return () => { active = false; controller.abort(); void loading?.destroy(); };
   }, [base, documentId, key]);
-  return state.key === key ? state : { key };
+  return state.key === key && !state.pdf?.loadingTask.destroyed ? state : { key };
 }
 
 export function useBoardPdfPage(pdf: PDFDocumentProxy | undefined, page: number) {
   const [state, setState] = useState<{ pdf?: PDFDocumentProxy; number: number; page?: PDFPageProxy; error?: string }>({ number: 0 });
   useEffect(() => {
-    if (!pdf) return;
+    const document = pdf;
+    if (!document || document.loadingTask.destroyed) return;
     let active = true;
-    void pdf.getPage(page).then(
-      (next) => { if (active) setState({ pdf, number: page, page: next }); },
-      () => { if (active) setState({ pdf, number: page, error: t("liveLesson.pdfError") }); },
-    );
+    async function load(current: PDFDocumentProxy) {
+      try {
+        const next = await current.getPage(page);
+        if (active) setState({ pdf: current, number: page, page: next });
+      } catch {
+        if (active) setState({ pdf: current, number: page, error: t("liveLesson.pdfError") });
+      }
+    }
+    void load(document);
     return () => { active = false; };
   }, [pdf, page]);
-  return state.pdf === pdf && state.number === page ? state : { number: page };
+  return state.pdf === pdf && state.number === page && !pdf?.loadingTask.destroyed ? state : { number: page };
 }
 
 export function BoardPdfCanvas({ page, onReady, onError }: Readonly<{

@@ -29,11 +29,11 @@ function BoardMark({ stroke, canvasHeight }: Readonly<{ stroke: BoardStrokeInput
     opacity={stroke.tool === "highlighter" ? 0.3 : 1} strokeLinecap="round" strokeLinejoin="round" />;
 }
 
-export function BoardCanvas({ board, editable, color, width, draft, onDraft, onStroke, tool = "pen", note = "", onErase, aspect = 5 / 3 }: Readonly<{
+export function BoardCanvas({ board, editable, color, width, draft, onDraft, onStroke, tool = "pen", note = "", onErase, onNoteRequired, aspect = 5 / 3 }: Readonly<{
   board: LessonBoard; editable: boolean; color: BoardStrokeInput["color"]; width: BoardStrokeInput["width"];
   draft: BoardStrokeInput | null; onDraft: (stroke: BoardStrokeInput | null) => void;
   onStroke: (stroke: BoardStrokeInput, epoch: number) => void;
-  tool?: BoardTool; note?: string; onErase?: (id: string) => void; aspect?: number;
+  tool?: BoardTool; note?: string; onErase?: (id: string) => void; onNoteRequired?: () => void; aspect?: number;
 }>) {
   const gesture = useRef<{ stroke: BoardStrokeInput; epoch: number; pointer: number } | null>(null);
   function down(event: PointerEvent<SVGSVGElement>) {
@@ -44,7 +44,7 @@ export function BoardCanvas({ board, editable, color, width, draft, onDraft, onS
       if (hit) onErase?.(hit.id);
       return;
     }
-    if (tool === "note" && !note.trim()) return;
+    if (tool === "note" && !note.trim()) { onNoteRequired?.(); return; }
     const stroke: BoardStrokeInput = { id: crypto.randomUUID(), points: [point(event)], color, width, tool, ...boardScope(board), ...(tool === "note" ? { text: note.trim() } : {}) };
     if (tool === "note") { onStroke(stroke, board.epoch); return; }
     if (["line", "rectangle", "ellipse"].includes(tool)) stroke.points.push(stroke.points[0]);

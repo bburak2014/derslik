@@ -1293,16 +1293,25 @@ test("web rejected PDFs never reserve storage and student paths cannot upload le
 
 function pdfSourceFixture(options = {}) {
   const renderer = createTsxFixture(), requests = [], downloads = [], parsed = [], destroyed = [];
+  const effects = new Set();
+  const react = { ...renderer.react, useEffect: (setup, dependencies) => renderer.react.useEffect(() => {
+    const effect = { setup, cleanup: setup() };
+    effects.add(effect);
+    return () => { effect.cleanup?.(); effects.delete(effect); };
+  }, dependencies) };
   const pdf = options.pdf ?? { numPages: 2, getPage: (number) => Promise.resolve({ number }) };
   const library = { GlobalWorkerOptions: {}, getDocument: (config) => {
     parsed.push(config);
-    const loading = options.loading ? options.loading(parsed.length) : { promise: Promise.resolve(pdf) };
-    loading.destroy = () => { destroyed.push(parsed.length); return Promise.resolve(); };
+    const index = parsed.length;
+    const loading = options.loading ? options.loading(index) : { promise: Promise.resolve(pdf) };
+    loading.destroyed = false;
+    loading.destroy = () => { loading.destroyed = true; destroyed.push(index); return options.onDestroy?.(index) ?? Promise.resolve(); };
+    loading.promise = loading.promise.then((document) => { document.loadingTask = loading; return document; });
     return loading;
   } };
   const source = loadTestModule("apps/web/components/derslik/board-pdf.tsx", {
     dependencies: {
-      react: options.element ? { ...renderer.react, useRef: () => ({ current: options.element }) } : renderer.react, "react/jsx-runtime": renderer.jsx,
+      react: options.element ? { ...react, useRef: () => ({ current: options.element }) } : react, "react/jsx-runtime": renderer.jsx,
       "@derslik/contracts": { ...liveContracts, t: (key) => key },
       "pdfjs-dist": library,
       "@/lib/client": { backend: (path) => {
@@ -1320,7 +1329,14 @@ function pdfSourceFixture(options = {}) {
     const page = source.useBoardPdfPage(document.pdf, current.page ?? 1);
     return { type: "State", props: { value: { document, page } } };
   }, props).props.value;
-  return { source, render, renderer, parsed, destroyed, requests, downloads, library, unmount: renderer.unmount };
+  return { source, render, renderer, parsed, destroyed, requests, downloads, library, unmount: renderer.unmount,
+    // Refresh preserves hook state but cleans up and reruns every mounted effect.
+    replayEffects() {
+      const mounted = [...effects];
+      mounted.forEach((effect) => { effect.cleanup?.(); effect.cleanup = undefined; });
+      mounted.forEach((effect) => { effect.cleanup = effect.setup(); });
+    },
+  };
 }
 
 test("actual PDF parsing uses bytes, rejects unsupported files and destroys parse tasks", async () => {
@@ -1372,6 +1388,75 @@ test("actual PDF hooks retain full bytes across page changes and cancel stale do
   assert.strictEqual(stale.render({ id: "fresh" }).document.pdf, pdf);
   assert.equal(stale.downloads[0].init.signal.aborted, true);
   stale.unmount();
+});
+
+test("actual PDF page hooks catch destroyed proxy failures thrown before a promise exists", async () => {
+  const f = pdfSourceFixture({ pdf: { numPages: 2, getPage: () => { throw new TypeError("Cannot read properties of null (reading 'sendWithPromise')"); } } });
+  f.render({ id: "destroyed" });
+  await settle();
+  assert.doesNotThrow(() => f.render({ id: "destroyed" }), "a destroyed PDF transport must report a retryable error instead of crashing the app");
+  await settle();
+  assert.equal(f.render({ id: "destroyed" }).page.error, "liveLesson.pdfError");
+  f.unmount();
+});
+
+test("actual PDF hooks replace destroyed documents when refresh replays effects with retained state", async () => {
+  const dead = new Set(), pages = [];
+  const documents = [1, 2].map((index) => ({ numPages: 2, getPage: (number) => {
+    if (dead.has(index)) throw new TypeError("Cannot read properties of null (reading 'sendWithPromise')");
+    pages.push({ index, number });
+    return Promise.resolve({ document: index, number });
+  } }));
+  const f = pdfSourceFixture({ loading: (index) => ({ promise: Promise.resolve(documents[index - 1]) }), onDestroy: (index) => { dead.add(index); return Promise.resolve(); } });
+  f.render({ id: "document-1" });
+  await settle(); f.render({ id: "document-1" });
+  await settle();
+  assert.equal(f.render({ id: "document-1" }).page.page.document, 1);
+  assert.doesNotThrow(() => f.replayEffects(), "effect replay cannot read the transport destroyed by its document cleanup");
+  assert.notStrictEqual(f.render({ id: "document-1" }).document.pdf, documents[0]);
+  await settle(); f.render({ id: "document-1" });
+  await settle();
+  assert.equal(f.render({ id: "document-1" }).page.page.document, 2);
+  assert.equal(f.requests.length, 2);
+  assert.equal(f.downloads[0].init.signal.aborted, true);
+  assert.deepEqual(pages.at(-1), { index: 2, number: 1 });
+  f.unmount();
+});
+
+test("actual PDF hooks never revive a destroyed proxy during rapid document A to B to A navigation", async () => {
+  const pending = deferred(), dead = new Set();
+  const documents = [1, 2, 3].map((index) => ({ numPages: 2, getPage: (number) => {
+    if (dead.has(index)) throw new TypeError("Cannot read properties of null (reading 'sendWithPromise')");
+    return Promise.resolve({ document: index, number });
+  } }));
+  const f = pdfSourceFixture({ loading: (index) => ({ promise: index === 2 ? pending.promise : Promise.resolve(documents[index - 1]) }), onDestroy: (index) => { dead.add(index); return Promise.resolve(); } });
+  f.render({ id: "A" });
+  await settle(); f.render({ id: "A" });
+  await settle();
+  assert.equal(f.render({ id: "A" }).page.page.document, 1);
+  f.render({ id: "B" });
+  await settle();
+  assert.doesNotThrow(() => f.render({ id: "A" }), "returning to the prior document cannot reuse its destroyed loading task");
+  await settle(); f.render({ id: "A" });
+  await settle();
+  assert.equal(f.render({ id: "A" }).page.page.document, 3);
+  pending.resolve(documents[1]);
+  await settle();
+  assert.strictEqual(f.render({ id: "A" }).document.pdf, documents[2], "late document B cannot replace the newly opened document A");
+  f.unmount();
+});
+
+test("actual PDF initial effect replay aborts the first download and parses only the current document", async () => {
+  const f = pdfSourceFixture();
+  f.render({ id: "document-1" });
+  f.replayEffects();
+  await settle(); f.render({ id: "document-1" });
+  await settle();
+  assert.equal(f.render({ id: "document-1" }).page.page.number, 1);
+  assert.equal(f.parsed.length, 1);
+  assert.equal(f.downloads[0].init.signal.aborted, true);
+  assert.equal(f.downloads[1].init.signal.aborted, false);
+  f.unmount();
 });
 
 test("actual PDF downloads fail with a retryable translated error and unmount aborts pending bytes", async () => {
@@ -1602,6 +1687,68 @@ test("web shape, highlighter, literal note and eraser tools perform their select
   assert.deepEqual(erase.erased, [owned.id]);
   assert.equal(erase.strokes.length, 0);
   erase.unmount();
+});
+
+test("web text controls focus a newly shown note input, refocus active T and leave read-only inputs alone", () => {
+  const renderer = createTsxFixture(), selections = [], edits = [];
+  let focused = 0;
+  const inputRef = { current: { focus: () => focused++ } };
+  const { BoardTools } = loadTestModule("apps/web/components/derslik/board-controls.tsx", { dependencies: {
+    react: renderer.react, "react/jsx-runtime": renderer.jsx,
+    "lucide-react": new Proxy({}, { get: (_target, name) => String(name) }),
+    "@derslik/contracts": { ...liveContracts, t: (key) => key },
+  } });
+  const props = { tool: "pen", color: boardColors[0], width: 4, disabled: false, note: "", noteInputRef: inputRef,
+    onTool: (tool) => { selections.push(tool); props.tool = tool; }, onColor() {}, onWidth() {}, onNote: (value) => edits.push(value) };
+  let tree = renderer.render(BoardTools, props);
+  assert.equal(focused, 0);
+  oneNode(tree, (node) => node.type === "button" && node.props["aria-label"] === "liveLesson.note").props.onClick();
+  assert.equal(focused, 0, "first T selection waits for the input mount");
+  tree = renderer.render(BoardTools, props);
+  assert.equal(focused, 1);
+  const input = oneNode(tree, (node) => node.type === "input");
+  assert.strictEqual(input.props.ref, inputRef);
+  assert.equal(input.props.maxLength, 300);
+  input.props.onChange({ target: { value: "  x = 2  " } });
+  assert.deepEqual(edits, ["  x = 2  "]);
+  oneNode(tree, (node) => node.type === "button" && node.props["aria-label"] === "liveLesson.note").props.onClick();
+  assert.equal(focused, 2, "re-clicking active T restores input focus");
+  props.disabled = true;
+  tree = renderer.render(BoardTools, props);
+  const disabled = oneNode(tree, (node) => node.type === "button" && node.props["aria-label"] === "liveLesson.note");
+  assert.equal(disabled.props.disabled, true);
+  disabled.props.onClick();
+  assert.equal(focused, 2);
+  assert.deepEqual(selections, ["note", "note"]);
+  renderer.unmount();
+});
+
+test("web blank text placements request the note input and only typed literal text saves a scoped point", () => {
+  const documentId = randomUUID();
+  let required = 0;
+  const f = webFixture("canvas", { initial: board(1, { documentId, page: 2 }), props: { tool: "note", note: "", onNoteRequired: () => required++ } });
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen" }));
+  f.props.note = " \n "; f.render();
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen" }));
+  assert.equal(required, 2);
+  assert.equal(f.strokes.length, 0);
+  assert.equal(f.drafts.length, 0);
+  assert.equal(f.captures.length, 0);
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen", button: 5 }));
+  f.props.editable = false; f.render();
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen" }));
+  assert.equal(required, 2, "unrelated pen buttons and read-only taps cannot steal focus");
+  f.props.editable = true; f.props.note = "  <script>literal</script>  "; f.render();
+  f.canvas().props.onPointerDown(f.pointer(125, 150, { pointerType: "pen" }));
+  f.canvas().props.onPointerMove(f.pointer(375, 250, { pointerType: "pen" }));
+  f.canvas().props.onPointerUp(f.pointer(375, 250, { pointerType: "pen" }));
+  assert.equal(f.strokes.length, 1);
+  assert.equal(f.strokes[0].stroke.text, "<script>literal</script>");
+  assert.deepEqual(f.strokes[0].stroke.points, [{ x: 0.25, y: 0.5 }]);
+  assert.equal(f.strokes[0].stroke.documentId, documentId);
+  assert.equal(f.strokes[0].stroke.page, 2);
+  assert.equal(boardStrokeInputSchema.safeParse(f.strokes[0].stroke).success, true);
+  f.unmount();
 });
 
 test("web canvas ignores secondary/foreign pointers and cancellation never submits a stroke", () => {
