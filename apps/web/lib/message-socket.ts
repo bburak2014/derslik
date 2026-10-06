@@ -8,6 +8,7 @@ import { MessageSocket, type MessageSocketEvent } from "@derslik/api-client";
 
 let socket: MessageSocket | null = null;
 let users = 0;
+let stopping: ReturnType<typeof setTimeout> | null = null;
 
 async function ticket(signal: AbortSignal) {
   const r = await fetch("/api/socket", {
@@ -46,13 +47,23 @@ export function useMessageEvents(
   useEffect(() => {
     if (!enabled) return;
     const s = instance();
+    if (stopping) clearTimeout(stopping);
+    stopping = null;
     const off = s.subscribe((event) => latest.current(event));
     users += 1;
     s.start();
     return () => {
       off();
       users -= 1;
-      if (users === 0) s.stop();
+      // Bir görünüm kapanıp yenisi aynı anda açılırken (geliştirmede React
+      // her efekti bir kez kapatıp yeniden açar) soket kapatılmaz: kapatma
+      // bir an ertelenir, yeni dinleyici gelirse bağlantı ve bilet isteği
+      // sürer. Yoksa ilk bilet isteği iptal edilip baştan istenirdi.
+      if (users === 0)
+        stopping = setTimeout(() => {
+          stopping = null;
+          if (users === 0) s.stop();
+        }, 0);
     };
   }, [enabled]);
 }

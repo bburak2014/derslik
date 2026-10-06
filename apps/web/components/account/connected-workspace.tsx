@@ -1,10 +1,16 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useState,
+  type ComponentProps,
+} from "react";
 import type { Access } from "@derslik/api-client";
 import { noticeAccess, t, upper, type NoticeTarget } from "@derslik/contracts";
 import type { NoticeFocus } from "@/components/derslik/learning-panel";
 import { ApiError } from "@derslik/api-client";
-import dynamic from "next/dynamic";
 import { AuthForm } from "./auth-form";
 import { backend, formText, webRequest } from "@/lib/client";
 import { clearChatDrafts, forgetChatInUrl } from "@/lib/chat-drafts";
@@ -41,12 +47,23 @@ const chunkLoader = () => (
     <PageLoader />
   </main>
 );
-const Workspace = dynamic(() => import("@/components/derslik/workspace"), {
-  loading: chunkLoader,
-});
-const Portal = dynamic(
-  () => import("@/components/derslik/portal").then((m) => m.Portal),
-  { loading: chunkLoader },
+// React.lazy, next/dynamic yerine: next/dynamic sayfaya bu paketler için
+// önceden yükleme etiketi basıyordu. Geliştirme derleyicisinin (Turbopack)
+// listesinde sunulmayan bir parça olduğundan her açılışta konsolda 404 ve
+// "kullanılmayan ön yükleme" uyarısı çıkıyordu. Bölme ve yükleme ekranı aynı.
+const LazyWorkspace = lazy(() => import("@/components/derslik/workspace"));
+const LazyPortal = lazy(() =>
+  import("@/components/derslik/portal").then((m) => ({ default: m.Portal })),
+);
+const Workspace = (props: ComponentProps<typeof LazyWorkspace>) => (
+  <Suspense fallback={chunkLoader()}>
+    <LazyWorkspace {...props} />
+  </Suspense>
+);
+const Portal = (props: ComponentProps<typeof LazyPortal>) => (
+  <Suspense fallback={chunkLoader()}>
+    <LazyPortal {...props} />
+  </Suspense>
 );
 
 /** Paket, ekran açılmadan önce indirilmeye başlar; sonuç beklenmez. */

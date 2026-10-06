@@ -2,13 +2,39 @@
 import { ApiError } from "@derslik/api-client";
 import { t } from "@derslik/contracts";
 const retries = new Map<string, string>();
+const reading = new Map<string, Promise<unknown>>();
 /** `idempotencyKey` verilirse anahtarı çağıran yönetir (ör. mesaj gönderimi:
  *  aynı metin ayrı ayrı gönderilebilmeli); yoksa aynı yol ve gövdenin yeniden
- *  denemesi, ağ ya da sunucu hatasından sonra aynı anahtarla gider. */
-export async function webRequest<T = unknown>(
+ *  denemesi, ağ ya da sunucu hatasından sonra aynı anahtarla gider.
+ *
+ *  Aynı adresi aynı anda okuyan bileşenler (ör. kenar çubuğu sayacı ile açık
+ *  sayfa) tek isteği paylaşır; her biri yanıtın kendi kopyasını alır. Bir
+ *  yazma işlemi gönderilince paylaşım biter: sonraki okumalar sunucuya gider
+ *  ve yazmadan önceki yanıtı almaz. */
+export function webRequest<T = unknown>(
   path: string,
   body?: unknown,
   method = body === undefined ? "GET" : "POST",
+  idempotencyKey?: string,
+): Promise<T> {
+  if (method !== "GET") {
+    reading.clear();
+    return send<T>(path, body, method, idempotencyKey);
+  }
+  let request = reading.get(path) as Promise<T> | undefined;
+  if (!request) {
+    const sent = send<T>(path, body, method, idempotencyKey).finally(() => {
+      if (reading.get(path) === sent) reading.delete(path);
+    });
+    reading.set(path, sent);
+    request = sent;
+  }
+  return request.then((data) => structuredClone(data));
+}
+async function send<T>(
+  path: string,
+  body: unknown,
+  method: string,
   idempotencyKey?: string,
 ): Promise<T> {
   const own = !!idempotencyKey,
