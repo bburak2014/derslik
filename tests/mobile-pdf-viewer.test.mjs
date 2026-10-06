@@ -119,6 +119,8 @@ test("the PDF viewer draws only pages near the screen, at bounded size", async (
   const v = viewer();
   await v.settle();
   assert.equal(v.watcher().targets.length, 100, "one box per page");
+  // Boxes keep the A4 shape through padding, supported by every WebView.
+  assert.match(v.watcher().targets[0].style.paddingTop, /^141\.5\d*%$/);
   assert.equal(v.drawn().length, 0, "nothing is drawn before it is near");
   assert.equal(v.watcher().options.rootMargin, "100% 0px");
   await v.show(0, 3);

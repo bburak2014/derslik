@@ -30,8 +30,8 @@ function buildHtml(url: string, background: string, muted: string) {
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=4">
 <style>
   html,body{margin:0;padding:0;background:${background};}
-  .page{position:relative;width:100%;margin:0 0 10px;background:#fff;}
-  .page canvas{display:block;width:100%;height:100%;}
+  .page{position:relative;width:100%;height:0;margin:0 0 10px;background:#fff;}
+  .page canvas{position:absolute;top:0;left:0;display:block;width:100%;height:100%;}
   #err{display:none;padding:24px;font:15px -apple-system,Roboto,sans-serif;color:${muted};text-align:center;}
 </style></head>
 <body>
@@ -50,8 +50,10 @@ function buildHtml(url: string, background: string, muted: string) {
     document.getElementById("err").style.display = "block";
     send("error:" + reason);
   }
+  // The box keeps the page's shape through its padding, which every WebView
+  // supports (CSS aspect-ratio needs Chrome 88 / Safari 15).
   function shape(node, base) {
-    node.style.aspectRatio = base.width + " / " + base.height;
+    node.style.paddingTop = (base.height / base.width) * 100 + "%";
   }
   if (!window.pdfjsLib) return fail("library");
   pdfjsLib.GlobalWorkerOptions.workerSrc = ${scriptJson(PDFJS + "/pdf.worker.min.js")};

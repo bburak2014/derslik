@@ -1,4 +1,34 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
+import { isIPv6 } from "node:net";
+
+/**
+ * IP başına sayaçların anahtarı. Bir IPv6 ağının (/64) elinde sayısız adres
+ * vardır: her adres yeni kova açsaydı anahtar sınırı dolar, yeni ziyaretçiler
+ * bir pencere boyunca reddedilirdi. IPv6 /64 ön ekiyle, IPv4 olduğu gibi sayılır.
+ */
+export function ipBucket(ip: string) {
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapped) return mapped[1];
+  const address = ip.split("%")[0];
+  if (!isIPv6(address)) return ip;
+  const parts = address.split("::");
+  const left = parts[0] ? parts[0].split(":") : [];
+  let groups = left;
+  if (parts.length === 2) {
+    const right = parts[1] ? parts[1].split(":") : [];
+    groups = [
+      ...left,
+      ...new Array<string>(8 - left.length - right.length).fill("0"),
+      ...right,
+    ];
+  }
+  return (
+    groups
+      .slice(0, 4)
+      .map((g) => Number.parseInt(g, 16).toString(16))
+      .join(":") + "::/64"
+  );
+}
 
 /**
  * Süreç içi sabit pencereli sayaç. Tek API süreci için yeterli; birden fazla
