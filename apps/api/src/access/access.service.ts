@@ -148,21 +148,22 @@ export class AccessService {
     );
     if (result.replayed) {
       // Aynı anahtarla tekrar (ilk yanıt istemciye ulaşmamış olabilir):
-      // saklı yanıtta bağlantı yok, bu yüzden token yenilenir. Eski bağlantı
-      // hiç görülmediği için geçersiz kalması sorun değil.
+      // saklı yanıtta bağlantı yok, bu yüzden ikinci bir bağlantı üretilir.
+      // İlk bağlantı e-postayla alıcıya gitmiş olabilir; o da geçerli kalır.
+      // Her tekrar yalnızca bir önceki tekrarın bağlantısının yerini alır.
       const fresh = randomBytes(32).toString("hex");
-      const rotated = await this.db.transaction(
+      const added = await this.db.transaction(
         actor,
         ws,
         async (tx) =>
           (
             await tx.query(
-              "UPDATE derslik.invitations SET token_hash=$3 WHERE workspace_id=$1 AND id=$2 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>now() RETURNING id",
+              "UPDATE derslik.invitations SET replay_token_hash=$3 WHERE workspace_id=$1 AND id=$2 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>now() RETURNING id",
               [ws, result.data.id, tokenHash(fresh)],
             )
           ).rowCount,
       );
-      return rotated
+      return added
         ? { ...result, data: { ...result.data, url: this.inviteUrl(fresh) } }
         : result;
     }
@@ -189,12 +190,17 @@ export class AccessService {
     // Confirm the bound email with Auth; a token's unconfirmed email alone is insufficient.
     const email = await confirmedEmail(this.config, authorization, actor.id);
     if (!email) throw new ForbiddenException("api.verifyEmailForInvite");
-    const hash = tokenHash(token);
     try {
       return await this.db.transaction(actor, null, async (tx) => {
         // Bir e-posta ya öğretmen ya öğrencidir: öğretmen hesabı öğrenci
         // davetini kabul edemez (veli daveti serbest).
         await lockAccountRole(tx, actor.id);
+        // Tekrarlanan davet isteğinin bağlantısı asıl belirtece çevrilir.
+        const hash = (
+          await tx.query("SELECT derslik.invitation_token($1) AS hash", [
+            tokenHash(token),
+          ])
+        ).rows[0].hash;
         const check = (
           await tx.query(
             "SELECT derslik.invitation_role($1,$2) AS role, derslik.is_teacher_account($3) AS teacher",
@@ -294,7 +300,7 @@ export class AccessService {
           `SELECT
    (SELECT count(*) FROM derslik.students WHERE workspace_id=$1 AND active) AS students,
    (SELECT COALESCE(sum(COALESCE(duration_seconds,reserved_seconds)),0) FROM derslik.videos WHERE workspace_id=$1 AND status NOT IN ('FAILED','DELETED')) AS video_seconds,
-   (SELECT COALESCE(sum(size_bytes),0) FROM derslik.materials WHERE workspace_id=$1 AND status<>'DELETED') AS material_bytes`,
+   (SELECT COALESCE(sum(size_bytes),0) FROM derslik.materials WHERE workspace_id=$1 AND purged_at IS NULL) AS material_bytes`,
           [ws],
         )
       ).rows[0];

@@ -1528,6 +1528,8 @@ export const fr: Messages = {
     signupFailed:
       "L'inscription n'a pas pu aboutir. Vérifiez votre adresse e-mail et réessayez.",
     teacherWorkspaceRequired: "Un espace enseignant est requis.",
+    accountChanged:
+      "Le compte de cet onglet a changé dans un autre onglet. La page se rouvre avec le compte actuel.",
   },
   ws: {
     addPayment: "Ajouter un encaissement",

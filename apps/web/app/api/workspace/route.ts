@@ -7,28 +7,48 @@ import {
   readBody,
   json,
 } from "@/lib/server/session";
-import { commandSchema, requestIdSchema } from "@derslik/contracts";
+import { serverLocale } from "@/lib/server/locale";
+import { WORKSPACE_HEADER } from "@/lib/workspace-prefetch";
+import { commandSchema, requestIdSchema, translate } from "@derslik/contracts";
 
 export const dynamic = "force-dynamic";
-async function owner() {
+
+class AccountChanged extends Error {}
+
+// Oturum ve bağlam çerezleri bütün sekmelerde ortaktır. Başka sekmede başka
+// hesaba girilince eski sekmenin isteği yeni hesabın alanına giderdi; istek
+// ekrandaki alanı taşır, çerezlerin seçtiği alan o değilse hiçbir şey yapılmaz.
+async function owner(request: Request) {
   const { client } = await serverSession();
   const { active } = await selectedAccess(client);
   if (active?.role !== "OWNER")
     throw new HttpError(403, "web.teacherWorkspaceRequired");
+  if (request.headers.get(WORKSPACE_HEADER) !== active.id)
+    throw new AccountChanged();
   return { client, workspaceId: active.id };
 }
-export async function GET() {
+async function failure(e: unknown) {
+  if (!(e instanceof AccountChanged)) return errorResponse(e);
+  return json(
+    {
+      error: translate(await serverLocale(), "web.accountChanged"),
+      accountChanged: true,
+    },
+    409,
+  );
+}
+export async function GET(request: Request) {
   try {
-    const { client, workspaceId } = await owner();
+    const { client, workspaceId } = await owner(request);
     return json(await client.snapshot(workspaceId));
   } catch (e) {
-    return errorResponse(e);
+    return failure(e);
   }
 }
 export async function POST(request: Request) {
   try {
     csrf(request);
-    const { client, workspaceId } = await owner();
+    const { client, workspaceId } = await owner(request);
     const command = commandSchema.safeParse(await readBody(request));
     if (!command.success) throw new HttpError(400, "web.invalidFields");
     const key = requestIdSchema.safeParse(
@@ -37,6 +57,6 @@ export async function POST(request: Request) {
     if (!key.success) throw new HttpError(400, "web.keyRequired");
     return json(await client.command(workspaceId, command.data, key.data));
   } catch (e) {
-    return errorResponse(e);
+    return failure(e);
   }
 }

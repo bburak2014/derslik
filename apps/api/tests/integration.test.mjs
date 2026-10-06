@@ -27,6 +27,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { createApplication } from "../../../.api-build/apps/api/src/main.js";
 import { loadConfig } from "../../../.api-build/apps/api/src/config.js";
 import { migrateDatabase } from "../../../.api-build/apps/api/src/db/migrate.js";
+import { DatabaseService } from "../../../.api-build/apps/api/src/db/database.service.js";
 
 async function listen(server) {
   server.listen(0, "127.0.0.1");
@@ -836,6 +837,60 @@ test(
           assert.equal(list.data.length, 1);
           assert.equal(list.pagination.hasMore, true);
           assert.equal((await request(path("students?limit=101"))).status, 400);
+        },
+      );
+
+      await t.test(
+        "workspace snapshot reads one consistent view while another connection writes",
+        { skip: wasmMode ? "Requires native PostgreSQL concurrency" : false },
+        async () => {
+          // Öğrenciler okunduktan hemen sonra başka bir bağlantı yeni öğrenci,
+          // paketi ve ödemesini kaydeder; anlık görüntü yarım ilişki taşımaz.
+          const pool = app.get(DatabaseService).pool,
+            connect = pool.connect;
+          const patched = [];
+          let created;
+          pool.connect = async function (...args) {
+            const client = await connect.apply(this, args);
+            const query = client.query;
+            patched.push([client, query]);
+            client.query = async function (...q) {
+              const result = await query.apply(this, q);
+              if (
+                !created &&
+                String(q[0]).startsWith("SELECT * FROM derslik.students")
+              ) {
+                pool.connect = connect;
+                const s = (
+                  await ok(path("students"), { ...studentBody, name: "Arada" })
+                ).data;
+                await ok(path("packages"), packageBody(s.id, 2, "2000"));
+                await ok(path("payments"), paymentBody(s.id, "2000"));
+                created = s.id;
+              }
+              return result;
+            };
+            return client;
+          };
+          let snapshot;
+          try {
+            snapshot = await ok(path("snapshot"));
+          } finally {
+            pool.connect = connect;
+            for (const [client, query] of patched) client.query = query;
+          }
+          assert.ok(created, "the concurrent write ran between the reads");
+          const students = new Set(snapshot.students.map((s) => s.id));
+          for (const table of ["packages", "payments", "lessons", "credits"])
+            for (const row of snapshot[table])
+              assert.ok(
+                students.has(row.student_id),
+                `${table} ${row.id} without its student`,
+              );
+          assert.ok(!students.has(created));
+          assert.ok(
+            (await ok(path("snapshot"))).students.some((s) => s.id === created),
+          );
         },
       );
 

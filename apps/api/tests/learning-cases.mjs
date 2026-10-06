@@ -2,6 +2,7 @@ import { BillingProvider } from "../../../.api-build/apps/api/src/subscriptions/
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import { MediaProviders } from "../../../.api-build/apps/api/src/media/providers.js";
+import { MaterialCleanupService } from "../../../.api-build/apps/api/src/media/material-cleanup.service.js";
 import { MailService } from "../../../.api-build/apps/api/src/access/mail.js";
 import { LessonRemindersService } from "../../../.api-build/apps/api/src/lessons/reminders.service.js";
 // Due dates are Istanbul calendar days (UTC+3, no DST).
@@ -53,6 +54,7 @@ export async function learningCases({
   });
   let assignment, submission, studentInvite, guardianInvite, video, providerUid;
   const providers = app.get(MediaProviders),
+    cleanup = app.get(MaterialCleanupService),
     remoteVideos = new Map(),
     fileObjects = new Map();
   let reservations = 0,
@@ -113,6 +115,9 @@ export async function learningCases({
     fileObjects.get(key)?.bytes || Buffer.alloc(0);
   providers.deleteFile = async (key) => {
     fileObjects.delete(key);
+  };
+  providers.deleteFiles = async (keys) => {
+    for (const key of keys) fileObjects.delete(key);
   };
   await t.test(
     "workspace snapshot connects the shared web/mobile contract",
@@ -240,13 +245,14 @@ export async function learningCases({
       ).rows[0].response;
       assert.equal(stored.data.url, undefined);
       assert.ok(!JSON.stringify(stored).includes(first.url.split("/").at(-1)));
-      // Tekrar: aynı davet, yeni bağlantı; eskisi artık geçmez.
+      // Tekrar: aynı davet, ikinci bağlantı. İlk bağlantı e-postayla alıcıya
+      // gitmiş olabilir; o da geçerli kalır.
       const replay = (await ok(base + "/invitations", body, { key })).data;
       assert.equal(replay.id, first.id);
       assert.ok(replay.url && replay.url !== first.url);
       const hashes = (
         await admin.query(
-          "SELECT token_hash FROM derslik.invitations WHERE id=$1",
+          "SELECT token_hash,replay_token_hash FROM derslik.invitations WHERE id=$1",
           [first.id],
         )
       ).rows;
@@ -254,7 +260,45 @@ export async function learningCases({
       const { createHash } = await import("node:crypto");
       const hash = (url) =>
         createHash("sha256").update(url.split("/").at(-1)).digest("hex");
-      assert.equal(hashes[0].token_hash, hash(replay.url));
+      assert.equal(hashes[0].token_hash, hash(first.url));
+      assert.equal(hashes[0].replay_token_hash, hash(replay.url));
+      assert.deepEqual(
+        (
+          await admin.query(
+            "SELECT derslik.invitation_role(derslik.invitation_token($1),$3) AS emailed, derslik.invitation_role(derslik.invitation_token($2),$3) AS replayed",
+            [hash(first.url), hash(replay.url), body.email],
+          )
+        ).rows[0],
+        { emailed: "GUARDIAN", replayed: "GUARDIAN" },
+      );
+      // E-postadaki bağlantıyla kabul edilir; davet tek kullanımlık kalır.
+      const later = randomUUID(),
+        tokenLater = await token(later);
+      verifiedUsers.set(`Bearer ${tokenLater}`, {
+        id: later,
+        email: body.email,
+        email_confirmed_at: new Date().toISOString(),
+      });
+      await ok(
+        "/v1/invitations/accept",
+        { token: first.url.split("/").at(-1) },
+        { auth: tokenLater },
+      );
+      assert.equal(
+        (
+          await request("/v1/invitations/accept", {
+            method: "POST",
+            body: { token: replay.url.split("/").at(-1) },
+            auth: tokenLater,
+          })
+        ).status,
+        409,
+      );
+      // Sonraki testlerde (ders hatırlatması) fazladan veli olmasın.
+      await admin.query(
+        "UPDATE derslik.portal_links SET revoked_at=now() WHERE user_id=$1",
+        [later],
+      );
       // Saatlik sınır: 20 davet.
       await admin.query(
         `INSERT INTO derslik.invitations(workspace_id,student_id,email,role,permissions,token_hash,expires_at)
@@ -667,23 +711,20 @@ export async function learningCases({
       }
       assert.equal(refused?.status, 409);
       assert.match(refused.body.error.message, /Tamamlanmamış yüklemeniz/);
+      // Bağlantıları da bitmiş, tamamlanma süresi geçmiş bekleyen yüklemeler.
       const stale = (
         await admin.query(
-          "UPDATE derslik.materials SET created_at=now()-interval '4 hours' WHERE workspace_id=$1 AND status='PENDING' AND name='bekleyen.pdf' RETURNING id,object_key",
+          "UPDATE derslik.materials SET created_at=now()-interval '4 hours',upload_window_ends=now()-interval '1 hour' WHERE workspace_id=$1 AND status='PENDING' AND name='bekleyen.pdf' RETURNING id,object_key",
           [ws],
         )
       ).rows;
-      // Eskiyen bekleyenler kotaya sayılmaz: kalan yer tam bir dosyalık.
       await admin.query(
         `UPDATE derslik.workspace_limits SET material_bytes=(
-           SELECT COALESCE(sum(size_bytes),0) FROM derslik.materials WHERE workspace_id=$1 AND status<>'DELETED' AND name<>'bekleyen.pdf'
+           SELECT COALESCE(sum(size_bytes),0) FROM derslik.materials WHERE workspace_id=$1 AND purged_at IS NULL AND name<>'bekleyen.pdf'
          )+1024 WHERE workspace_id=$1`,
         [ws],
       );
-      const fresh = await reserve();
-      assert.ok(fresh.status < 300, JSON.stringify(fresh.body));
-      assert.equal((await reserve()).status, 409);
-      // Eskiyen yükleme tamamlanamaz.
+      // Eskiyen yükleme tamamlanamaz; nesnesi depoya yüklenmiş olabilir.
       fileObjects.set(stale[0].object_key, {
         info: { size: 1024, content_type: "application/pdf" },
         bytes: Buffer.from("%PDF-1.7"),
@@ -695,8 +736,27 @@ export async function learningCases({
       });
       assert.equal(late.status, 409, JSON.stringify(late.body));
       assert.match(late.body.error.message, /süresi doldu/);
+      // Nesneleri temizlenene kadar kotayı tutarlar.
+      const held = await reserve();
+      assert.equal(held.status, 409, JSON.stringify(held.body));
+      assert.match(held.body.error.message, /Dosya depolama sınırı dolu/);
+      assert.ok((await cleanup.run()) >= stale.length);
+      assert.ok(!fileObjects.has(stale[0].object_key));
+      assert.equal(
+        (
+          await admin.query(
+            "SELECT count(*)::int AS n FROM derslik.materials WHERE workspace_id=$1 AND name='bekleyen.pdf' AND status='DELETED' AND purged_at IS NOT NULL",
+            [ws],
+          )
+        ).rows[0].n,
+        stale.length,
+      );
+      // Temizlenince kalan yer tam bir dosyalık.
+      const fresh = await reserve();
+      assert.ok(fresh.status < 300, JSON.stringify(fresh.body));
+      assert.equal((await reserve()).status, 409);
       await admin.query(
-        "UPDATE derslik.materials SET status='DELETED' WHERE workspace_id=$1 AND name='bekleyen.pdf'",
+        "UPDATE derslik.materials SET status='DELETED',purged_at=now() WHERE workspace_id=$1 AND name='bekleyen.pdf'",
         [ws],
       );
       await admin.query(
@@ -738,7 +798,98 @@ export async function learningCases({
           assert.notEqual(r.status, 503, JSON.stringify(r.body));
       }
       await admin.query(
-        "UPDATE derslik.materials SET status='DELETED' WHERE workspace_id=$1 AND name='yaris-silme.pdf'",
+        "UPDATE derslik.materials SET status='DELETED',purged_at=now() WHERE workspace_id=$1 AND name='yaris-silme.pdf'",
+        [ws],
+      );
+    },
+  );
+  await t.test(
+    "a deleted file keeps its quota until its upload link expires and the path is purged again",
+    async () => {
+      const body = {
+        assignmentId: null,
+        purpose: "RESOURCE",
+        name: "eski-baglanti.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1024,
+      };
+      const pdf = {
+        info: { size: 1024, content_type: "application/pdf" },
+        bytes: Buffer.from("%PDF-1.7"),
+      };
+      await admin.query(
+        `UPDATE derslik.workspace_limits SET material_bytes=(
+           SELECT COALESCE(sum(size_bytes),0) FROM derslik.materials WHERE workspace_id=$1 AND purged_at IS NULL
+         )+1024 WHERE workspace_id=$1`,
+        [ws],
+      );
+      const f = (await ok(media + "/files", body)).data;
+      assert.ok(f.uploadUrl);
+      const { object_key: key } = (
+        await admin.query(
+          "SELECT object_key FROM derslik.materials WHERE id=$1",
+          [f.id],
+        )
+      ).rows[0];
+      fileObjects.set(key, pdf);
+      await ok(media + `/files/${f.id}/finish`, {});
+      await ok(media + `/files/${f.id}/delete`, {});
+      assert.ok(!fileObjects.has(key));
+      // Eski bağlantı hâlâ geçerli: aynı yola yeniden yüklenen nesne de
+      // kotaya sayılır, yeni yer açılmaz.
+      fileObjects.set(key, pdf);
+      const full = await request(media + "/files", {
+        method: "POST",
+        body: { ...body, name: "yeni.pdf" },
+      });
+      assert.equal(full.status, 409, JSON.stringify(full.body));
+      assert.match(full.body.error.message, /Dosya depolama sınırı dolu/);
+      // Bağlantı bitmeden temizlenmez; ikinci silme de nesneyi siler.
+      await cleanup.run();
+      assert.ok(fileObjects.has(key));
+      await ok(media + `/files/${f.id}/delete`, {});
+      assert.ok(!fileObjects.has(key));
+      fileObjects.set(key, pdf);
+      await admin.query(
+        "UPDATE derslik.materials SET upload_window_ends=now()-interval '1 minute' WHERE id=$1",
+        [f.id],
+      );
+      assert.ok((await cleanup.run()) >= 1);
+      assert.ok(!fileObjects.has(key));
+      assert.ok(
+        (
+          await admin.query(
+            "SELECT purged_at FROM derslik.materials WHERE id=$1",
+            [f.id],
+          )
+        ).rows[0].purged_at,
+      );
+      const replayKey = randomUUID();
+      const next = (
+        await ok(media + "/files", { ...body, name: "yeni.pdf" }, {
+          key: replayKey,
+        })
+      ).data;
+      assert.ok(next.uploadUrl);
+      // Bağlantı kaydın ilk saatinde verilir: aynı istek sonradan tekrar
+      // gelirse yeni bağlantı açılmaz.
+      await admin.query(
+        "UPDATE derslik.materials SET created_at=now()-interval '2 hours' WHERE id=$1",
+        [next.id],
+      );
+      const replay = await request(media + "/files", {
+        method: "POST",
+        body: { ...body, name: "yeni.pdf" },
+        key: replayKey,
+      });
+      assert.equal(replay.status, 409, JSON.stringify(replay.body));
+      assert.match(replay.body.error.message, /süresi doldu/);
+      await admin.query(
+        "UPDATE derslik.materials SET status='DELETED',purged_at=now() WHERE id=$1",
+        [next.id],
+      );
+      await admin.query(
+        "UPDATE derslik.workspace_limits SET material_bytes=209715200 WHERE workspace_id=$1",
         [ws],
       );
     },
@@ -1467,6 +1618,84 @@ export async function learningCases({
           version: due.version + 1,
         });
       } finally {
+        mail.sendLessonReminder = original;
+      }
+    },
+  );
+  await t.test(
+    "a slow email provider does not hold back reminders of later lessons",
+    async () => {
+      const reminders = app.get(LessonRemindersService),
+        mail = app.get(MailService),
+        original = mail.sendLessonReminder,
+        sent = [];
+      let release;
+      const gate = new Promise((resolve) => (release = resolve));
+      mail.sendLessonReminder = async (message) => {
+        await gate;
+        sent.push(message.topic);
+        return true;
+      };
+      // Eski kodda tick e-postaları beklerdi; testin asılı kalmaması için.
+      const tick = () =>
+        Promise.race([
+          reminders["tick"](),
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
+      const notified = async (id) =>
+        (
+          await admin.query(
+            "SELECT count(*)::int AS n FROM derslik.notifications WHERE target_id=$1",
+            [id],
+          )
+        ).rows[0].n;
+      try {
+        const pack = (
+          await ok(`/v1/workspaces/${ws}/packages`, {
+            studentId: student.id,
+            name: "Yavaş e-posta",
+            granted: 4,
+            priceMinor: "400000",
+            expiresOn: null,
+          })
+        ).data;
+        const lessonAt = async (minutes, topic) =>
+          (
+            await ok(`/v1/workspaces/${ws}/sessions`, {
+              ...sessionBody(
+                student.id,
+                pack.id,
+                new Date(
+                  Math.ceil((Date.now() + minutes * 60_000) / 60_000) * 60_000,
+                ).toISOString(),
+              ),
+              topic,
+              duration: 15,
+            })
+          ).data.lessons[0];
+        const first = await lessonAt(30, "İlk ders");
+        await tick();
+        assert.equal(await notified(first.id), 3);
+        // İlk dersin e-postaları sağlayıcıda beklerken başka bir ders vakti
+        // gelir: bildirimi bir sonraki turda yazılır.
+        const second = await lessonAt(50, "İkinci ders");
+        await tick();
+        assert.equal(await notified(second.id), 3);
+        assert.deepEqual(sent, []);
+        release();
+        assert.equal(await reminders.run(), 0);
+        assert.deepEqual(sent, [
+          "İlk ders",
+          "İlk ders",
+          "İkinci ders",
+          "İkinci ders",
+        ]);
+        for (const l of [first, second])
+          await ok(`/v1/workspaces/${ws}/sessions/${l.id}/cancel`, {
+            version: l.version,
+          });
+      } finally {
+        release();
         mail.sendLessonReminder = original;
       }
     },

@@ -442,7 +442,28 @@ test(
         (await call("/api/session", { key: `${foreign}:OWNER:` })).status,
         403,
       );
-      assert.equal((await call("/api/workspace")).status, 200);
+      // İstek ekrandaki alanı taşır: başka sekmede hesap ya da alan
+      // değiştiyse eski ekranın isteği yeni hesaba gitmez.
+      const shown = { "X-Derslik-Workspace": ws };
+      assert.equal((await call("/api/workspace", undefined, shown)).status, 200);
+      for (const headers of [{}, { "X-Derslik-Workspace": foreign }]) {
+        const stale = await call("/api/workspace", undefined, headers);
+        assert.equal(stale.status, 409);
+        assert.equal((await stale.json()).accountChanged, true);
+        const write = await call(
+          "/api/workspace",
+          {
+            action: "student.create",
+            name: "Eski sekme",
+            subject: "Math",
+            grade: "",
+            phone: "",
+            email: "",
+          },
+          { ...headers, "Idempotency-Key": randomUUID() },
+        );
+        assert.equal(write.status, 409);
+      }
       assert.equal((await call("/api/teaching")).status, 404);
       assert.equal(
         (await call(`/api/backend/workspaces/${foreign}/snapshot`)).status,
@@ -462,6 +483,7 @@ test(
         email: "",
       };
       const failed = await call("/api/workspace", command, {
+        ...shown,
         "Idempotency-Key": randomUUID(),
       });
       assert.equal(failed.status, 503);

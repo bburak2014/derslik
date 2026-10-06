@@ -1540,6 +1540,8 @@ export const de: Messages = {
       "Die Registrierung konnte nicht abgeschlossen werden. Prüfen Sie Ihre E-Mail-Adresse und versuchen Sie es erneut.",
     teacherWorkspaceRequired:
       "Ein Arbeitsbereich für Lehrkräfte ist erforderlich.",
+    accountChanged:
+      "Das Konto in diesem Tab wurde in einem anderen Tab gewechselt. Die Seite wird mit dem aktuellen Konto neu geöffnet.",
   },
   ws: {
     addPayment: "Zahlung hinzufügen",

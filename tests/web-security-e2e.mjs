@@ -82,7 +82,17 @@ for (const actor of ["owner", "otherOwner", "student", "guardian"]) {
   );
 }
 await check("owner: own workspace and student remain reachable", async () => {
-  assert.equal((await request("owner", "/api/workspace")).status, 200);
+  assert.equal(
+    (
+      await request("owner", "/api/workspace", {
+        headers: { "X-Derslik-Workspace": ws },
+      })
+    ).status,
+    200,
+  );
+  // Ekrandaki alanı taşımayan istek, başka sekmede değişmiş oturumla
+  // işlem yapamaz.
+  assert.equal((await request("owner", "/api/workspace")).status, 409);
   assert.equal(
     (await request("owner", `/api/backend/workspaces/${ws}/students`)).status,
     200,

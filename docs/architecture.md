@@ -16,7 +16,7 @@ Web ve mobil aynı Supabase hesabıyla aynı çalışma alanını görür. `pack
 
 Ödevler oluşturulabilir, düzenlenebilir, tamamlanabilir veya iptal edilebilir. Kapanmış ödev öğrenci teslimine kapalıdır. Öğretmen bağımsız PDF materyali veya ödev eki yükleyebilir. Öğrenci yalnızca izinli kendi ödevine teslim dosyası ekleyebilir. Öğrenci/veli izinleri PostgreSQL RLS ve API kontrolleri ile korunur; özel öğretmen notları ayrıdır.
 
-Dosya ve video büyük gövdeleri API RAM’inden geçirilmez: API yetki/kota kontrolünden sonra özel yükleme adresi verir. Bütün metadata PostgreSQL’dedir. PDF tamamlama gerçek boyut/tür ve imzayı doğrular. Silme başarısız olursa kayıt ve kota korunur; yeni indirme/izleme adresleri kapatılır ve tekrar denenebilir. Önceden verilmiş süreli URL’ler süresi bitene kadar geçerli olabilir.
+Dosya ve video büyük gövdeleri API RAM’inden geçirilmez: API yetki/kota kontrolünden sonra özel yükleme adresi verir. Bütün metadata PostgreSQL’dedir. PDF tamamlama gerçek boyut/tür ve imzayı doğrular. Silme başarısız olursa kayıt ve kota korunur; yeni indirme/izleme adresleri kapatılır ve tekrar denenebilir. Önceden verilmiş süreli URL’ler süresi bitene kadar geçerli olabilir. Dosya yükleme URL’si de öyledir: silinen dosyanın kotası URL süresi bitene kadar tutulur, ardından temizleme işi yolu provider’dan yeniden siler ve kotayı boşaltır.
 
 `.env.api` yerel bağlantı ayarlarının kaynağıdır. `scripts/sync-env.mjs` yalnızca izin verilen API/Auth adreslerini ve public key’i web/mobile aktarır. `scripts/dev.mjs` PostgreSQL hazırlığını, tek API’yi ve web geliştirme sunucusunu başlatır. Next sunucusu iş kurallarını tutan ikinci backend değildir.
 

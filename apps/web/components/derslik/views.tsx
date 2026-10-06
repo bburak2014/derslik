@@ -987,7 +987,10 @@ export function PaymentsView({
               </TableHeader>
               <TableBody>
                 {data.payments.map((p) => {
-                  const s = data.students.find((s) => s.id === p.student_id)!;
+                  const s = data.students.find((s) => s.id === p.student_id);
+                  // Anlık görüntü tek okumadan gelir; yine de öğrencisi
+                  // eksik bir satır bütün sayfayı düşürmesin.
+                  if (!s) return null;
                   return (
                     <TableRow
                       key={p.id}

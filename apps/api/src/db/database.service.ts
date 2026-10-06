@@ -49,14 +49,20 @@ export class DatabaseService implements OnModuleDestroy {
     }
   }
 
+  /** `consistent`: bütün sorgular işlemin başındaki tek görüntüyü okur
+   *  (REPEATABLE READ). Birden çok tabloyu ayrı sorgularla okuyan çağrılar
+   *  arada işlenen yazmayı yarım görmesin diye. */
   async transaction<T>(
     actor: Actor,
     workspaceId: string | null,
     fn: (tx: PoolClient) => Promise<T>,
+    consistent = false,
   ): Promise<T> {
     const tx = await this.pool.connect();
     try {
-      await tx.query("BEGIN");
+      await tx.query(
+        consistent ? "BEGIN ISOLATION LEVEL REPEATABLE READ" : "BEGIN",
+      );
       await tx.query("SET LOCAL statement_timeout = '8s'");
       await tx.query("SET LOCAL lock_timeout = '5s'");
       await tx.query(

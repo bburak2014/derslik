@@ -1477,6 +1477,8 @@ export const en: Messages = {
     signupFailed:
       "Sign-up couldn't be completed. Check your email address and try again.",
     teacherWorkspaceRequired: "A teacher workspace is required.",
+    accountChanged:
+      "The account in this tab changed in another tab. The page is reopening with the current account.",
   },
   ws: {
     addPayment: "Add payment",

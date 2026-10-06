@@ -1430,6 +1430,7 @@ export const ja: Messages = {
     signupFailed:
       "登録を完了できませんでした。メールアドレスを確認して、もう一度お試しください。",
     teacherWorkspaceRequired: "講師用ワークスペースが必要です。",
+    accountChanged: "このタブのアカウントが別のタブで切り替わりました。現在のアカウントでページを開き直します。",
   },
   ws: {
     addPayment: "入金を追加",

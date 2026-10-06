@@ -21,6 +21,7 @@ import { MailService } from "./access/mail.js";
 import { LearningController } from "./learning/learning.controller.js";
 import { MediaProviders } from "./media/providers.js";
 import { MediaService } from "./media/media.service.js";
+import { MaterialCleanupService } from "./media/material-cleanup.service.js";
 import {
   MediaController,
   MediaCapabilitiesController,
@@ -95,6 +96,7 @@ export class AppModule {
         MailService,
         MediaProviders,
         MediaService,
+        MaterialCleanupService,
         BillingProvider,
         SubscriptionService,
         DirectoryService,

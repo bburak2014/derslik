@@ -64,6 +64,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
         .int()
         .min(0)
         .default(30),
+      // Bulunamayan takvim bağlantıları bütün istemciler için ortak sayılır:
+      // değişen rastgele belirteçlerle tarama veritabanına bu kadar ulaşır.
+      // Dolunca yalnızca son 24 saatte çalışmış bağlantılar okunur.
+      RATE_LIMIT_CALENDAR_MISSES_PER_MINUTE: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .default(120),
       // Mesaj gönderimi hesap başına ayrıca sınırlanır (genel sınırın içinde).
       RATE_LIMIT_MESSAGES_PER_MINUTE: z.coerce
         .number()

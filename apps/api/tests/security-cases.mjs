@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { SignJWT } from "jose";
 import { createApplication } from "../../../.api-build/apps/api/src/main.js";
+import { RateLimiter } from "../../../.api-build/apps/api/src/common/rate-limit.js";
 
 export async function securityCases({
   t,
@@ -268,4 +269,45 @@ export async function securityCases({
       }
     },
   );
+
+  await t.test(
+    "security: random calendar tokens share one miss budget; working feeds keep reading",
+    async () => {
+      const limited = await createApplication({
+        ...config,
+        RATE_LIMIT_CALENDAR_PER_MINUTE: 5,
+        RATE_LIMIT_CALENDAR_MISSES_PER_MINUTE: 3,
+      });
+      await limited.listen(0, "127.0.0.1");
+      const url = await limited.getUrl();
+      const feed = /([a-f0-9]{64})\.ics$/.exec(
+        (await ok("/v1/calendar", {})).data.url,
+      )[1];
+      const read = async (token) =>
+        (await fetch(url + "/v1/calendar/" + token)).status;
+      try {
+        assert.equal(await read(feed), 200);
+        // Her istekte başka belirteç: belirteç başına sınır işlemez, ortak
+        // bütçe işler.
+        const statuses = [];
+        for (let i = 0; i < 5; i++)
+          statuses.push(await read(String(i + 2).repeat(64)));
+        assert.deepEqual(statuses, [404, 404, 404, 429, 429]);
+        // Çalışan abonelik tarama sırasında da okunur.
+        assert.equal(await read(feed), 200);
+      } finally {
+        await limited.close();
+      }
+    },
+  );
+
+  await t.test("security: rate limit keys are bounded", () => {
+    const limiter = new RateLimiter(10, 60_000, 3);
+    const now = Date.now();
+    for (const key of ["a", "b", "c"]) assert.equal(limiter.take(key, now), 0);
+    assert.equal(limiter.take("d", now), 60);
+    // Var olan anahtar sayılmaya devam eder; pencere bitince yer açılır.
+    assert.equal(limiter.take("a", now), 0);
+    assert.equal(limiter.take("d", now + 60_001), 0);
+  });
 }

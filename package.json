@@ -48,7 +48,7 @@
     "services:check": "node scripts/check-services.mjs",
     "test:media": "pnpm api:build && node --test tests/media-config.test.mjs",
     "test:booking": "node --experimental-strip-types --test tests/booking-rules.test.mjs tests/booking-form.test.mjs tests/availability-form.test.mjs",
-    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs tests/pnpm-install.test.mjs tests/sonar-cloud.test.mjs tests/sonar-lint.test.mjs tests/coverage.test.mjs tests/sonar-cloud-integration.test.mjs tests/sonar-cli.test.mjs tests/coverage-cli.test.mjs tests/web-session-body.test.mjs tests/mobile-oauth.test.mjs tests/live-lesson.test.mjs",
+    "test:quality": "node --experimental-strip-types --test tests/frontend-quality.test.mjs tests/sonar-report.test.mjs tests/site-build.test.mjs tests/sonar-gate.test.mjs tests/sonar-suppressions.test.mjs tests/sonar-local.test.mjs tests/sonar-hook.test.mjs tests/pnpm-install.test.mjs tests/sonar-cloud.test.mjs tests/sonar-lint.test.mjs tests/coverage.test.mjs tests/sonar-cloud-integration.test.mjs tests/sonar-cli.test.mjs tests/coverage-cli.test.mjs tests/web-session-body.test.mjs tests/mobile-oauth.test.mjs tests/mobile-session.test.mjs tests/mobile-pdf-viewer.test.mjs tests/live-lesson.test.mjs",
     "quality:sonar": "node scripts/sonar.mjs",
     "quality:gate": "node scripts/sonar.mjs --gate",
     "quality:cloud": "node scripts/sonar-cloud-gate.mjs",
@@ -76,7 +76,7 @@
     "drizzle-orm": "0.45.2",
     "jose": "^6.2.12",
     "lucide-react": "^1.47.0",
-    "next": "16.3.4",
+    "next": "16.3.7",
     "next-themes": "^0.4.6",
     "pg": "^8.23.0",
     "radix-ui": "^1.6.7",
@@ -107,7 +107,7 @@
     "drizzle-kit": "0.31.10",
     "embedded-postgres": "18.4.0-beta.17",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.7",
     "eslint-plugin-sonarjs": "4.2.1",
     "prettier": "^3.9.6",
     "react-server-dom-webpack": "19.2.8",
@@ -121,7 +121,7 @@
   "type": "module",
   "overrides": {
     "miniflare": {
-      "sharp": "0.35.4"
+      "sharp": "0.35.5"
     }
   },
   "packageManager": "pnpm@11.25.0"

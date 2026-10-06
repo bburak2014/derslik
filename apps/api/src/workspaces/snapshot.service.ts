@@ -14,7 +14,20 @@ export function rawDto(value: unknown): unknown {
 @Injectable()
 export class SnapshotService {
   constructor(private readonly db: DatabaseService) {}
-  get(actor: Actor, ws: string) {
+  // Altı tablo ayrı sorgularla okunur. READ COMMITTED'da her sorgu kendi
+  // anını görür: arada eklenen yeni öğrencinin paketi ve ödemesi gelir,
+  // öğrencinin kendisi gelmezdi; istemci olmayan öğrenciye erişip çökerdi.
+  // Okuma tek görüntüden yapılır. Ender eşzamanlı güncelleme çakışmasında
+  // (abonelik süresi dolarken) bir kez yeniden denenir.
+  async get(actor: Actor, ws: string) {
+    try {
+      return await this.read(actor, ws);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "40001") throw error;
+      return this.read(actor, ws);
+    }
+  }
+  private read(actor: Actor, ws: string) {
     return this.db.transaction(actor, ws, async (tx) => {
       const data: Record<string, unknown> = {};
       for (const [name, table] of Object.entries({
@@ -39,6 +52,6 @@ export class SnapshotService {
         is_sample: s.is_sample ? 1 : 0,
       }));
       return rawDto({ ...data, serverTime: new Date() });
-    });
+    }, true);
   }
 }

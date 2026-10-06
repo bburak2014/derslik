@@ -26,7 +26,7 @@ packageImportMethod: clone-or-copy
 verifyDepsBeforeRun: false
 optimisticRepeatInstall: false
 overrides:
-  miniflare>sharp: 0.35.4
+  miniflare>sharp: 0.35.5
   # Güvenlik düzeltmeleri (pnpm audit). Aynı ana sürüm içinde yükseltir.
   ws@>=8.0.0 <8.21.0: ^8.21.0
   js-yaml@>=4.0.0 <4.3.2: ^4.3.2
@@ -42,3 +42,8 @@ overrides:
   baseline-browser-mapping@<2.11.0: ^2.11.21
   esbuild@<0.28.1: ^0.28.1
   uuid@<11.1.1: ^11.1.1
+  proxy-addr@<2.0.8: ^2.0.8
+  compression@<1.8.2: ^1.8.2
+  fast-uri@>=3.0.0 <3.1.8: ^3.1.8
+  shell-quote@>=1.8.4 <1.11.0: ^1.11.0
+  sharp@<0.35.5: ^0.35.5

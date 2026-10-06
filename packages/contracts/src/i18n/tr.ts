@@ -1456,6 +1456,8 @@ export const tr = {
     signupFailed:
       "Kayıt tamamlanamadı. E-posta adresinizi kontrol ederek yeniden deneyin.",
     teacherWorkspaceRequired: "Öğretmen çalışma alanı gerekli.",
+    accountChanged:
+      "Bu sekmedeki hesap başka bir sekmede değişti. Sayfa güncel hesapla yeniden açılıyor.",
   },
   ws: {
     addPayment: "Tahsilat ekle",

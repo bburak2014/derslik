@@ -3,7 +3,11 @@ import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras, type NoticeFocus } from "./learning-panel";
 import { t, upper, type MessageKey, type Showcase } from "@derslik/contracts";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { workspaceResponse } from "@/lib/workspace-prefetch";
+import {
+  accountChanged,
+  WORKSPACE_HEADER,
+  workspaceResponse,
+} from "@/lib/workspace-prefetch";
 import {
   BookOpen,
   CalendarDays,
@@ -269,9 +273,14 @@ export default function Workspace({
   } | null>(null);
   const inFlight = useRef(false),
     retryKeys = useRef(new Map<string, string>());
+  const workspaceId = connected.id;
   const reload = useCallback(async () => {
     try {
-      const r = await workspaceResponse();
+      const r = await workspaceResponse(workspaceId);
+      if (await accountChanged(r)) {
+        location.reload();
+        return false;
+      }
       const json = (await r.json()) as WorkspaceData & { error?: string };
       if (!r.ok) throw new Error(json.error || t("ws.loadFailed"));
       setData(json);
@@ -285,7 +294,7 @@ export default function Workspace({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [workspaceId]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
     void reload();
@@ -448,9 +457,14 @@ export default function Workspace({
           "Content-Type": "application/json",
           "Idempotency-Key": key,
           "X-Derslik-Client": "web",
+          [WORKSPACE_HEADER]: workspaceId,
         },
         body: signature,
       });
+      if (await accountChanged(r)) {
+        location.reload();
+        return false;
+      }
       const result = (await r.json()) as { error?: string };
       if (!r.ok) throw new Error(result.error || t("ws.saveFailed"));
       retryKeys.current.delete(signature);

@@ -69,9 +69,15 @@ const videoSchema = z
 // the assignment must be open, and once it has a hand-in the files are frozen
 // after the due day. Reserve, finish and delete all go through this gate, so
 // an upload started earlier cannot complete after the assignment closed.
-// Bekleyen yükleme bu süreden sonra kotaya sayılmaz ve tamamlanamaz
-// (0010 migration'ındaki reserve_material_quota ile aynı değer).
+// Bekleyen yükleme bu süreden sonra tamamlanamaz ve temizlenir
+// (0022 migration'ındaki material_cleanup_due ile aynı değer).
 const PENDING_UPLOAD_HOURS = 3;
+// Supabase'in imzalı yükleme bağlantısı verildiği andan iki saat geçerlidir ve
+// geri alınamaz. Kayda yazılan bitiş anı saat farkına karşı biraz geç tutulur.
+// Bağlantı yalnızca kaydın ilk saatinde verilir: her bağlantı tamamlama süresi
+// dolarken biter, süresi dolan kayıt yeni bağlantıyla canlanamaz.
+const UPLOAD_LINK_MINUTES = 125;
+const UPLOAD_LINK_ISSUE_HOURS = 1;
 
 async function reserveQuota(
   tx: PoolClient,
@@ -194,14 +200,44 @@ export class MediaService {
     const file = await this.file(actor, ws, student, result.data.id, true);
     if (file.status !== "PENDING")
       return { data: { id: file.id, status: file.status } };
+    const objectKey = await this.openUploadWindow(actor, ws, student, file.id);
     return {
       data: {
         id: file.id,
         status: file.status,
-        uploadUrl: await this.providers.uploadFileUrl(file.object_key),
+        uploadUrl: await this.providers.uploadFileUrl(objectKey),
         mimeType: file.mime_type,
       },
     };
+  }
+  /** Yükleme bağlantısından önce bağlantının bitiş anı kayda yazılır. Kayıt
+   *  bu andan önce silinse de kota tutulur ve yol bu andan sonra yeniden
+   *  temizlenir (MaterialCleanupService). */
+  private async openUploadWindow(
+    actor: Actor,
+    ws: string,
+    student: string,
+    id: string,
+  ): Promise<string> {
+    const row = await this.access(
+      actor,
+      ws,
+      student,
+      "assignments",
+      async (tx) =>
+        (
+          await tx.query(
+            `UPDATE derslik.materials SET upload_window_ends=GREATEST(upload_window_ends,now()+make_interval(mins => $4))
+             WHERE workspace_id=$1 AND student_id=$2 AND id=$3 AND status='PENDING' AND NOT delete_requested
+               AND created_at>now()-make_interval(hours => $5)
+             RETURNING object_key`,
+            [ws, student, id, UPLOAD_LINK_MINUTES, UPLOAD_LINK_ISSUE_HOURS],
+          )
+        ).rows[0],
+      true,
+    );
+    if (!row) throw new ConflictException("api.uploadExpired");
+    return row.object_key;
   }
   private async file(
     actor: Actor,
@@ -308,6 +344,9 @@ export class MediaService {
   async deleteFile(actor: Actor, ws: string, student: string, id: string) {
     // Hide immediately; release quota only after the object deletion succeeds.
     // A provider outage leaves a retryable record, never a working download.
+    // An upload link may outlive the record: until it expires the object can be
+    // uploaded again, so the quota stays reserved and the cleanup job deletes
+    // the path once more after the link has expired.
     const file = await this.access(
       actor,
       ws,
@@ -328,7 +367,7 @@ export class MediaService {
           await assignmentLock(tx, ws, peek.assignment_id);
         const row = (
           await tx.query(
-            "SELECT *,derslik.is_owner($1) AS owner FROM derslik.materials WHERE workspace_id=$1 AND student_id=$2 AND id=$3 FOR UPDATE",
+            "SELECT *,derslik.is_owner($1) AS owner,now() AS checked_at FROM derslik.materials WHERE workspace_id=$1 AND student_id=$2 AND id=$3 FOR UPDATE",
             [ws, student, id],
           )
         ).rows[0];
@@ -349,8 +388,9 @@ export class MediaService {
       },
       true,
     );
-    if (file.status !== "DELETED")
-      await this.providers.deleteFile(file.object_key);
+    if (!file.purged_at) await this.providers.deleteFile(file.object_key);
+    // The deletion started after `checked_at`: links that had expired by then
+    // can no longer write to the path, so the quota is released.
     return this.access(
       actor,
       ws,
@@ -359,8 +399,10 @@ export class MediaService {
       async (tx) => ({
         data: (
           await tx.query(
-            "UPDATE derslik.materials SET status='DELETED' WHERE workspace_id=$1 AND student_id=$2 AND id=$3 RETURNING id,status",
-            [ws, student, id],
+            `UPDATE derslik.materials SET status='DELETED',
+               purged_at=CASE WHEN upload_window_ends IS NULL OR upload_window_ends<=$4 THEN COALESCE(purged_at,now()) ELSE purged_at END
+             WHERE workspace_id=$1 AND student_id=$2 AND id=$3 RETURNING id,status`,
+            [ws, student, id, file.checked_at],
           )
         ).rows[0],
       }),

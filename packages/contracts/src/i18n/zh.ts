@@ -1331,6 +1331,7 @@ export const zh: Messages = {
     signoutFailed: "退出登录未能完成。",
     signupFailed: "注册未能完成。请检查邮箱地址后重试。",
     teacherWorkspaceRequired: "需要老师工作区。",
+    accountChanged: "此标签页的账户已在另一个标签页中切换。页面正在以当前账户重新打开。",
   },
   ws: {
     addPayment: "登记收款",

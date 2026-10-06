@@ -174,11 +174,16 @@ export class MediaProviders {
       await reader.cancel();
     }
   }
-  async deleteFile(key: string) {
+  deleteFile(key: string) {
+    return this.deleteFiles([key]);
+  }
+  /** Olmayan nesneyi silmek de başarılıdır; temizleme işi aynı yolu yeniden
+   *  silebilir. */
+  async deleteFiles(keys: string[]) {
     await this.storage("/object/" + this.config.STORAGE_BUCKET, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prefixes: [key] }),
+      body: JSON.stringify({ prefixes: keys }),
     });
   }
 }

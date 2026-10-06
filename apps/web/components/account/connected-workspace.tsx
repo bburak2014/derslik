@@ -65,10 +65,33 @@ function initialStudentMode() {
 }
 
 type SessionState = {
-  user: { email: string };
+  user: { id: string; email: string };
   list: Access[];
   active: Access | null;
 };
+
+/** Oturum çerezleri sekmeler arasında ortaktır. Her sekme hangi hesapla
+ *  açıldığını duyurur; başka hesap (ya da çıkış) duyulursa eski hesabın
+ *  ekranı yeniden açılır, eski ekrandan yeni hesaba bir şey yazılmaz.
+ *  Oturum henüz bilinmiyorsa (yükleniyor) ne duyurulur ne dinlenir. */
+function useAccountAcrossTabs(
+  session: SessionState | null,
+  signedOut: boolean,
+) {
+  let account: string | null | undefined;
+  if (session) account = session.user.id;
+  else if (signedOut) account = null;
+  useEffect(() => {
+    if (account === undefined || typeof BroadcastChannel === "undefined")
+      return;
+    const channel = new BroadcastChannel("derslik-account");
+    channel.onmessage = (event: MessageEvent<string | null>) => {
+      if (event.data !== account) location.reload();
+    };
+    channel.postMessage(account);
+    return () => channel.close();
+  }, [account]);
+}
 
 const key = (a: Access) => `${a.id}:${a.role}:${a.studentId || ""}`;
 const sameAccess = (a: Access | null, b: Access | null) =>
@@ -143,7 +166,7 @@ export function ConnectedWorkspace({
     // Oturum sunucudan geldiyse doğru alanın kodu ve (öğretmende) verisi
     // hemen, birbirini beklemeden istenir.
     if (initialSession?.active?.role === "OWNER") {
-      prefetchWorkspace();
+      prefetchWorkspace(initialSession.active.id);
       preload(() => import("@/components/derslik/workspace"));
     } else if (initialSession?.active)
       preload(() => import("@/components/derslik/portal"));
@@ -152,6 +175,7 @@ export function ConnectedWorkspace({
     // Yalnızca ilk açılışta; sonraki yenilemeler reload() ile yapılır.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useAccountAcrossTabs(session, unauthorized);
   // Sekme başlığı açık olan alana uyar: öğrenci ve veli "öğretmen çalışma
   // alanı" görmesin.
   const studentView = isStudentView(session, studentMode);

@@ -1507,6 +1507,8 @@ export const es: Messages = {
     signupFailed:
       "No se pudo completar el registro. Revisa tu dirección de correo e inténtalo de nuevo.",
     teacherWorkspaceRequired: "Se necesita un espacio de profesor.",
+    accountChanged:
+      "La cuenta de esta pestaña cambió en otra pestaña. La página se vuelve a abrir con la cuenta actual.",
   },
   ws: {
     addPayment: "Añadir cobro",

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -99,25 +99,38 @@ function Application() {
     setActive(next);
     setFocus({ ...target, at: Date.now() });
   };
+  // Hangi hesabın oturumu açık. İstek sürerken başka hesaba geçilirse eski
+  // hesabın geç gelen yanıtı listeyi ve yükleme durumunu o hesaba yazmasın.
+  const sessionUser = useRef<string | undefined>(undefined);
   // `prefer` opens a given view, such as an invitation just accepted;
-  // otherwise the current view stays selected.
+  // otherwise the current view stays selected. Returns false when the session
+  // changed while the list was loading; the answer then belongs to another
+  // account and is dropped.
   const load = useCallback(async (prefer?: AccessRef) => {
+    const owner = sessionUser.current;
+    let list: Access[] | null = null,
+      failure = "";
     try {
-      const r = await request<{ data: Access[] }>("/access");
-      setAccess(r.data);
-      setActive(
-        (old) =>
-          r.data.find((a) => sameAccess(a, prefer)) ||
-          r.data.find((a) => sameAccess(a, old)) ||
-          r.data[0] ||
-          null,
-      );
-      setError("");
+      list = (await request<{ data: Access[] }>("/access")).data;
     } catch (e) {
-      setError((e as Error).message);
+      failure = (e as Error).message;
     } finally {
       setBoot(false);
     }
+    if (sessionUser.current !== owner) return false;
+    if (list) {
+      const data = list;
+      setAccess(data);
+      setActive(
+        (old) =>
+          data.find((a) => sameAccess(a, prefer)) ||
+          data.find((a) => sameAccess(a, old)) ||
+          data[0] ||
+          null,
+      );
+    }
+    setError(failure);
+    return true;
   }, []);
   useEffect(() => {
     if (!supabase) return;
@@ -186,8 +199,12 @@ function Application() {
   }, []);
   useEffect(() => {
     const uid = session?.user.id;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
-    if (uid) void load().then(() => setLoadedFor(uid));
+    sessionUser.current = uid;
+    if (uid)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the loader sets state only after its request resolves.
+      void load().then((current) => {
+        if (current) setLoadedFor(uid);
+      });
   }, [session?.user.id, load]);
   async function signout() {
     try {

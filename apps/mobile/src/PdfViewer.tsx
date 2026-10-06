@@ -17,13 +17,21 @@ import { nativePdfJsUrl as PDFJS, pdfScriptJson as scriptJson } from "./pdf-html
 // font. 3.x is kept because 4.x ships only as ES modules; the vendor's
 // mitigation is isEvalSupported:false, set on getDocument below. The WebView
 // also refuses to navigate anywhere, so a hostile file cannot leave the page.
+//
+// Memory: a small text PDF can have hundreds of pages. Drawing every page at
+// the device's pixel ratio kept one full bitmap per page alive (100 A4 pages
+// at DPR 3 ≈ 740 MiB). Each page is now an empty box of the page's shape; only
+// pages within about a screen of the viewport get a canvas, and a canvas that
+// scrolls away is released. Pixel ratio is capped at 2 and one canvas at
+// 4 million pixels, like the lesson board viewer.
 function buildHtml(url: string, background: string, muted: string) {
   return `<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=4">
 <style>
   html,body{margin:0;padding:0;background:${background};}
-  canvas{display:block;width:100%;margin:0 0 10px;}
+  .page{position:relative;width:100%;margin:0 0 10px;background:#fff;}
+  .page canvas{display:block;width:100%;height:100%;}
   #err{display:none;padding:24px;font:15px -apple-system,Roboto,sans-serif;color:${muted};text-align:center;}
 </style></head>
 <body>
@@ -32,41 +40,98 @@ function buildHtml(url: string, background: string, muted: string) {
 <script src="${PDFJS}/pdf.min.js"></script>
 <script>
 (function () {
+  var RATIO = Math.min(window.devicePixelRatio || 1, 2);
+  var MAX_PIXELS = 4000000;
+  var announced = false;
+  function send(message) {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
+  }
   function fail(reason) {
     document.getElementById("err").style.display = "block";
-    if (window.ReactNativeWebView)
-      window.ReactNativeWebView.postMessage("error:" + reason);
+    send("error:" + reason);
+  }
+  function shape(node, base) {
+    node.style.aspectRatio = base.width + " / " + base.height;
   }
   if (!window.pdfjsLib) return fail("library");
   pdfjsLib.GlobalWorkerOptions.workerSrc = ${scriptJson(PDFJS + "/pdf.worker.min.js")};
   pdfjsLib
     .getDocument({ url: ${scriptJson(url)}, isEvalSupported: false })
     .promise.then(function (pdf) {
-      var holder = document.getElementById("pages");
-      var ratio = window.devicePixelRatio || 1;
-      var chain = Promise.resolve();
-      for (var i = 1; i <= pdf.numPages; i++) {
-        (function (pageNumber) {
-          chain = chain.then(function () {
-            return pdf.getPage(pageNumber).then(function (page) {
+      return pdf.getPage(1).then(function (first) {
+        var holder = document.getElementById("pages");
+        var firstBase = first.getViewport({ scale: 1 });
+        var pages = [];
+        function draw(entry) {
+          if (entry.canvas) return;
+          var canvas = document.createElement("canvas");
+          entry.canvas = canvas;
+          pdf
+            .getPage(entry.number)
+            .then(function (page) {
+              if (entry.canvas !== canvas) return null;
               var base = page.getViewport({ scale: 1 });
-              var scale = (window.innerWidth * ratio) / base.width;
+              shape(entry.node, base);
+              var scale = Math.min(
+                (Math.max(window.innerWidth, 1) * RATIO) / base.width,
+                Math.sqrt(MAX_PIXELS / (base.width * base.height))
+              );
               var viewport = page.getViewport({ scale: scale });
-              var canvas = document.createElement("canvas");
-              canvas.width = viewport.width;
-              canvas.height = viewport.height;
-              holder.appendChild(canvas);
-              return page.render({
+              canvas.width = Math.max(1, Math.floor(viewport.width));
+              canvas.height = Math.max(1, Math.floor(viewport.height));
+              entry.node.appendChild(canvas);
+              entry.task = page.render({
                 canvasContext: canvas.getContext("2d"),
                 viewport: viewport,
-              }).promise;
+              });
+              return entry.task.promise;
+            })
+            .then(
+              function () {
+                if (entry.canvas !== canvas) return;
+                entry.task = null;
+                if (!announced) {
+                  announced = true;
+                  send("ready");
+                }
+              },
+              function (e) {
+                if (entry.canvas !== canvas) return;
+                entry.task = null;
+                fail(String((e && e.message) || e));
+              }
+            );
+        }
+        function release(entry) {
+          var canvas = entry.canvas;
+          if (!canvas) return;
+          entry.canvas = null;
+          if (entry.task) entry.task.cancel();
+          entry.task = null;
+          // A zero-sized canvas gives its bitmap back at once.
+          canvas.width = 0;
+          canvas.height = 0;
+          canvas.remove();
+        }
+        var observer = new IntersectionObserver(
+          function (changes) {
+            changes.forEach(function (change) {
+              var entry = pages[Number(change.target.dataset.page) - 1];
+              if (change.isIntersecting) draw(entry);
+              else release(entry);
             });
-          });
-        })(i);
-      }
-      return chain.then(function () {
-        if (window.ReactNativeWebView)
-          window.ReactNativeWebView.postMessage("ready");
+          },
+          { rootMargin: "100% 0px" }
+        );
+        for (var i = 1; i <= pdf.numPages; i++) {
+          var node = document.createElement("div");
+          node.className = "page";
+          node.dataset.page = String(i);
+          shape(node, firstBase);
+          holder.appendChild(node);
+          pages.push({ number: i, node: node, canvas: null, task: null });
+          observer.observe(node);
+        }
       });
     })
     .catch(function (e) {
