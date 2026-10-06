@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { SignJWT } from "jose";
 import { createApplication } from "../../../.api-build/apps/api/src/main.js";
-import { RateLimiter } from "../../../.api-build/apps/api/src/common/rate-limit.js";
+import {
+  ipBucket,
+  RateLimiter,
+} from "../../../.api-build/apps/api/src/common/rate-limit.js";
 
 export async function securityCases({
   t,
@@ -310,4 +313,23 @@ export async function securityCases({
     assert.equal(limiter.take("a", now), 0);
     assert.equal(limiter.take("d", now + 60_001), 0);
   });
+
+  await t.test(
+    "security: one IPv6 network shares a public rate limit bucket",
+    () => {
+      // Adres değiştirerek yeni kova açılamaz: aynı /64 aynı kovadır.
+      for (const ip of [
+        "2001:db8:1:2:3:4:5:6",
+        "2001:DB8:1:2:ffff::1",
+        "2001:0db8:0001:0002::",
+        "2001:db8:1:2::9%eth0",
+      ])
+        assert.equal(ipBucket(ip), "2001:db8:1:2::/64", ip);
+      assert.equal(ipBucket("2001:db8::1"), "2001:db8:0:0::/64");
+      assert.notEqual(ipBucket("2001:db8:1:3::1"), ipBucket("2001:db8:1:2::1"));
+      assert.equal(ipBucket("::ffff:198.51.100.7"), "198.51.100.7");
+      assert.equal(ipBucket("198.51.100.7"), "198.51.100.7");
+      assert.equal(ipBucket("unknown"), "unknown");
+    },
+  );
 }

@@ -12,7 +12,7 @@ import { loadConfig, type ApiConfig } from "./config.js";
 import { DatabaseService } from "./db/database.service.js";
 import { ApiErrorFilter } from "./common/api-error.filter.js";
 import { localeMiddleware } from "./common/i18n.js";
-import { RateLimiter, RecentKeys } from "./common/rate-limit.js";
+import { ipBucket, RateLimiter, RecentKeys } from "./common/rate-limit.js";
 import { RealtimeService } from "./messages/realtime.service.js";
 
 // DATE is a calendar day, not a process-local midnight instant.
@@ -80,7 +80,7 @@ export async function createApplication(config: ApiConfig) {
   // ziyaretçinin IP'sini X-Forwarded-For ile iletir.
   const publicLimiter = new RateLimiter(config.RATE_LIMIT_PUBLIC_PER_MINUTE);
   app.use("/v1/teachers", (req: Request, res: Response, next: NextFunction) => {
-    const wait = publicLimiter.take(req.ip || "unknown");
+    const wait = publicLimiter.take(ipBucket(req.ip || "unknown"));
     if (!wait) return next();
     res.setHeader("Retry-After", String(wait));
     next(
