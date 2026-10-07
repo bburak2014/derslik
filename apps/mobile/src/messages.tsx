@@ -29,6 +29,8 @@ import {
   senderLabel,
   t,
   threadTitle,
+  threadWithMessage,
+  threadsWithMessage,
   timeAgo,
   timeLabel,
   unreadBadge,
@@ -54,9 +56,10 @@ import {
 } from "./ui";
 
 // Uygulama içi mesajlaşma: öğretmen ve portal (öğrenci, veli) aynı parçaları
-// kullanır. Yeni mesaj soketle anında gelir (soket yalnızca hangi yazışmanın
-// değiştiğini söyler, mesajlar REST'ten çekilir). Yoklama yedektir: açık
-// yazışma 15 sn'de (soket bağlıyken 60 sn'de), liste ve sayaç dakikada bir.
+// kullanır. Yeni mesaj soketle içeriğiyle anında gelir; ekrana ve listeye
+// REST'e gidilmeden eklenir. İçeriksiz olayda (okundu, yeniden bağlanma)
+// REST'ten yenilenir. Yoklama yedektir: açık yazışma 15 sn'de (soket
+// bağlıyken 60 sn'de), liste ve sayaç dakikada bir.
 // Uygulama arka plandayken soket kapanır, yoklama durur.
 
 const THREAD_POLL = 15000,
@@ -182,10 +185,34 @@ export function useMessages(path: string | null) {
   useEffect(() => {
     void load();
   }, [load]);
-  // Yeni mesaj ya da başka cihazda okuma: liste ve sayaç hemen yenilenir.
+  // Yazışmanın kimliğinden başka bir şey bilinmiyorsa liste ve sayaç
+  // yenilenir.
   const loadSoon = useCoalesced(() => void load());
+  // Okundu olayı okunmamışı düşürür. Satır zaten okunmuş görünüyorsa (bu
+  // cihazın kendi okumasının yankısı) yenilenecek bir şey yoktur; karar,
+  // okundu isteğinin yanıtı gelmiş olsun diye olaylar toplandıktan sonra verilir.
+  const reads = useRef(new Set<string>());
+  const readSoon = useCoalesced(() => {
+    const linkIds = [...reads.current];
+    reads.current.clear();
+    const unread = (id: string) =>
+      threads?.find((x) => x.linkId === id)?.unread !== 0;
+    if (linkIds.some(unread)) void load();
+  });
   useMessageEvents((event) => {
-    if (path && eventConcerns(path, event)) loadSoon();
+    if (!path || !eventConcerns(path, event)) return;
+    if (event.type === "resync") return loadSoon();
+    if (event.type === "read") {
+      reads.current.add(event.thread);
+      return readSoon();
+    }
+    const { message } = event;
+    if (!message || !threads?.some((x) => x.linkId === event.thread))
+      return loadSoon();
+    // Mesaj soketle geldi: satır elden güncellenir, liste yeniden istenmez.
+    setThreads(
+      (old) => (old && threadsWithMessage(old, event.thread, message)) ?? old,
+    );
   }, !!path);
   // Liste az önce (ör. aşağı çekip yenileyerek) alındıysa ya da tek satırını
   // açık yazışma zaten yokluyorsa (öğrencinin tek yazışması) bu tur atlanır.
@@ -886,8 +913,10 @@ export function Conversation({
     // Yazışmadan çıkılınca geç gelen yanıt durumu değiştirmez, okundu
     // göndermez.
     alive = useRef(true),
-    // Aynı anda tek okundu isteği gider.
+    // Aynı anda tek okundu isteği gider; sürerken yeni mesaj gösterildiyse
+    // ardından onunla bir kez daha gider.
     reading = useRef(false),
+    readNext = useRef<{ thread: MessageThread; upTo: string } | null>(null),
     // Gönderimin tekrar anahtarı: yalnızca aynı metnin hatadan sonraki
     // yeniden denemesi aynı anahtarla gider (sunucu ikinci kez kaydetmez).
     // Gönderilince ya da metin değişince bırakılır; aynı metin ("Tamam")
@@ -921,22 +950,30 @@ export function Conversation({
    *  okunmamış kalır, sonraki yoklama yeniden dener. */
   const markRead = useCallback(
     async (current: MessageThread, upTo: string | undefined) => {
-      if (
-        !upTo ||
-        !alive.current ||
-        reading.current ||
-        AppState.currentState !== "active"
-      )
+      if (!upTo || !alive.current || AppState.currentState !== "active") return;
+      if (reading.current) {
+        readNext.current = { thread: current, upTo };
         return;
+      }
       reading.current = true;
+      let next: { thread: MessageThread; upTo: string } | null = {
+        thread: current,
+        upTo,
+      };
       try {
-        await request(url + "/read", { upTo });
-        callbacks.current.onUpdate?.({ ...current, unread: 0 });
-        callbacks.current.onRead?.();
+        while (next && alive.current) {
+          readNext.current = null;
+          // eslint-disable-next-line no-await-in-loop -- okundu istekleri sırayla gider: sonraki tur, bu istek sürerken ekrana gelen mesajla yeniden okur; aynı anda iki istek eskisinin yanıtıyla sayacı geri yazabilir.
+          await request(url + "/read", { upTo: next.upTo });
+          callbacks.current.onUpdate?.({ ...next.thread, unread: 0 });
+          callbacks.current.onRead?.();
+          next = readNext.current;
+        }
       } catch {
         // Yazışma okunmamış kalır; sonraki yoklama yeniden dener.
       } finally {
         reading.current = false;
+        readNext.current = null;
       }
     },
     [url],
@@ -999,14 +1036,30 @@ export function Conversation({
   }, [refresh]);
   const live = useSocketLive();
   usePolling(refresh, live ? LIVE_THREAD_POLL : THREAD_POLL);
-  // Bu yazışmaya yeni mesaj gelince hemen çekilir.
+  // İçeriksiz olayda yazışma REST'ten yenilenir.
   const refreshSoon = useCoalesced(() => void refresh());
+  /** Soketten gelen yeni mesaj ekrana eklenir; yazışma yeniden istenmez.
+   *  Ekranda olan mesaj (bu cihaz gönderdi) bir şey değiştirmez. Liste
+   *  satırını liste kendisi aynı olaydan günceller. */
+  function receive(message: ChatMessage, current: MessageThread) {
+    if (known.current.has(message.id)) return;
+    known.current.add(message.id);
+    show(byTime([...shown.current, message]));
+    if (atBottom.current || message.mine) smooth.current = true;
+    const next = threadWithMessage(current, message) ?? current;
+    setThread(next);
+    setNow(Date.now());
+    if (message.mine) return;
+    announceIncoming([message], next);
+    void markRead(next, message.createdAt);
+  }
   useMessageEvents((event) => {
-    if (
-      event.type === "resync" ||
-      (event.type === "message" && event.thread === linkId)
-    )
-      refreshSoon();
+    if (event.type === "resync") return refreshSoon();
+    if (event.type !== "message" || event.thread !== linkId) return;
+    // Yazışma henüz yüklenmediyse yükleme bu mesajı kaçırmış olabilir.
+    if (event.message && loaded.current && thread)
+      receive(event.message, thread);
+    else refreshSoon();
   });
 
   // Android geri tuşu yazışmadan listeye döner.
@@ -1085,13 +1138,19 @@ export function Conversation({
           ? current.slice(raw.length).trimStart()
           : current,
       );
-      if (!known.current.has(r.data.id)) {
-        known.current.add(r.data.id);
-        const own = ownMessage(thread, r.data, text);
+      const own = ownMessage(thread, r.data, text);
+      if (!known.current.has(own.id)) {
+        known.current.add(own.id);
         show(byTime([...shown.current, own]));
       }
       smooth.current = true;
-      void refresh();
+      // Liste satırı da yeni son mesajı gösterir; yazışma yeniden istenmez
+      // (karşı taraftan gelenler soketle ya da yoklamayla gelir).
+      const next = threadWithMessage(thread, own);
+      if (next) {
+        setThread(next);
+        callbacks.current.onUpdate?.(next);
+      }
     } catch (e) {
       // Sunucu metni geri çevirdiyse (4xx) sonraki deneme yeni anahtarla
       // gider. Bağlantı ya da sunucu hatasında anahtar korunur: metin belki

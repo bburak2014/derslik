@@ -16,16 +16,33 @@ import { CONFIG, type ApiConfig } from "../config.js";
 import { DatabaseService } from "../db/database.service.js";
 import { RateLimiter } from "../common/rate-limit.js";
 
-/** Soket olayı: yalnızca hangi yazışmanın değiştiği. İstemci mesajları REST
- *  uçlarından çeker; içerik sokete hiç çıkmaz. */
+/** Soket olayı: hangi yazışmanın değiştiği. Yeni mesajda alıcılar mesajın
+ *  kendisini de alır; içerik bu olayda değil, dağıtılırken veritabanından
+ *  okunur (NOTIFY'a sığmayabilir). */
 export type MessageEvent = {
   t: "message" | "read";
   /** Çalışma alanı. */
   w: string;
   /** Yazışma (portal bağlantısı). */
   l: string;
+  /** Yeni mesajın kimliği. */
+  m?: string;
   /** Okundu olayında okuyan hesap; olay yalnızca ona gider. */
   u?: string;
+};
+
+/** Olayı alacak hesap; yeni mesajda mesaj o hesabın REST'te göreceği biçimde. */
+type Recipient = {
+  user_id: string;
+  workspace_id: string;
+  student_id: string;
+  message?: {
+    id: string;
+    senderRole: string;
+    mine: boolean;
+    body: string;
+    createdAt: string;
+  };
 };
 
 // LISTEN parametre almaz; kanal adı sabittir, dışarıdan gelen değer yok.
@@ -47,6 +64,7 @@ const notifySchema = z.object({
   t: z.enum(["message", "read"]),
   w: uuid,
   l: uuid,
+  m: uuid.nullish(),
   u: uuid.nullish(),
   o: z.string().nullish(),
 });
@@ -59,7 +77,8 @@ type Live = WebSocket & { alive?: boolean };
 /**
  * Anlık mesajlaşma. İstemci REST ile tek kullanımlık bir bilet alır ve
  * `/v1/socket`'e onunla bağlanır. Mesaj ya da okundu bilgisi yazılınca alıcılar
- * veritabanından o anda bulunur ve soketlerine yazışmanın kimliği gider.
+ * veritabanından o anda bulunur ve soketlerine yazışmanın kimliği gider; yeni
+ * mesajda mesajın kendisi de (istemci onu REST'ten yeniden çekmez).
  *
  * Olay iki yoldan gelir: isteği işleyen süreç commit'ten sonra olayı hemen
  * kendisi dağıtır (publish); veritabanı tetikleyicisi de NOTIFY yayınlar ve
@@ -242,14 +261,7 @@ export class RealtimeService implements OnModuleDestroy {
 
   private async dispatch(event: MessageEvent) {
     if (!this.sockets.size) return;
-    const rows = (
-      await this.db.pool.query<{
-        user_id: string;
-        workspace_id: string;
-        student_id: string;
-      }>("SELECT * FROM derslik.message_recipients($1)", [event.l])
-    ).rows;
-    for (const row of rows) {
+    for (const row of await this.recipients(event)) {
       if (event.t === "read" && row.user_id !== event.u) continue;
       const targets = this.sockets.get(row.user_id);
       if (!targets) continue;
@@ -258,9 +270,49 @@ export class RealtimeService implements OnModuleDestroy {
         workspace: row.workspace_id,
         student: row.student_id,
         thread: event.l,
+        ...(row.message && { message: row.message }),
       };
       for (const ws of targets) send(ws, payload);
     }
+  }
+
+  /** Yazışmayı o anda okuyabilen hesaplar. Yeni mesajda mesaj ve alıcılar tek
+   *  sorguda okunur; mesaj silinmişse ya da başka yazışmanınsa kimseye gitmez. */
+  private async recipients(event: MessageEvent): Promise<Recipient[]> {
+    if (event.t !== "message" || !event.m)
+      return (
+        await this.db.pool.query<Recipient>(
+          "SELECT * FROM derslik.message_recipients($1)",
+          [event.l],
+        )
+      ).rows;
+    const rows = (
+      await this.db.pool.query<{
+        user_id: string;
+        workspace_id: string;
+        student_id: string;
+        link_id: string;
+        id: string;
+        sender_role: string;
+        mine: boolean;
+        body: string;
+        created_at: Date;
+      }>("SELECT * FROM derslik.message_delivery($1)", [event.m])
+    ).rows;
+    return rows
+      .filter((row) => row.link_id === event.l)
+      .map((row) => ({
+        user_id: row.user_id,
+        workspace_id: row.workspace_id,
+        student_id: row.student_id,
+        message: {
+          id: row.id,
+          senderRole: row.sender_role,
+          mine: row.mine,
+          body: row.body,
+          createdAt: row.created_at.toISOString(),
+        },
+      }));
   }
 
   private notified(payload: string | undefined) {
@@ -275,6 +327,7 @@ export class RealtimeService implements OnModuleDestroy {
       t: event.t,
       w: event.w,
       l: event.l,
+      m: event.m ?? undefined,
       u: event.u ?? undefined,
     });
   }

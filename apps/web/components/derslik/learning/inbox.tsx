@@ -126,10 +126,13 @@ export function AccountExtras({
   const unread = inbox.filter((n) => !n.readAt).length;
   // Zildeki sayaç için liste sayfa açılışında bir kez sessizce alınır; hata
   // olursa zil sayaçsız kalır, panel açıldığında yeniden denenir.
-  // Bir yazışma okununca mesajlar görünümü "derslik:inbox" olayı gönderir;
-  // o yazışmanın bildirimi sunucuda okundu sayıldığı için sayaç yenilenir.
+  // Karşı taraftan mesaj gelince ve bir yazışma okununca mesajlar görünümü
+  // "derslik:inbox" olayı gönderir; bildirim eklenmiş ya da okunmuş olabilir,
+  // sayaç yenilenir. Art arda gelen olaylar (yeni mesaj, hemen ardından onun
+  // okunması) tek isteğe toplanır.
   useEffect(() => {
-    let alive = true;
+    let alive = true,
+      soon: ReturnType<typeof setTimeout> | undefined;
     const load = () =>
       backend<{ data: Notice[] }>("/inbox")
         .then((r) => {
@@ -138,11 +141,18 @@ export function AccountExtras({
           setNow(Date.now());
         })
         .catch(() => {});
+    const loadSoon = () => {
+      soon ??= setTimeout(() => {
+        soon = undefined;
+        void load();
+      }, 250);
+    };
     void load();
-    window.addEventListener("derslik:inbox", load);
+    window.addEventListener("derslik:inbox", loadSoon);
     return () => {
       alive = false;
-      window.removeEventListener("derslik:inbox", load);
+      clearTimeout(soon);
+      window.removeEventListener("derslik:inbox", loadSoon);
     };
   }, []);
   // İki istek paralel çalışır; panel son düzeni tutan bir iskeletle açılır.

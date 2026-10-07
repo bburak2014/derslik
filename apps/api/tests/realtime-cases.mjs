@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import WebSocket from "ws";
 
 // Anlık mesajlaşma soketi: istemci REST ile tek kullanımlık bilet alır ve
-// /v1/socket'e onunla bağlanır. Yeni mesajda yazışmayı okuyabilen herkese
-// (öğretmen, bağlantının hesabı, paylaşımlara erişimi olan veli) yalnızca
-// yazışmanın kimliği gider; mesajın içeriği sokete çıkmaz.
+// /v1/socket'e onunla bağlanır. Yeni mesaj, yazışmayı okuyabilen herkese
+// (öğretmen, bağlantının hesabı, paylaşımlara erişimi olan veli) o kişinin
+// REST'te göreceği biçimde gider; okuyamayan hiçbir şey almaz.
 export async function realtimeCases({
   t,
   admin,
@@ -189,47 +189,122 @@ export async function realtimeCases({
 
   const sockets = {};
   await t.test(
-    "realtime: a new message reaches every reader at once, once, without its body",
+    "realtime: a new message reaches every reader at once, once, as REST shows it to them",
     async () => {
       for (const who of ["teacher", "pupil", "parent", "quiet", "stranger"])
         sockets[who] = await connect(who);
       for (const s of Object.values(sockets))
         await until(s.events, (e) => e.type === "ready");
 
-      await portalSend("pupil", links.pupil, "Gizli içerik 123");
-      const expected = {
-        type: "message",
-        workspace: ws,
-        student,
-        thread: links.pupil,
-      };
-      for (const who of ["teacher", "pupil", "parent"])
-        assert.deepEqual(
-          await until(sockets[who].events, (e) => e.type === "message"),
-          expected,
+      const sent = (await portalSend("pupil", links.pupil, "Gizli içerik 123"))
+        .data;
+      // Her okuyucunun REST'te gördüğü son mesaj.
+      const restView = async (who) =>
+        (
+          await ok(
+            who === "teacher"
+              ? `/v1/workspaces/${ws}/messages/${links.pupil}?limit=1`
+              : `/v1/portal/${ws}/${student}/messages/${links.pupil}?limit=1`,
+            undefined,
+            { auth: auth[who] },
+          )
+        ).data.messages[0];
+      for (const who of ["teacher", "pupil", "parent"]) {
+        const event = await until(
+          sockets[who].events,
+          (e) => e.type === "message",
         );
+        const shown = await restView(who);
+        assert.equal(shown.id, sent.id, who);
+        assert.deepEqual(
+          event,
+          {
+            type: "message",
+            workspace: ws,
+            student,
+            thread: links.pupil,
+            message: shown,
+          },
+          who,
+        );
+        assert.equal(event.message.mine, who === "pupil", who);
+        assert.equal(event.message.senderRole, "STUDENT", who);
+        assert.equal(event.message.body, "Gizli içerik 123", who);
+      }
       await quietFor(400);
       // Aynı olay bir kez gelir (süreç kendi NOTIFY'ını atlar).
       for (const who of ["teacher", "pupil", "parent"])
         assert.equal(changes(sockets[who].events).length, 1, who);
-      // Okuyamayan veli ve başka kullanıcı hiçbir şey almaz.
+      // Okuyamayan veli ve başka kullanıcı hiçbir şey almaz, içeriği de.
       assert.equal(changes(sockets.quiet.events).length, 0);
       assert.equal(changes(sockets.stranger.events).length, 0);
-      for (const s of Object.values(sockets))
-        assert.ok(!JSON.stringify(s.events).includes("Gizli"));
+      for (const who of ["quiet", "stranger"])
+        assert.ok(!JSON.stringify(sockets[who].events).includes("Gizli"), who);
 
       // Öğretmen veliye yazar: yalnızca o veli ve öğretmen haber alır.
-      await ownerSend(links.quiet);
-      await until(
-        sockets.quiet.events,
-        (e) => e.type === "message" && e.thread === links.quiet,
-      );
+      const own = (await ownerSend(links.quiet, "Veliye not")).data;
+      const toParent = (who) =>
+        until(
+          sockets[who].events,
+          (e) => e.type === "message" && e.thread === links.quiet,
+        );
+      for (const [who, mine] of [
+        ["quiet", false],
+        ["teacher", true],
+      ])
+        assert.deepEqual((await toParent(who)).message, {
+          id: own.id,
+          senderRole: "OWNER",
+          mine,
+          body: "Veliye not",
+          createdAt: own.createdAt,
+        });
       await quietFor(300);
       for (const who of ["pupil", "parent"])
         assert.ok(
           !sockets[who].events.some((e) => e.thread === links.quiet),
           who,
         );
+    },
+  );
+
+  await t.test(
+    "realtime: a reader REST refuses (no lesson access) gets no message content",
+    async () => {
+      // Davetler Dersler iznini hep içerir; kural veritabanında zorunlu
+      // değildir. Bu izni olmayan bağlantı REST'te yazışmayı okuyamaz.
+      const notesOnly = randomUUID();
+      await admin.query(
+        "INSERT INTO derslik.users(id,email) VALUES($1,$2) ON CONFLICT DO NOTHING",
+        [notesOnly, `soket-${notesOnly}@example.test`],
+      );
+      await admin.query(
+        "INSERT INTO derslik.portal_links(workspace_id,student_id,user_id,role,permissions) VALUES($1,$2,$3,'GUARDIAN',ARRAY['notes'])",
+        [ws, student, notesOnly],
+      );
+      auth.notesOnly = await token(notesOnly);
+      assert.equal(
+        (
+          await request(`/v1/portal/${ws}/${student}/messages/${links.pupil}`, {
+            auth: auth.notesOnly,
+          })
+        ).status,
+        403,
+      );
+      const s = await connect("notesOnly");
+      await until(s.events, (e) => e.type === "ready");
+      await portalSend("pupil", links.pupil, "Dersler izni yok");
+      await until(
+        sockets.teacher.events,
+        (e) => e.message?.body === "Dersler izni yok",
+      );
+      await quietFor(300);
+      assert.equal(changes(s.events).length, 0);
+      assert.ok(!JSON.stringify(s.events).includes("Dersler izni yok"));
+      await admin.query(
+        "UPDATE derslik.portal_links SET revoked_at=now() WHERE user_id=$1",
+        [notesOnly],
+      );
     },
   );
 
@@ -287,14 +362,29 @@ export async function realtimeCases({
     async () => {
       const before = changes(sockets.teacher.events).length;
       // Başka bir yazar (yönetici bağlantısı, başka application_name).
-      await admin.query(
-        "INSERT INTO derslik.messages(workspace_id,link_id,sender_id,body) VALUES($1,$2,$3,'dışarıdan')",
-        [ws, links.pupil, pupil],
-      );
+      const row = (
+        await admin.query(
+          "INSERT INTO derslik.messages(workspace_id,link_id,sender_id,body) VALUES($1,$2,$3,'dışarıdan') RETURNING id,created_at",
+          [ws, links.pupil, pupil],
+        )
+      ).rows[0];
       await until(
         sockets.teacher.events,
         () => changes(sockets.teacher.events).length > before,
       );
+      // Bildirim yalnızca mesajın kimliğini taşır; içerik veritabanından okunur.
+      assert.deepEqual(changes(sockets.teacher.events).at(-1).message, {
+        id: row.id,
+        senderRole: "STUDENT",
+        mine: false,
+        body: "dışarıdan",
+        createdAt: row.created_at.toISOString(),
+      });
+      const pupilEvent = await until(
+        sockets.pupil.events,
+        (e) => e.type === "message" && e.message?.id === row.id,
+      );
+      assert.equal(pupilEvent.message.mine, true);
     },
   );
 
