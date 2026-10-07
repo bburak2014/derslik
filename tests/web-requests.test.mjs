@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import { loadTestModule } from "../scripts/test-source-loader.mjs";
 import { createTsxFixture } from "./tsx-fixture.mjs";
 
@@ -373,4 +374,398 @@ test("workspace and portal load lazily behind the same loading screen", async ()
   assert.equal(m.Portal({ access: null }).props.children.type, "Lazy2");
   assert.equal((await factories[0]()).default, "WorkspaceView");
   assert.equal((await factories[1]()).default, "PortalView");
+});
+
+/** Web'in mesajlar görünümü gerçek kaynağıyla; soket, backend ve pencere
+ *  olayları kayıt tutan sahte nesneler. `reply` her isteğin yanıtını verir. */
+function chatModule(reply) {
+  const renderer = createTsxFixture();
+  const requests = [],
+    inbox = [];
+  const socket = { handler: null };
+  const contracts = {
+    ...loadTestModule("packages/contracts/src/messages.ts", {
+      dependencies: {
+        zod: createRequire(import.meta.url)("zod"),
+        "./i18n/index.ts": { t: (key) => key },
+      },
+    }),
+    t: (key) => key,
+    intlLocale: () => "tr-TR",
+    lower: (text) => text.toLowerCase(),
+    timeAgo: () => "",
+    dateKey: (iso) => String(iso).slice(0, 10),
+    addDays: (key) => key,
+    dayLabel: (iso) => iso.slice(0, 10),
+    timeLabel: (iso) => iso.slice(11, 16),
+  };
+  const { eventConcerns } = loadTestModule("packages/api-client/src/socket.ts");
+  const m = loadTestModule("apps/web/components/derslik/messages.tsx", {
+    // Yazışma bileşeni dışa açık değil; yalnızca bu test için.
+    suffix: "exports.Conversation = Conversation;",
+    dependencies: {
+      react: { ...renderer.react, useId: () => "id", useLayoutEffect() {} },
+      "react/jsx-runtime": renderer.jsx,
+      "@derslik/api-client": { ApiError, eventConcerns },
+      "@/lib/message-socket": {
+        useMessageEvents(handler, enabled = true) {
+          if (enabled) socket.handler = handler;
+        },
+        useSocketLive: () => true,
+      },
+      "@derslik/contracts": contracts,
+      "lucide-react": {},
+      cn: { cn: () => "" },
+      "@/lib/client": {
+        backend: async (path, body) => {
+          requests.push(body === undefined ? `GET ${path}` : `POST ${path}`);
+          return structuredClone(await reply(path, body));
+        },
+      },
+      "@/lib/chat-drafts": { getChatDraft: () => undefined, setChatDraft() {} },
+      "@/components/ui/badge": {},
+      "@/components/ui/button": {},
+      "@/components/ui/empty": {},
+      "@/components/ui/input-group": {},
+      "@/components/ui/item": {},
+      "@/components/ui/textarea": {},
+      "@/components/ui/toggle": {},
+      "./feedback": {},
+      "./loading": {},
+    },
+    globals: {
+      structuredClone,
+      Event: class {
+        constructor(type) {
+          this.type = type;
+        }
+      },
+      window: {
+        dispatchEvent: (event) => inbox.push(event.type),
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      document: {
+        visibilityState: "visible",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      setInterval: () => 0,
+      clearInterval() {},
+      CSS: { supports: () => true },
+    },
+  });
+  return {
+    m,
+    renderer,
+    requests,
+    inbox,
+    emit: (event) => socket.handler(event),
+  };
+}
+
+function chatListModule() {
+  let rows = [];
+  const f = chatModule(async () => ({ data: rows }));
+  let store;
+  const View = () => {
+    store = f.m.useMessageThreads("/workspaces/w-1/messages");
+    return null;
+  };
+  return {
+    ...f,
+    setRows: (value) => (rows = value),
+    render: () => (f.renderer.render(View), store),
+  };
+}
+
+const chatRow = {
+  linkId: "l-1",
+  role: "STUDENT",
+  studentId: "s-1",
+  studentName: "Öğrenci",
+  teacherName: "Öğretmen",
+  guardianEmail: null,
+  viewer: "OWNER",
+  canSend: true,
+  active: true,
+  guardianReaders: 0,
+  lastBody: "Eski",
+  lastAt: "2026-10-07T09:00:00.000Z",
+  lastMine: true,
+  unread: 0,
+};
+const chatEvent = (type, extra = {}) => ({
+  type,
+  workspace: "w-1",
+  student: "s-1",
+  thread: "l-1",
+  ...extra,
+});
+const chatMessage = (id, at, mine, body = "Merhaba") => ({
+  id,
+  senderRole: mine ? "OWNER" : "STUDENT",
+  mine,
+  body,
+  createdAt: `2026-10-07T10:00:0${at}.000Z`,
+});
+// useCoalesced olayları 250 ms toplar.
+const afterEvents = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+test("a socket message with its content updates the thread list without any request", async () => {
+  const f = chatListModule();
+  f.setRows([chatRow]);
+  f.render();
+  await tick();
+  f.render();
+  assert.deepEqual(f.requests, ["GET /workspaces/w-1/messages"]);
+  f.requests.length = 0;
+
+  // Karşı taraftan: satır güncellenir, zil (bildirim) yenilenir.
+  f.emit(chatEvent("message", { message: chatMessage("m-1", 1, false) }));
+  await afterEvents();
+  let row = f.render().threads[0];
+  assert.deepEqual(f.requests, []);
+  assert.deepEqual(f.inbox, ["derslik:inbox"]);
+  assert.equal(row.unread, 1);
+  assert.equal(row.lastBody, "Merhaba");
+  assert.equal(row.lastMine, false);
+
+  // Kendi mesajı (bu ya da başka sekmeden): ne istek ne zil.
+  f.inbox.length = 0;
+  f.emit(chatEvent("message", { message: chatMessage("m-2", 2, true, "Tamam") }));
+  await afterEvents();
+  row = f.render().threads[0];
+  assert.deepEqual(f.requests, []);
+  assert.deepEqual(f.inbox, []);
+  assert.equal(row.lastBody, "Tamam");
+  assert.equal(row.unread, 1);
+
+  // Aynı mesaj ikinci kez gelirse sayaç yine artmaz.
+  f.emit(chatEvent("message", { message: chatMessage("m-1", 1, false) }));
+  await afterEvents();
+  assert.equal(f.render().threads[0].unread, 1);
+  assert.deepEqual(f.requests, []);
+});
+
+test("a read event that the list already reflects costs no request", async () => {
+  const f = chatListModule();
+  f.setRows([chatRow]);
+  f.render();
+  await tick();
+  f.render();
+  f.requests.length = 0;
+  // Bu sekme okudu (satır okunmuş); sunucudan yankı gelir.
+  f.emit(chatEvent("read"));
+  await afterEvents();
+  assert.deepEqual(f.requests, []);
+  assert.deepEqual(f.inbox, []);
+
+  // Başka sekme, burada okunmamış görünen yazışmayı okudu: liste ve zil yenilenir.
+  f.emit(chatEvent("message", { message: chatMessage("m-1", 1, false) }));
+  await afterEvents();
+  f.render();
+  f.inbox.length = 0;
+  f.emit(chatEvent("read"));
+  await afterEvents();
+  assert.deepEqual(f.requests, ["GET /workspaces/w-1/messages"]);
+  assert.deepEqual(f.inbox, ["derslik:inbox"]);
+});
+
+test("socket events without usable content still reload the thread list", async () => {
+  const f = chatListModule();
+  f.setRows([chatRow]);
+  f.render();
+  await tick();
+  f.render();
+  f.requests.length = 0;
+  // Eski sunucu ya da bozuk mesaj: yalnızca yazışma kimliği.
+  f.emit(chatEvent("message"));
+  await afterEvents();
+  assert.deepEqual(f.requests, ["GET /workspaces/w-1/messages"]);
+  // Listede olmayan yazışma.
+  f.requests.length = 0;
+  f.emit(
+    chatEvent("message", { thread: "l-2", message: chatMessage("m-9", 3, false) }),
+  );
+  await afterEvents();
+  assert.deepEqual(f.requests, ["GET /workspaces/w-1/messages"]);
+  // Başka çalışma alanının olayı bu listeyi ilgilendirmez.
+  f.requests.length = 0;
+  f.emit(chatEvent("message", { workspace: "w-2" }));
+  await afterEvents();
+  assert.deepEqual(f.requests, []);
+});
+
+/** Açık yazışma (Conversation): ilk sayfa bir mesajla gelir. Okundu istekleri
+ *  `reads` ile tutulabilir. */
+function chatConversation({ holdReads = false } = {}) {
+  const upserts = [],
+    reads = [];
+  const path = "/workspaces/w-1/messages/l-1";
+  const f = chatModule((url, body) => {
+    if (url === path + "/read") {
+      if (!holdReads) return { data: { read: true } };
+      const d = deferred();
+      reads.push({ body, release: () => d.resolve({ data: { read: true } }) });
+      return d.promise;
+    }
+    return {
+      data: {
+        thread: chatRow,
+        messages: [chatMessage("m-0", 0, true, "İlk")],
+        more: false,
+      },
+    };
+  });
+  const props = {
+    base: "/workspaces/w-1/messages",
+    linkId: "l-1",
+    summary: chatRow,
+    store: { upsert: (_id, change) => upserts.push(change) },
+    teacher: true,
+    refreshAt: 0,
+  };
+  return {
+    ...f,
+    path,
+    upserts,
+    reads,
+    render: () => f.renderer.render(f.m.Conversation, props),
+  };
+}
+function deferred() {
+  let resolve;
+  const promise = new Promise((yes) => (resolve = yes));
+  return { promise, resolve };
+}
+const bodies = (tree) =>
+  JSON.stringify(tree).match(/"(İlk|Merhaba[^"]*|Tamam)"/g) ?? [];
+
+test("an open conversation shows a socket message without fetching the page again", async () => {
+  const f = chatConversation();
+  f.render();
+  await tick();
+  f.render();
+  assert.deepEqual(f.requests, [`GET ${f.path}?limit=50`, `POST ${f.path}/read`]);
+  f.requests.length = 0;
+  f.upserts.length = 0;
+
+  // Karşı taraftan: ekrana eklenir, okundu bildirilir; sayfa yeniden istenmez.
+  const incoming = chatMessage("m-1", 1, false, "Merhaba yeni");
+  f.emit(chatEvent("message", { message: incoming }));
+  await tick();
+  let tree = f.render();
+  assert.deepEqual(f.requests, [`POST ${f.path}/read`]);
+  assert.deepEqual(bodies(tree), ['"İlk"', '"Merhaba yeni"']);
+  // Liste satırı yeni son mesajla ve okunmuş olarak güncellenir.
+  assert.equal(f.upserts.at(-1).lastBody, "Merhaba yeni");
+  assert.equal(f.upserts.at(-1).unread, 0);
+
+  // Başka sekmeden gönderilen kendi mesajı: eklenir, okundu gerekmez.
+  f.requests.length = 0;
+  f.emit(chatEvent("message", { message: chatMessage("m-2", 2, true, "Tamam") }));
+  await tick();
+  tree = f.render();
+  assert.deepEqual(f.requests, []);
+  assert.deepEqual(bodies(tree), ['"İlk"', '"Merhaba yeni"', '"Tamam"']);
+
+  // Ekranda olan mesaj (bu sekme gönderdi) yeniden gelirse hiçbir şey olmaz.
+  f.emit(chatEvent("message", { message: chatMessage("m-2", 2, true, "Tamam") }));
+  await afterEvents();
+  tree = f.render();
+  assert.deepEqual(f.requests, []);
+  assert.equal(bodies(tree).length, 3);
+
+  // Başka yazışmanın mesajı bu yazışmayı ilgilendirmez.
+  f.emit(chatEvent("message", { thread: "l-2", message: chatMessage("m-3", 3, false) }));
+  await afterEvents();
+  assert.deepEqual(f.requests, []);
+
+  // İçeriksiz olay: sayfa REST'ten yenilenir.
+  f.emit(chatEvent("message"));
+  await afterEvents();
+  assert.deepEqual(f.requests, [`GET ${f.path}?limit=50`]);
+});
+
+test("messages that arrive while a read is in flight are read right after it", async () => {
+  const f = chatConversation({ holdReads: true });
+  f.render();
+  await tick();
+  f.render();
+  f.reads.shift().release();
+  await tick();
+  f.render();
+  f.requests.length = 0;
+
+  f.emit(chatEvent("message", { message: chatMessage("m-1", 1, false, "Merhaba 1") }));
+  await tick();
+  f.render();
+  f.emit(chatEvent("message", { message: chatMessage("m-2", 2, false, "Merhaba 2") }));
+  await tick();
+  f.render();
+  // İlk okundu sürerken ikincisi gönderilmez, beklenir.
+  assert.equal(f.reads.length, 1);
+  assert.equal(f.reads[0].body.upTo, chatMessage("m-1", 1).createdAt);
+  f.reads.shift().release();
+  await tick();
+  await tick();
+  assert.equal(f.reads.length, 1);
+  assert.equal(f.reads[0].body.upTo, chatMessage("m-2", 2).createdAt);
+  f.reads.shift().release();
+  await tick();
+  await tick();
+  assert.equal(f.upserts.at(-1).lastBody, "Merhaba 2");
+  assert.equal(f.upserts.at(-1).unread, 0);
+  assert.deepEqual(f.requests, [`POST ${f.path}/read`, `POST ${f.path}/read`]);
+});
+
+test("the bell reloads once for a burst of inbox events", async () => {
+  const renderer = createTsxFixture();
+  const requests = [],
+    listeners = new Map();
+  const { AccountExtras } = loadTestModule(
+    "apps/web/components/derslik/learning/inbox.tsx",
+    {
+      dependencies: {
+        react: renderer.react,
+        "react/jsx-runtime": renderer.jsx,
+        "@/components/account/subscription": {},
+        "@derslik/contracts": { t: (key) => key, intlLocale: () => "tr-TR" },
+        "@/lib/client": {
+          backend: async (path) => {
+            requests.push(path);
+            return { data: [] };
+          },
+        },
+        "@/components/ui/button": {},
+        "lucide-react": {},
+        "@/components/ui/tooltip": {},
+        "@/components/derslik/loading": {},
+        "@/components/ui/badge": {},
+        "@/components/ui/card": {},
+        "@/components/ui/empty": {},
+        "@/components/ui/progress": {},
+        "@/components/ui/sheet": {},
+        "@/components/ui/tabs": {},
+        "../feedback": {},
+      },
+      globals: {
+        window: {
+          addEventListener: (type, listener) => listeners.set(type, listener),
+          removeEventListener: (type) => listeners.delete(type),
+        },
+      },
+    },
+  );
+  renderer.render(AccountExtras, {});
+  await tick();
+  assert.deepEqual(requests, ["/inbox"]);
+  // Yeni mesaj ve hemen ardından okundu: zil bir kez yenilenir.
+  listeners.get("derslik:inbox")();
+  listeners.get("derslik:inbox")();
+  await afterEvents();
+  assert.deepEqual(requests, ["/inbox", "/inbox"]);
+  renderer.unmount();
+  assert.equal(listeners.size, 0);
 });

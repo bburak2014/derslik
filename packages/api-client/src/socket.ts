@@ -1,7 +1,11 @@
-// Anlık mesajlaşma soketi: web ve mobil aynı istemciyi kullanır. Soket yalnızca
-// "şu yazışma değişti" der; mesajlar her zamanki REST uçlarından çekilir.
-// Bağlantı koparsa artan aralıklarla yeniden kurulur; kurulunca istemciye
-// `resync` gider (aradaki olaylar kaçmış olabilir, bir kez yenilenir).
+import type { ChatMessage } from "../../contracts/src/messages.ts";
+
+// Anlık mesajlaşma soketi: web ve mobil aynı istemciyi kullanır. Soket "şu
+// yazışma değişti" der; yeni mesajda mesajın kendisini de getirir, istemci onu
+// REST'ten yeniden çekmez. Mesajı olmayan olayda (okundu, eski sunucu, bozuk
+// mesaj) yazışma REST'ten yenilenir. Bağlantı koparsa artan aralıklarla
+// yeniden kurulur; kurulunca istemciye `resync` gider (aradaki olaylar kaçmış
+// olabilir, bir kez yenilenir).
 
 export type MessageSocketEvent =
   | {
@@ -10,6 +14,8 @@ export type MessageSocketEvent =
       student: string;
       /** Yazışmanın (portal bağlantısının) kimliği. */
       thread: string;
+      /** Yeni mesaj, alıcının REST'te göreceği biçimde. */
+      message?: ChatMessage;
     }
   | { type: "resync" };
 
@@ -36,6 +42,30 @@ const MAX_WAIT = 30_000;
 
 const isId = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= 64;
+const senderRoles = new Set(["OWNER", "STUDENT", "GUARDIAN", "OTHER"]);
+
+/** Olaydaki mesaj; biçimi tutmuyorsa yok sayılır (yazışma REST'ten yenilenir). */
+function chatMessage(value: unknown): ChatMessage | null {
+  if (!value || typeof value !== "object") return null;
+  const m = value as Record<string, unknown>;
+  if (
+    !isId(m.id) ||
+    typeof m.senderRole !== "string" ||
+    !senderRoles.has(m.senderRole) ||
+    typeof m.mine !== "boolean" ||
+    typeof m.body !== "string" ||
+    typeof m.createdAt !== "string" ||
+    Number.isNaN(Date.parse(m.createdAt))
+  )
+    return null;
+  return {
+    id: m.id,
+    senderRole: m.senderRole as ChatMessage["senderRole"],
+    mine: m.mine,
+    body: m.body,
+    createdAt: m.createdAt,
+  };
+}
 
 function parse(data: unknown): MessageSocketEvent | null {
   if (typeof data !== "string") return null;
@@ -47,13 +77,17 @@ function parse(data: unknown): MessageSocketEvent | null {
       isId(value.workspace) &&
       isId(value.student) &&
       isId(value.thread)
-    )
+    ) {
+      const message =
+        value.type === "message" ? chatMessage(value.message) : null;
       return {
         type: value.type,
         workspace: value.workspace,
         student: value.student,
         thread: value.thread,
+        ...(message && { message }),
       };
+    }
   } catch {
     // Bozuk ileti yok sayılır.
   }

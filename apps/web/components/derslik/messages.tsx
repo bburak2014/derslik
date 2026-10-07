@@ -21,6 +21,8 @@ import {
   senderLabel,
   t,
   threadTitle,
+  threadWithMessage,
+  threadsWithMessage,
   timeAgo,
   timeLabel,
   unreadBadge,
@@ -71,11 +73,12 @@ import { FormError } from "./feedback";
 import { Skeleton, Spinner } from "./loading";
 
 // Uygulama içi mesajlaşma: öğretmen çalışma alanı ve öğrenci/veli portalı
-// aynı bileşeni kullanır. Yeni mesaj soketle anında gelir: soket yalnızca
-// hangi yazışmanın değiştiğini söyler, mesajlar REST'ten çekilir. Soket
-// kuruluyken ya da kopukken yoklama sürer (açık yazışma 15 sn, liste ve
-// sayaçlar 60 sn; soket bağlıyken açık yazışma da 60 sn), yalnızca sekme
-// görünürken. Telefon numarası hiçbir yerde gösterilmez.
+// aynı bileşeni kullanır. Yeni mesaj soketle içeriğiyle anında gelir; ekrana
+// ve listeye REST'e gidilmeden eklenir. İçeriksiz olayda (okundu, yeniden
+// bağlanma) REST'ten yenilenir. Soket kuruluyken ya da kopukken yoklama sürer
+// (açık yazışma 15 sn, liste ve sayaçlar 60 sn; soket bağlıyken açık yazışma
+// da 60 sn), yalnızca sekme görünürken. Telefon numarası hiçbir yerde
+// gösterilmez.
 
 const LIST_POLL = 60_000,
   THREAD_POLL = 15_000,
@@ -202,13 +205,40 @@ export function useMessageThreads(path: string | null) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- yükleyici durumu yalnızca istek bitince yazar.
     void reload();
   }, [reload]);
-  // Yeni mesaj ya da başka sekmede okuma: liste, sayaç ve zil hemen yenilenir.
-  const reloadSoon = useCoalesced(() => {
+  // Yazışmanın kimliğinden başka bir şey bilinmiyorsa liste, sayaç ve zil
+  // yenilenir.
+  const reloadAll = () => {
     void reload();
     window.dispatchEvent(new Event("derslik:inbox"));
+  };
+  const reloadSoon = useCoalesced(reloadAll);
+  // Okundu olayı okunmamışı düşürür. Satır zaten okunmuş görünüyorsa (bu
+  // sekmenin kendi okumasının yankısı) yenilenecek bir şey yoktur; karar,
+  // okundu isteğinin yanıtı gelmiş olsun diye olaylar toplandıktan sonra verilir.
+  const reads = useRef(new Set<string>());
+  const readSoon = useCoalesced(() => {
+    const linkIds = [...reads.current];
+    reads.current.clear();
+    const unread = (id: string) =>
+      threads?.find((x) => x.linkId === id)?.unread !== 0;
+    if (linkIds.some(unread)) reloadAll();
   });
   useMessageEvents((event) => {
-    if (path && eventConcerns(path, event)) reloadSoon();
+    if (!path || !eventConcerns(path, event)) return;
+    if (event.type === "resync") return reloadSoon();
+    if (event.type === "read") {
+      reads.current.add(event.thread);
+      return readSoon();
+    }
+    const { message } = event;
+    if (!message || !threads?.some((x) => x.linkId === event.thread))
+      return reloadSoon();
+    // Mesaj soketle geldi: satır elden güncellenir, liste yeniden istenmez.
+    setThreads(
+      (old) => (old && threadsWithMessage(old, event.thread, message)) ?? old,
+    );
+    // Karşı taraftan gelen mesaj zile bildirim ekler; kişinin kendi mesajı eklemez.
+    if (!message.mine) window.dispatchEvent(new Event("derslik:inbox"));
   }, !!path);
   // Liste az önce alındıysa ya da tek satırını açık yazışma zaten yokluyorsa
   // (ör. öğrencinin tek yazışması açık) bu tur atlanır; aynı veri iki kez
@@ -865,8 +895,10 @@ function Conversation({
     // gider (sunucu ikinci kez kaydetmez). Gönderilince ya da metin değişince
     // bırakılır; aynı metin sonradan ayrı bir mesaj olarak gönderilebilir.
     sendKey = useRef<SendAttempt | null>(null),
-    // Aynı anda tek okundu isteği gider.
-    reading = useRef(false);
+    // Aynı anda tek okundu isteği gider; sürerken yeni mesaj gösterildiyse
+    // ardından o sayfayla bir kez daha gider.
+    reading = useRef(false),
+    readNext = useRef<Page | null>(null);
   const countId = useId();
   useEffect(() => {
     alive.current = true;
@@ -888,18 +920,29 @@ function Conversation({
    *  gösterilmeyen mesaj okunmamış kalır. */
   const read = useCallback(
     async (shown: Page) => {
-      if (!alive.current || reading.current) return;
+      if (!alive.current) return;
+      if (reading.current) {
+        readNext.current = shown;
+        return;
+      }
       reading.current = true;
-      const upTo = shown.messages.at(-1)?.createdAt;
+      let next: Page | null = shown;
       try {
-        await backend(path + "/read", upTo ? { upTo } : {});
-        upsert(linkId, { ...shown.thread, unread: 0 });
-        // Zildeki bildirim de okundu sayılmış olabilir; sayaç yenilensin.
-        window.dispatchEvent(new Event("derslik:inbox"));
+        while (next && alive.current) {
+          readNext.current = null;
+          const upTo = next.messages.at(-1)?.createdAt;
+          // eslint-disable-next-line no-await-in-loop -- okundu istekleri sırayla gider: sonraki tur, bu istek sürerken ekrana gelen mesajla yeniden okur; aynı anda iki istek eskisinin yanıtıyla sayacı geri yazabilir.
+          await backend(path + "/read", upTo ? { upTo } : {});
+          upsert(linkId, { ...next.thread, unread: 0 });
+          // Zildeki bildirim de okundu sayılmış olabilir; sayaç yenilensin.
+          window.dispatchEvent(new Event("derslik:inbox"));
+          next = readNext.current;
+        }
       } catch {
         // Yazışma okunmamış kalır; sonraki yoklama yeniden dener.
       } finally {
         reading.current = false;
+        readNext.current = null;
       }
     },
     [path, linkId, upsert],
@@ -956,15 +999,39 @@ function Conversation({
     () => void latest(false),
     live ? LIVE_THREAD_POLL : THREAD_POLL,
   );
-  // Bu yazışmaya yeni mesaj gelince hemen çekilir (okundu olayı listeyi
+  // İçeriksiz olayda yazışma REST'ten yenilenir (okundu olayı listeyi
   // yeniler, yazışmayı değil).
   const latestSoon = useCoalesced(() => void latest(false));
+  /** Soketten gelen yeni mesaj sayfaya eklenir; sayfa yeniden istenmez.
+   *  Ekranda olan mesaj (bu sekme gönderdi) bir şey değiştirmez. */
+  function receive(message: ChatMessage, old: Page) {
+    if (old.messages.some((m) => m.id === message.id)) return;
+    const next: Page = {
+      ...old,
+      thread: threadWithMessage(old.thread, message) ?? old.thread,
+      messages: merge(old.messages, [message]),
+    };
+    const scrolled = scrollAfterLatest(
+      false,
+      false,
+      [message],
+      atBottom.current,
+    );
+    if (scrolled !== undefined) scroll.current = scrolled;
+    current.current = next;
+    setPage(next);
+    setClock(Date.now());
+    if (message.mine) return;
+    setAnnounce(announcement([message], next.thread));
+    void read(next);
+  }
   useMessageEvents((event) => {
-    if (
-      event.type === "resync" ||
-      (event.type === "message" && event.thread === linkId)
-    )
-      latestSoon();
+    if (event.type === "resync") return latestSoon();
+    if (event.type !== "message" || event.thread !== linkId) return;
+    // Sayfa henüz yüklenmediyse yükleme bu mesajı kaçırmış olabilir.
+    if (event.message && current.current)
+      receive(event.message, current.current);
+    else latestSoon();
   });
   useEffect(() => {
     if (!refreshAt || refreshAt === seenRefresh.current) return;

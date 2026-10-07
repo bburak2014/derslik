@@ -96,6 +96,46 @@ export function senderLabel(m: ChatMessage, thread: MessageThread): string {
   return t("chat.someone");
 }
 
+/** Yazışma satırı, soketten gelen yeni mesajdan sonra: son mesaj sunucunun
+ *  listesindeki gibi ilk 200 karakteriyle, karşı taraftan geldiyse okunmamış
+ *  bir artar. Satır bu mesajı ya da daha yenisini zaten gösteriyorsa null. */
+export function threadWithMessage(
+  thread: MessageThread,
+  message: ChatMessage,
+): MessageThread | null {
+  if (
+    thread.lastAt &&
+    Date.parse(thread.lastAt) >= Date.parse(message.createdAt)
+  )
+    return null;
+  return {
+    ...thread,
+    lastBody: Array.from(message.body).slice(0, 200).join(""),
+    lastAt: message.createdAt,
+    lastMine: message.mine,
+    unread: message.mine ? thread.unread : thread.unread + 1,
+  };
+}
+
+/** Yazışma listesi, soketten gelen yeni mesajdan sonra: satır güncellenir ve
+ *  sunucunun sırasıyla (son mesajı en yeni olan başta, mesajsızlar sonda)
+ *  yerine geçer; öteki satırların sırası değişmez. Yazışma listede yoksa ya
+ *  da mesajı zaten gösteriyorsa null (liste değişmez). */
+export function threadsWithMessage(
+  threads: readonly MessageThread[],
+  linkId: string,
+  message: ChatMessage,
+): MessageThread[] | null {
+  const row = threads.find((x) => x.linkId === linkId);
+  const next = row && threadWithMessage(row, message);
+  if (!next) return null;
+  const last = (x: MessageThread) =>
+    x.lastAt ? Date.parse(x.lastAt) : -Infinity;
+  return threads
+    .map((x) => (x === row ? next : x))
+    .sort((a, b) => last(b) - last(a) || 0);
+}
+
 /** Okunmamış mesaj sayacı. Velinin yalnızca okuduğu çocuk yazışması sayılmaz. */
 export function unreadBadge(threads: MessageThread[]): number {
   return threads.reduce(

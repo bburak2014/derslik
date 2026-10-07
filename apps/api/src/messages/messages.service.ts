@@ -173,10 +173,15 @@ export class MessagesService {
           ? { studentId: student, permission: "lessons", write: false }
           : undefined,
       );
-      // Commit'ten sonra: alıcılar yazışmayı anında yeniler. Aynı anahtarla
-      // tekrar (replayed) yeni mesaj yazmaz, olay da göndermez.
+      // Commit'ten sonra: alıcılar mesajı soketten anında alır. Aynı
+      // anahtarla tekrar (replayed) yeni mesaj yazmaz, olay da göndermez.
       if (!result.replayed)
-        this.realtime.publish({ t: "message", w: ws, l: link });
+        this.realtime.publish({
+          t: "message",
+          w: ws,
+          l: link,
+          m: (result.data as { id: string }).id,
+        });
       return result;
     } catch (error) {
       // Erişim, ilk denetimle kilit arasında kalktıysa (erişim kaldırma,
