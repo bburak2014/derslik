@@ -274,15 +274,17 @@ export default function Workspace({
   const inFlight = useRef(false),
     retryKeys = useRef(new Map<string, string>());
   const workspaceId = connected.id;
-  const reload = useCallback(async () => {
+  // `fresh`: kayıttan sonra ya da yeniden denemede sürmekte olan yükleme
+  // paylaşılmaz, sunucudan yenisi alınır.
+  const reload = useCallback(async (fresh = false) => {
     try {
-      const r = await workspaceResponse(workspaceId);
-      if (await accountChanged(r)) {
+      const r = await workspaceResponse(workspaceId, fresh);
+      if (r.accountChanged) {
         location.reload();
         return false;
       }
-      const json = (await r.json()) as WorkspaceData & { error?: string };
-      if (!r.ok) throw new Error(json.error || t("ws.loadFailed"));
+      const json = r.body as (WorkspaceData & { error?: string }) | null;
+      if (!r.ok || !json) throw new Error(json?.error || t("ws.loadFailed"));
       setData(json);
       setLoadError("");
       return true;
@@ -468,7 +470,7 @@ export default function Workspace({
       const result = (await r.json()) as { error?: string };
       if (!r.ok) throw new Error(result.error || t("ws.saveFailed"));
       retryKeys.current.delete(signature);
-      const refreshed = await reload();
+      const refreshed = await reload(true);
       toast.success(message, {
         description: refreshed ? undefined : t("ws.savedRefresh"),
       });
@@ -603,7 +605,7 @@ export default function Workspace({
             size="icon"
             variant="ghost"
             aria-label={t("ws.refresh")}
-            onClick={() => void reload()}
+            onClick={() => void reload(true)}
             disabled={busy || loading}
           >
             <RefreshCw size={17} className={loading ? "animate-spin" : ""} />
@@ -630,7 +632,7 @@ export default function Workspace({
           {loadError && (
             <div className="error-banner" role="alert">
               <span>{loadError}</span>
-              <Button size="sm" variant="outline" onClick={() => void reload()}>
+              <Button size="sm" variant="outline" onClick={() => void reload(true)}>
                 {t("common.retry")}
               </Button>
             </div>
@@ -733,7 +735,7 @@ export default function Workspace({
                   fallbackName={connected.name}
                   focus={showcaseFocus}
                   onPending={setRequests}
-                  onAccepted={() => void reload()}
+                  onAccepted={() => void reload(true)}
                   onOpenStudent={setStudentId}
                 />
               )}

@@ -154,7 +154,11 @@ test(
         NODE_ENV: "test",
         DATABASE_URL: runtimeUrl,
         AUTH_ISSUER: issuer,
-        CORS_ORIGINS: "http://localhost:3000",
+        // İzole web (security:web-fixture, 127.0.0.1:3100) mesaj soketine
+        // bağlanabilsin; yoksa her sayfada el sıkışma 403 alırdı.
+        CORS_ORIGINS: securityFixture
+          ? "http://localhost:3000,http://127.0.0.1:3100"
+          : "http://localhost:3000",
         SUPABASE_PUBLISHABLE_KEY: "test-publishable-key",
         SUPABASE_SERVICE_ROLE_KEY: randomUUID(),
         CLOUDFLARE_ACCOUNT_ID: "a".repeat(32),

@@ -59,6 +59,13 @@ export async function learningCases({
     fileObjects = new Map();
   let reservations = 0,
     deleted = 0;
+  // Temizleme işi API'nin havuzunu doğrudan kullanır. Reddedilen bir isteğin
+  // ROLLBACK'i yanıttan sonra bitebilir; PGlite tek oturumdur, admin sorgusu
+  // önce oturumun boşalmasını bekler.
+  const purge = async () => {
+    await admin.query("SELECT 1");
+    return cleanup.run();
+  };
   async function webhook(
     body,
     time = Math.floor(Date.now() / 1000),
@@ -740,7 +747,7 @@ export async function learningCases({
       const held = await reserve();
       assert.equal(held.status, 409, JSON.stringify(held.body));
       assert.match(held.body.error.message, /Dosya depolama sınırı dolu/);
-      assert.ok((await cleanup.run()) >= stale.length);
+      assert.ok((await purge()) >= stale.length);
       assert.ok(!fileObjects.has(stale[0].object_key));
       assert.equal(
         (
@@ -845,7 +852,7 @@ export async function learningCases({
       assert.equal(full.status, 409, JSON.stringify(full.body));
       assert.match(full.body.error.message, /Dosya depolama sınırı dolu/);
       // Bağlantı bitmeden temizlenmez; ikinci silme de nesneyi siler.
-      await cleanup.run();
+      await purge();
       assert.ok(fileObjects.has(key));
       await ok(media + `/files/${f.id}/delete`, {});
       assert.ok(!fileObjects.has(key));
@@ -854,7 +861,7 @@ export async function learningCases({
         "UPDATE derslik.materials SET upload_window_ends=now()-interval '1 minute' WHERE id=$1",
         [f.id],
       );
-      assert.ok((await cleanup.run()) >= 1);
+      assert.ok((await purge()) >= 1);
       assert.ok(!fileObjects.has(key));
       assert.ok(
         (
