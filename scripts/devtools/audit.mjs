@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { analyzeMessageSend, analyzeWindow, DevtoolsRecorder } from "./network-audit.mjs";
 import { launchDevtoolsBrowser } from "./cdp-browser.mjs";
 
@@ -29,29 +30,28 @@ const DEFAULT_ROUTES = {
   ],
 };
 
-const baseUrl = process.env.DEVTOOLS_BASE_URL ?? "http://127.0.0.1:3000";
-const profile = process.env.DEVTOOLS_PROFILE ?? "public";
-const reportPath = process.env.DEVTOOLS_REPORT ?? "reports/devtools-audit.json";
-const settleMs = Number(process.env.DEVTOOLS_SETTLE_MS ?? 1200);
-const duplicateWindowMs = Number(process.env.DEVTOOLS_DUPLICATE_WINDOW_MS ?? 800);
-
-function routes() {
-  const explicit = process.env.DEVTOOLS_ROUTES;
-  if (explicit)
-    return explicit
-      .split(",")
-      .map((route) => route.trim())
-      .filter(Boolean);
-  const selected = DEFAULT_ROUTES[profile];
-  if (!selected)
+export function auditConfiguration(env = process.env) {
+  const profile = env.DEVTOOLS_PROFILE ?? "public";
+  const explicit = env.DEVTOOLS_ROUTES;
+  const routes = explicit
+    ? explicit.split(",").map((route) => route.trim()).filter(Boolean)
+    : DEFAULT_ROUTES[profile];
+  if (!routes)
     throw new Error(
       `Bilinmeyen DEVTOOLS_PROFILE=${profile}. public, teacher veya portal kullanın.`,
     );
-  return selected;
+  return {
+    baseUrl: env.DEVTOOLS_BASE_URL ?? "http://127.0.0.1:3000",
+    profile,
+    routes,
+    reportPath: env.DEVTOOLS_REPORT ?? "reports/devtools-audit.json",
+    settleMs: Number(env.DEVTOOLS_SETTLE_MS ?? 1200),
+    duplicateWindowMs: Number(env.DEVTOOLS_DUPLICATE_WINDOW_MS ?? 800),
+  };
 }
 
-function absolute(route) {
-  return new URL(route, baseUrl).toString();
+function absolute(route, config) {
+  return new URL(route, config.baseUrl).toString();
 }
 
 function printResult(name, result) {
@@ -98,14 +98,14 @@ async function fillAndSend(page, text) {
   })()`);
 }
 
-async function auditRoute(page, recorder, route) {
+async function auditRoute(page, recorder, route, config) {
   const mark = recorder.checkpoint();
-  await page.navigate(absolute(route));
-  await page.settle(settleMs);
+  await page.navigate(absolute(route, config));
+  await page.settle(config.settleMs);
   const window = recorder.window(mark);
   return {
     route,
-    result: analyzeWindow(window, { duplicateWindowMs }),
+    result: analyzeWindow(window, { duplicateWindowMs: config.duplicateWindowMs }),
     counts: {
       requests: window.requests.length,
       responses: window.responses.length,
@@ -115,23 +115,23 @@ async function auditRoute(page, recorder, route) {
   };
 }
 
-async function auditMessageSend(page, recorder) {
-  const route = process.env.DEVTOOLS_MESSAGE_URL;
+async function auditMessageSend(page, recorder, config, env) {
+  const route = env.DEVTOOLS_MESSAGE_URL;
   if (!route) return null;
-  await page.navigate(absolute(route));
+  await page.navigate(absolute(route, config));
   await page.waitFor(`document.querySelector('textarea')`);
-  await page.settle(settleMs);
+  await page.settle(config.settleMs);
   const socketCreatedBeforeSend = recorder.websockets.created.length;
   const mark = recorder.checkpoint();
   const text =
-    process.env.DEVTOOLS_MESSAGE_TEXT ?? `devtools-${Date.now().toString(36)}`;
+    env.DEVTOOLS_MESSAGE_TEXT ?? `devtools-${Date.now().toString(36)}`;
   await fillAndSend(page, text);
-  await page.settle(settleMs);
+  await page.settle(config.settleMs);
   const window = recorder.window(mark);
   const send = analyzeMessageSend(window);
-  const general = analyzeWindow(window, { duplicateWindowMs });
+  const general = analyzeWindow(window, { duplicateWindowMs: config.duplicateWindowMs });
   const problems = [...send.problems, ...general.problems];
-  const requireSocket = process.env.DEVTOOLS_ALLOW_NO_SOCKET !== "1";
+  const requireSocket = env.DEVTOOLS_ALLOW_NO_SOCKET !== "1";
   const socketSeen =
     socketCreatedBeforeSend > 0 || window.websockets.created.length > 0;
   if (requireSocket && !socketSeen)
@@ -152,17 +152,20 @@ async function auditMessageSend(page, recorder) {
   };
 }
 
-async function main() {
-  const browser = await launchDevtoolsBrowser();
+export async function runAudit({ env = process.env, launchBrowser = launchDevtoolsBrowser } = {}) {
+  const config = auditConfiguration(env);
+  const { baseUrl, profile, reportPath, settleMs, duplicateWindowMs } = config;
+  const browser = await launchBrowser();
   const recorder = new DevtoolsRecorder(browser.session);
   const rows = [];
   let message = null;
   try {
-    if (process.env.DEVTOOLS_COOKIE)
-      await browser.page.setCookieHeader(process.env.DEVTOOLS_COOKIE, baseUrl);
-    for (const route of routes()) {
+    if (env.DEVTOOLS_COOKIE)
+      await browser.page.setCookieHeader(env.DEVTOOLS_COOKIE, baseUrl);
+    // All routes share one page and recorder; finish each capture before navigating again.
+    await config.routes.reduce((previous, route) => previous.then(async () => {
       try {
-        const row = await auditRoute(browser.page, recorder, route);
+        const row = await auditRoute(browser.page, recorder, route, config);
         rows.push(row);
         printResult(`${profile} ${route}`, row.result);
       } catch (error) {
@@ -170,14 +173,14 @@ async function main() {
         rows.push({ route, result, counts: {} });
         printResult(`${profile} ${route}`, result);
       }
-    }
+    }), Promise.resolve());
     try {
-      message = await auditMessageSend(browser.page, recorder);
+      message = await auditMessageSend(browser.page, recorder, config, env);
       if (message)
         printResult("mesaj gönderimi / network + WebSocket", message);
     } catch (error) {
       message = {
-        route: process.env.DEVTOOLS_MESSAGE_URL,
+        route: env.DEVTOOLS_MESSAGE_URL,
         ok: false,
         problems: [String(error.message ?? error)],
       };
@@ -200,7 +203,10 @@ async function main() {
   await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   console.log(`DevTools raporu: ${reportPath}`);
-  if (report.failed) process.exitCode = 1;
+  return report;
 }
 
-await main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  const report = await runAudit();
+  process.exitCode = report.failed ? 1 : 0;
+}
