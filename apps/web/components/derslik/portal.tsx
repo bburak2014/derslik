@@ -1,4 +1,6 @@
 "use client";
+import { BRAND_CAPS } from "@derslik/contracts/brand";
+import { BrandLockup } from "@/components/brand-mark";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Access, PortalData } from "@derslik/api-client";
@@ -274,10 +276,7 @@ function PortalBrand({ onHome }: Readonly<{ onHome: () => void }>) {
         setOpenMobile(false);
       }}
     >
-      <BookOpen />
-      <span>
-        derslik<span className="brand-dot">.</span>
-      </span>
+      <BrandLockup />
     </Link>
   );
 }
@@ -558,7 +557,7 @@ export function Portal({
           <div className="page-heading">
             <div>
               <p className="eyebrow">
-                {upper("Derslik") + " / " + upper(t(heading.label))}
+                {BRAND_CAPS + " / " + upper(t(heading.label))}
               </p>
               <h1>{t(heading.label)}</h1>
               <p>{t(heading.subtitle)}</p>

@@ -268,10 +268,20 @@
     color: var(--sidebar-accent-foreground);
     font-weight: 800;
   }
+  /* Tutorwise Academy işareti: lacivert kısımlar yazının rengini alır
+     (koyu kenar çubuğunda açık); sayfalar kendi renklerinde. */
   .brand > svg {
-    width: 29px;
-    height: 29px;
-    color: var(--sidebar-primary);
+    flex: none;
+    width: auto;
+    height: 1.15em;
+    color: inherit;
+  }
+  /* Logodaki yazı: Montserrat, çok kalın; kenar çubuğuna sığsın diye küçük. */
+  .brand-name {
+    font-family: var(--font-brand), var(--font-display, sans-serif);
+    font-size: 0.78em;
+    font-weight: 800;
+    letter-spacing: -0.01em;
   }
   .sidebar-kicker {
     font-size: 10px;
@@ -541,9 +551,6 @@
     font-size: 11px;
     font-weight: 400;
     margin-left: 12px;
-  }
-  .workspace-footer .brand-dot {
-    color: var(--brand);
   }
   .error-banner {
     justify-content: space-between;
@@ -1535,9 +1542,6 @@
     color: white;
     margin: 0;
   }
-  .auth-story .brand-dot {
-    color: var(--sidebar-primary);
-  }
   .auth-story-label {
     font-size: 0.75rem;
     font-weight: 650;
@@ -2336,9 +2340,6 @@
   }
   [data-slot="sidebar-container"] {
     border-right-color: var(--navy) !important;
-  }
-  .brand-dot {
-    color: var(--marker);
   }
   /* Etkin sayfa, defter ayracı gibi kağıda bağlanır: sağ kenara kadar uzanır
    ve zemin rengini alır. */

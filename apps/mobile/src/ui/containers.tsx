@@ -164,7 +164,8 @@ export function SectionHeading({
 export type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 /** Üst başlık (web: .eyebrow). Metni etkin dilin kurallarıyla büyük harfe
- *  çevirir: Türkçede "Derslik hesabı" -> "DERSLİK HESABI". */
+ *  çevirir: Türkçede "öğrenci hesabı" -> "ÖĞRENCİ HESABI"; marka adı düz
+ *  büyür ("TUTORWISE"). */
 export function Kicker({
   children,
   muted = false,

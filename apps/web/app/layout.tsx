@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Onest } from "next/font/google";
+import { Bricolage_Grotesque, Montserrat, Onest } from "next/font/google";
 import { cookies } from "next/headers";
 import { translate } from "@derslik/contracts";
 import { allCatalogs } from "@derslik/contracts/i18n/all";
@@ -25,7 +25,16 @@ const bricolage = Bricolage_Grotesque({
   preload: false,
   variable: "--font-derslik-display",
 });
-const fonts = `${onest.variable} ${bricolage.variable}`;
+// Logodaki "Tutorwise" yazısı (Tutorwise Academy logosu): tek ağırlık,
+// yalnız marka yazısında kullanılır.
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: "800",
+  display: "swap",
+  preload: false,
+  variable: "--font-brand",
+});
+const fonts = `${onest.variable} ${bricolage.variable} ${montserrat.variable}`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await serverLocale();

@@ -277,7 +277,7 @@ export const en: Messages = {
     videoUploadUrlInvalid: "The video upload address is invalid.",
   },
   auth: {
-    account: "Derslik account",
+    account: "Tutorwise account",
     callbackFailed:
       "Sign-in couldn't be completed. The link may have been cancelled or expired. Please try again.",
     checkInbox: "Check your inbox. You can continue with the link we sent you.",
@@ -438,8 +438,8 @@ export const en: Messages = {
     feedRotated:
       "Your new link is ready. Remove the old one from your calendar and add this one.",
     feedTitle: "Add your lessons to your calendar",
-    icsDescription: "Open Derslik for lesson details: {url}",
-    icsName: "Derslik lessons",
+    icsDescription: "Open Tutorwise for lesson details: {url}",
+    icsName: "Tutorwise lessons",
     icsSummaryGuardian: "{student}: {topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
@@ -597,11 +597,11 @@ export const en: Messages = {
     failedTitle: "Couldn't connect",
     inviteText:
       "You're signed in as {email}. An invitation can only be accepted with the email address it was sent to; if it was sent to a different address, sign in with that account below.",
-    inviteTitle: "Your Derslik invitation",
+    inviteTitle: "Your Tutorwise invitation",
     noticeNoAccess:
       "You no longer have access to the area this notification belongs to.",
     otherAccount: "Sign in with another account",
-    setupEyebrow: "Set up your Derslik.",
+    setupEyebrow: "Set up your Tutorwise.",
     setupText:
       "If you're a teacher, create a workspace. If you're a student or parent, open the invitation link your teacher sent you.",
     setupTitle: "Let's take the first step.",
@@ -878,7 +878,7 @@ export const en: Messages = {
     weekStart: "Week starting",
     weeklySummary: "Weekly summary",
     whatsappBody:
-      "I've set up a Derslik account for you. You can sign in using the link below within 7 days:",
+      "I've set up a Tutorwise account for you. You can sign in using the link below within 7 days:",
     whatsappHello: "Hi,",
     whatsappHelloName: "Hi {name},",
     writeFeedback: "Write feedback",
@@ -905,13 +905,13 @@ export const en: Messages = {
   },
   mail: {
     inviteIntroGuardian:
-      "Parent access to Derslik has been set up for you for {name}.",
+      "Parent access to Tutorwise has been set up for you for {name}.",
     inviteIntroStudent:
-      "Student access to Derslik has been set up for you for {name}.",
+      "Student access to Tutorwise has been set up for you for {name}.",
     inviteOpen: "Open invitation",
     inviteSignIn:
       "Sign in using the link below within 7 days. You can only accept the invitation with an account that uses this email address.",
-    inviteSubject: "Derslik invitation · {name}",
+    inviteSubject: "Tutorwise invitation · {name}",
     inviteValidity:
       "The link is valid for 7 days. You can only accept the invitation with an account that uses this email address.",
     reminderSubject: "Lesson reminder · {time}",
@@ -924,8 +924,8 @@ export const en: Messages = {
   },
   meta: {
     description: "Your students, lessons and payments in one place.",
-    title: "Derslik · Teacher workspace",
-    titleStudent: "Derslik · Student workspace",
+    title: "Tutorwise · Teacher workspace",
+    titleStudent: "Tutorwise · Student workspace",
   },
   ml: {
     active: "Active",
@@ -965,7 +965,7 @@ export const en: Messages = {
     resumeUpload: "Resume upload",
     revokeBody: "This account will no longer see the student's information.",
     send: "Send",
-    shareInvite: "Your Derslik invitation (valid for 7 days): {url}",
+    shareInvite: "Your Tutorwise invitation (valid for 7 days): {url}",
     studentArea: "Student workspace",
     summaryDraft: "Draft summary",
     unreadCount: {
@@ -1026,7 +1026,7 @@ export const en: Messages = {
     amountField: "Amount received (₺)",
     archiveBody:
       "First complete or cancel any scheduled lessons. Past records are kept.",
-    balanceNote: "Student payments, not your Derslik subscription.",
+    balanceNote: "Student payments, not your Tutorwise subscription.",
     busy: "The previous action is still finishing.",
     calendarDate: "Calendar date",
     cancelBody: "No lesson credit will be used.",
@@ -1199,7 +1199,7 @@ export const en: Messages = {
     step2Title: "Set up their package",
     step3Text: "When it's completed, a credit is deducted automatically.",
     step3Title: "Schedule the first lesson",
-    welcome: "Welcome to Derslik",
+    welcome: "Welcome to Tutorwise",
   },
   payments: {
     actionsFor: "Payment actions for {name}",
@@ -1469,7 +1469,7 @@ export const en: Messages = {
     sessionEnded: "Your session has ended.",
     setupBody:
       "The app's connection settings haven't been completed yet. Complete the web and API settings in the setup guide and restart.",
-    setupTitle: "Derslik setup",
+    setupTitle: "Tutorwise setup",
     signIn: "Please sign in.",
     signinFailed:
       "Couldn't sign in. Check your details and make sure your email is verified.",
@@ -1491,7 +1491,7 @@ export const en: Messages = {
     focusOnTeaching: "Focus on teaching.",
     footerTagline: "More time for teaching.",
     footerTimezone: "Turkey time · Istanbul",
-    homeLink: "Derslik home",
+    homeLink: "Tutorwise home",
     loadFailed: "Records couldn't be loaded.",
     myWorkspace: "My workspace",
     noteBig: "Big progress.",
@@ -1672,7 +1672,7 @@ export const en: Messages = {
     viewPublic: "Open public page",
     viewTeacher: "View profile",
     welcomeText: "How would you like to continue?",
-    welcomeTitle: "Welcome to Derslik",
+    welcomeTitle: "Welcome to Tutorwise",
     writeReview: "Write a review",
     yourReview: "Your review",
     experience: {

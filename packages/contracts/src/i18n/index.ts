@@ -8,6 +8,7 @@ import {
   type Plural,
 } from "./core.ts";
 import { tr } from "./tr.ts";
+import { BRAND_CAPS, BRAND_NAME } from "../brand.ts";
 
 export * from "./core.ts";
 export * from "./flags.ts";
@@ -80,9 +81,13 @@ export function translate(
 export const t = (key: MessageKey, params?: Params) =>
   translate(current, key, params);
 
-/** Dile uygun büyük harf: Türkçede i → İ, diğer dillerde i → I. */
+/** Dile uygun büyük harf: Türkçede i → İ, diğer dillerde i → I. Marka adı
+ *  her dilde düz büyütülür ("TUTORWISE"; Türkçe kuralıyla "TUTORWİSE" olurdu). */
 export const upper = (text: string, locale: Locale = current) =>
-  text.toLocaleUpperCase(intlTags[locale]);
+  text
+    .split(BRAND_NAME)
+    .map((part) => part.toLocaleUpperCase(intlTags[locale]))
+    .join(BRAND_CAPS);
 
 /** Adları etkin dilin alfabe sırasına göre karşılaştırır. */
 export const compareText = (a: string, b: string) =>

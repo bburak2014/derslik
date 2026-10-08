@@ -1,4 +1,6 @@
 "use client";
+import { BRAND_CAPS } from "@derslik/contracts/brand";
+import { BrandLockup } from "@/components/brand-mark";
 import { TeachingHub, isTeachingView, type TeachingView } from "./teaching-hub";
 import { AccountExtras, type NoticeFocus } from "./learning-panel";
 import { t, upper, type MessageKey, type Showcase } from "@derslik/contracts";
@@ -9,7 +11,6 @@ import {
   workspaceResponse,
 } from "@/lib/workspace-prefetch";
 import {
-  BookOpen,
   CalendarDays,
   LayoutDashboard,
   Users,
@@ -557,10 +558,7 @@ export default function Workspace({
       <Sidebar>
         <SidebarHeader className="p-7">
           <a href="/" className="brand" aria-label={t("ws.homeLink")}>
-            <BookOpen />
-            <span>
-              derslik<span className="brand-dot">.</span>
-            </span>
+            <BrandLockup />
           </a>
           <p className="sidebar-kicker">{upper(t("ws.teacherWorkspace"))}</p>
         </SidebarHeader>
@@ -743,7 +741,7 @@ export default function Workspace({
           )}
           <footer className="workspace-footer">
             <span>
-              derslik<span className="brand-dot">.</span>{" "}
+              Tutorwise{" "}
               <span>{t("ws.footerTagline")}</span>
             </span>
             <span>{t("ws.footerTimezone")}</span>
@@ -871,7 +869,7 @@ function focusedUrlOf(
 const eyebrowFor = (view: View) =>
   view === "overview"
     ? upper(t("ws.focusOnTeaching"))
-    : upper("Derslik") +
+    : BRAND_CAPS +
       " / " +
       upper(t(navigation.find((n) => n.id === view)!.label));
 
