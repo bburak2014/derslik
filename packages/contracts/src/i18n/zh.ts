@@ -233,7 +233,7 @@ export const zh: Messages = {
     videoUploadUrlInvalid: "视频上传地址无效。",
   },
   auth: {
-    account: "Derslik 账号",
+    account: "Tutorwise 账号",
     callbackFailed: "登录未能完成，链接可能已被撤销或已过期，请重试。",
     checkInbox: "请查看您的邮箱，通过邮件中的链接继续。",
     continueWith: "使用 {name} 继续",
@@ -379,8 +379,8 @@ export const zh: Messages = {
     feedRotateTitle: "要生成新链接吗？",
     feedRotated: "新链接已生成。请从日历中移除旧链接，并添加这个新链接。",
     feedTitle: "将课程添加到您的日历",
-    icsDescription: "打开 Derslik 查看课程详情：{url}",
-    icsName: "Derslik 课程",
+    icsDescription: "打开 Tutorwise 查看课程详情：{url}",
+    icsName: "Tutorwise 课程",
     icsSummaryGuardian: "{student}：{topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
@@ -521,10 +521,10 @@ export const zh: Messages = {
     failedTitle: "连接失败",
     inviteText:
       "您当前以 {email} 登录。邀请只能用接收邀请的邮箱地址接受；如果邀请发送到了其他地址，请在下方使用该账号登录。",
-    inviteTitle: "您的 Derslik 邀请",
+    inviteTitle: "您的 Tutorwise 邀请",
     noticeNoAccess: "您已无权访问此通知所属的区域。",
     otherAccount: "使用其他账号登录",
-    setupEyebrow: "准备好您的 Derslik。",
+    setupEyebrow: "准备好您的 Tutorwise。",
     setupText:
       "如果您是老师，请创建工作区；如果您是学生或家长，请打开老师发给您的邀请链接。",
     setupTitle: "迈出第一步。",
@@ -780,7 +780,7 @@ export const zh: Messages = {
     weekStart: "周起始日",
     weeklySummary: "每周总结",
     whatsappBody:
-      "我已在 Derslik 为您创建了账号。请在 7 天内通过下方链接登录：",
+      "我已在 Tutorwise 为您创建了账号。请在 7 天内通过下方链接登录：",
     whatsappHello: "您好：",
     whatsappHelloName: "{name}，您好：",
     writeFeedback: "写反馈",
@@ -805,12 +805,12 @@ export const zh: Messages = {
     scheduled: "已安排",
   },
   mail: {
-    inviteIntroGuardian: "已为您开通 {name} 在 Derslik 上的家长访问权限。",
-    inviteIntroStudent: "已为您开通 {name} 在 Derslik 上的学生访问权限。",
+    inviteIntroGuardian: "已为您开通 {name} 在 Tutorwise 上的家长访问权限。",
+    inviteIntroStudent: "已为您开通 {name} 在 Tutorwise 上的学生访问权限。",
     inviteOpen: "打开邀请",
     inviteSignIn:
       "请在 7 天内通过下方链接登录。只有使用此邮箱地址的账号才能接受邀请。",
-    inviteSubject: "Derslik 邀请 · {name}",
+    inviteSubject: "Tutorwise 邀请 · {name}",
     inviteValidity: "链接 7 天内有效。只有使用此邮箱地址的账号才能接受邀请。",
     reminderSubject: "课程提醒 · {time}",
     reminderIntroStudent: "您与 {teacher} 的课程即将开始。",
@@ -822,8 +822,8 @@ export const zh: Messages = {
   },
   meta: {
     description: "学生、课程和收款，一处管理。",
-    title: "Derslik · 老师工作区",
-    titleStudent: "Derslik · 学生学习空间",
+    title: "Tutorwise · 老师工作区",
+    titleStudent: "Tutorwise · 学生学习空间",
   },
   ml: {
     active: "有效",
@@ -862,7 +862,7 @@ export const zh: Messages = {
     resumeUpload: "继续上传",
     revokeBody: "此账号将无法再查看该学生的信息。",
     send: "发送",
-    shareInvite: "您的 Derslik 邀请（7 天内有效）：{url}",
+    shareInvite: "您的 Tutorwise 邀请（7 天内有效）：{url}",
     studentArea: "学生学习空间",
     summaryDraft: "总结草稿",
     unreadCount: {
@@ -917,7 +917,7 @@ export const zh: Messages = {
     addPackage: "添加课时包",
     amountField: "收款金额（₺）",
     archiveBody: "请先完成或取消已安排的课程。历史记录会保留。",
-    balanceNote: "学生的课费收款，不是 Derslik 订阅费用。",
+    balanceNote: "学生的课费收款，不是 Tutorwise 订阅费用。",
     busy: "上一项操作仍在进行中。",
     calendarDate: "日历日期",
     cancelBody: "不会扣除课时。",
@@ -1082,7 +1082,7 @@ export const zh: Messages = {
     step2Title: "创建课时包",
     step3Text: "课程完成后自动扣除课时。",
     step3Title: "安排第一节课",
-    welcome: "欢迎使用 Derslik",
+    welcome: "欢迎使用 Tutorwise",
   },
   payments: {
     actionsFor: "{name} 的收款操作",
@@ -1325,7 +1325,7 @@ export const zh: Messages = {
     sessionEnded: "您的会话已结束。",
     setupBody:
       "应用的连接设置尚未完成。请按照安装指南完成网页端和 API 设置后重启。",
-    setupTitle: "Derslik 设置",
+    setupTitle: "Tutorwise 设置",
     signIn: "请登录。",
     signinFailed: "登录失败。请检查您的信息以及邮箱是否已验证。",
     signoutFailed: "退出登录未能完成。",
@@ -1342,7 +1342,7 @@ export const zh: Messages = {
     focusOnTeaching: "专注于教学。",
     footerTagline: "把更多时间留给教学。",
     footerTimezone: "土耳其时间 · 伊斯坦布尔",
-    homeLink: "Derslik 首页",
+    homeLink: "Tutorwise 首页",
     loadFailed: "无法加载记录。",
     myWorkspace: "我的工作区",
     noteBig: "大进步。",
@@ -1507,7 +1507,7 @@ export const zh: Messages = {
     viewPublic: "打开公开页面",
     viewTeacher: "查看资料",
     welcomeText: "你想如何继续？",
-    welcomeTitle: "欢迎使用 Derslik",
+    welcomeTitle: "欢迎使用 Tutorwise",
     writeReview: "写评价",
     yourReview: "你的评价",
     experience: {

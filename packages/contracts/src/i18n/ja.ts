@@ -271,7 +271,7 @@ export const ja: Messages = {
     videoUploadUrlInvalid: "動画のアップロード先アドレスが無効です。",
   },
   auth: {
-    account: "Derslik アカウント",
+    account: "Tutorwise アカウント",
     callbackFailed:
       "ログインを完了できませんでした。リンクが取り消されたか、期限切れの可能性があります。もう一度お試しください。",
     checkInbox: "メールをご確認ください。届いたリンクから続行できます。",
@@ -429,8 +429,8 @@ export const ja: Messages = {
     feedRotated:
       "新しいリンクができました。古いリンクをカレンダーから削除し、こちらを追加してください。",
     feedTitle: "授業をカレンダーに追加",
-    icsDescription: "授業の詳細は Derslik で確認できます: {url}",
-    icsName: "Derslik の授業",
+    icsDescription: "授業の詳細は Tutorwise で確認できます: {url}",
+    icsName: "Tutorwise の授業",
     icsSummaryGuardian: "{student}: {topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
@@ -579,10 +579,10 @@ export const ja: Messages = {
     failedTitle: "接続できません",
     inviteText:
       "{email} でログインしています。招待は送信先のメールアドレスでのみ承認できます。別のアドレスに届いた場合は、下からそのアカウントでログインしてください。",
-    inviteTitle: "Derslik への招待",
+    inviteTitle: "Tutorwise への招待",
     noticeNoAccess: "この通知の対象にアクセスする権限がなくなりました。",
     otherAccount: "別のアカウントでログイン",
-    setupEyebrow: "Derslik の準備をしましょう。",
+    setupEyebrow: "Tutorwise の準備をしましょう。",
     setupText:
       "講師の方はワークスペースを作成してください。生徒・保護者の方は、講師から届いた招待リンクを開いてください。",
     setupTitle: "最初の一歩を踏み出しましょう。",
@@ -846,7 +846,7 @@ export const ja: Messages = {
     weekStart: "週の開始日",
     weeklySummary: "週のまとめ",
     whatsappBody:
-      "Derslik にあなたのアカウントを作成しました。7 日以内に下のリンクからログインしてください。",
+      "Tutorwise にあなたのアカウントを作成しました。7 日以内に下のリンクからログインしてください。",
     whatsappHello: "こんにちは。",
     whatsappHelloName: "{name} さん、こんにちは。",
     writeFeedback: "フィードバックを書く",
@@ -872,13 +872,13 @@ export const ja: Messages = {
   },
   mail: {
     inviteIntroGuardian:
-      "{name} さんの保護者として、Derslik へのアクセスが設定されました。",
+      "{name} さんの保護者として、Tutorwise へのアクセスが設定されました。",
     inviteIntroStudent:
-      "{name} さんの生徒アカウントとして、Derslik へのアクセスが設定されました。",
+      "{name} さんの生徒アカウントとして、Tutorwise へのアクセスが設定されました。",
     inviteOpen: "招待を開く",
     inviteSignIn:
       "7 日以内に下のリンクからログインしてください。招待は、このメールアドレスのアカウントでのみ承認できます。",
-    inviteSubject: "Derslik への招待 · {name}",
+    inviteSubject: "Tutorwise への招待 · {name}",
     inviteValidity:
       "リンクの有効期間は 7 日間です。招待は、このメールアドレスのアカウントでのみ承認できます。",
     reminderSubject: "授業のお知らせ · {time}",
@@ -892,8 +892,8 @@ export const ja: Messages = {
   },
   meta: {
     description: "生徒、授業、入金をひとつの場所で。",
-    title: "Derslik · 講師用ワークスペース",
-    titleStudent: "Derslik · 生徒用スペース",
+    title: "Tutorwise · 講師用ワークスペース",
+    titleStudent: "Tutorwise · 生徒用スペース",
   },
   ml: {
     active: "有効",
@@ -934,7 +934,7 @@ export const ja: Messages = {
     resumeUpload: "アップロードを再開",
     revokeBody: "このアカウントは生徒の情報を見られなくなります。",
     send: "送信",
-    shareInvite: "Derslik への招待（7 日間有効）：{url}",
+    shareInvite: "Tutorwise への招待（7 日間有効）：{url}",
     studentArea: "生徒用スペース",
     summaryDraft: "まとめの下書き",
     unreadCount: {
@@ -992,7 +992,7 @@ export const ja: Messages = {
     amountField: "入金額（₺）",
     archiveBody:
       "予定中の授業を先に完了するかキャンセルしてください。これまでの記録は保存されます。",
-    balanceNote: "生徒からの入金です。Derslik の利用料金ではありません。",
+    balanceNote: "生徒からの入金です。Tutorwise の利用料金ではありません。",
     busy: "前の処理を完了しています。",
     calendarDate: "カレンダーの日付",
     cancelBody: "回数は消化されません。",
@@ -1164,7 +1164,7 @@ export const ja: Messages = {
     step2Title: "パッケージを作成",
     step3Text: "完了すると自動で 1 回分が消化されます。",
     step3Title: "最初の授業を予定",
-    welcome: "Derslik へようこそ",
+    welcome: "Tutorwise へようこそ",
   },
   payments: {
     actionsFor: "{name} さんの入金の操作",
@@ -1422,7 +1422,7 @@ export const ja: Messages = {
     sessionEnded: "セッションが終了しました。",
     setupBody:
       "アプリの接続設定がまだ完了していません。セットアップガイドのウェブと API の設定を済ませてから再起動してください。",
-    setupTitle: "Derslik のセットアップ",
+    setupTitle: "Tutorwise のセットアップ",
     signIn: "ログインしてください。",
     signinFailed:
       "ログインできませんでした。入力内容とメールアドレスの確認状況をご確認ください。",
@@ -1442,7 +1442,7 @@ export const ja: Messages = {
     focusOnTeaching: "指導に集中しましょう。",
     footerTagline: "教えることに、もっと時間を。",
     footerTimezone: "トルコ時間 · イスタンブール",
-    homeLink: "Derslik ホーム",
+    homeLink: "Tutorwise ホーム",
     loadFailed: "記録を読み込めませんでした。",
     myWorkspace: "マイワークスペース",
     noteBig: "大きな成長へ。",
@@ -1621,7 +1621,7 @@ export const ja: Messages = {
     viewPublic: "公開ページを開く",
     viewTeacher: "プロフィールを見る",
     welcomeText: "どのように始めますか？",
-    welcomeTitle: "Derslik へようこそ",
+    welcomeTitle: "Tutorwise へようこそ",
     writeReview: "レビューを書く",
     yourReview: "あなたのレビュー",
     experience: {

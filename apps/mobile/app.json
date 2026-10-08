@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Derslik",
+    "name": "Tutorwise",
     "slug": "derslik",
     "version": "0.3.0",
     "orientation": "portrait",
@@ -16,8 +16,8 @@
       "permissions": [],
       "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#141c4d"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
       }
     },
     "plugins": [
@@ -26,7 +26,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Derslik, vitrin profilinize fotoğraf eklemek için galerinize erişir.",
+          "photosPermission": "Tutorwise, vitrin profilinize fotoğraf eklemek için galerinize erişir.",
           "cameraPermission": false,
           "microphonePermission": false
         }

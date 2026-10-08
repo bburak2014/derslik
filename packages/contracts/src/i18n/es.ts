@@ -283,7 +283,7 @@ export const es: Messages = {
     videoUploadUrlInvalid: "La dirección de subida del vídeo no es válida.",
   },
   auth: {
-    account: "Cuenta de Derslik",
+    account: "Cuenta de Tutorwise",
     callbackFailed:
       "No se pudo completar el inicio de sesión. Puede que el enlace se haya cancelado o haya caducado. Inténtalo de nuevo.",
     checkInbox:
@@ -450,8 +450,8 @@ export const es: Messages = {
     feedRotated:
       "Tu enlace nuevo está listo. Quita el anterior de tu calendario y añade este.",
     feedTitle: "Añade tus clases a tu calendario",
-    icsDescription: "Abre Derslik para ver los detalles de la clase: {url}",
-    icsName: "Clases de Derslik",
+    icsDescription: "Abre Tutorwise para ver los detalles de la clase: {url}",
+    icsName: "Clases de Tutorwise",
     icsSummaryGuardian: "{student}: {topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
@@ -610,11 +610,11 @@ export const es: Messages = {
     failedTitle: "No se pudo conectar",
     inviteText:
       "Has iniciado sesión como {email}. Una invitación solo se puede aceptar con la dirección de correo a la que se envió; si se envió a otra dirección, inicia sesión abajo con esa cuenta.",
-    inviteTitle: "Tu invitación a Derslik",
+    inviteTitle: "Tu invitación a Tutorwise",
     noticeNoAccess:
       "Ya no tienes acceso al espacio al que pertenece esta notificación.",
     otherAccount: "Iniciar sesión con otra cuenta",
-    setupEyebrow: "Prepara tu Derslik.",
+    setupEyebrow: "Prepara tu Tutorwise.",
     setupText:
       "Si eres profesor, crea un espacio de trabajo. Si eres alumno o familia, abre el enlace de invitación que te envió tu profesor.",
     setupTitle: "Demos el primer paso.",
@@ -896,7 +896,7 @@ export const es: Messages = {
     weekStart: "Inicio de la semana",
     weeklySummary: "Resumen semanal",
     whatsappBody:
-      "Te he creado una cuenta en Derslik. Puedes iniciar sesión con el enlace de abajo durante los próximos 7 días:",
+      "Te he creado una cuenta en Tutorwise. Puedes iniciar sesión con el enlace de abajo durante los próximos 7 días:",
     whatsappHello: "Hola:",
     whatsappHelloName: "Hola, {name}:",
     writeFeedback: "Escribir comentarios",
@@ -923,13 +923,13 @@ export const es: Messages = {
   },
   mail: {
     inviteIntroGuardian:
-      "Se ha creado tu acceso de familia a Derslik para {name}.",
+      "Se ha creado tu acceso de familia a Tutorwise para {name}.",
     inviteIntroStudent:
-      "Se ha creado tu acceso de alumno a Derslik para {name}.",
+      "Se ha creado tu acceso de alumno a Tutorwise para {name}.",
     inviteOpen: "Abrir invitación",
     inviteSignIn:
       "Inicia sesión con el enlace de abajo en los próximos 7 días. Solo puedes aceptar la invitación con una cuenta que use esta dirección de correo.",
-    inviteSubject: "Invitación a Derslik · {name}",
+    inviteSubject: "Invitación a Tutorwise · {name}",
     inviteValidity:
       "El enlace es válido durante 7 días. Solo puedes aceptar la invitación con una cuenta que use esta dirección de correo.",
     reminderSubject: "Recordatorio de clase · {time}",
@@ -943,8 +943,8 @@ export const es: Messages = {
   },
   meta: {
     description: "Tus alumnos, clases y cobros en un solo lugar.",
-    title: "Derslik · Espacio del profesor",
-    titleStudent: "Derslik · Espacio del alumno",
+    title: "Tutorwise · Espacio del profesor",
+    titleStudent: "Tutorwise · Espacio del alumno",
   },
   ml: {
     active: "Activo",
@@ -985,7 +985,7 @@ export const es: Messages = {
     resumeUpload: "Reanudar subida",
     revokeBody: "Esta cuenta ya no verá la información del alumno.",
     send: "Enviar",
-    shareInvite: "Tu invitación a Derslik (válida 7 días): {url}",
+    shareInvite: "Tu invitación a Tutorwise (válida 7 días): {url}",
     studentArea: "Espacio del alumno",
     summaryDraft: "Borrador de resumen",
     unreadCount: {
@@ -1048,7 +1048,7 @@ export const es: Messages = {
     amountField: "Importe recibido (₺)",
     archiveBody:
       "Primero completa o cancela las clases programadas. El historial se conserva.",
-    balanceNote: "Cobros a alumnos, no tu suscripción a Derslik.",
+    balanceNote: "Cobros a alumnos, no tu suscripción a Tutorwise.",
     busy: "La operación anterior aún se está completando.",
     calendarDate: "Fecha del calendario",
     cancelBody: "No se descontará ninguna clase.",
@@ -1224,7 +1224,7 @@ export const es: Messages = {
     step2Title: "Crea su paquete",
     step3Text: "Al completarla, la clase se descuenta automáticamente.",
     step3Title: "Programa la primera clase",
-    welcome: "Te damos la bienvenida a Derslik",
+    welcome: "Te damos la bienvenida a Tutorwise",
   },
   payments: {
     actionsFor: "Acciones de cobro de {name}",
@@ -1499,7 +1499,7 @@ export const es: Messages = {
     sessionEnded: "Tu sesión ha finalizado.",
     setupBody:
       "La configuración de conexión de la app aún no está completa. Completa los ajustes de la web y de la API de la guía de instalación y reinicia.",
-    setupTitle: "Configuración de Derslik",
+    setupTitle: "Configuración de Tutorwise",
     signIn: "Inicia sesión.",
     signinFailed:
       "No se pudo iniciar sesión. Revisa tus datos y la verificación de tu correo.",
@@ -1521,7 +1521,7 @@ export const es: Messages = {
     focusOnTeaching: "Céntrate en enseñar.",
     footerTagline: "Más tiempo para enseñar.",
     footerTimezone: "Hora de Turquía · Estambul",
-    homeLink: "Inicio de Derslik",
+    homeLink: "Inicio de Tutorwise",
     loadFailed: "No se pudieron cargar los registros.",
     myWorkspace: "Mi espacio de trabajo",
     noteBig: "Grandes avances.",
@@ -1704,7 +1704,7 @@ export const es: Messages = {
     viewPublic: "Abrir página pública",
     viewTeacher: "Ver perfil",
     welcomeText: "¿Cómo quieres continuar?",
-    welcomeTitle: "Te damos la bienvenida a Derslik",
+    welcomeTitle: "Te damos la bienvenida a Tutorwise",
     writeReview: "Escribir reseña",
     yourReview: "Tu reseña",
     experience: {

@@ -1,4 +1,5 @@
 "use client";
+import { BRAND_NAME } from "@derslik/contracts/brand";
 import { useEffect, useState } from "react";
 import { Check, ExternalLink, RefreshCw } from "lucide-react";
 import { backend } from "@/lib/client";
@@ -101,7 +102,7 @@ export function Subscription({
   return (
     <Card className="gap-5 py-5">
       <CardHeader className="px-5">
-        <CardTitle>Derslik Pro</CardTitle>
+        <CardTitle>{BRAND_NAME} Pro</CardTitle>
         <CardDescription>
           {data.providerId ? t("sub.managedByProvider") : t("sub.onPilot")}
         </CardDescription>

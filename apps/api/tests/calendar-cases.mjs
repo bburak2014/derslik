@@ -125,7 +125,7 @@ export async function calendarCases({
         feed.text,
         /\r\nBEGIN:VTIMEZONE\r\nTZID:Europe\/Istanbul\r\n/,
       );
-      assert.match(feed.text, /\r\nX-WR-CALNAME:Derslik dersleri\r\n/);
+      assert.match(feed.text, /\r\nX-WR-CALNAME:Tutorwise dersleri\r\n/);
       assert.match(
         feed.text,
         /\r\nSUMMARY:Kesirler\\, oranlar\\; tekrar · Ayşe Yılmaz\r\n/,
@@ -146,7 +146,7 @@ export async function calendarCases({
         await feedOf(tokenPupil, { "Accept-Language": "en-US,en;q=0.9" }),
       );
       assert.deepEqual(uids(pupilFeed.text), [first.id]);
-      assert.match(pupilFeed.text, /\r\nX-WR-CALNAME:Derslik lessons\r\n/);
+      assert.match(pupilFeed.text, /\r\nX-WR-CALNAME:Tutorwise lessons\r\n/);
       assert.match(
         pupilFeed.text,
         /\r\nSUMMARY:Kesirler\\, oranlar\\; tekrar · Takvim Hoca\r\n/,

@@ -8,7 +8,8 @@
     "./validation": "./src/validation.ts",
     "./types": "./src/types.ts",
     "./i18n": "./src/i18n/index.ts",
-    "./i18n/all": "./src/i18n/all.ts"
+    "./i18n/all": "./src/i18n/all.ts",
+    "./brand": "./src/brand.ts"
   },
   "dependencies": {
     "zod": "^3.25.76"

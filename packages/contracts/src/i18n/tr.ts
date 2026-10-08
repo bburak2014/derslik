@@ -266,7 +266,7 @@ export const tr = {
     videoUploadUrlInvalid: "Video yükleme adresi geçersiz.",
   },
   auth: {
-    account: "Derslik hesabı",
+    account: "Tutorwise hesabı",
     callbackFailed:
       "Giriş tamamlanamadı. Bağlantı iptal edilmiş veya süresi dolmuş olabilir. Lütfen yeniden deneyin.",
     checkInbox:
@@ -428,8 +428,8 @@ export const tr = {
     feedRotated:
       "Yeni bağlantı hazır. Eskisini takviminizden kaldırıp yenisini ekleyin.",
     feedTitle: "Derslerinizi takviminize ekleyin",
-    icsDescription: "Ders ayrıntıları için Derslik'i açın: {url}",
-    icsName: "Derslik dersleri",
+    icsDescription: "Ders ayrıntıları için Tutorwise'ı açın: {url}",
+    icsName: "Tutorwise dersleri",
     icsSummaryGuardian: "{student}: {topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
@@ -587,7 +587,7 @@ export const tr = {
     failedTitle: "Bağlantı kurulamadı",
     inviteText:
       "{email} ile giriş yaptınız. Davet yalnızca gönderildiği e-posta adresiyle kabul edilir; başka bir adrese geldiyse aşağıdan o hesapla giriş yapın.",
-    inviteTitle: "Derslik davetiniz",
+    inviteTitle: "Tutorwise davetiniz",
     noticeNoAccess: "Bu bildirimin ait olduğu alana artık erişiminiz yok.",
     otherAccount: "Başka hesapla giriş yap",
     setupEyebrow: "Dersliğinizi hazırlayın.",
@@ -864,7 +864,7 @@ export const tr = {
     weekStart: "Hafta başlangıcı",
     weeklySummary: "Haftalık özet",
     whatsappBody:
-      "Derslik'te size bir hesap tanımladım. Aşağıdaki bağlantıdan 7 gün içinde giriş yapabilirsiniz:",
+      "Tutorwise'da size bir hesap tanımladım. Aşağıdaki bağlantıdan 7 gün içinde giriş yapabilirsiniz:",
     whatsappHello: "Merhaba,",
     whatsappHelloName: "Merhaba {name},",
     writeFeedback: "Geri bildirim yaz",
@@ -890,12 +890,12 @@ export const tr = {
     scheduled: "Planlandı",
   },
   mail: {
-    inviteIntroGuardian: "{name} için Derslik'te veli erişiminiz tanımlandı.",
-    inviteIntroStudent: "{name} için Derslik'te öğrenci erişiminiz tanımlandı.",
+    inviteIntroGuardian: "{name} için Tutorwise'da veli erişiminiz tanımlandı.",
+    inviteIntroStudent: "{name} için Tutorwise'da öğrenci erişiminiz tanımlandı.",
     inviteOpen: "Daveti aç",
     inviteSignIn:
       "Aşağıdaki bağlantıdan 7 gün içinde giriş yapın. Daveti yalnızca bu e-posta adresiyle açtığınız hesapla kabul edebilirsiniz.",
-    inviteSubject: "Derslik daveti · {name}",
+    inviteSubject: "Tutorwise daveti · {name}",
     inviteValidity:
       "Bağlantı 7 gün geçerlidir. Daveti yalnızca bu e-posta adresiyle açtığınız hesapla kabul edebilirsiniz.",
     reminderSubject: "Ders hatırlatması · {time}",
@@ -908,8 +908,8 @@ export const tr = {
   },
   meta: {
     description: "Öğrencileriniz, dersleriniz ve tahsilatlarınız bir arada.",
-    title: "Derslik · Öğretmen çalışma alanı",
-    titleStudent: "Derslik · Öğrenci çalışma alanı",
+    title: "Tutorwise · Öğretmen çalışma alanı",
+    titleStudent: "Tutorwise · Öğrenci çalışma alanı",
   },
   ml: {
     active: "Etkin",
@@ -949,7 +949,7 @@ export const tr = {
     resumeUpload: "Yüklemeye devam et",
     revokeBody: "Bu hesap öğrenci bilgilerini artık göremeyecek.",
     send: "Gönder",
-    shareInvite: "Derslik davetiniz (7 gün geçerli): {url}",
+    shareInvite: "Tutorwise davetiniz (7 gün geçerli): {url}",
     studentArea: "Öğrenci çalışma alanı",
     summaryDraft: "Özet taslağı",
     unreadCount: {
@@ -1012,7 +1012,7 @@ export const tr = {
     amountField: "Alınan tutar (₺)",
     archiveBody:
       "Planlanmış dersleri önce tamamlayın veya iptal edin. Geçmiş kayıtlar korunur.",
-    balanceNote: "Öğrenci tahsilatları; Derslik abonelik ücreti değildir.",
+    balanceNote: "Öğrenci tahsilatları; Tutorwise abonelik ücreti değildir.",
     busy: "Önceki işlem tamamlanıyor.",
     calendarDate: "Takvim tarihi",
     cancelBody: "Ders hakkı düşülmeyecek.",
@@ -1182,7 +1182,7 @@ export const tr = {
     step2Title: "Paketini tanımlayın",
     step3Text: "Tamamlandığında hak otomatik düşer.",
     step3Title: "İlk dersi planlayın",
-    welcome: "Derslik'e hoş geldiniz",
+    welcome: "Tutorwise'a hoş geldiniz",
   },
   payments: {
     actionsFor: "{name} tahsilat işlemleri",
@@ -1448,7 +1448,7 @@ export const tr = {
     sessionEnded: "Oturumunuz sona erdi.",
     setupBody:
       "Uygulamanın bağlantı ayarları henüz tamamlanmamış. Kurulum kılavuzundaki web ve API ayarlarını tamamlayıp yeniden başlatın.",
-    setupTitle: "Derslik kurulumu",
+    setupTitle: "Tutorwise kurulumu",
     signIn: "Oturum açın.",
     signinFailed:
       "Giriş yapılamadı. Bilgilerinizi ve e-posta doğrulamanızı kontrol edin.",
@@ -1470,7 +1470,7 @@ export const tr = {
     focusOnTeaching: "Öğretmeye odaklanın.",
     footerTagline: "Öğretmeye daha çok zaman.",
     footerTimezone: "Türkiye saati · İstanbul",
-    homeLink: "Derslik ana sayfa",
+    homeLink: "Tutorwise ana sayfa",
     loadFailed: "Kayıtlar yüklenemedi.",
     myWorkspace: "Çalışma alanım",
     noteBig: "Büyük gelişimler.",
@@ -1652,7 +1652,7 @@ export const tr = {
     viewPublic: "Vitrindeki sayfayı aç",
     viewTeacher: "Profili gör",
     welcomeText: "Nasıl devam etmek istersiniz?",
-    welcomeTitle: "Derslik'e hoş geldiniz",
+    welcomeTitle: "Tutorwise'a hoş geldiniz",
     writeReview: "Değerlendir",
     yourReview: "Değerlendirmeniz",
     experience: {

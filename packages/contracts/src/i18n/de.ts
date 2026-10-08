@@ -295,7 +295,7 @@ export const de: Messages = {
     videoUploadUrlInvalid: "Die Video-Upload-Adresse ist ungültig.",
   },
   auth: {
-    account: "Derslik-Konto",
+    account: "Tutorwise-Konto",
     callbackFailed:
       "Die Anmeldung konnte nicht abgeschlossen werden. Der Link wurde möglicherweise widerrufen oder ist abgelaufen. Bitte versuchen Sie es erneut.",
     checkInbox:
@@ -466,8 +466,8 @@ export const de: Messages = {
     feedRotated:
       "Ihr neuer Link ist bereit. Entfernen Sie den alten aus Ihrem Kalender und fügen Sie diesen hinzu.",
     feedTitle: "Stunden zu Ihrem Kalender hinzufügen",
-    icsDescription: "Details zur Stunde finden Sie in Derslik: {url}",
-    icsName: "Derslik-Stunden",
+    icsDescription: "Details zur Stunde finden Sie in Tutorwise: {url}",
+    icsName: "Tutorwise-Stunden",
     icsSummaryGuardian: "{student}: {topic} · {teacher}",
     icsSummaryStudent: "{topic} · {teacher}",
     icsSummaryTeacher: "{topic} · {student}",
@@ -626,11 +626,11 @@ export const de: Messages = {
     failedTitle: "Keine Verbindung",
     inviteText:
       "Sie sind als {email} angemeldet. Eine Einladung kann nur mit der E-Mail-Adresse angenommen werden, an die sie gesendet wurde; wurde sie an eine andere Adresse geschickt, melden Sie sich unten mit diesem Konto an.",
-    inviteTitle: "Ihre Derslik-Einladung",
+    inviteTitle: "Ihre Tutorwise-Einladung",
     noticeNoAccess:
       "Sie haben keinen Zugriff mehr auf den Bereich, zu dem diese Benachrichtigung gehört.",
     otherAccount: "Mit anderem Konto anmelden",
-    setupEyebrow: "Richten Sie Derslik ein.",
+    setupEyebrow: "Richten Sie Tutorwise ein.",
     setupText:
       "Als Lehrkraft erstellen Sie einen Arbeitsbereich. Als Schüler oder Elternteil öffnen Sie den Einladungslink Ihrer Lehrkraft.",
     setupTitle: "Der erste Schritt.",
@@ -912,7 +912,7 @@ export const de: Messages = {
     weekStart: "Wochenbeginn",
     weeklySummary: "Wochenzusammenfassung",
     whatsappBody:
-      "Ich habe für Sie ein Derslik-Konto eingerichtet. Über den folgenden Link können Sie sich innerhalb von 7 Tagen anmelden:",
+      "Ich habe für Sie ein Tutorwise-Konto eingerichtet. Über den folgenden Link können Sie sich innerhalb von 7 Tagen anmelden:",
     whatsappHello: "Hallo,",
     whatsappHelloName: "Hallo {name},",
     writeFeedback: "Feedback schreiben",
@@ -939,13 +939,13 @@ export const de: Messages = {
   },
   mail: {
     inviteIntroGuardian:
-      "Für {name} wurde Ihnen ein Elternzugang zu Derslik eingerichtet.",
+      "Für {name} wurde Ihnen ein Elternzugang zu Tutorwise eingerichtet.",
     inviteIntroStudent:
-      "Für {name} wurde Ihnen ein Schülerzugang zu Derslik eingerichtet.",
+      "Für {name} wurde Ihnen ein Schülerzugang zu Tutorwise eingerichtet.",
     inviteOpen: "Einladung öffnen",
     inviteSignIn:
       "Melden Sie sich innerhalb von 7 Tagen über den folgenden Link an. Die Einladung können Sie nur mit einem Konto annehmen, das diese E-Mail-Adresse verwendet.",
-    inviteSubject: "Derslik-Einladung · {name}",
+    inviteSubject: "Tutorwise-Einladung · {name}",
     inviteValidity:
       "Der Link ist 7 Tage gültig. Die Einladung können Sie nur mit einem Konto annehmen, das diese E-Mail-Adresse verwendet.",
     reminderSubject: "Erinnerung an Ihre Stunde · {time}",
@@ -959,8 +959,8 @@ export const de: Messages = {
   },
   meta: {
     description: "Ihre Schüler, Stunden und Zahlungen an einem Ort.",
-    title: "Derslik · Arbeitsbereich für Lehrkräfte",
-    titleStudent: "Derslik · Schülerbereich",
+    title: "Tutorwise · Arbeitsbereich für Lehrkräfte",
+    titleStudent: "Tutorwise · Schülerbereich",
   },
   ml: {
     active: "Aktiv",
@@ -1003,7 +1003,7 @@ export const de: Messages = {
     revokeBody:
       "Dieses Konto kann die Informationen des Schülers nicht mehr sehen.",
     send: "Senden",
-    shareInvite: "Ihre Derslik-Einladung (7 Tage gültig): {url}",
+    shareInvite: "Ihre Tutorwise-Einladung (7 Tage gültig): {url}",
     studentArea: "Schülerbereich",
     summaryDraft: "Zusammenfassung entwerfen",
     unreadCount: {
@@ -1068,7 +1068,7 @@ export const de: Messages = {
     amountField: "Erhaltener Betrag (₺)",
     archiveBody:
       "Schließen Sie geplante Stunden zuerst ab oder sagen Sie sie ab. Bisherige Einträge bleiben erhalten.",
-    balanceNote: "Zahlungen Ihrer Schüler, nicht Ihr Derslik-Abo.",
+    balanceNote: "Zahlungen Ihrer Schüler, nicht Ihr Tutorwise-Abo.",
     busy: "Der vorherige Vorgang wird noch abgeschlossen.",
     calendarDate: "Kalenderdatum",
     cancelBody: "Es wird keine Stunde vom Paket abgezogen.",
@@ -1246,7 +1246,7 @@ export const de: Messages = {
     step2Title: "Paket anlegen",
     step3Text: "Nach dem Abschluss wird automatisch eine Stunde abgezogen.",
     step3Title: "Erste Stunde planen",
-    welcome: "Willkommen bei Derslik",
+    welcome: "Willkommen bei Tutorwise",
   },
   payments: {
     actionsFor: "Zahlungsaktionen für {name}",
@@ -1531,7 +1531,7 @@ export const de: Messages = {
     sessionEnded: "Ihre Sitzung ist abgelaufen.",
     setupBody:
       "Die Verbindungseinstellungen der App sind noch nicht vollständig. Ergänzen Sie die Web- und API-Einstellungen aus der Einrichtungsanleitung und starten Sie neu.",
-    setupTitle: "Derslik einrichten",
+    setupTitle: "Tutorwise einrichten",
     signIn: "Bitte melden Sie sich an.",
     signinFailed:
       "Anmeldung fehlgeschlagen. Prüfen Sie Ihre Angaben und ob Ihre E-Mail-Adresse bestätigt ist.",
@@ -1555,7 +1555,7 @@ export const de: Messages = {
     focusOnTeaching: "Konzentrieren Sie sich aufs Unterrichten.",
     footerTagline: "Mehr Zeit zum Unterrichten.",
     footerTimezone: "Türkische Zeit · Istanbul",
-    homeLink: "Derslik-Startseite",
+    homeLink: "Tutorwise-Startseite",
     loadFailed: "Die Einträge konnten nicht geladen werden.",
     myWorkspace: "Mein Arbeitsbereich",
     noteBig: "Große Fortschritte.",
@@ -1744,7 +1744,7 @@ export const de: Messages = {
     viewPublic: "Öffentliche Seite öffnen",
     viewTeacher: "Profil ansehen",
     welcomeText: "Wie möchten Sie fortfahren?",
-    welcomeTitle: "Willkommen bei Derslik",
+    welcomeTitle: "Willkommen bei Tutorwise",
     writeReview: "Bewerten",
     yourReview: "Ihre Bewertung",
     experience: {

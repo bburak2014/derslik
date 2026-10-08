@@ -429,17 +429,8 @@ export const makeSection = (colors: Palette, type: Typography) =>
       backgroundColor: colors.surface,
     },
 
-    // Marka işareti: lacivert kare içinde fosforlu kitap (web'deki
-    // kenar çubuğu logosunun küçük hali).
+    // Marka: Tutorwise Academy işareti ve yazısı (ui/brand.tsx).
     brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-    brandMark: {
-      width: 32,
-      height: 32,
-      borderRadius: 9,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: colors.navy,
-    },
 
     // Mürekkep yüzeyi
     ink: {

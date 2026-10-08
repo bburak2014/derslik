@@ -1,6 +1,7 @@
 "use client";
+import { BrandLockup } from "@/components/brand-mark";
 import { useEffect, useState } from "react";
-import { BookOpen, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { t, upper } from "@derslik/contracts";
 import { ThemeToggle } from "@/components/account/theme-toggle";
 import { LanguageSelect } from "@/components/i18n/language-select";
@@ -40,12 +41,9 @@ export function PublicDirectory({
     <div className="public-shell">
       <header className="public-header">
         {/* Görünen ad erişilebilir adın başında kalır (ekran okuyucu ve
-            sesli komut kullanıcısı "derslik" diyerek bulabilsin). */}
+            sesli komut kullanıcısı "Tutorwise" diyerek bulabilsin). */}
         <a href="/teachers" className="brand">
-          <BookOpen aria-hidden="true" />
-          <span>
-            derslik<span className="brand-dot">.</span>
-          </span>
+          <BrandLockup />
           <span className="sr-only"> · {t("dir.back")}</span>
         </a>
         <div className="flex items-center gap-3">

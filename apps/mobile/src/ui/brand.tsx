@@ -9,7 +9,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, Path, Pattern, Rect, Stop } from "react-native-svg";
+import { BRAND_NAME, MARK_VIEWBOX, ROYAL_GRADIENT, brand, capParts, markParts } from "@derslik/contracts/brand";
 import { type IconName } from "./tokens";
 import { useTheme } from "./theme";
 import { ripple } from "./buttons";
@@ -45,9 +46,37 @@ export function GridTexture() {
   );
 }
 
-/** "derslik." yazısı. Açık yüzeyde lacivert karo + marka noktası; mürekkep
- *  zeminde (giriş ekranı) beyaz yazı + fosforlu nokta, web'deki gibi.
- *  `compact` dar başlıklarda yalnızca karoyu çizer. */
+/** Tutorwise Academy işareti (@derslik/contracts/brand): lacivert kısımlar
+ *  `ink` rengini alır (açık temada lacivert, koyu zeminde açık); sayfalar
+ *  kendi renklerinde. */
+export function BrandMark({ size, ink }: Readonly<{ size: number; ink: string }>) {
+  const { x, y, width, height } = MARK_VIEWBOX;
+  const g = ROYAL_GRADIENT;
+  return (
+    <Svg width={(size * width) / height} height={size} viewBox={`${x} ${y} ${width} ${height}`}>
+      <Defs>
+        <LinearGradient id="tutorwise-royal" gradientUnits="userSpaceOnUse" x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}>
+          <Stop offset="0" stopColor={brand.royal[0]} />
+          <Stop offset="1" stopColor={brand.royal[1]} />
+        </LinearGradient>
+      </Defs>
+      <Path fill={ink} d={markParts.cover.left} />
+      <Path fill={ink} d={markParts.cover.right} />
+      <Path fill={brand.orange} d={markParts.upper.left} />
+      <Path fill={brand.sky} d={markParts.upper.right} />
+      <Path fill={brand.sky} d={markParts.lower.left} />
+      <Path fill="url(#tutorwise-royal)" d={markParts.lower.right} />
+      <Path fill={ink} stroke={ink} strokeWidth={6} strokeLinejoin="round" d={capParts.top} />
+      <Path fill={ink} d={capParts.base} />
+      <Path fill="none" stroke={ink} strokeWidth={4} strokeLinecap="round" d={capParts.cord} />
+      <Circle fill={ink} cx={capParts.knob.cx} cy={capParts.knob.cy} r={capParts.knob.r} />
+      <Path fill={ink} d={capParts.tassel} />
+    </Svg>
+  );
+}
+
+/** Marka: işaret ve "Tutorwise" yazısı. Mürekkep zeminde (giriş ekranı)
+ *  açık renkte ve biraz büyük. `compact` dar başlıklarda yalnızca işareti çizer. */
 export function Brand({
   inverse = false,
   compact = false,
@@ -56,26 +85,18 @@ export function Brand({
   compact?: boolean;
 }>) {
   const { colors, styles, section } = useTheme();
+  const ink = inverse ? colors.onNavyStrong : colors.ink;
   return (
     <View
       style={section.brandRow}
       accessible
       accessibilityRole="header"
-      accessibilityLabel="Derslik"
+      accessibilityLabel={BRAND_NAME}
     >
-      {inverse ? (
-        <Ionicons name="book-outline" size={26} color={colors.marker} />
-      ) : (
-        <View style={section.brandMark}>
-          <Ionicons name="book-outline" size={18} color={colors.marker} />
-        </View>
-      )}
+      <BrandMark size={inverse ? 34 : 28} ink={ink} />
       {!compact && (
         <Text style={[styles.brand, inverse && { color: colors.onNavyStrong }]}>
-          derslik
-          <Text style={{ color: inverse ? colors.marker : colors.brand }}>
-            .
-          </Text>
+          {BRAND_NAME}
         </Text>
       )}
     </View>

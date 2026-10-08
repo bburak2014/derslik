@@ -1,4 +1,5 @@
 "use client";
+import { BrandLockup } from "@/components/brand-mark";
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
@@ -86,10 +87,7 @@ export function AuthForm({
     <main className="auth-page">
       <aside className="auth-story">
         <a href="/" className="brand">
-          <BookOpen />
-          <span>
-            derslik<span className="brand-dot">.</span>
-          </span>
+          <BrandLockup />
         </a>
         <div className="auth-story-content">
           <span className="auth-story-label">
