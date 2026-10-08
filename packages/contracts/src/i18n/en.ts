@@ -1442,6 +1442,8 @@ export const en: Messages = {
     passwordRecoveryRequired:
       "To change your password, use the reset link sent to your email.",
     actionNotFound: "Action not found.",
+    apiUnreachable:
+      "The server can't be reached right now. Try again in a few seconds.",
     appRequestRequired: "A valid app request is required.",
     backHome: "Back to home",
     credentialsInvalid:

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadTestModule } from "../scripts/test-source-loader.mjs";
 
-function sessionFixture({ user = { id: "fixture-user" }, session = { access_token: "fixture-session" } } = {}) {
+function sessionFixture({ user = { id: "fixture-user" }, session = { access_token: "fixture-session" }, globals = {} } = {}) {
   return loadTestModule("apps/web/lib/server/session.ts", {
     dependencies: {
       "@derslik/contracts/i18n/all": {},
@@ -28,7 +28,7 @@ function sessionFixture({ user = { id: "fixture-user" }, session = { access_toke
       SUPABASE_URL: "https://identity.fixture.invalid",
       SUPABASE_PUBLISHABLE_KEY: "fixture-public",
       APP_ORIGIN: "https://web.fixture.invalid",
-    } } },
+    } }, ...globals },
   });
 }
 
@@ -147,4 +147,41 @@ test("missing identity or session never creates an authenticated API client", as
   await assert.rejects(anonymous.serverSession(), httpError(anonymous, 401, "web.signIn"));
   const expired = sessionFixture({ session: null });
   await assert.rejects(expired.serverSession(), httpError(expired, 401, "web.sessionEnded"));
+});
+
+// Node'un fetch'i bağlantı kurulamayınca (API kapalı ya da yeniden başlıyor)
+// bu biçimde reddeder; nedeni `cause.code`'dadır.
+const unreachable = (code) => Object.assign(new TypeError("fetch failed"), { cause: { code } });
+const recordingConsole = () => {
+  const errors = [];
+  return { errors, console: { ...console, error: (...args) => errors.push(args) } };
+};
+
+test("an unreachable API becomes a 503 that says the server cannot be reached", async () => {
+  const log = recordingConsole();
+  const fixture = sessionFixture({ globals: {
+    fetch: async () => { throw unreachable("ECONNREFUSED"); },
+    console: log.console,
+  } });
+  const { client } = await fixture.serverSession();
+  const failure = await client.options.fetch("https://api.fixture.invalid/v1/access").catch((e) => e);
+  assert.ok(failure instanceof fixture.HttpError);
+  assert.equal(failure.status, 503);
+  assert.equal(failure.message, "web.apiUnreachable");
+  const response = await fixture.errorResponse(failure);
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "web.apiUnreachable" });
+  // Sunucu kaydında hangi bağlantı hatası olduğu görünür.
+  assert.deepEqual(log.errors, [["Derslik API unreachable", "ECONNREFUSED"]]);
+});
+
+test("API responses and other fetch failures pass through the API fetch unchanged", async () => {
+  const answer = new Response("{}");
+  const reachable = sessionFixture({ globals: { fetch: async () => answer } });
+  const { client } = await reachable.serverSession();
+  assert.equal(await client.options.fetch("https://api.fixture.invalid/v1/access"), answer);
+  const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+  const slow = sessionFixture({ globals: { fetch: async () => { throw timeout; } } });
+  const slowClient = (await slow.serverSession()).client;
+  await assert.rejects(slowClient.options.fetch("https://api.fixture.invalid/v1/access"), (e) => e === timeout);
 });

@@ -1471,6 +1471,8 @@ export const es: Messages = {
     passwordRecoveryRequired:
       "Para cambiar tu contraseña, usa el enlace de restablecimiento que recibiste por correo.",
     actionNotFound: "No se encontró la operación.",
+    apiUnreachable:
+      "No se puede conectar con el servidor en este momento. Inténtalo de nuevo en unos segundos.",
     appRequestRequired: "Se necesita una solicitud de app válida.",
     backHome: "Volver al inicio",
     credentialsInvalid:
