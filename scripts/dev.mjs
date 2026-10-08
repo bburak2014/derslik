@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { createInterface } from "node:readline";
+import { apiRunner, compileFinished } from "./dev-api.mjs";
 import { root, syncEnv } from "./sync-env.mjs";
 
 const require = createRequire(import.meta.url);
@@ -41,6 +43,7 @@ function service(args, options = {}) {
   p.once("exit", (code) => {
     if (!stopping) stop(code || 1);
   });
+  return p;
 }
 try {
   const api = await syncEnv();
@@ -60,6 +63,17 @@ try {
     API_PORT: api.API_HTTP_PORT || "3001",
     API_HOST: api.API_BIND_ADDRESS || "127.0.0.1",
   };
+  const runtimeEnv = {
+    ...environment,
+    NODE_ENV: production ? "production" : "development",
+  };
+  for (const key of [
+    "DATABASE_ADMIN_URL",
+    "POSTGRES_PASSWORD",
+    "API_DATABASE_PASSWORD",
+  ])
+    delete runtimeEnv[key];
+  const apiMain = [".api-build/apps/api/src/main.js"];
   if (!production && !remote) {
     await run("docker", [
       "compose",
@@ -80,38 +94,28 @@ try {
     await run(process.execPath, [".api-build/apps/api/src/db/migrate.js"], {
       env: environment,
     });
-    service([
-      require.resolve("typescript/bin/tsc"),
-      "-p",
-      "apps/api/tsconfig.json",
-      "--watch",
-      "--preserveWatchOutput",
-    ]);
-  }
-  const runtimeEnv = {
-    ...environment,
-    NODE_ENV: production ? "production" : "development",
-  };
-  for (const key of [
-    "DATABASE_ADMIN_URL",
-    "POSTGRES_PASSWORD",
-    "API_DATABASE_PASSWORD",
-  ])
-    delete runtimeEnv[key];
-  if (!remote)
-    service(
-      [
-        ...(production
-          ? []
-          : [
-              ...(process.platform === "darwin" || process.platform === "win32"
-                ? ["--watch-path=.api-build"]
-                : ["--watch"]),
-            ]),
-        ".api-build/apps/api/src/main.js",
-      ],
-      { env: runtimeEnv },
+    // API, tsc --watch her derlemeyi bitirdiğinde yeniden başlar; çıktı
+    // klasörü izlenmez (gerekçe: scripts/dev-api.mjs). Derleyicinin satırları
+    // okunurken terminale de aynen yazılır.
+    const apiProcess = apiRunner(() =>
+      stopping ? null : child(process.execPath, apiMain, { env: runtimeEnv }),
     );
+    const compiler = service(
+      [
+        require.resolve("typescript/bin/tsc"),
+        "-p",
+        "apps/api/tsconfig.json",
+        "--watch",
+        "--preserveWatchOutput",
+        ...(process.stdout.isTTY ? ["--pretty"] : []),
+      ],
+      { stdio: ["inherit", "pipe", "inherit"] },
+    );
+    createInterface({ input: compiler.stdout }).on("line", (line) => {
+      console.log(line);
+      if (compileFinished(line)) void apiProcess.compiled();
+    });
+  } else if (!remote) service(apiMain, { env: runtimeEnv });
   // Only the allowlisted web settings are loaded by Next from apps/web/.env.local.
   service(
     [
