@@ -3,10 +3,7 @@
 // src/brand.ts'ten üretilmiş (scripts/brand-assets.mjs); elle değişmemiş.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { loadTestModule } from "../scripts/test-source-loader.mjs";
 import { createTsxFixture, treeNodes, treeText } from "./tsx-fixture.mjs";
 import {
@@ -47,24 +44,16 @@ test("the favicon and mobile icons are generated from the brand module", () => {
   assert.equal(readFileSync("apps/mobile/assets/adaptive-icon.svg", "utf8"), adaptiveIconSvg(1024));
 });
 
-test("the icon generator reproduces the committed icons", () => {
-  const out = mkdtempSync(join(tmpdir(), "tutorwise-icons-"));
-  try {
-    const run = spawnSync(process.execPath, ["--experimental-strip-types", "scripts/brand-assets.mjs", out], { encoding: "utf8" });
-    assert.equal(run.status, 0, run.stderr);
-    for (const file of ["apps/web/public/favicon.svg", "apps/mobile/assets/icon.svg", "apps/mobile/assets/adaptive-icon.svg"])
-      assert.equal(readFileSync(join(out, file), "utf8"), readFileSync(file, "utf8"), file);
-    // PNG başlığı: genişlik, yükseklik, renk türü (6 = saydamlıklı).
-    const header = (file) => {
-      const bytes = readFileSync(file);
-      return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colorType: bytes[25] };
-    };
-    for (const file of ["apps/mobile/assets/icon.png", "apps/mobile/assets/adaptive-icon.png"]) {
-      assert.deepEqual(header(join(out, file)), header(file), file);
-      assert.equal(header(file).width, 1024);
-    }
-  } finally {
-    rmSync(out, { recursive: true, force: true });
+test("the icon generator reproduces the committed icons", async () => {
+  const { brandAssets } = await import("../scripts/brand-assets.mjs");
+  const files = await brandAssets();
+  for (const file of ["apps/web/public/favicon.svg", "apps/mobile/assets/icon.svg", "apps/mobile/assets/adaptive-icon.svg"])
+    assert.equal(files[file], readFileSync(file, "utf8"), file);
+  // PNG başlığı: genişlik, yükseklik, renk türü (6 = saydamlıklı).
+  const header = (bytes) => ({ width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colorType: bytes[25] });
+  for (const file of ["apps/mobile/assets/icon.png", "apps/mobile/assets/adaptive-icon.png"]) {
+    assert.deepEqual(header(files[file]), header(readFileSync(file)), file);
+    assert.equal(header(files[file]).width, 1024);
   }
 });
 
