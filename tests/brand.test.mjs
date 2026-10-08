@@ -3,9 +3,15 @@
 // src/brand.ts'ten üretilmiş (scripts/brand-assets.mjs); elle değişmemiş.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadTestModule } from "../scripts/test-source-loader.mjs";
+import { createTsxFixture, treeNodes, treeText } from "./tsx-fixture.mjs";
 import {
   MARK_CENTER,
+  MARK_VIEWBOX,
   adaptiveIconSvg,
   brand,
   iconSvg,
@@ -41,10 +47,184 @@ test("the favicon and mobile icons are generated from the brand module", () => {
   assert.equal(readFileSync("apps/mobile/assets/adaptive-icon.svg", "utf8"), adaptiveIconSvg(1024));
 });
 
+test("the icon generator reproduces the committed icons", () => {
+  const out = mkdtempSync(join(tmpdir(), "tutorwise-icons-"));
+  try {
+    const run = spawnSync(process.execPath, ["--experimental-strip-types", "scripts/brand-assets.mjs", out], { encoding: "utf8" });
+    assert.equal(run.status, 0, run.stderr);
+    for (const file of ["apps/web/public/favicon.svg", "apps/mobile/assets/icon.svg", "apps/mobile/assets/adaptive-icon.svg"])
+      assert.equal(readFileSync(join(out, file), "utf8"), readFileSync(file, "utf8"), file);
+    // PNG başlığı: genişlik, yükseklik, renk türü (6 = saydamlıklı).
+    const header = (file) => {
+      const bytes = readFileSync(file);
+      return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colorType: bytes[25] };
+    };
+    for (const file of ["apps/mobile/assets/icon.png", "apps/mobile/assets/adaptive-icon.png"]) {
+      assert.deepEqual(header(join(out, file)), header(file), file);
+      assert.equal(header(file).width, 1024);
+    }
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 test("upper keeps the brand name in plain capitals in every language", async () => {
   const { upper } = await import("../packages/contracts/src/i18n/index.ts");
   // Türkçe kuralı (i → İ) markaya uygulanmaz; metnin geri kalanına uygulanır.
   assert.equal(upper("Tutorwise hesabı", "tr"), "TUTORWISE HESABI");
   assert.equal(upper("Tutorwise'a hoş geldiniz", "tr"), "TUTORWISE'A HOŞ GELDİNİZ");
   assert.equal(upper("Tutorwise account", "en"), "TUTORWISE ACCOUNT");
+});
+
+// ── Uygulamadaki işaret bileşenleri ──
+// Web (BrandMark) ve mobil (BrandMark/Brand) bileşenleri gerçek kaynaktan
+// çalıştırılır; çizdikleri şekiller favicon'u üreten markSvg ile aynı olmalı.
+
+const brandModule = await import("../packages/contracts/src/brand.ts");
+
+/** Rengin rolü: mürekkep (lacivert kısımlar) INK, koyu mavi sayfa GRADIENT. */
+function roleOf(color, ink) {
+  if (color === ink) return "INK";
+  if (color?.startsWith("url(")) return "GRADIENT";
+  return color;
+}
+
+/** Şekillerin sırası, yolu ve rolü. */
+function shapesOfSvg(svg) {
+  return [...svg.matchAll(/<(path|circle) ([^>]*)\/>/g)].map(([, tag, attrs]) => {
+    const get = (name) => new RegExp(`(?:^| )${name}="([^"]*)"`).exec(attrs)?.[1];
+    return {
+      tag,
+      d: get("d") ?? `${get("cx")},${get("cy")},${get("r")}`,
+      fill: roleOf(get("fill"), brand.navy),
+      stroke: roleOf(get("stroke"), brand.navy),
+    };
+  });
+}
+
+function shapesOfTree(tree, ink) {
+  return treeNodes(tree)
+    .filter((node) => /^(path|circle)$/i.test(node.type))
+    .map(({ type, props }) => ({
+      tag: type.toLowerCase(),
+      d: props.d ?? `${props.cx},${props.cy},${props.r}`,
+      fill: roleOf(props.fill, ink),
+      stroke: roleOf(props.stroke, ink),
+    }));
+}
+
+function webBrand() {
+  const renderer = createTsxFixture();
+  let ids = 0;
+  const exports = loadTestModule("apps/web/components/brand-mark.tsx", {
+    dependencies: {
+      react: { ...renderer.react, useId: () => `:r${++ids}:` },
+      "react/jsx-runtime": renderer.jsx,
+      "@derslik/contracts/brand": brandModule,
+    },
+  });
+  return { renderer, ...exports };
+}
+
+test("the web mark draws the logo's shapes, with the navy parts in the text color", () => {
+  const { renderer, BrandMark } = webBrand();
+  const tree = renderer.render(BrandMark, { className: "mark" });
+  const { x, y, width, height } = MARK_VIEWBOX;
+  assert.equal(tree.type, "svg");
+  assert.equal(tree.props.viewBox, `${x} ${y} ${width} ${height}`);
+  assert.equal(tree.props.className, "mark");
+  assert.equal(tree.props["aria-hidden"], "true");
+  assert.deepEqual(shapesOfTree(tree, "currentColor"), shapesOfSvg(markSvg()));
+});
+
+test("each web mark points its dark page at its own gradient", () => {
+  const { renderer, BrandMark } = webBrand();
+  const gradientOf = (tree) => {
+    const nodes = treeNodes(tree);
+    const id = nodes.find((node) => node.type === "linearGradient").props.id;
+    const used = nodes.filter((node) => node.props.fill?.startsWith("url(")).map((node) => node.props.fill);
+    return { id, used };
+  };
+  const first = gradientOf(renderer.render(BrandMark, {}));
+  const second = gradientOf(createTsxFixture().render(BrandMark, {}));
+  assert.deepEqual(first.used, [`url(#${first.id})`]);
+  assert.deepEqual(second.used, [`url(#${second.id})`]);
+  assert.notEqual(first.id, second.id);
+});
+
+test("the web lockup shows the mark and the brand name", () => {
+  const { renderer, BrandLockup } = webBrand();
+  const tree = renderer.render(BrandLockup, {});
+  assert.ok(treeNodes(tree).some((node) => node.type === "svg"));
+  const name = treeNodes(tree).find((node) => node.type === "span");
+  assert.equal(name.props.className, "brand-name");
+  assert.equal(treeText(name), brandModule.BRAND_NAME);
+});
+
+const colors = { ink: "#141c4d", onNavyStrong: "#ffffff" };
+function mobileBrand() {
+  const renderer = createTsxFixture();
+  const exports = loadTestModule("apps/mobile/src/ui/brand.tsx", {
+    dependencies: {
+      react: renderer.react,
+      "react/jsx-runtime": renderer.jsx,
+      "react-native": { Pressable: "Pressable", StyleSheet: { absoluteFill: {} }, Text: "Text", View: "View" },
+      "@expo/vector-icons": { Ionicons: "Ionicons" },
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ bottom: 0 }) },
+      "react-native-svg": {
+        __esModule: true,
+        default: "Svg",
+        Circle: "Circle",
+        Defs: "Defs",
+        LinearGradient: "LinearGradient",
+        Path: "Path",
+        Pattern: "Pattern",
+        Rect: "Rect",
+        Stop: "Stop",
+      },
+      "@derslik/contracts/brand": brandModule,
+      "./tokens": {},
+      "./theme": {
+        useTheme: () => ({ colors, styles: { brand: { fontSize: 20 } }, section: { brandRow: { gap: 10 } } }),
+      },
+      "./buttons": { ripple: () => undefined },
+    },
+  });
+  return { renderer, ...exports };
+}
+
+test("the mobile mark draws the logo's shapes in the given ink at the logo's proportions", () => {
+  const { renderer, BrandMark } = mobileBrand();
+  const tree = renderer.render(BrandMark, { size: 30, ink: "#123456" });
+  const { width, height } = MARK_VIEWBOX;
+  assert.equal(tree.type, "Svg");
+  assert.equal(tree.props.height, 30);
+  assert.equal(tree.props.width, (30 * width) / height);
+  assert.deepEqual(shapesOfTree(tree, "#123456"), shapesOfSvg(markSvg()));
+  const gradient = treeNodes(tree).find((node) => node.type === "LinearGradient").props.id;
+  assert.deepEqual(
+    treeNodes(tree).filter((node) => node.props.fill?.startsWith("url(")).map((node) => node.props.fill),
+    [`url(#${gradient})`],
+  );
+});
+
+test("the mobile brand names itself and switches ink on the dark surface", () => {
+  const { renderer, Brand } = mobileBrand();
+  const light = renderer.render(Brand, {});
+  assert.equal(light.props.accessibilityLabel, brandModule.BRAND_NAME);
+  assert.equal(light.props.accessibilityRole, "header");
+  const lightMark = treeNodes(light).find((node) => node.type === "Svg");
+  assert.equal(lightMark.props.height, 28);
+  assert.ok(shapesOfTree(light, colors.ink).some((shape) => shape.fill === "INK"));
+  assert.equal(treeText(treeNodes(light).find((node) => node.type === "Text")), brandModule.BRAND_NAME);
+
+  const dark = createTsxFixture().render(Brand, { inverse: true });
+  assert.equal(treeNodes(dark).find((node) => node.type === "Svg").props.height, 34);
+  assert.ok(shapesOfTree(dark, colors.onNavyStrong).some((shape) => shape.fill === "INK"));
+  const name = treeNodes(dark).find((node) => node.type === "Text");
+  assert.equal(name.props.style.at(-1).color, colors.onNavyStrong);
+
+  const compact = createTsxFixture().render(Brand, { compact: true });
+  assert.ok(treeNodes(compact).some((node) => node.type === "Svg"));
+  assert.ok(!treeNodes(compact).some((node) => node.type === "Text"));
 });
