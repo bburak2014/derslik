@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
-import { apiRunner, compileFinished } from "../scripts/dev-api.mjs";
+import { PassThrough } from "node:stream";
+import {
+  apiRunner,
+  compileFinished,
+  compilerArgs,
+  restartOnBuild,
+} from "../scripts/dev-api.mjs";
 
 // Geliştirmede API, tsc --watch bir derlemeyi bitirince yeniden başlatılır.
 // Dosya izleyicisi kullanılmaz: macOS dosya olaylarını onlarca saniye
@@ -23,6 +29,13 @@ test("tsc --watch compile-finished lines are recognised, other output is not", (
     "",
   ])
     assert.equal(compileFinished(line), false, line);
+});
+
+test("tsc --watch keeps its output on screen and colours it only in a terminal", () => {
+  const base = ["/tsc", "-p", "apps/api/tsconfig.json", "--watch", "--preserveWatchOutput"];
+  assert.deepEqual(compilerArgs("/tsc", true), [...base, "--pretty"]);
+  assert.deepEqual(compilerArgs("/tsc", false), base);
+  assert.deepEqual(compilerArgs("/tsc", undefined), base);
 });
 
 /** Gerçek alt süreç başlatan sahte API; başlangıçları sırasıyla kaydeder. */
@@ -105,4 +118,26 @@ test("no API is started while the launcher is shutting down", async (t) => {
   runner.compiled();
   await sleep(100);
   assert.equal(api.started.length, 1);
+});
+
+test("compiler output is echoed line by line and each finished build restarts the API", async (t) => {
+  const api = fakeApi(t);
+  const output = new PassThrough(), written = [];
+  restartOnBuild(output, api.start, (line) => written.push(line));
+  // tsc yazdığını parça parça gönderebilir; satır bütün gelince işlenir.
+  output.write("2:47:58 AM - Starting compilation in watch mode...\n2:48:00 AM - Found 0 ");
+  await sleep(50);
+  assert.equal(api.started.length, 0);
+  output.write("errors. Watching for file changes.\n");
+  await until(() => api.started.length === 1);
+  output.write("2:48:44 AM - File change detected. Starting incremental compilation...\n");
+  output.write("2:48:45 AM - Found 1 error. Watching for file changes.\n");
+  await until(() => api.started.length === 2);
+  assert.equal(api.started[1].previousExited, true);
+  assert.deepEqual(written, [
+    "2:47:58 AM - Starting compilation in watch mode...",
+    "2:48:00 AM - Found 0 errors. Watching for file changes.",
+    "2:48:44 AM - File change detected. Starting incremental compilation...",
+    "2:48:45 AM - Found 1 error. Watching for file changes.",
+  ]);
 });
