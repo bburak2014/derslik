@@ -1422,6 +1422,8 @@ export const tr = {
     passwordRecoveryRequired:
       "Şifrenizi değiştirmek için e-postanıza gelen sıfırlama bağlantısını kullanın.",
     actionNotFound: "İşlem bulunamadı.",
+    apiUnreachable:
+      "Sunucuya şu an ulaşılamıyor. Birkaç saniye sonra yeniden deneyin.",
     appRequestRequired: "Geçerli uygulama isteği gerekli.",
     backHome: "Ana sayfaya dön",
     credentialsInvalid: "Geçerli e-posta ve en az 10 karakterli şifre girin.",

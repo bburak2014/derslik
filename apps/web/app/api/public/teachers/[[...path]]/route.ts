@@ -1,4 +1,9 @@
-import { errorResponse, HttpError, optionalToken } from "@/lib/server/session";
+import {
+  apiFetch,
+  errorResponse,
+  HttpError,
+  optionalToken,
+} from "@/lib/server/session";
 import { serverLocale } from "@/lib/server/locale";
 import { intlTags } from "@derslik/contracts";
 import { clientIp } from "@/lib/server/client-ip";
@@ -28,7 +33,7 @@ export async function GET(
       "/v1/teachers" +
       path.map((p) => "/" + encodeURIComponent(p)).join("") +
       new URL(request.url).search;
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       cache: "no-store",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

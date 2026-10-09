@@ -1491,6 +1491,8 @@ export const fr: Messages = {
     passwordRecoveryRequired:
       "Pour changer votre mot de passe, utilisez le lien de réinitialisation reçu par e-mail.",
     actionNotFound: "Action introuvable.",
+    apiUnreachable:
+      "Le serveur est injoignable pour le moment. Réessayez dans quelques secondes.",
     appRequestRequired: "Une requête d'application valide est requise.",
     backHome: "Retour à l'accueil",
     credentialsInvalid:

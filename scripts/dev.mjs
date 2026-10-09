@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { compilerArgs, restartOnBuild } from "./dev-api.mjs";
 import { root, syncEnv } from "./sync-env.mjs";
 
 const require = createRequire(import.meta.url);
@@ -41,6 +42,7 @@ function service(args, options = {}) {
   p.once("exit", (code) => {
     if (!stopping) stop(code || 1);
   });
+  return p;
 }
 try {
   const api = await syncEnv();
@@ -60,6 +62,8 @@ try {
     API_PORT: api.API_HTTP_PORT || "3001",
     API_HOST: api.API_BIND_ADDRESS || "127.0.0.1",
   };
+  // Geliştirmede API'yi tsc --watch yeniden başlatır (scripts/dev-api.mjs).
+  let compiler = null;
   if (!production && !remote) {
     await run("docker", [
       "compose",
@@ -80,13 +84,10 @@ try {
     await run(process.execPath, [".api-build/apps/api/src/db/migrate.js"], {
       env: environment,
     });
-    service([
-      require.resolve("typescript/bin/tsc"),
-      "-p",
-      "apps/api/tsconfig.json",
-      "--watch",
-      "--preserveWatchOutput",
-    ]);
+    compiler = service(
+      compilerArgs(require.resolve("typescript/bin/tsc"), process.stdout.isTTY),
+      { stdio: ["inherit", "pipe", "inherit"] },
+    );
   }
   const runtimeEnv = {
     ...environment,
@@ -98,20 +99,12 @@ try {
     "API_DATABASE_PASSWORD",
   ])
     delete runtimeEnv[key];
-  if (!remote)
-    service(
-      [
-        ...(production
-          ? []
-          : [
-              ...(process.platform === "darwin" || process.platform === "win32"
-                ? ["--watch-path=.api-build"]
-                : ["--watch"]),
-            ]),
-        ".api-build/apps/api/src/main.js",
-      ],
-      { env: runtimeEnv },
+  const apiMain = [".api-build/apps/api/src/main.js"];
+  if (compiler)
+    restartOnBuild(compiler.stdout, () =>
+      stopping ? null : child(process.execPath, apiMain, { env: runtimeEnv }),
     );
+  else if (!remote) service(apiMain, { env: runtimeEnv });
   // Only the allowlisted web settings are loaded by Next from apps/web/.env.local.
   service(
     [

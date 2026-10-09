@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadTestModule } from "../scripts/test-source-loader.mjs";
 
-function sessionFixture({ user = { id: "fixture-user" }, session = { access_token: "fixture-session" } } = {}) {
+function sessionFixture({ user = { id: "fixture-user" }, session = { access_token: "fixture-session" }, globals = {} } = {}) {
   return loadTestModule("apps/web/lib/server/session.ts", {
     dependencies: {
       "@derslik/contracts/i18n/all": {},
@@ -28,7 +28,7 @@ function sessionFixture({ user = { id: "fixture-user" }, session = { access_toke
       SUPABASE_URL: "https://identity.fixture.invalid",
       SUPABASE_PUBLISHABLE_KEY: "fixture-public",
       APP_ORIGIN: "https://web.fixture.invalid",
-    } } },
+    } }, ...globals },
   });
 }
 
@@ -147,4 +147,91 @@ test("missing identity or session never creates an authenticated API client", as
   await assert.rejects(anonymous.serverSession(), httpError(anonymous, 401, "web.signIn"));
   const expired = sessionFixture({ session: null });
   await assert.rejects(expired.serverSession(), httpError(expired, 401, "web.sessionEnded"));
+});
+
+// Node'un fetch'i bağlantı kurulamayınca (API kapalı ya da yeniden başlıyor)
+// bu biçimde reddeder; nedeni `cause.code`'dadır.
+const unreachable = (code) => Object.assign(new TypeError("fetch failed"), { cause: { code } });
+const recordingConsole = () => {
+  const errors = [];
+  return { errors, console: { ...console, error: (...args) => errors.push(args) } };
+};
+
+test("an unreachable API becomes a 503 that says the server cannot be reached", async () => {
+  const log = recordingConsole();
+  const fixture = sessionFixture({ globals: {
+    fetch: async () => { throw unreachable("ECONNREFUSED"); },
+    console: log.console,
+  } });
+  const { client } = await fixture.serverSession();
+  const failure = await client.options.fetch("https://api.fixture.invalid/v1/access").catch((e) => e);
+  assert.ok(failure instanceof fixture.HttpError);
+  assert.equal(failure.status, 503);
+  assert.equal(failure.message, "web.apiUnreachable");
+  const response = await fixture.errorResponse(failure);
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "web.apiUnreachable" });
+  // Sunucu kaydında hangi bağlantı hatası olduğu görünür.
+  assert.deepEqual(log.errors, [["Derslik API unreachable", "ECONNREFUSED"]]);
+});
+
+test("a connection failure without an error code is still reported as unreachable", async () => {
+  const log = recordingConsole();
+  const fixture = sessionFixture({ globals: {
+    fetch: async () => { throw new TypeError("fetch failed"); },
+    console: log.console,
+  } });
+  const { client } = await fixture.serverSession();
+  const failure = await client.options.fetch("https://api.fixture.invalid/v1/access").catch((e) => e);
+  assert.equal(failure.message, "web.apiUnreachable");
+  assert.deepEqual(log.errors, [["Derslik API unreachable", "unknown"]]);
+});
+
+test("API responses and other fetch failures pass through the API fetch unchanged", async () => {
+  const answer = new Response("{}");
+  const reachable = sessionFixture({ globals: { fetch: async () => answer } });
+  const { client } = await reachable.serverSession();
+  assert.equal(await client.options.fetch("https://api.fixture.invalid/v1/access"), answer);
+  const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+  const slow = sessionFixture({ globals: { fetch: async () => { throw timeout; } } });
+  const slowClient = (await slow.serverSession()).client;
+  await assert.rejects(slowClient.options.fetch("https://api.fixture.invalid/v1/access"), (e) => e === timeout);
+});
+
+/** Vitrin yolu gerçek oturum modülüyle yüklenir; API'ye gidiş onun
+ *  apiFetch'inden geçer. */
+function teachersRoute(fetch) {
+  const session = sessionFixture({ globals: { fetch, console: recordingConsole().console } });
+  return loadTestModule("apps/web/app/api/public/teachers/[[...path]]/route.ts", {
+    dependencies: {
+      "@/lib/server/session": session,
+      "@/lib/server/locale": { serverLocale: async () => "tr" },
+      "@derslik/contracts": { intlTags: { tr: "tr-TR" } },
+      "@/lib/server/client-ip": { clientIp: () => null },
+    },
+    globals: { Response, process: { env: { API_BASE_URL: "https://api.fixture.invalid" } } },
+  });
+}
+const listTeachers = (route) =>
+  route.GET(new Request("https://web.fixture.invalid/api/public/teachers"), {
+    params: Promise.resolve({ path: [] }),
+  });
+
+test("the public teacher list says the server cannot be reached when the API is down", async () => {
+  const route = teachersRoute(async () => { throw unreachable("ECONNREFUSED"); });
+  const response = await listTeachers(route);
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "web.apiUnreachable" });
+});
+
+test("the public teacher list returns the API's answer when the API is up", async () => {
+  const requested = [];
+  const route = teachersRoute(async (url, init) => {
+    requested.push([url, init.headers["Accept-Language"]]);
+    return Response.json({ data: [], next: null });
+  });
+  const response = await listTeachers(route);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { data: [], next: null });
+  assert.deepEqual(requested, [["https://api.fixture.invalid/v1/teachers", "tr-TR"]]);
 });

@@ -1395,6 +1395,8 @@ export const ja: Messages = {
     passwordRecoveryRequired:
       "パスワードを変更するには、メールで届いたリセット用リンクを使用してください。",
     actionNotFound: "操作が見つかりません。",
+    apiUnreachable:
+      "現在サーバーに接続できません。数秒後にもう一度お試しください。",
     appRequestRequired: "有効なアプリからのリクエストが必要です。",
     backHome: "ホームに戻る",
     credentialsInvalid:

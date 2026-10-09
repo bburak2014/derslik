@@ -1302,6 +1302,7 @@ export const zh: Messages = {
     tooManyAttempts: "尝试次数过多，请几分钟后再试。",
     passwordRecoveryRequired: "如需修改密码，请使用发送到您邮箱的重置链接。",
     actionNotFound: "未找到该操作。",
+    apiUnreachable: "暂时无法连接服务器，请几秒后重试。",
     appRequestRequired: "需要有效的应用请求。",
     backHome: "返回首页",
     credentialsInvalid: "请输入有效的邮箱和至少 10 个字符的密码。",

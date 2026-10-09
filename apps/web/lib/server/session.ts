@@ -142,6 +142,24 @@ export async function hasSessionCookie() {
     .getAll()
     .some((c) => AUTH_COOKIE.test(c.name));
 }
+/** API'ye giden istek. Bağlantı hiç kurulamazsa (API kapalı ya da yeniden
+ *  başlıyor) genel "işlem tamamlanamadı" yerine bunu söyleyen 503 döner;
+ *  sunucu kaydına bağlantı hatasının kodu yazılır. Node'un fetch'i ağ
+ *  hatalarını "fetch failed" iletili TypeError olarak bildirir. */
+export const apiFetch: typeof fetch = async (input, init) => {
+  try {
+    return await fetch(input, init);
+  } catch (e) {
+    const failure = e as { name?: string; message?: string; cause?: unknown };
+    if (failure?.name !== "TypeError" || failure.message !== "fetch failed")
+      throw e;
+    console.error(
+      "Derslik API unreachable",
+      (failure.cause as { code?: string } | undefined)?.code ?? "unknown",
+    );
+    throw new HttpError(503, "web.apiUnreachable");
+  }
+};
 export async function serverSession() {
   const auth = await authClient();
   const {
@@ -163,6 +181,7 @@ export async function serverSession() {
       // hazır bir söz döndürülür (imza aynı: Promise<string>).
       getToken: () => Promise.resolve(session.access_token),
       locale: () => locale,
+      fetch: apiFetch,
     }),
   };
 }

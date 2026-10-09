@@ -1502,6 +1502,8 @@ export const de: Messages = {
     passwordRecoveryRequired:
       "Um Ihr Passwort zu ändern, verwenden Sie den Link zum Zurücksetzen aus Ihrer E-Mail.",
     actionNotFound: "Vorgang nicht gefunden.",
+    apiUnreachable:
+      "Der Server ist gerade nicht erreichbar. Versuchen Sie es in ein paar Sekunden erneut.",
     appRequestRequired: "Eine gültige App-Anfrage ist erforderlich.",
     backHome: "Zur Startseite",
     credentialsInvalid:
