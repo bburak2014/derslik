@@ -377,12 +377,24 @@ test("workspace and portal load lazily behind the same loading screen", async ()
 });
 
 /** Web'in mesajlar görünümü gerçek kaynağıyla; soket, backend ve pencere
- *  olayları kayıt tutan sahte nesneler. `reply` her isteğin yanıtını verir. */
-function chatModule(reply) {
+ *  olayları kayıt tutan sahte nesneler. `reply` her isteğin yanıtını verir.
+ *  `live` soketin bağlı olup olmadığıdır; kurulan yoklama aralıkları ve
+ *  pencere odak dinleyicileri kaydedilir, test onları elle tetikler. */
+function chatModule(reply, { live = true } = {}) {
   const renderer = createTsxFixture();
   const requests = [],
     inbox = [];
-  const socket = { handler: null };
+  const socket = { handler: null, live };
+  const timers = new Map(),
+    focus = new Set();
+  let timerId = 0,
+    skipped = 0;
+  // Modülün gördüğü saat; test ileri sarar (yoklama ve odak sınırları).
+  class ShiftedDate extends Date {
+    static now() {
+      return Date.now() + skipped;
+    }
+  }
   const contracts = {
     ...loadTestModule("packages/contracts/src/messages.ts", {
       dependencies: {
@@ -411,7 +423,7 @@ function chatModule(reply) {
         useMessageEvents(handler, enabled = true) {
           if (enabled) socket.handler = handler;
         },
-        useSocketLive: () => true,
+        useSocketLive: () => socket.live,
       },
       "@derslik/contracts": contracts,
       "lucide-react": {},
@@ -442,16 +454,22 @@ function chatModule(reply) {
       },
       window: {
         dispatchEvent: (event) => inbox.push(event.type),
-        addEventListener() {},
-        removeEventListener() {},
+        addEventListener: (type, listener) => {
+          if (type === "focus") focus.add(listener);
+        },
+        removeEventListener: (type, listener) => focus.delete(listener),
       },
       document: {
         visibilityState: "visible",
         addEventListener() {},
         removeEventListener() {},
       },
-      setInterval: () => 0,
-      clearInterval() {},
+      setInterval: (run, every) => {
+        timers.set(++timerId, { run, every });
+        return timerId;
+      },
+      clearInterval: (id) => timers.delete(id),
+      Date: ShiftedDate,
       CSS: { supports: () => true },
     },
   });
@@ -461,12 +479,18 @@ function chatModule(reply) {
     requests,
     inbox,
     emit: (event) => socket.handler(event),
+    setLive: (value) => (socket.live = value),
+    /** Şu an kurulu yoklama aralıkları (ms). */
+    polls: () => [...timers.values()].map((t) => t.every),
+    firePolls: () => [...timers.values()].forEach((t) => t.run()),
+    focusWindow: () => [...focus].forEach((listener) => listener()),
+    advance: (ms) => (skipped += ms),
   };
 }
 
-function chatListModule() {
+function chatListModule(options) {
   let rows = [];
-  const f = chatModule(async () => ({ data: rows }));
+  const f = chatModule(async () => ({ data: rows }), options);
   let store;
   const View = () => {
     store = f.m.useMessageThreads("/workspaces/w-1/messages");
@@ -599,7 +623,7 @@ test("socket events without usable content still reload the thread list", async 
 
 /** Açık yazışma (Conversation): ilk sayfa bir mesajla gelir. Okundu istekleri
  *  `reads` ile tutulabilir. */
-function chatConversation({ holdReads = false } = {}) {
+function chatConversation({ holdReads = false, live = true } = {}) {
   const upserts = [],
     reads = [];
   const path = "/workspaces/w-1/messages/l-1";
@@ -617,7 +641,7 @@ function chatConversation({ holdReads = false } = {}) {
         more: false,
       },
     };
-  });
+  }, { live });
   const props = {
     base: "/workspaces/w-1/messages",
     linkId: "l-1",
@@ -768,4 +792,68 @@ test("the bell reloads once for a burst of inbox events", async () => {
   assert.deepEqual(requests, ["/inbox", "/inbox"]);
   renderer.unmount();
   assert.equal(listeners.size, 0);
+});
+
+// Soket bağlıyken mesajlar soketten gelir; kopukken yoklama onun yerini tutar.
+// Bağlanınca soket `resync` gönderir, aradaki değişiklikler bir kez alınır.
+
+test("the thread list is not polled while the socket is live, and every minute while it is down", async () => {
+  const f = chatListModule({ live: true });
+  f.setRows([chatRow]);
+  f.render();
+  await tick();
+  f.render();
+  assert.deepEqual(f.polls(), []);
+
+  // Soket koptu: liste dakikada bir yoklanır.
+  f.setLive(false);
+  f.render();
+  await tick();
+  assert.deepEqual(f.polls(), [60_000]);
+  f.requests.length = 0;
+  f.advance(31_000);
+  f.firePolls();
+  await tick();
+  assert.deepEqual(f.requests, ["GET /workspaces/w-1/messages"]);
+
+  // Soket yeniden bağlandı: yoklama durur.
+  f.setLive(true);
+  f.render();
+  await tick();
+  assert.deepEqual(f.polls(), []);
+});
+
+test("going back to the window refreshes the thread list once, even while the socket is live", async () => {
+  const f = chatListModule({ live: true });
+  f.setRows([chatRow]);
+  f.render();
+  await tick();
+  f.render();
+  f.requests.length = 0;
+  f.advance(31_000);
+  f.focusWindow();
+  await tick();
+  assert.deepEqual(f.requests, ["GET /workspaces/w-1/messages"]);
+});
+
+test("an open conversation is not polled while the socket is live, and every 15 s while it is down", async () => {
+  const f = chatConversation({ live: true });
+  f.render();
+  await tick();
+  f.render();
+  assert.deepEqual(f.polls(), []);
+
+  f.setLive(false);
+  f.render();
+  await tick();
+  assert.deepEqual(f.polls(), [15_000]);
+  f.requests.length = 0;
+  f.firePolls();
+  await tick();
+  assert.deepEqual(f.requests, [`GET ${f.path}?limit=50`]);
+
+  f.setLive(true);
+  f.render();
+  await tick();
+  assert.deepEqual(f.polls(), []);
 });
