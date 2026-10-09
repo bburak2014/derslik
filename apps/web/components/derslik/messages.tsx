@@ -75,14 +75,14 @@ import { Skeleton, Spinner } from "./loading";
 // Uygulama içi mesajlaşma: öğretmen çalışma alanı ve öğrenci/veli portalı
 // aynı bileşeni kullanır. Yeni mesaj soketle içeriğiyle anında gelir; ekrana
 // ve listeye REST'e gidilmeden eklenir. İçeriksiz olayda (okundu, yeniden
-// bağlanma) REST'ten yenilenir. Soket kuruluyken ya da kopukken yoklama sürer
-// (açık yazışma 15 sn, liste ve sayaçlar 60 sn; soket bağlıyken açık yazışma
-// da 60 sn), yalnızca sekme görünürken. Telefon numarası hiçbir yerde
-// gösterilmez.
+// bağlanma) REST'ten yenilenir. Soket bağlıyken yoklama yoktur: kopan soket
+// yeniden bağlanınca `resync` gelir, aradaki değişiklikler bir kez alınır.
+// Soket kuruluyken ya da kopukken yoklama sürer (açık yazışma 15 sn, liste ve
+// sayaçlar 60 sn), yalnızca sekme görünürken. Sekmeye dönünce her durumda bir
+// kez yenilenir. Telefon numarası hiçbir yerde gösterilmez.
 
 const LIST_POLL = 60_000,
   THREAD_POLL = 15_000,
-  LIVE_THREAD_POLL = 60_000,
   // Art arda gelen olaylar tek isteğe toplanır.
   EVENT_DELAY = 250,
   PAGE = 50,
@@ -118,9 +118,14 @@ export function chatFromSearch(search: string) {
     : { thread: null, student: null };
 }
 
-/** Sekme görünürken `run`'ı aralıkla çalıştırır; sekmeye dönünce ve pencere
- *  odak alınca da hemen (ikisi art arda gelirse bir kez) çalıştırır. */
-function useVisiblePoll(run: () => void, every: number, enabled = true) {
+/** Sekme görünürken `run`'ı aralıkla çalıştırır (`every` null ise aralık
+ *  yoktur); sekmeye dönünce ve pencere odak alınca da hemen (ikisi art arda
+ *  gelirse bir kez) çalıştırır. */
+function useVisiblePoll(
+  run: () => void,
+  every: number | null,
+  enabled = true,
+) {
   const latest = useRef(run);
   useEffect(() => {
     latest.current = run;
@@ -134,12 +139,12 @@ function useVisiblePoll(run: () => void, every: number, enabled = true) {
       last = Date.now();
       latest.current();
     };
-    const id = setInterval(() => tick(true), every);
+    const id = every === null ? null : setInterval(() => tick(true), every);
     const back = () => tick(false);
     document.addEventListener("visibilitychange", back);
     window.addEventListener("focus", back);
     return () => {
-      clearInterval(id);
+      if (id !== null) clearInterval(id);
       document.removeEventListener("visibilitychange", back);
       window.removeEventListener("focus", back);
     };
@@ -242,7 +247,8 @@ export function useMessageThreads(path: string | null) {
   }, !!path);
   // Liste az önce alındıysa ya da tek satırını açık yazışma zaten yokluyorsa
   // (ör. öğrencinin tek yazışması açık) bu tur atlanır; aynı veri iki kez
-  // istenmez.
+  // istenmez. Soket bağlıyken aralıkla yoklanmaz.
+  const live = useSocketLive();
   useVisiblePoll(
     () => {
       const recent = (at: number) => Date.now() - at < LIST_POLL / 2;
@@ -255,7 +261,7 @@ export function useMessageThreads(path: string | null) {
         return;
       void reload();
     },
-    LIST_POLL,
+    live ? null : LIST_POLL,
     !!path,
   );
   /** Açık yazışmanın satırını günceller (okundu, son mesaj); listede yoksa
@@ -995,10 +1001,7 @@ function Conversation({
     void latest(true);
   }, [latest]);
   const live = useSocketLive();
-  useVisiblePoll(
-    () => void latest(false),
-    live ? LIVE_THREAD_POLL : THREAD_POLL,
-  );
+  useVisiblePoll(() => void latest(false), live ? null : THREAD_POLL);
   // İçeriksiz olayda yazışma REST'ten yenilenir (okundu olayı listeyi
   // yeniler, yazışmayı değil).
   const latestSoon = useCoalesced(() => void latest(false));
